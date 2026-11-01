@@ -1,7 +1,7 @@
 # Design: Performance gate
 
 Feature code: PERF
-Status: Approved
+Status: In-progress
 Date: 2026-11-01
 Requirements: ./requirements.md
 
