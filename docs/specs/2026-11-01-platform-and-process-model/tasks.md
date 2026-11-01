@@ -13,6 +13,7 @@ Execution-mode: continuous
 Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
+Delivered-by: PR #3
 
 **Goal:** Give the Core a safe, measured view of the user's processes — snapshot, Agent sessions with Harness/project/worktree/branch/terminal, Harness lookup, child activity, exit watching — and a power-assertion wrapper, with all `unsafe` confined to one platform crate.
 
