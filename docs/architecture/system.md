@@ -5,7 +5,7 @@ Date: 2026-11-01
 
 ## Purpose and boundary
 
-The major parts of Navori and how they relate: the app process, the Rust Core (kernel, modules, AI runtime), the Swift Shell, the `navori` CLI and the external actors around them. It records both what exists today (R0 Foundation) and the committed shape of the planned parts (R1–R6, per the Roadmap in `docs/ARCHITECTURE.md` and `docs/product/vision.md`).
+The major parts of Navori and how they relate: the app process, the Rust Core (kernel, modules, AI runtime), the Swift Shell, the `navori` CLI and the external actors around them. It records both what exists today (R0 Foundation) and the committed shape of the planned parts (R1–R6, per `docs/roadmap/INDEX.md` and `docs/product/vision.md`).
 
 Not covered here, by design:
 - Binding rules — `docs/architecture/INDEX.md` (ARCH-N).

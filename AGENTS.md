@@ -12,7 +12,9 @@ Navori is an AI-first personal cockpit for macOS (Apple Silicon): a menubar app 
 | Architecture invariants (ARCH-N) — cite as `Respects: ARCH-N` | `docs/architecture/INDEX.md` |
 | Engineering standards, Definition of Done | `docs/standards/` |
 | Glossary (use these names) | `CONTEXT.md` |
-| System design narrative, roadmap R0–R6 | `docs/ARCHITECTURE.md` |
+| Milestones MILE-N / roadmap items ROAD-N | `docs/roadmap/INDEX.md` |
+| Decisions of record | `docs/adr/` |
+| System design narrative, design seeds | `docs/ARCHITECTURE.md` |
 | Menubar UI (locked brief) | `docs/design/2026-11-01-menubar-ui-brief.md` |
 
 ## Commands

@@ -2,13 +2,15 @@
 
 Navori is an AI-first personal cockpit for macOS (Apple Silicon): one menubar app whose logic lives in a Rust **Core** (kernel, modules, AI runtime) and whose UI is a Swift **Shell** (AppKit + SwiftUI), connected through UniFFI. It is built for a single user, runs locally, works with any cloud model the user chooses, and keeps a hardcore performance budget. First capabilities: Awake, Ports and GitHub pull requests — which are also the AI's first tools.
 
-This file is the **entry point**: it maps where each part of the architecture is documented, keeps the principles' rationale, the roadmap and the locked decisions until their dedicated homes exist, and holds the **design seeds** for features not yet specified. When this file disagrees with a document listed below, that document wins.
+This file is the **entry point**: it maps where each part of the architecture is documented, keeps the principles' rationale and the index of locked decisions, and holds the **design seeds** for features not yet specified. When this file disagrees with a document listed below, that document wins.
 
 ## Document map
 
 | Topic | Document |
 |---|---|
 | Vision, goals (GOAL-N), non-goals, scope | [`product/vision.md`](product/vision.md) |
+| Milestones (MILE-N), roadmap items (ROAD-N), focus | [`roadmap/INDEX.md`](roadmap/INDEX.md) |
+| Decisions of record (ADRs) | [`adr/`](adr/) |
 | Architecture invariants (ARCH-N) | [`architecture/INDEX.md`](architecture/INDEX.md) |
 | Components and how they relate | [`architecture/system.md`](architecture/system.md) |
 | Processes, threads, lifecycle, timing | [`architecture/runtime.md`](architecture/runtime.md) |
@@ -42,19 +44,7 @@ The binding rules are the ARCH-N invariants; this table records why they exist.
 
 ## Roadmap
 
-*Moves to `docs/roadmap/INDEX.md` when planned with `plan-milestones`.*
-
-No v1/v2 split. Each release adds **one** complete capability per the Definition of Done; once a release is done it is usable every day immediately.
-
-| Release | Goals | What you can use right away | Includes |
-|---|---|---|---|
-| **R0 — Foundation** *(groundwork, not a feature)* | GOAL-7, GOAL-8 | A stably-signed menubar app, installed/updated with one command, launching at login, Settings, the `navori` CLI + `doctor` | Rust workspace + SwiftPM; kernel, store, config, logging, redact; `navori-ffi` + `CoreStore`; IPC; `xtask signing-setup` / `install` |
-| **R1 — Awake** | GOAL-2 | Keep the machine awake manually/on a timer/per command; auto-hold & auto-release following Claude Code, Grok, Codex sessions; one-button hook install | lease, IOKit, kqueue, `navori hook`, Integrations UI |
-| **R2 — AI Assistant** | GOAL-1, GOAL-5, GOAL-6 | Chat in the menubar + quick-ask hotkey with **any model** (Claude, ChatGPT, DeepSeek, Gemini, Grok, OpenRouter, custom endpoint); control Awake in plain language | 4 adapters + conformance, catalog + roles + fallback + usage/budget, agent loop + policy + approvals, Context Engine/Gateway + Sensitive Data Shield, memory |
-| **R3 — Ports** | GOAL-3 | See all ports by project/worktree/harness, open/kill each one or all; ask the AI to "clean up the ports of merged worktrees" | libproc, `navori-procs`, kill with approval |
-| **R4 — GitHub** | GOAL-4 | PR inbox (needs review / mine / involved), CI, approve/merge, notifications; the AI summarizes PRs & CI failures | device flow, multi-account, notifications polling, GraphQL, cache |
-| **R5 — Proactive** | GOAL-9, GOAL-1 | The AI speaks up on its own when it matters: CI fail, new review, agent session done, port conflict | triggers, budget, quiet hours |
-| **R6 — MCP** | GOAL-10 | Claude Code/Grok/Codex use Navori's tools; Navori uses external MCP servers | `navori-mcp` client + server |
+Milestones, their order, members and commitments live in [`roadmap/INDEX.md`](roadmap/INDEX.md) (MILE-N, ROAD-N); release names R0–R6 map to MILE-1 … MILE-7. Each release adds **one** complete capability per the Definition of Done; once done it is usable every day.
 
 **Why AI is in R2 and not last**: AI is the core (P1). Placing it early lets the `Action` / `context()` / `Event` contracts be validated by Navori AI before Ports and GitHub are written — those two features are born as AI tools. Screen observation (screenshot + OCR) is in R2 because the Sensitive Data Shield is a prerequisite for releasing AI.
 

@@ -1,0 +1,145 @@
+# Roadmap: Navori
+
+Status: Approved
+Date: 2026-11-01
+
+<!--
+The program layer: milestone INTENT, above any single feature and below the product
+vision. `plan-milestones` authors it; `refresh-roadmap-status` derives progress from it
+without writing anything.
+
+This file owns intent only: outcomes, priority, ordering, membership, dependencies,
+commitments, blockers, deferrals, goal dispositions. It never records how far a feature has
+got — that lives once, as `Status:` in the feature's own requirements.md, mirrored into its
+docs/specs/INDEX.md row. Every heading below is a REQUIRED slot — filled or `None`.
+
+Structural rules S1–S9, the Focus rules and the ID rules are those of the `plan-milestones`
+roadmap template. In short: MILE-N / ROAD-N are flat, repo-wide and permanent (retire by
+strikethrough, never renumber or reuse); priority lives only in ## Focus; order between
+items is the After: field; GOAL-N is defined in docs/product/vision.md and only cited here;
+feature codes are never written here — a ROAD-N is a program slot that a feature binds to
+through the "Roadmap item" cell of docs/specs/catalog/*.md.
+
+Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
+-->
+
+## Focus
+
+**Now:** MILE-2
+**Next:** MILE-3
+
+| ID | Milestone | Outcome | Depends-on | Commitment |
+|---|---|---|---|---|
+| MILE-1 | Foundation (R0) | The user installs Navori with one command, it starts at login as a menubar icon, and `navori doctor` reports every check green. | none | Committed |
+| MILE-2 | Awake (R1) | The Mac stays awake while any Claude Code, Codex or Grok session is working and goes back to normal sleep after they stop, with no manual action. | MILE-1 | Planned |
+| MILE-3 | AI Assistant (R2) | The user asks Navori AI anything from the menubar, a hotkey or the terminal with any configured model, and answers its Decisions in Needs you before anything destructive runs. | MILE-2 | Planned |
+| MILE-4 | Ports (R3) | The user sees every listening port grouped by project, worktree and harness, and frees a whole group in at most 2 actions. | MILE-3 | Planned |
+| MILE-5 | GitHub (R4) | The user sees pull requests needing review, failing checks and conflicts counted in the menubar, and opens, approves or merges them from the submenu. | MILE-3 | Planned |
+| MILE-6 | Proactive (R5) | Navori AI tells the user on its own, within a daily budget and quiet hours, when CI fails, a review arrives, an Agent session finishes or a port conflicts. | MILE-4, MILE-5 | Planned |
+| MILE-7 | MCP (R6) | Claude Code, Codex and Grok call Navori's tools over MCP under the same approval policy, and Navori AI uses tools from external MCP servers. | MILE-3 | Planned |
+
+## MILE-1 — Foundation (R0)
+
+**Outcome:** The user installs Navori with one command, it starts at login as a menubar icon, and `navori doctor` reports every check green.
+**Goals:** GOAL-7, GOAL-8
+**Members:**
+- **ROAD-1** core-foundation — After: none — Surfaces: `crates/protocol/`, `crates/redact/`, `crates/config/`, `crates/store/`, `crates/kernel/`, `crates/ipc/`, `crates/ffi/`
+- **ROAD-2** menubar-shell — After: ROAD-1 — Surfaces: `apps/macos/`
+- **ROAD-3** cli-and-doctor — After: ROAD-1 — Surfaces: `apps/cli/`
+- **ROAD-4** build-sign-install — After: none — Surfaces: `xtask/`, `.cargo/config.toml`
+**Depends-on:** none
+**Commitment:** Committed 2026-11-01
+**Closed:** None
+**Deferred:** ROAD-27 open-source-distribution → unscheduled (2026-11-01, vision defers open source: license, Developer ID + notarization, Homebrew cask, download page, auto-update)
+**Blockers:** None
+
+## MILE-2 — Awake (R1)
+
+**Outcome:** The Mac stays awake while any Claude Code, Codex or Grok session is working and goes back to normal sleep after they stop, with no manual action.
+**Goals:** GOAL-2, GOAL-7
+**Members:**
+- **ROAD-5** perf-gate — After: none — Surfaces: `xtask/`
+- **ROAD-6** platform-and-process-model — After: none — Surfaces: `crates/macos/`, `crates/procs/`
+- **ROAD-7** kernel-contract-extensions — After: none — Surfaces: `crates/kernel/`, `crates/protocol/`, `crates/ffi/`
+- **ROAD-8** awake-leases — After: ROAD-6, ROAD-7 — Surfaces: `modules/awake/`, `crates/ffi/`, `apps/macos/Navori/Features/`, `apps/cli/`
+- **ROAD-9** harness-hooks — After: ROAD-8 — Surfaces: `apps/cli/`, `integrations/`, `apps/macos/Navori/Features/Settings/`
+**Depends-on:** MILE-1
+**Commitment:** Planned
+**Closed:** None
+**Deferred:** None
+**Blockers:** None
+
+## MILE-3 — AI Assistant (R2)
+
+**Outcome:** The user asks Navori AI anything from the menubar, a hotkey or the terminal with any configured model, and answers its Decisions in Needs you before anything destructive runs.
+**Goals:** GOAL-1, GOAL-5, GOAL-6
+**Members:**
+- **ROAD-10** keychain-secrets — After: none — Surfaces: `crates/secrets/`
+- **ROAD-11** providers-and-model-roles — After: ROAD-10 — Surfaces: `ai/llm/`, `ai/models/`, `apps/macos/Navori/Features/Settings/`
+- **ROAD-12** shield-and-context-gateway — After: none — Surfaces: `crates/redact/`, `ai/context/`, `crates/ffi/`, `apps/macos/Navori/Platform/`
+- **ROAD-13** needs-you-inbox — After: none — Surfaces: `modules/inbox/`, `apps/macos/Navori/Features/Panel/`
+- **ROAD-14** agent-loop-and-approvals — After: ROAD-11, ROAD-12, ROAD-13 — Surfaces: `ai/agent/`, `crates/ffi/`
+- **ROAD-15** chat-and-quick-ask — After: ROAD-14 — Surfaces: `apps/macos/Navori/Features/`, `apps/cli/`
+- **ROAD-16** memory — After: ROAD-14 — Surfaces: `ai/memory/`, `crates/store/`
+**Depends-on:** MILE-2
+**Commitment:** Planned
+**Closed:** None
+**Deferred:** None
+**Blockers:** None
+
+## MILE-4 — Ports (R3)
+
+**Outcome:** The user sees every listening port grouped by project, worktree and harness, and frees a whole group in at most 2 actions.
+**Goals:** GOAL-3
+**Members:**
+- **ROAD-17** port-discovery — After: none — Surfaces: `modules/ports/`, `crates/procs/`, `crates/macos/`
+- **ROAD-18** ports-panel-and-stop — After: ROAD-17 — Surfaces: `modules/ports/`, `apps/macos/Navori/Features/`
+**Depends-on:** MILE-3
+**Commitment:** Planned
+**Closed:** None
+**Deferred:** None
+**Blockers:** None
+
+## MILE-5 — GitHub (R4)
+
+**Outcome:** The user sees pull requests needing review, failing checks and conflicts counted in the menubar, and opens, approves or merges them from the submenu.
+**Goals:** GOAL-4
+**Members:**
+- **ROAD-19** github-device-auth — After: none — Surfaces: `modules/github/`, `crates/secrets/`, `apps/macos/Navori/Features/Settings/`
+- **ROAD-20** pull-request-inbox — After: ROAD-19 — Surfaces: `modules/github/`, `apps/macos/Navori/Features/`
+- **ROAD-21** pull-request-actions — After: ROAD-20 — Surfaces: `modules/github/`, `apps/macos/Navori/Features/`
+**Depends-on:** MILE-3
+**Commitment:** Planned
+**Closed:** None
+**Deferred:** ROAD-26 github-multi-account → unscheduled (2026-11-01, vision defers multiple GitHub accounts; the locked UI brief has no account switcher)
+**Blockers:** None
+
+## MILE-6 — Proactive (R5)
+
+**Outcome:** Navori AI tells the user on its own, within a daily budget and quiet hours, when CI fails, a review arrives, an Agent session finishes or a port conflicts.
+**Goals:** GOAL-9, GOAL-1
+**Members:**
+- **ROAD-22** triggers-and-budget — After: none — Surfaces: `ai/triggers/`, `crates/kernel/`
+- **ROAD-23** proactive-notifications — After: ROAD-22 — Surfaces: `ai/triggers/`, `modules/inbox/`, `apps/macos/Navori/Platform/`
+**Depends-on:** MILE-4, MILE-5
+**Commitment:** Planned
+**Closed:** None
+**Deferred:** None
+**Blockers:** None
+
+## MILE-7 — MCP (R6)
+
+**Outcome:** Claude Code, Codex and Grok call Navori's tools over MCP under the same approval policy, and Navori AI uses tools from external MCP servers.
+**Goals:** GOAL-10
+**Members:**
+- **ROAD-24** mcp-server — After: none — Surfaces: `ai/mcp/`, `apps/cli/`, `integrations/`
+- **ROAD-25** mcp-client — After: none — Surfaces: `ai/mcp/`, `ai/agent/`
+**Depends-on:** MILE-3
+**Commitment:** Planned
+**Closed:** None
+**Deferred:** None
+**Blockers:** None
+
+## Goal dispositions
+
+None — every live `GOAL-N` in `docs/product/vision.md` (GOAL-1 … GOAL-10) is cited by a milestone.
