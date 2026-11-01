@@ -39,6 +39,8 @@ enum Cmd {
     SigningSetup,
     /// Enforce the architecture's crate dependency rules.
     CheckDeps,
+    /// Prove `unsafe_code` and `clippy::undocumented_unsafe_blocks` fail the build.
+    LintProbe,
     /// Compare workspace dependency versions with the latest stable releases on crates.io.
     Outdated,
     /// Regenerate the checked-in app icons (`xtask/assets/*.icns`) from `xtask/assets/make-icon.swift`.
@@ -104,6 +106,7 @@ fn main() -> Result<()> {
         Cmd::Install => install(&root),
         Cmd::SigningSetup => signing_setup(&root),
         Cmd::CheckDeps => check_deps(&root),
+        Cmd::LintProbe => lint_probe(&root),
         Cmd::Outdated => outdated(&root),
         Cmd::Icon => icon(&root),
         Cmd::Ci => ci(&root),
@@ -733,6 +736,158 @@ fn rust_sources(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
     Ok(())
 }
 
+struct RemoveOnDrop(PathBuf);
+
+impl Drop for RemoveOnDrop {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+fn lint_probe(root: &Path) -> Result<()> {
+    let dir = std::env::temp_dir().join(format!("navori-lint-probe-{}", std::process::id()));
+    let _cleanup = RemoveOnDrop(dir.clone());
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).context("reset lint-probe directory")?;
+    }
+    std::fs::create_dir_all(&dir).context("create lint-probe directory")?;
+
+    let workspace_lints = workspace_lint_table(root)?;
+    std::fs::write(
+        dir.join("Cargo.toml"),
+        probe_workspace_manifest(&workspace_lints)?,
+    )
+    .context("write lint-probe workspace manifest")?;
+    write_probe_member(
+        &dir,
+        "a",
+        &member_lints(root, "crates/procs/Cargo.toml")?,
+        "pub fn probe() -> u8 { let x = 1u8;\n// SAFETY: x is a live local u8.\nunsafe { std::ptr::read(&x) } }\n",
+    )?;
+    write_probe_member(
+        &dir,
+        "b",
+        &member_lints(root, "crates/macos/Cargo.toml")?,
+        "pub fn probe() -> u8 { let x = 1u8;\nunsafe { std::ptr::read(&x) } }\n",
+    )?;
+
+    require_codes("a", &clippy_error_codes(&dir.join("a"))?, &["unsafe_code"])?;
+    require_codes(
+        "b",
+        &clippy_error_codes(&dir.join("b"))?,
+        &["clippy::undocumented_unsafe_blocks"],
+    )?;
+    println!("✓ lint-probe");
+    Ok(())
+}
+
+fn workspace_lint_table(root: &Path) -> Result<toml::Value> {
+    let workspace: toml::Table = std::fs::read_to_string(root.join("Cargo.toml"))
+        .context("read workspace Cargo.toml")?
+        .parse()
+        .context("parse workspace Cargo.toml")?;
+    workspace
+        .get("workspace")
+        .and_then(|workspace| workspace.get("lints"))
+        .cloned()
+        .context("workspace lints missing")
+}
+
+fn member_lints(root: &Path, rel: &str) -> Result<toml::Value> {
+    let path = root.join(rel);
+    let manifest = read_manifest(
+        path.to_str()
+            .with_context(|| format!("{rel} is not valid UTF-8"))?,
+    )?;
+    manifest
+        .get("lints")
+        .cloned()
+        .with_context(|| format!("{rel} has no [lints]"))
+}
+
+fn probe_workspace_manifest(lints: &toml::Value) -> Result<String> {
+    let mut package = toml::Table::new();
+    package.insert("edition".into(), "2024".into());
+    let mut workspace = toml::Table::new();
+    workspace.insert("resolver".into(), "3".into());
+    workspace.insert(
+        "members".into(),
+        toml::Value::Array(vec!["a".into(), "b".into()]),
+    );
+    workspace.insert("package".into(), toml::Value::Table(package));
+    workspace.insert("lints".into(), lints.clone());
+    let mut manifest = toml::Table::new();
+    manifest.insert("workspace".into(), toml::Value::Table(workspace));
+    toml::to_string(&manifest).context("serialize lint-probe workspace")
+}
+
+fn write_probe_member(dir: &Path, name: &str, lints: &toml::Value, src: &str) -> Result<()> {
+    let member = dir.join(name);
+    std::fs::create_dir_all(member.join("src")).context("create lint-probe member")?;
+    let mut edition = toml::Table::new();
+    edition.insert("workspace".into(), toml::Value::Boolean(true));
+    let mut package = toml::Table::new();
+    package.insert("name".into(), name.into());
+    package.insert("version".into(), "0.0.0".into());
+    package.insert("edition".into(), toml::Value::Table(edition));
+    let mut manifest = toml::Table::new();
+    manifest.insert("package".into(), toml::Value::Table(package));
+    manifest.insert("lints".into(), lints.clone());
+    std::fs::write(
+        member.join("Cargo.toml"),
+        toml::to_string(&manifest).context("serialize lint-probe member")?,
+    )
+    .context("write lint-probe member manifest")?;
+    std::fs::write(member.join("src/lib.rs"), src).context("write lint-probe fixture")?;
+    Ok(())
+}
+
+fn clippy_error_codes(dir: &Path) -> Result<Vec<String>> {
+    let mut cmd = Command::new(std::env::var("CARGO").unwrap_or_else(|_| "cargo".into()));
+    cmd.current_dir(dir)
+        .args(["clippy", "--message-format=json", "--", "-D", "warnings"])
+        .env("CARGO_TERM_COLOR", "never")
+        // The probe dir is deleted on drop; a inherited target dir would leak the build.
+        .env_remove("CARGO_TARGET_DIR");
+    let out = cmd
+        .output()
+        .context("cannot run cargo clippy for lint-probe")?;
+    let stdout = String::from_utf8(out.stdout).context("lint-probe clippy stdout is not UTF-8")?;
+    let mut codes = Vec::new();
+    for line in stdout.lines() {
+        if !line.starts_with('{') {
+            continue;
+        }
+        let value: serde_json::Value =
+            serde_json::from_str(line).context("lint-probe clippy JSON line")?;
+        if value["reason"] != "compiler-message" || value["message"]["level"] != "error" {
+            continue;
+        }
+        if let Some(code) = value["message"]["code"]["code"].as_str() {
+            codes.push(code.to_owned());
+        }
+    }
+    if !out.status.success() && codes.is_empty() {
+        bail!(
+            "lint-probe clippy failed with no error codes:\n{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    Ok(codes)
+}
+
+fn require_codes(fixture: &str, got: &[String], expected: &[&str]) -> Result<()> {
+    let same = got.len() == expected.len() && got.iter().zip(expected).all(|(got, exp)| got == exp);
+    if !same {
+        bail!(
+            "fixture {fixture}: expected [{}], got [{}]",
+            expected.join(", "),
+            got.join(", ")
+        );
+    }
+    Ok(())
+}
+
 // ── outdated ───────────────────────────────────────────────────────────────────────────
 
 fn outdated(root: &Path) -> Result<()> {
@@ -788,6 +943,7 @@ fn ci(root: &Path) -> Result<()> {
     ]))?;
     sh(cargo(root).args(["test", "--workspace"]))?;
     check_deps(root)?;
+    lint_probe(root)?;
     build_core(root, Profile::Dev)?;
     sh(Command::new("swift")
         .args(["build", "--arch", "arm64", "--package-path"])
