@@ -23,17 +23,47 @@ enum PerfProbe {
 
     static func markStatusItemDrawn() {
         guard AppEnvironment.perfMode, !didMarkStatusItem else { return }
+        guard let start = processStartMicroseconds() else {
+            log.fault("status item clock failed to read the process start")
+            return
+        }
+        guard let now = nowMicroseconds() else {
+            log.fault("status item clock read failed")
+            return
+        }
+        guard let ms = milliseconds(from: start, to: now) else {
+            log.fault("status item clock went backwards")
+            return
+        }
         didMarkStatusItem = true
-        guard let start = processStartMicroseconds() else { return }
-        let ms = milliseconds(from: start, to: nowMicroseconds())
         log.notice("statusItemDrawn ms=\(format(ms), privacy: .public)")
     }
 
     static func markMenuOpened(since: UInt64, first: Bool, modules: Int) {
         guard AppEnvironment.perfMode else { return }
-        let ms = milliseconds(from: since, to: nowMicroseconds())
+        guard let now = nowMicroseconds() else {
+            log.fault("menu open clock read failed")
+            return
+        }
+        guard let ms = milliseconds(from: since, to: now) else {
+            log.fault("menu open clock went backwards")
+            return
+        }
         let text = format(ms)
         log.notice("menuOpened ms=\(text, privacy: .public) first=\(first, privacy: .public) modules=\(modules, privacy: .public)")
+    }
+
+    /// Clock sample taken after a panel close and before the panel is shown.
+    static func captureTrigger() -> UInt64? {
+        guard let now = nowMicroseconds() else {
+            log.fault("menu open clock read failed")
+            return nil
+        }
+        return now
+    }
+
+    static func fault(_ message: String) {
+        log.fault("\(message, privacy: .public)")
     }
 
     // Ignore first: the default action would terminate the process before the source runs.
@@ -44,8 +74,7 @@ enum PerfProbe {
         let openMenu = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
         openMenu.setEventHandler {
             MainActor.assumeIsolated {
-                let trigger = nowMicroseconds()
-                statusBar?.openMenuFresh(trigger: trigger)
+                statusBar?.openMenuFresh()
             }
         }
         openMenu.resume()
@@ -60,10 +89,10 @@ enum PerfProbe {
         sources = [openMenu, terminate]
     }
 
-    private static func nowMicroseconds() -> UInt64 {
+    private static func nowMicroseconds() -> UInt64? {
         var tv = timeval()
-        gettimeofday(&tv, nil)
-        return microseconds(tv) ?? 0
+        guard gettimeofday(&tv, nil) == 0 else { return nil }
+        return microseconds(tv)
     }
 
     private static func processStartMicroseconds() -> UInt64? {
@@ -84,9 +113,9 @@ enum PerfProbe {
         return UInt64(tv.tv_sec) * 1_000_000 + UInt64(tv.tv_usec)
     }
 
-    private static func milliseconds(from start: UInt64, to end: UInt64) -> Double {
-        let delta = end >= start ? end - start : 0
-        return Double(delta) / 1000
+    private static func milliseconds(from start: UInt64, to end: UInt64) -> Double? {
+        guard end >= start else { return nil }
+        return Double(end - start) / 1000
     }
 
     private static func format(_ ms: Double) -> String {

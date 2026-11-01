@@ -1,6 +1,7 @@
 //! `cargo xtask <command>` — build, bundle, sign, install and check Navori.
 //!
-//! Profiles: `dev` → "Navori Dev.app" (`dev.navori.app.debug`, debug build);
+//! Profiles: `dev` → "Navori Dev.app" (`dev.navori.app.debug`; debug by default,
+//!           release when the perf gate bundles it);
 //!           `release` → "Navori.app" (`dev.navori.app`, release build).
 
 use std::path::{Path, PathBuf};

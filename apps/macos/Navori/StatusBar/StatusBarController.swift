@@ -72,7 +72,7 @@ final class StatusBarController: NSObject {
         }
     }
 
-    func openMenuFresh(trigger: UInt64) {
+    func openMenuFresh() {
         let builtBefore = panelBuilt
         if panelBuilt, panel.isVisible {
             let behavior = panel.animationBehavior
@@ -80,7 +80,11 @@ final class StatusBarController: NSObject {
             panel.close()
             panel.animationBehavior = behavior
         }
-        guard let button = item.button else { return }
+        guard let button = item.button else {
+            PerfProbe.fault("SIGUSR1 open has no status button")
+            return
+        }
+        guard let trigger = PerfProbe.captureTrigger() else { return }
         panel.show(relativeTo: button) { [weak self] in
             guard let self else { return }
             PerfProbe.markMenuOpened(since: trigger, first: !builtBefore, modules: self.store.moduleCount)

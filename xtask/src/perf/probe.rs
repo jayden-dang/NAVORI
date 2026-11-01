@@ -129,7 +129,15 @@ fn wait_child(child: &mut Child, rendered: &str) -> Result<ExitStatus> {
             return Ok(status);
         }
         if started.elapsed() >= COMMAND_TIMEOUT {
-            let _ = child.kill();
+            if let Err(err) = child.kill()
+                && !err.to_string().contains("No such process")
+                && !err.to_string().contains("can't kill an exited process")
+            {
+                eprintln!(
+                    "{rendered} timed out and kill failed for pid {}: {err}",
+                    child.id()
+                );
+            }
             let reap_started = Instant::now();
             loop {
                 match child.try_wait() {

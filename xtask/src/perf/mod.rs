@@ -130,7 +130,7 @@ fn measure_phase_a(
         menu_open_cpu_ms.push(reopen.cpu_ms);
     }
     let peak = sample_pid(probe, pid)?;
-    let _exited = request_exit(&mut launched, MEASURED_EXIT)?;
+    finish_measured(&mut launched)?;
     Ok(PhaseAProcess {
         cold_start_ms,
         menu_open_after_launch_ms: first.ms,
@@ -165,7 +165,7 @@ fn measure_phase_b(
         before = after;
     }
     let peak_bytes = before.peak;
-    let _exited = request_exit(&mut launched, MEASURED_EXIT)?;
+    finish_measured(&mut launched)?;
     Ok(PhaseBProcess {
         windows,
         peak_bytes,
@@ -353,8 +353,27 @@ fn idle_window(before: &Sample, after: &Sample) -> Result<PhaseBWindow> {
 }
 
 fn await_mark(log: &mut LogStream, pid: u32, want: fn(&Mark) -> bool, what: &str) -> Result<Mark> {
-    log.wait_for(pid, want, MARK_TIMEOUT)
-        .with_context(|| format!("pid {pid} produced no {what} within 10s"))
+    match log.wait_for(pid, want, MARK_TIMEOUT)? {
+        Some(mark) => Ok(mark),
+        None => bail!("pid {pid} produced no {what} within 10s"),
+    }
+}
+
+fn finish_measured(launched: &mut Launched) -> Result<()> {
+    if request_exit(launched, MEASURED_EXIT)? {
+        return Ok(());
+    }
+    // PERF-3.4: a measured process that ignores SIGTERM is killed. The samples
+    // already taken stay. Warm-up does not use this path.
+    emit(&format!(
+        "pid {} ignored SIGTERM for 5s; sending SIGKILL",
+        launched.pid
+    ))?;
+    match launched.signal("KILL") {
+        Ok(()) => Ok(()),
+        Err(err) if format!("{err:#}").contains("No such process") => Ok(()),
+        Err(err) => Err(err),
+    }
 }
 
 fn request_exit(launched: &mut Launched, timeout: Duration) -> Result<bool> {
@@ -558,4 +577,107 @@ fn join_pipe(handle: thread::JoinHandle<std::io::Result<Vec<u8>>>, which: &str) 
         .join()
         .map_err(|_| anyhow::anyhow!("{which} reader panicked"))?
         .with_context(|| format!("read {which}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+    use std::time::Duration;
+
+    use super::probe::Sample;
+    use super::{
+        PhaseAProcess, PhaseBProcess, PhaseBWindow, finish_measured, idle_window, measurements,
+    };
+    use crate::perf::launch::Launched;
+
+    fn process(reopen: [f64; 5]) -> PhaseAProcess {
+        PhaseAProcess {
+            cold_start_ms: 40.0,
+            menu_open_after_launch_ms: 20.0,
+            footprint_menu_open_mb: 10.0,
+            modules: 3,
+            menu_reopen_ms: reopen,
+            menu_open_cpu_ms: vec![1.0, 3.0],
+            peak_bytes: 3 * 1_048_576,
+        }
+    }
+
+    fn phase_b() -> PhaseBProcess {
+        PhaseBProcess {
+            windows: vec![PhaseBWindow {
+                cpu_pct: 0.0,
+                wakeups_per_s: 0.0,
+                footprint_mb: 8.0,
+                disk_writes_kb: 1.0,
+                threads: 4.0,
+            }],
+            peak_bytes: 1_048_576,
+        }
+    }
+
+    #[test]
+    fn reopen_median_is_the_median_of_per_process_medians() {
+        let phase_a = [
+            process([0.0, 0.0, 0.0, 100.0, 100.0]),
+            process([10.0, 10.0, 10.0, 10.0, 10.0]),
+        ];
+        let measured = measurements(&phase_a, &phase_b(), 12.5).unwrap();
+        assert_eq!(measured["menu_reopen_ms"], 5.0);
+        assert_eq!(measured["cold_start_ms"], 40.0);
+        assert_eq!(measured["menu_open_cpu_ms"], 2.0);
+        assert_eq!(measured["idle_footprint_mb"], 8.0);
+        assert_eq!(measured["peak_footprint_mb"], 3.0);
+        assert_eq!(measured["app_size_mb"], 12.5);
+        assert_eq!(measured["modules_running"], 3.0);
+    }
+
+    #[test]
+    fn idle_window_uses_nanoseconds_and_kibibytes() {
+        let before = Sample {
+            t_ns: 1_000_000_000,
+            footprint: 0,
+            peak: 0,
+            logical_writes: 100,
+            cpu_ns: 0,
+            idle_wakeups: 10,
+            threads: 1,
+        };
+        let after = Sample {
+            t_ns: 3_000_000_000,
+            footprint: 2 * 1_048_576,
+            peak: 9 * 1_048_576,
+            logical_writes: 100 + 2048,
+            cpu_ns: 500_000_000,
+            idle_wakeups: 14,
+            threads: 7,
+        };
+        let window = idle_window(&before, &after).unwrap();
+        assert_eq!(window.cpu_pct, 25.0);
+        assert_eq!(window.wakeups_per_s, 2.0);
+        assert_eq!(window.disk_writes_kb, 2.0);
+        assert_eq!(window.footprint_mb, 2.0);
+        assert_eq!(window.threads, 7.0);
+    }
+
+    #[test]
+    fn a_measured_process_that_ignores_sigterm_is_killed() {
+        let mut launched = Launched::spawn(
+            Path::new("/usr/bin/perl"),
+            &["-e", "$SIG{TERM} = 'IGNORE'; sleep 30;"],
+            &[],
+        )
+        .unwrap();
+        // The handler is not installed until perl starts. A signal before that
+        // uses the default action and kills the process.
+        std::thread::sleep(Duration::from_millis(200));
+        launched.signal("TERM").unwrap();
+        let ignored = launched.wait_exit(Duration::from_millis(200)).unwrap();
+        assert!(
+            !ignored,
+            "SIGTERM ended the process; the ignore did not hold"
+        );
+        finish_measured(&mut launched).unwrap();
+        let gone = launched.wait_exit(Duration::from_secs(2)).unwrap();
+        assert!(gone, "pid {} still running", launched.pid);
+    }
 }

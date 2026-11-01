@@ -107,12 +107,12 @@ impl LogStream {
         pid: u32,
         want: fn(&Mark) -> bool,
         timeout: Duration,
-    ) -> Option<Mark> {
+    ) -> Result<Option<Mark>> {
         let deadline = Instant::now() + timeout;
         loop {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
-                return None;
+                return Ok(None);
             }
             match self.lines.recv_timeout(remaining) {
                 Ok(line) => {
@@ -120,10 +120,11 @@ impl LogStream {
                         && seen == pid
                         && want(&mark)
                     {
-                        return Some(mark);
+                        return Ok(Some(mark));
                     }
                 }
-                Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => return None,
+                Err(RecvTimeoutError::Timeout) => return Ok(None),
+                Err(RecvTimeoutError::Disconnected) => bail!("log stream ended"),
             }
         }
     }
@@ -134,8 +135,30 @@ impl Drop for LogStream {
         let Some(mut child) = self.child.take() else {
             return;
         };
-        let _ = child.kill();
-        let _ = child.wait();
+        if let Err(err) = child.kill() {
+            let text = err.to_string();
+            if !text.contains("No such process") && !text.contains("can't kill an exited process") {
+                eprintln!("perf log stream kill failed for pid {}: {err}", child.id());
+            }
+        }
+        let started = Instant::now();
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => return,
+                Ok(None) if started.elapsed() >= Duration::from_secs(2) => {
+                    eprintln!(
+                        "perf log stream pid {} is still running after kill",
+                        child.id()
+                    );
+                    return;
+                }
+                Ok(None) => thread::sleep(Duration::from_millis(20)),
+                Err(err) => {
+                    eprintln!("perf log stream wait failed for pid {}: {err}", child.id());
+                    return;
+                }
+            }
+        }
     }
 }
 
@@ -210,11 +233,13 @@ mod tests {
 {\"eventMessage\":\"statusItemDrawn ms=10.0\",\"processID\":9}\n\
 {\"eventMessage\":\"menuOpened ms=31.2 first=true modules=1\",\"processID\":9}\n";
         let mut stream = LogStream::from_reader(Cursor::new(raw.to_owned().into_bytes()));
-        let mark = stream.wait_for(
-            9,
-            |mark| matches!(mark, Mark::MenuOpened { first: true, .. }),
-            Duration::from_secs(1),
-        );
+        let mark = stream
+            .wait_for(
+                9,
+                |mark| matches!(mark, Mark::MenuOpened { first: true, .. }),
+                Duration::from_secs(1),
+            )
+            .unwrap();
         assert_eq!(
             mark,
             Some(Mark::MenuOpened {
@@ -226,13 +251,48 @@ mod tests {
     }
 
     #[test]
-    fn wait_for_times_out_with_none() {
-        let mut stream = LogStream::from_reader(Cursor::new(Vec::new()));
-        let mark = stream.wait_for(
-            9,
-            |mark| matches!(mark, Mark::MenuOpened { .. }),
-            Duration::from_millis(50),
+    fn parses_a_later_menu_open() {
+        let line = r#"{"eventMessage":"menuOpened ms=11.7 first=false modules=4","processID":9}"#;
+        assert_eq!(
+            parse_line(line),
+            Some((
+                9,
+                Mark::MenuOpened {
+                    ms: 11.7,
+                    first: false,
+                    modules: 4,
+                },
+            ))
         );
+    }
+
+    #[test]
+    fn a_closed_stream_is_not_a_timeout() {
+        let mut stream = LogStream::from_reader(Cursor::new(Vec::new()));
+        let err = stream
+            .wait_for(
+                9,
+                |mark| matches!(mark, Mark::MenuOpened { .. }),
+                Duration::from_millis(200),
+            )
+            .unwrap_err();
+        assert!(format!("{err:#}").contains("log stream ended"), "{err:#}");
+    }
+
+    #[test]
+    fn wait_for_times_out_while_the_stream_stays_open() {
+        let (tx, lines) = std::sync::mpsc::channel();
+        let mut stream = LogStream { lines, child: None };
+        let started = std::time::Instant::now();
+        let mark = stream
+            .wait_for(
+                9,
+                |mark| matches!(mark, Mark::MenuOpened { .. }),
+                Duration::from_millis(40),
+            )
+            .unwrap();
         assert_eq!(mark, None);
+        assert!(started.elapsed() >= Duration::from_millis(30));
+        drop(tx);
     }
 }

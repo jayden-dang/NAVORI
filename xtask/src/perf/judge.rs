@@ -74,7 +74,7 @@ pub const METRICS: &[MetricSpec] = &[
     },
     MetricSpec {
         name: "idle_disk_writes_kb",
-        unit: "KB",
+        unit: "KiB",
         kind: Kind::BaselineOnly,
         floor: 64.0,
     },
@@ -218,6 +218,8 @@ fn note_regression(
         return;
     };
     let Some(&(median, _)) = baseline.metrics.get(spec.name) else {
+        *passed = false;
+        line.push_str(" missing from baseline");
         return;
     };
     // Floor comes from the metric table, not the recorded file, so a stale file cannot loosen it.
@@ -237,7 +239,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::super::baseline::{Baseline, Machine};
-    use super::{Measurements, judge, median};
+    use super::{Kind, METRICS, Measurements, judge, median};
 
     fn machine() -> Machine {
         Machine {
@@ -415,7 +417,15 @@ mod tests {
         median_value: f64,
         floor: f64,
     ) -> Baseline {
+        let measured = within_budget();
         let mut metrics = BTreeMap::new();
+        for spec in METRICS {
+            if matches!(spec.kind, Kind::Skipped { .. }) {
+                continue;
+            }
+            let value = measured[spec.name];
+            metrics.insert(spec.name.to_owned(), (value, spec.floor));
+        }
         metrics.insert(metric.to_owned(), (median_value, floor));
         Baseline {
             machine: Machine {
@@ -457,8 +467,75 @@ mod tests {
     }
 
     #[test]
+    fn matching_baseline_missing_an_enabled_metric_fails() {
+        let mut baseline = baseline_with("cold_start_ms", 100.0, 10.0);
+        baseline.metrics.remove("menu_reopen_ms");
+        let verdict = judge(&within_budget(), Some(&baseline), &machine());
+        assert!(!verdict.passed, "{:?}", verdict.lines);
+        assert!(
+            verdict.lines.iter().any(|line| {
+                line.contains("menu_reopen_ms") && line.contains("missing from baseline")
+            }),
+            "{:?}",
+            verdict.lines
+        );
+    }
+
+    #[test]
+    fn metrics_match_the_performance_standard() {
+        let standard = include_str!("../../../docs/standards/performance.md");
+        let expected: &[(&str, f64, Option<f64>, &str)] = &[
+            ("cold_start_ms", 10.0, Some(200.0), "≤ 200 ms"),
+            ("menu_open_after_launch_ms", 5.0, Some(50.0), "≤ 50 ms"),
+            ("menu_reopen_ms", 5.0, Some(50.0), "≤ 50 ms"),
+            ("footprint_menu_open_mb", 1.0, Some(60.0), "≤ 60 MB"),
+            ("idle_cpu_pct", 0.1, Some(0.0), "0%"),
+            ("idle_wakeups_per_s", 0.2, Some(1.0), "≤ 1 / s"),
+            ("idle_footprint_mb", 1.0, Some(30.0), "≤ 30 MB"),
+            ("app_size_mb", 0.5, Some(25.0), "≤ 25 MB"),
+            ("peak_footprint_mb", 2.0, None, "2 MB `peak_footprint_mb`"),
+            (
+                "idle_disk_writes_kb",
+                64.0,
+                None,
+                "64 KiB `idle_disk_writes_kb`",
+            ),
+            (
+                "menu_open_cpu_ms",
+                5.0,
+                None,
+                "5 ms `menu_open_after_launch_ms`",
+            ),
+            ("thread_count", 2.0, None, "2 threads `thread_count`"),
+            (
+                "submenu_open_ms",
+                0.0,
+                None,
+                "submenu_open_ms skipped: no submenu until the A5 menu",
+            ),
+        ];
+        assert_eq!(METRICS.len(), expected.len());
+        for (spec, (name, floor, budget, phrase)) in METRICS.iter().zip(expected) {
+            assert_eq!(spec.name, *name);
+            assert_eq!(spec.floor, *floor);
+            match (spec.kind, budget) {
+                (Kind::Gated { budget: actual }, Some(want)) => assert_eq!(actual, *want),
+                (Kind::BaselineOnly, None) | (Kind::Skipped { .. }, None) => {}
+                (kind, want) => panic!("{name} kind {kind:?} budget {want:?}"),
+            }
+            assert!(
+                standard.contains(phrase),
+                "{name} phrase {phrase:?} missing from the standard"
+            );
+        }
+        assert!(standard.contains("submenu_open_ms skipped: no submenu until the A5 menu"));
+    }
+
+    #[test]
     fn floor_wins_for_small_values() {
-        let baseline = baseline_with("menu_open_cpu_ms", 20.0, 5.0);
+        // The stored floor is 100, not the 5 ms spec floor. A judge that
+        // reads the file floor would allow 25.1.
+        let baseline = baseline_with("menu_open_cpu_ms", 20.0, 100.0);
         let mut at_limit = within_budget();
         at_limit.insert("menu_open_cpu_ms".to_owned(), 25.0);
         let at_limit = judge(&at_limit, Some(&baseline), &machine());

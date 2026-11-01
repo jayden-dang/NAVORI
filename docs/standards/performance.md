@@ -3,7 +3,7 @@
 Status: Approved
 Date: 2026-11-01
 
-"Light, fast, hardcore-optimized" (vision) is a measured budget, not a feeling. GOAL-7 states it; ARCH-15 – ARCH-18 prevent the usual causes at design time.
+"Light, fast, hardcore-optimized" (vision) is a measured budget, not a feeling. GOAL-7 states it; ARCH-15 – ARCH-18 prevent the usual causes at design time. `cargo xtask perf` checks the GOAL-7 budgets. It does not check ARCH-15 through ARCH-18.
 
 ## Budget (GOAL-7)
 
@@ -26,11 +26,11 @@ R0 baseline (debug build, 2026-11-01): 0.0% CPU, 0 wake-ups/s, 21 MB footprint, 
 - Counters come from `proc_pid_rusage`: phys_footprint (equal to `footprint`), peak footprint, logical writes, CPU time and idle wake-ups (equal to `top` IDLEW). Thread count comes from `proc_pidinfo`.
 - Idle metrics are the median of 5 consecutive 12 s windows after a 10 s settle. Cold start, the first menu open and the menu-open footprint are the median of 5 processes. Menu reopen is the median across those processes of 5 reopens each.
 - A gated metric fails over its budget. Idle CPU is compared to 0.0 after rounding to one decimal. An enabled metric with no measurement fails. With a baseline from the same machine model and macOS version, every measured metric also fails when its value exceeds `baseline median + max(10% of that median, floor)`. The floor is the one listed below, not the copy stored in the baseline file. No baseline, or a different `hw.model` or macOS version, skips only the regression check and prints why.
-- Floors: 10 ms `cold_start_ms`; 5 ms `menu_open_after_launch_ms`, `menu_reopen_ms` and `menu_open_cpu_ms`; 1 MB `footprint_menu_open_mb` and `idle_footprint_mb`; 2 MB `peak_footprint_mb`; 0.5 MB `app_size_mb`; 0.1 percentage points `idle_cpu_pct`; 0.2 per second `idle_wakeups_per_s`; 64 KB `idle_disk_writes_kb`; 2 threads `thread_count`.
+- Floors: 10 ms `cold_start_ms`; 5 ms `menu_open_after_launch_ms`, `menu_reopen_ms` and `menu_open_cpu_ms`; 1 MB `footprint_menu_open_mb` and `idle_footprint_mb`; 2 MB `peak_footprint_mb`; 0.5 MB `app_size_mb`; 0.1 percentage points `idle_cpu_pct`; 0.2 per second `idle_wakeups_per_s`; 64 KiB `idle_disk_writes_kb`; 2 threads `thread_count`. `idle_disk_writes_kb` is kibibytes (1024 bytes).
 - `cargo xtask perf --record` writes `perf-baseline.json` (machine model, macOS version, git revision, date, and each measured metric's median and floor) only when the run passes. Without `--record`, or when the run fails, the file is left unchanged.
 - Baseline-only metrics have no budget and are still regression-checked: `peak_footprint_mb`, `idle_disk_writes_kb`, `menu_open_cpu_ms`, `thread_count`.
-- Skip list, declared in the tool: `submenu_open_ms`, reason "no submenu until the A5 menu". The line is printed `skipped: <reason>` and does not fail the run.
-- Perf runs share the `dev.navori.app.debug` preferences domain (unused by the app today).
+- Skip list, declared in the tool: `submenu_open_ms`, reason "no submenu until the A5 menu". The line is printed `submenu_open_ms skipped: no submenu until the A5 menu` and does not fail the run.
+- Perf runs use the same `dev.navori.app.debug` preferences domain as `cargo xtask run`.
 
 ## Design rules (from the architecture spine)
 

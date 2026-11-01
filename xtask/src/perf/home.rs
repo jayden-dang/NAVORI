@@ -255,12 +255,14 @@ fn process_comm(pid: u32) -> Result<Option<PathBuf>> {
 
 fn signal_kill(pid: u32) -> Result<()> {
     let out = command_output("/bin/kill", &["-KILL", &pid.to_string()])?;
-    ensure!(
-        out.status.success(),
-        "kill -KILL {pid} failed: {}",
-        String::from_utf8_lossy(&out.stderr).trim()
-    );
-    Ok(())
+    if out.status.success() {
+        return Ok(());
+    }
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    if stderr.contains("No such process") {
+        return Ok(());
+    }
+    bail!("kill -KILL {pid} failed: {}", stderr.trim());
 }
 
 fn command_output(program: &str, args: &[&str]) -> Result<Output> {
@@ -308,7 +310,15 @@ fn wait_child(child: &mut Child, rendered: &str) -> Result<ExitStatus> {
             return Ok(status);
         }
         if started.elapsed() >= COMMAND_TIMEOUT {
-            let _ = child.kill();
+            if let Err(err) = child.kill()
+                && !err.to_string().contains("No such process")
+                && !err.to_string().contains("can't kill an exited process")
+            {
+                eprintln!(
+                    "{rendered} timed out and kill failed for pid {}: {err}",
+                    child.id()
+                );
+            }
             let reap_started = Instant::now();
             loop {
                 match child.try_wait() {
@@ -345,7 +355,7 @@ mod tests {
     use std::thread;
     use std::time::{Duration, Instant};
 
-    use super::{PerfHome, check_socket_len, current_uid};
+    use super::{PerfHome, check_socket_len, current_uid, signal_kill};
 
     fn temp_base() -> tempfile::TempDir {
         tempfile::Builder::new().tempdir_in("/tmp").unwrap()
@@ -493,6 +503,18 @@ mod tests {
         );
         assert!(still_alive(&mut unrecorded), "unrecorded sleep was killed");
         assert!(still_alive(&mut other_exe), "recorded perl was killed");
+    }
+
+    #[test]
+    fn killing_an_already_exited_pid_is_not_a_sweep_failure() {
+        let mut sleep = Proc::spawn("/bin/sleep", &["30"]);
+        let pid = sleep.id();
+        std::process::Command::new("/bin/kill")
+            .args(["-KILL", &pid.to_string()])
+            .output()
+            .unwrap();
+        assert!(wait_until_exited(&mut sleep), "sleep did not exit");
+        signal_kill(pid).unwrap();
     }
 
     #[test]
