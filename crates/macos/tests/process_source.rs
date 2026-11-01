@@ -185,3 +185,31 @@ fn reading_the_working_directory_of_launchd_is_denied() {
     let procs = source();
     assert_eq!(procs.cwd(1).unwrap_err(), ReadError::Denied);
 }
+
+#[test]
+fn reading_arguments_of_a_missing_process_reports_gone() {
+    let procs = source();
+    assert_eq!(procs.argv(999_999).unwrap_err(), ReadError::Gone);
+}
+
+#[test]
+fn reading_arguments_of_launchd_is_denied() {
+    let procs = source();
+    assert_eq!(procs.argv(1).unwrap_err(), ReadError::Denied);
+}
+
+#[test]
+fn a_spawned_child_reports_its_arguments() {
+    let child = ChildTree::spawn("sleep", &["30"], None);
+    let procs = source();
+    assert_eq!(procs.argv(child.id()).unwrap(), vec!["sleep", "30"]);
+}
+
+#[test]
+fn the_test_process_own_arguments_exclude_its_environment() {
+    let procs = source();
+    assert_eq!(
+        procs.argv(std::process::id() as i32).unwrap(),
+        std::env::args().collect::<Vec<_>>()
+    );
+}

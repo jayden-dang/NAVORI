@@ -88,8 +88,8 @@ impl ProcessSource for MacProcesses {
         read_exe(pid)
     }
 
-    fn argv(&self, _pid: i32) -> Result<Vec<String>, ReadError> {
-        Err(ReadError::Malformed)
+    fn argv(&self, pid: i32) -> Result<Vec<String>, ReadError> {
+        crate::procargs::read_argv(pid, || read_entry(pid).is_err())
     }
 
     fn cwd(&self, pid: i32) -> Result<PathBuf, ReadError> {

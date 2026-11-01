@@ -1,1 +1,150 @@
 //! Argument buffer for one process, without its environment.
+
+use std::sync::{Mutex, OnceLock};
+
+use crate::error::ReadError;
+
+/// Split a `KERN_PROCARGS2` buffer into its `argc` argument strings.
+///
+/// The executable path and the environment that follows the arguments are not returned.
+/// A byte that is not UTF-8 becomes U+FFFD. The buffer is malformed when `argc` strings
+/// are not all there, each with its trailing NUL.
+pub fn parse_procargs(buf: &[u8]) -> Result<Vec<String>, ReadError> {
+    let argc = read_i32(buf, 0).ok_or(ReadError::Malformed)?;
+    let argc = usize::try_from(argc).map_err(|_| ReadError::Malformed)?;
+    let (mut index, _) = cstr_at(buf, 4).ok_or(ReadError::Malformed)?;
+    index = skip_nuls(buf, index).ok_or(ReadError::Malformed)?;
+    let mut args = Vec::new();
+    for _ in 0..argc {
+        let (next, bytes) = cstr_at(buf, index).ok_or(ReadError::Malformed)?;
+        args.push(String::from_utf8_lossy(bytes).into_owned());
+        index = next;
+    }
+    Ok(args)
+}
+
+/// Read the argument vector for `pid`.
+///
+/// `entry_failed` runs only after `EINVAL`. That is what `KERN_PROCARGS2` returns both
+/// when the pid is gone and when the caller may not inspect it.
+pub(crate) fn read_argv(
+    pid: i32,
+    entry_failed: impl FnOnce() -> bool,
+) -> Result<Vec<String>, ReadError> {
+    let max = argmax().map_err(plain_error)?;
+    let mut mib = [libc::CTL_KERN, libc::KERN_PROCARGS2, pid];
+    let probed = match sysctl(&mut mib, None) {
+        Ok(len) if len > 0 && len <= max => len,
+        Ok(_) => return Err(ReadError::Malformed),
+        Err(errno) => return Err(procargs_error(errno, entry_failed)),
+    };
+    let buf = match copy_procargs(&mut mib, probed) {
+        Ok(buf) => buf,
+        Err(errno) => return Err(procargs_error(errno, entry_failed)),
+    };
+    parse_procargs(&buf)
+}
+
+fn read_i32(buf: &[u8], at: usize) -> Option<i32> {
+    let end = at.checked_add(4)?;
+    let bytes: [u8; 4] = buf.get(at..end)?.try_into().ok()?;
+    Some(i32::from_ne_bytes(bytes))
+}
+
+/// The bytes of one NUL-terminated string, and the index just past its NUL.
+fn cstr_at(buf: &[u8], index: usize) -> Option<(usize, &[u8])> {
+    let rest = buf.get(index..)?;
+    let end = rest.iter().position(|byte| *byte == 0)?;
+    let bytes = rest.get(..end)?;
+    let next = index.checked_add(end)?.checked_add(1)?;
+    Some((next, bytes))
+}
+
+fn skip_nuls(buf: &[u8], mut index: usize) -> Option<usize> {
+    while buf.get(index).copied() == Some(0) {
+        index = index.checked_add(1)?;
+    }
+    Some(index)
+}
+
+fn argmax() -> Result<usize, i32> {
+    static ARGMAX: OnceLock<usize> = OnceLock::new();
+    if let Some(max) = ARGMAX.get() {
+        return Ok(*max);
+    }
+    let mut mib = [libc::CTL_KERN, libc::KERN_ARGMAX];
+    let mut raw = [0u8; 4];
+    let len = sysctl(&mut mib, Some(&mut raw))?;
+    if len != raw.len() {
+        return Err(libc::EINVAL);
+    }
+    let max = usize::try_from(i32::from_ne_bytes(raw)).map_err(|_| libc::EINVAL)?;
+    if max == 0 {
+        return Err(libc::EINVAL);
+    }
+    Ok(*ARGMAX.get_or_init(|| max))
+}
+
+/// One scratch buffer, grown to the largest block read. The kernel's ceiling is `KERN_ARGMAX`.
+fn copy_procargs(mib: &mut [i32], probed: usize) -> Result<Vec<u8>, i32> {
+    static SCRATCH: Mutex<Vec<u8>> = Mutex::new(Vec::new());
+    let mut scratch = SCRATCH
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if scratch.len() < probed {
+        scratch.resize(probed, 0);
+    }
+    let Some(dest) = scratch.get_mut(..probed) else {
+        return Ok(Vec::new());
+    };
+    let len = sysctl(mib, Some(dest))?;
+    // A reported length past the buffer we offered is not a readable block.
+    if len > probed {
+        return Ok(Vec::new());
+    }
+    Ok(scratch.get(..len).unwrap_or_default().to_vec())
+}
+
+fn procargs_error(errno: i32, entry_failed: impl FnOnce() -> bool) -> ReadError {
+    if errno != libc::EINVAL {
+        return plain_error(errno);
+    }
+    if entry_failed() {
+        ReadError::Gone
+    } else {
+        ReadError::Denied
+    }
+}
+
+fn plain_error(errno: i32) -> ReadError {
+    match errno {
+        libc::ESRCH => ReadError::Gone,
+        libc::EPERM => ReadError::Denied,
+        _ => ReadError::Malformed,
+    }
+}
+
+fn sysctl(mib: &mut [i32], dest: Option<&mut [u8]>) -> Result<usize, i32> {
+    let mut len = dest.as_ref().map_or(0, |buf| buf.len());
+    let ptr = dest
+        .map(|buf| buf.as_mut_ptr().cast::<libc::c_void>())
+        .unwrap_or(std::ptr::null_mut());
+    // SAFETY: mib is a live MIB of namelen ints. ptr is null for a size probe, or writable
+    // for `len` bytes. sysctl writes at most `len` bytes and stores the byte count in `len`.
+    // newp is null because this call only reads.
+    let rc = unsafe {
+        libc::sysctl(
+            mib.as_mut_ptr(),
+            mib.len() as libc::c_uint,
+            ptr,
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if rc == 0 { Ok(len) } else { Err(last_errno()) }
+}
+
+fn last_errno() -> i32 {
+    std::io::Error::last_os_error().raw_os_error().unwrap_or(0)
+}
