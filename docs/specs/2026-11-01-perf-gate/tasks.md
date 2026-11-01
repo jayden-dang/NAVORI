@@ -294,7 +294,7 @@ _Requirements: PERF-1.1, PERF-1.5, PERF-1.6, PERF-1.10, PERF-3.1, PERF-3.2, PERF
 ### Task 11: Document the gate
 
 **Files:**
-- Modify: `docs/standards/performance.md`, `docs/standards/testing.md`, `README.md`, `AGENTS.md`, `docs/agents/project.md`
+- Modify: `docs/standards/performance.md`, `docs/standards/testing.md`, `README.md`, `AGENTS.md`, `docs/agents/project.md`, `docs/architecture/INDEX.md`
 - Test: none — documentation
 
 **Reuse:** rung 2 — edits the existing standard
