@@ -305,8 +305,8 @@ _Requirements: PERF-1.1, PERF-1.5, PERF-1.6, PERF-1.10, PERF-3.1, PERF-3.2, PERF
 
 **Depends-on:** Task 10
 
-- [ ] **Step 1: Edit** `performance.md` (release code packaged as the dev identity; `proc_pid_rusage` counters, equal to `footprint` and `top` IDLEW; 5 × 12 s windows; `--record`; floors rule; baseline-only metrics; skip list; the shared `dev.navori.app.debug` preferences domain; drop "to be built with the next release"); `testing.md` Exempt (xtask's perf logic is unit-tested); `README.md` and `AGENTS.md` command lists; `docs/agents/project.md` release steps (`cargo xtask perf` after `ci`).
-- [ ] **Step 2: Commit** — `git commit -m "docs: document cargo xtask perf"`
+- [x] **Step 1: Edit** `performance.md` (release code packaged as the dev identity; `proc_pid_rusage` counters, equal to `footprint` and `top` IDLEW; 5 × 12 s windows; `--record`; floors rule; baseline-only metrics; skip list; the shared `dev.navori.app.debug` preferences domain; drop "to be built with the next release"); `testing.md` Exempt (xtask's perf logic is unit-tested); `README.md` and `AGENTS.md` command lists; `docs/agents/project.md` release steps (`cargo xtask perf` after `ci`).
+- [x] **Step 2: Commit** — `git commit -m "docs: document cargo xtask perf"`
 
 _Requirements: PERF-1.1_
 
