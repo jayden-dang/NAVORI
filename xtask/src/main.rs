@@ -41,6 +41,8 @@ enum Cmd {
     CheckDeps,
     /// Compare workspace dependency versions with the latest stable releases on crates.io.
     Outdated,
+    /// Regenerate the checked-in app icons (`xtask/assets/*.icns`) from `xtask/assets/make-icon.swift`.
+    Icon,
     /// Rust tests + clippy + fmt check + dependency rules + Swift build.
     Ci,
 }
@@ -70,6 +72,12 @@ impl Profile {
             Self::Release => "Navori",
         }
     }
+    fn icon_file(self) -> &'static str {
+        match self {
+            Self::Dev => "AppIconDev.icns",
+            Self::Release => "AppIcon.icns",
+        }
+    }
     fn bundle_id(self) -> &'static str {
         match self {
             Self::Dev => "dev.navori.app.debug",
@@ -97,6 +105,7 @@ fn main() -> Result<()> {
         Cmd::SigningSetup => signing_setup(&root),
         Cmd::CheckDeps => check_deps(&root),
         Cmd::Outdated => outdated(&root),
+        Cmd::Icon => icon(&root),
         Cmd::Ci => ci(&root),
     }
 }
@@ -282,6 +291,11 @@ fn bundle(root: &Path, profile: Profile) -> Result<PathBuf> {
         contents.join("Helpers/navori"),
     )
     .context("copy CLI")?;
+    std::fs::copy(
+        root.join("xtask/assets").join(profile.icon_file()),
+        contents.join("Resources/AppIcon.icns"),
+    )
+    .context("copy app icon")?;
     std::fs::write(contents.join("PkgInfo"), "APPL????")?;
     std::fs::write(
         contents.join("Info.plist"),
@@ -294,6 +308,22 @@ fn bundle(root: &Path, profile: Profile) -> Result<PathBuf> {
     )?;
     sign(&app, profile.bundle_id())?;
     Ok(app)
+}
+
+/// Renders both icon variants with Swift/CoreGraphics and packs them with `iconutil`.
+fn icon(root: &Path) -> Result<()> {
+    let script = root.join("xtask/assets/make-icon.swift");
+    let tmp = std::env::temp_dir().join(format!("navori-icon-{}", std::process::id()));
+    for (variant, file) in [("release", "AppIcon.icns"), ("dev", "AppIconDev.icns")] {
+        let set = tmp.join(format!("{variant}.iconset"));
+        sh(Command::new("swift").arg(&script).arg(variant).arg(&set))?;
+        sh(Command::new("iconutil")
+            .args(["-c", "icns", "-o"])
+            .arg(root.join("xtask/assets").join(file))
+            .arg(&set))?;
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+    Ok(())
 }
 
 fn build_number(root: &Path) -> String {
@@ -326,6 +356,7 @@ fn info_plist(profile: Profile, build: &str) -> String {
     <key>CFBundleDevelopmentRegion</key><string>en</string>
     <key>CFBundleDisplayName</key><string>{name}</string>
     <key>CFBundleExecutable</key><string>Navori</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleIdentifier</key><string>{id}</string>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
     <key>CFBundleName</key><string>{name}</string>
