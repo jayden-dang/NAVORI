@@ -67,3 +67,9 @@ todo = "warn"
 lto = "thin"
 codegen-units = 1
 strip = "debuginfo"
+
+# Proc-macros and build scripts are dlopen'd by rustc on the host. On macOS 27 (ld-27106)
+# a stripped proc-macro dylib fails to load ("mis-aligned LINKEDIT string pool"), so they
+# stay unstripped; shipped artifacts are still stripped by the profile above.
+[profile.release.build-override]
+strip = "none"
