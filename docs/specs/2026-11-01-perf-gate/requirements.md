@@ -34,6 +34,8 @@ Terms used below:
 - **PERF-1.8** IF any gated metric exceeds its budget THEN THE SYSTEM SHALL exit non-zero and print the metric, the measured value and the budget.
 - **PERF-1.9** IF a metric that is not on the skip list has no measurement after its phase THEN THE SYSTEM SHALL exit non-zero with "no line for an enabled metric: <metric>".
 - **PERF-1.10** WHEN a run finishes THE SYSTEM SHALL print the elapsed time of the build, phase A and phase B.
+- **PERF-1.11** WHEN `cargo xtask perf` runs THE SYSTEM SHALL print `build <seconds>s` as the first line of stdout, with three digits after the decimal.
+- **PERF-1.12** (guard) WHEN `cargo xtask perf` prints the build elapsed line THE SYSTEM SHALL CONTINUE TO print `phase A <seconds>s` and `phase B <seconds>s` after the verdict lines, each with three digits after the decimal.
 
 ## 2. Record a baseline and catch regressions
 

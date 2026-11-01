@@ -54,13 +54,13 @@ Locality: `xtask/src/main.rs` only — extend; `ci`, `run`, `install` keep their
 
 ### xtask perf runner
 
-Satisfies: PERF-1.5, PERF-1.6, PERF-1.10, PERF-3.1, PERF-3.2, PERF-3.3, PERF-3.4, PERF-3.5, PERF-4.6, PERF-6.1, PERF-6.3, PERF-6.5
+Satisfies: PERF-1.5, PERF-1.6, PERF-1.10, PERF-1.11, PERF-1.12, PERF-3.1, PERF-3.2, PERF-3.3, PERF-3.4, PERF-3.5, PERF-4.6, PERF-6.1, PERF-6.3, PERF-6.5
 Reuse: none — new code (rung 7); nothing in the repo launches the app, samples it or reads the unified log
 Respects: ARCH-11, ARCH-14
 Security: TB-2, THR-4
 Interface: `cargo xtask perf [--record]` → exit status + printed report; internally `run(root, record) -> Result<Report>`.
 Depth: if this module vanished, a caller would still only need "build the perf bundle, give me per-metric medians for phase A and phase B"; the process lifecycle, home copying, signal timing and log routing stay hidden.
-Locality: new `xtask/src/perf/` (`mod.rs` orchestration, `home.rs`, `launch.rs`, `logstream.rs`); one `Cmd::Perf` arm in `main.rs` — leave everything else.
+Locality: new `xtask/src/perf/` (`mod.rs` orchestration, `home.rs`, `launch.rs`, `logstream.rs`); one `Cmd::Perf` arm in `main.rs`; `sh` in `main.rs` pipes tool stdout to stderr so the build line is first on stdout (PERF-1.11) — leave everything else.
 
 Flow:
 1. `bundle(root, Dev, Release, build/perf)`; compile `perf-probe` once; print build time.
@@ -131,10 +131,11 @@ Locality: `docs/standards/testing.md:24` — xtask's pure perf logic is now unit
 | `perf::baseline` — load / save / record-only-on-pass (temp dir) | unit | PERF-2.1, PERF-2.2, PERF-2.3 |
 | `perf::logstream` — ndjson line → `(pid, Mark)` parser, banner/finished lines ignored, other pids dropped | unit | PERF-4.6 (filtering), PERF-1.9 (missing line) |
 | `perf::home::prepare` — temp root: creates 0700, replaces a stale tree it owns, refuses a symlink or foreign-owned path, rejects a socket path > 103 bytes | integration (filesystem) | PERF-3.3, PERF-6.3, PERF-6.5 |
-| `cargo xtask perf` on the author's Mac — full run, `--record`, three consecutive runs, Ctrl-C mid-run, daily app and Navori Dev left running | e2e (manual, recorded in the task report) | PERF-1.1, PERF-1.5, PERF-1.6, PERF-1.10, PERF-3.1, PERF-3.2, PERF-3.4, PERF-3.5, PERF-4.1–4.6, PERF-6.1, PERF-6.2, PERF-6.4 |
+| `cargo xtask perf` on the author's Mac — full run, `--record`, three consecutive runs, Ctrl-C mid-run, daily app and Navori Dev left running | e2e (manual, recorded in the task report) | PERF-1.1, PERF-1.5, PERF-1.6, PERF-1.10, PERF-1.11, PERF-1.12, PERF-3.1, PERF-3.2, PERF-3.4, PERF-3.5, PERF-4.1–4.6, PERF-6.1, PERF-6.2, PERF-6.4 |
+| `xtask` `tool_stdout` / `sh` — child stdout is a pipe forwarded to stderr (in-crate unit test) | unit | PERF-1.11 |
 | Calibration — panel stays open after SIGUSR1; in-process marks vs one-shot display-link frame reference | e2e (manual spike, once) | PERF-4.1, PERF-4.2, PERF-4.3 |
 | Existing gates — `cargo xtask ci`, `cargo xtask install` + `navori doctor`, `plutil -p` on both bundles, manual left/right/control click | e2e (manual) + existing `ci` | PERF-5.1, PERF-5.2, PERF-5.3, PERF-5.4, PERF-5.5, PERF-5.6 |
 
 ## Coverage check
 
-Every requirement ID appears in a `Satisfies:` line: PERF-1.1–1.10, 2.1–2.6, 3.1–3.5, 4.1–4.6, 5.1–5.6, 6.1–6.5. PERF-1.3 and PERF-1.6 appear in two sections by necessity (the runner collects, the helper reads, the judge reports). PERF-6.4 (three consecutive passes) is verified by the e2e seam, not owned by one module. No ID is deliberately unmapped.
+Every requirement ID appears in a `Satisfies:` line: PERF-1.1–1.12, 2.1–2.6, 3.1–3.5, 4.1–4.6, 5.1–5.6, 6.1–6.5. PERF-1.3 and PERF-1.6 appear in two sections by necessity (the runner collects, the helper reads, the judge reports). PERF-1.11 is also covered by the `tool_stdout` unit seam. PERF-6.4 (three consecutive passes) is verified by the e2e seam, not owned by one module. No ID is deliberately unmapped.

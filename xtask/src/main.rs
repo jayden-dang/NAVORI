@@ -5,7 +5,8 @@
 //!           `release` → "Navori.app" (`dev.navori.app`, release build).
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::thread;
 
 use anyhow::{Context, Result, bail, ensure};
 use clap::{Parser, Subcommand, ValueEnum};
@@ -153,17 +154,36 @@ fn workspace_root() -> Result<PathBuf> {
         .context("xtask must live one level below the workspace root")
 }
 
+/// Stdio for tool child stdout. Piped so `cargo xtask perf` can keep report
+/// stdout free of xcodebuild/swift progress (first line must be `build …s`).
+fn tool_stdout() -> Stdio {
+    Stdio::piped()
+}
+
 /// Runs a command, echoing it, failing on non-zero exit.
+/// Child stdout is forwarded to stderr so perf report stdout stays clean.
 fn sh(cmd: &mut Command) -> Result<()> {
-    eprintln!("$ {}", render(cmd));
-    let status = cmd
-        .status()
-        .with_context(|| format!("cannot run {}", render(cmd)))?;
-    ensure!(
-        status.success(),
-        "command failed ({status}): {}",
-        render(cmd)
-    );
+    let rendered = render(cmd);
+    eprintln!("$ {rendered}");
+    let mut child = cmd
+        .stdout(tool_stdout())
+        .spawn()
+        .with_context(|| format!("cannot run {rendered}"))?;
+    let mut pipe = child
+        .stdout
+        .take()
+        .with_context(|| format!("{rendered} has no stdout"))?;
+    let pump = thread::spawn(move || {
+        let mut sink = std::io::stderr().lock();
+        std::io::copy(&mut pipe, &mut sink)
+    });
+    let status = child
+        .wait()
+        .with_context(|| format!("wait for {rendered}"))?;
+    pump.join()
+        .map_err(|_| anyhow::anyhow!("tool stdout forwarder panicked"))?
+        .context("forward tool stdout to stderr")?;
+    ensure!(status.success(), "command failed ({status}): {rendered}");
     Ok(())
 }
 
@@ -991,4 +1011,35 @@ fn ci(root: &Path) -> Result<()> {
         .arg(root.join("apps/macos")))?;
     println!("✓ ci passed");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Read;
+    use std::process::Command;
+
+    use super::tool_stdout;
+
+    /// Child tool progress must be on a pipe, not inherited stdout, so
+    /// `cargo xtask perf` can emit `build <seconds>s` as the first report line.
+    #[test]
+    fn tool_stdout_is_piped_so_report_stdout_stays_clean() {
+        let mut child = Command::new("/bin/echo")
+            .arg("xcframework successfully written out to: /tmp/fake")
+            .stdout(tool_stdout())
+            .spawn()
+            .unwrap();
+        let mut pipe = child
+            .stdout
+            .take()
+            .expect("tool stdout must be a pipe so perf report stdout stays clean");
+        let mut buf = String::new();
+        pipe.read_to_string(&mut buf).unwrap();
+        let status = child.wait().unwrap();
+        assert!(status.success());
+        assert!(
+            buf.contains("xcframework successfully written out to:"),
+            "piped tool stdout was empty: {buf:?}"
+        );
+    }
 }
