@@ -9,6 +9,7 @@ members = [
     "crates/ipc",
     "crates/ffi",
     "apps/cli",
+    "xtask",
 ]
 
 [workspace.package]
