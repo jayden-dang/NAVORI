@@ -1,0 +1,34 @@
+[package]
+name = "navori-macos"
+description = "macOS process, exit and power reads."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+fake = []
+
+[dependencies]
+libc.workspace = true
+objc2-core-foundation.workspace = true
+objc2-io-kit.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+navori-macos = { path = ".", features = ["fake"] }
+
+[lints.rust]
+missing_debug_implementations = "warn"
+unused_must_use = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+dbg_macro = "warn"
+todo = "warn"
+undocumented_unsafe_blocks = "warn"

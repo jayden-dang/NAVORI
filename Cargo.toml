@@ -7,6 +7,8 @@ members = [
     "crates/store",
     "crates/kernel",
     "crates/ipc",
+    "crates/macos",
+    "crates/procs",
     "crates/ffi",
     "apps/cli",
     "xtask",
@@ -26,6 +28,8 @@ navori-config = { path = "crates/config" }
 navori-store = { path = "crates/store" }
 navori-kernel = { path = "crates/kernel" }
 navori-ipc = { path = "crates/ipc" }
+navori-macos = { path = "crates/macos" }
+navori-procs = { path = "crates/procs" }
 
 # Versions = latest stable on crates.io as of 2026-11-01 (`cargo xtask outdated` re-checks).
 anyhow = "1.0.104"
@@ -33,6 +37,8 @@ assert_cmd = "2.2.2"
 clap = { version = "4.6.7", features = ["derive", "env"] }
 futures = "0.3.34"
 libc = "0.2.191"
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFString"] }
+objc2-io-kit = { version = "0.3.2", default-features = false, features = ["std", "pwr_mgt", "libc"] }
 predicates = "3.1.4"
 regex = "1.13.1"
 rusqlite = { version = "0.41.1", features = ["bundled", "backup"] }
@@ -62,6 +68,7 @@ unwrap_used = "warn"
 expect_used = "warn"
 dbg_macro = "warn"
 todo = "warn"
+undocumented_unsafe_blocks = "warn"
 
 [profile.release]
 lto = "thin"

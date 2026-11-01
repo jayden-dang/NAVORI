@@ -24,6 +24,8 @@ Where things live in this repository and where new code belongs. Covers the top-
 | `apps/macos/` | The Swift Shell (SwiftPM package `Package.swift`); `Navori/` sources: `App/`, `Core/`, `StatusBar/`, `Features/`, `Platform/`, `main.swift`. |
 | `apps/macos/Generated/` | Generated and gitignored: UniFFI Swift bindings (`NavoriCore/`) and `NavoriCoreFFI.xcframework`. Never edit by hand. |
 | `xtask/` | Build, bundle, sign, install, CI, dependency rules (`cargo xtask <command>`). |
+| `crates/macos/` | `navori-macos` — platform FFI behind safe traits `ProcessSource`, `ExitSource` and `PowerAssertions`. The only hand-written `unsafe`. |
+| `crates/procs/` | `navori-procs` — process snapshot, project/worktree resolver, Harness table, child activity and exit watcher. No `unsafe`. |
 | `docs/` | Product (`product/`), architecture (`architecture/`, `ARCHITECTURE.md`), codebase (`codebase/`), standards (`standards/`), UI briefs (`design/`), specs (`specs/`), ADRs (`adr/`), agent config (`agents/`). |
 | Root files | `Cargo.toml` (workspace, dependencies, lints), `rust-toolchain.toml`, `.cargo/config.toml` (xtask alias, deployment target), `clippy.toml`, `AGENTS.md`, `CONTEXT.md`, `README.md`. |
 
@@ -31,8 +33,6 @@ Where things live in this repository and where new code belongs. Covers the top-
 
 | Path | Purpose |
 |---|---|
-| `crates/macos/` | `navori-macos` — platform FFI: IOKit, libproc, kqueue, sysctl (R1). |
-| `crates/procs/` | `navori-procs` — process graph, project/worktree resolver, harness catalog (R1). |
 | `crates/secrets/` | `navori-secrets` — Keychain (R2). |
 | `modules/` | One crate per feature module: `awake/` (R1), `inbox/` (R2), `ports/` (R3), `github/` (R4). |
 | `ai/` | AI runtime crates: `llm/`, `models/`, `context/`, `agent/`, `memory/` (R2), `triggers/` (R5), `mcp/` (R6). |
