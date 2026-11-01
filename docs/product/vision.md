@@ -1,0 +1,51 @@
+# Product Vision: Navori
+
+Status: Approved
+Date: 2026-11-01
+
+## Problem
+
+Everyday work on a Mac — including coding with several AI agents in parallel across projects and worktrees — is split across many apps, tabs and single-purpose menubar utilities. The Mac sleeps mid-run and stalls an agent; orphaned dev servers hold ports; pull-request pressure and CI failures sit scattered on GitHub; and no assistant sees the whole picture, so nothing tells the user "this is what needs your decision now" or helps proactively. Each fix today is another utility that costs memory, wake-ups and attention.
+
+## Users
+
+One user: the author — a developer on macOS (Apple Silicon) who runs multiple agentic harnesses (Claude Code, Codex, Grok Build) side by side, reads Vietnamese and English, and builds Navori from source. Navori is both this user's **AI assistant** and their **personal utility app**.
+
+Later, when open-sourced, other developers may install it themselves for their own personal use (`brew install --cask` or a download page). They are users of their own copy, not a second persona Navori is designed around today.
+
+## Goals
+
+- **GOAL-1** Every decision that needs the user — from Navori AI, an agent, or a module — reaches exactly one place, **Needs you**, and can be answered with one click from the menubar; no `Destructive` action ever runs without the user's explicit approval.
+- **GOAL-2** The Mac never sleeps while a Claude Code, Codex or Grok session is working, and returns to normal sleep within 5 minutes after every session has stopped — with no manual action.
+- **GOAL-3** Every port the user has open is shown with the project, worktree and harness that started it, and a whole group can be freed in at most 2 actions.
+- **GOAL-4** Pull requests needing review, failing checks and merge conflicts are counted in the menubar and refreshed within 2 minutes of a change on GitHub; open, approve and merge are reachable from the submenu.
+- **GOAL-5** The user can ask Navori with any model they configure (Claude, OpenAI, DeepSeek, Gemini, Grok, OpenRouter, or a custom OpenAI-compatible endpoint), and the AI can call every action of every module through the same action surface — no per-module AI code.
+- **GOAL-6** The AI sees the full context of what the user is doing, yet no secret (per the Sensitive Data Shield rules) ever leaves the machine or is written to disk; the user can see what the AI has seen.
+- **GOAL-7** The hardcore performance budget stays green in `cargo xtask perf` on every release: idle 0% CPU, ≤ 1 wakeup/s and ≤ 30 MB footprint; ≤ 60 MB with all features and the menu open; cold start to menubar icon ≤ 200 ms; menu open ≤ 50 ms; release `.app` ≤ 25 MB.
+- **GOAL-8** Every release ships one complete capability that meets the Definition of Done and is used daily by the user for at least 3 days without a blocking defect.
+- **GOAL-9** Navori AI proactively puts Decisions and Updates into Needs you when it is worth the interruption (CI failed, an agent finished, a port conflict), within a daily token budget and quiet hours.
+- **GOAL-10** Claude Code, Grok Build and Codex can call Navori's tools over MCP, under the same approval policy as Navori's own AI.
+
+## Non-goals
+
+- Replacing the IDE, terminal, GitHub web or any specialised app — Navori coordinates; it is not where the work happens.
+- Building its own coding agent or agent harness.
+- Windows, Linux, or Intel Macs.
+- Keeping the Mac running with the lid closed (needs a privileged root helper).
+- Letting the AI perform a `Destructive` action without approval.
+- Telemetry, analytics, or any Navori-owned account or server — the only network calls go to GitHub and the AI providers the user configures.
+- Distributing builds to other people for now.
+
+## Scope boundaries
+
+- **In scope now:** releases R1–R6 (Awake, AI Assistant, Ports, GitHub, Proactive, MCP) on macOS 15+ / Apple Silicon for one user; R0 Foundation has shipped.
+- **Deferred:**
+  - Open source: choose a license (the workspace is `UNLICENSED` today), Developer ID signing + notarization, a Homebrew cask, a download page, auto-update.
+  - "Life" utility modules beyond the developer workflow (calendar, notes, clipboard…) — each must pass a check against this vision before it is planned.
+  - Multiple GitHub accounts.
+- **Hard constraints:**
+  - Local-first: no Navori server; data leaves the machine only through the Context Gateway or a module's declared API client.
+  - Navori's secrets live only in the macOS Keychain.
+  - The GOAL-7 performance budget applies to every feature.
+  - No App Sandbox (Navori needs process inspection, kill and IOKit power assertions).
+  - Self-signed code signing with a stable identity until open-sourcing.
