@@ -561,6 +561,24 @@ fn check_deps(root: &Path) -> Result<()> {
     let packages = meta["packages"]
         .as_array()
         .context("cargo metadata: packages")?;
+    let workspace: toml::Table = std::fs::read_to_string(root.join("Cargo.toml"))
+        .context("read workspace Cargo.toml")?
+        .parse()
+        .context("parse workspace Cargo.toml")?;
+    let workspace_lints = workspace
+        .get("workspace")
+        .and_then(|workspace| workspace.get("lints"))
+        .context("workspace lints missing")?;
+    let mut expected_rust = workspace_lints
+        .get("rust")
+        .and_then(toml::Value::as_table)
+        .context("workspace rust lints missing")?
+        .clone();
+    expected_rust.remove("unsafe_code");
+    let expected_clippy = workspace_lints
+        .get("clippy")
+        .and_then(toml::Value::as_table)
+        .context("workspace clippy lints missing")?;
 
     let mut violations = Vec::new();
     for p in packages {
@@ -597,6 +615,14 @@ fn check_deps(root: &Path) -> Result<()> {
                 && !["navori-config", "navori-ipc", "navori-protocol"].contains(dep)
             {
                 Some("the CLI is a thin client: only config, ipc and protocol")
+            } else if name == "navori-macos" {
+                Some("navori-macos has no internal dependencies")
+            } else if *dep == "navori-macos"
+                && name != "navori-procs"
+                && name != "navori-ffi"
+                && !is_module
+            {
+                Some("only navori-procs, navori-ffi, or a module may depend on navori-macos")
             } else if is_module && dep_is_module {
                 Some("modules must not depend on other modules (use the event bus)")
             } else if is_module && dep.starts_with("navori-ai") {
@@ -612,13 +638,99 @@ fn check_deps(root: &Path) -> Result<()> {
                 violations.push(format!("{name} → {dep}: {rule}"));
             }
         }
+
+        if name != "navori-ffi" && name != "navori-macos" {
+            let manifest = read_manifest(path)?;
+            let inherits = manifest
+                .get("lints")
+                .and_then(|lints| lints.get("workspace"))
+                .and_then(toml::Value::as_bool)
+                == Some(true);
+            if !inherits {
+                violations.push(format!("{name}: [lints] workspace = true is required"));
+            }
+        }
+        if name == "navori-macos" {
+            let manifest = read_manifest(path)?;
+            let rust_lints = manifest
+                .get("lints")
+                .and_then(|lints| lints.get("rust"))
+                .and_then(toml::Value::as_table);
+            let clippy_lints = manifest
+                .get("lints")
+                .and_then(|lints| lints.get("clippy"))
+                .and_then(toml::Value::as_table);
+            if rust_lints != Some(&expected_rust) {
+                violations.push(format!(
+                    "{name}: [lints.rust] must match the workspace rust lints minus unsafe_code"
+                ));
+            }
+            if clippy_lints != Some(expected_clippy) {
+                violations.push(format!(
+                    "{name}: [lints.clippy] must match the workspace clippy lints"
+                ));
+            }
+        }
     }
+    violations.extend(public_unsafe_items(root)?);
     if violations.is_empty() {
         println!("✓ dependency rules hold for {} packages", packages.len());
         Ok(())
     } else {
         bail!("dependency rule violations:\n  {}", violations.join("\n  "))
     }
+}
+
+fn read_manifest(path: &str) -> Result<toml::Table> {
+    std::fs::read_to_string(path)
+        .with_context(|| format!("read {path}"))?
+        .parse()
+        .with_context(|| format!("parse {path}"))
+}
+
+fn public_unsafe_items(root: &Path) -> Result<Vec<String>> {
+    let mut files = Vec::new();
+    rust_sources(&root.join("crates/macos/src"), &mut files)?;
+    let mut violations = Vec::new();
+    for file in files {
+        let text =
+            std::fs::read_to_string(&file).with_context(|| format!("read {}", file.display()))?;
+        for (idx, line) in text.lines().enumerate() {
+            if line.contains("pub unsafe fn")
+                || line.contains("pub unsafe trait")
+                || line.contains("pub(crate) unsafe trait")
+                || line.contains("pub unsafe extern")
+            {
+                let rel = file.strip_prefix(root).unwrap_or(file.as_path());
+                violations.push(format!(
+                    "navori-macos: public unsafe item at {}:{}: no pub unsafe fn, pub unsafe trait, pub(crate) unsafe trait, or pub unsafe extern",
+                    rel.display(),
+                    idx + 1
+                ));
+            }
+        }
+    }
+    Ok(violations)
+}
+
+fn rust_sources(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
+    if !dir.is_dir() {
+        return Ok(());
+    }
+    let mut entries = std::fs::read_dir(dir)
+        .with_context(|| format!("read {}", dir.display()))?
+        .collect::<std::io::Result<Vec<_>>>()
+        .with_context(|| format!("read {}", dir.display()))?;
+    entries.sort_by_key(std::fs::DirEntry::file_name);
+    for entry in entries {
+        let path = entry.path();
+        if path.is_dir() {
+            rust_sources(&path, out)?;
+        } else if path.extension().is_some_and(|ext| ext == "rs") {
+            out.push(path);
+        }
+    }
+    Ok(())
 }
 
 // ── outdated ───────────────────────────────────────────────────────────────────────────

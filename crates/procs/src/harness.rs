@@ -1,0 +1,1 @@
+//! Coding-agent harness recognition.
