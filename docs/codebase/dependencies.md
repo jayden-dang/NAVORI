@@ -22,14 +22,17 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | `navori-ffi` | every foundation crate (`config`, `ipc`, `kernel`, `protocol`, `redact`, `store`) | allowed — the composition root; later also `modules/*`, `ai/*` |
 | `navori` CLI (`navori-cli`) | `navori-config`, `navori-ipc`, `navori-protocol` | allowed — thin client; `navori-ffi` only as a dev-dependency for end-to-end tests |
 | `xtask` | — | allowed: none (tooling only) |
+| `navori-macos` | — | allowed: none — leaf |
+| `navori-procs` | `navori-macos` | allowed — through the safe traits |
 | Swift `Navori` target | `NavoriCore` (generated) → `NavoriCoreFFI` (xcframework) | allowed — only `CoreStore` imports `NavoriCore` (ARCH-2) |
+
+`modules/*` may name `navori-macos` for the traits `ProcessSource`, `ExitSource` and `PowerAssertions`. `navori-ffi` may too (composition root). No other crate may. `cargo xtask check-deps` enforces that edge.
 
 **Planned**
 
 | From | To | Rule |
 |---|---|---|
-| `navori-procs` | `navori-macos` | allowed (through safe traits) |
-| `modules/*` | `kernel`, `protocol`, `store`, `config`, `redact`, `procs`, `secrets` | allowed; platform code reached through traits from `navori-macos` |
+| `modules/*` | `kernel`, `protocol`, `store`, `config`, `redact`, `procs`, `secrets` | allowed |
 | `ai/agent` | `ai/llm`, `ai/models`, `ai/context`, `ai/memory`, `ai/mcp`, `kernel`, `protocol` | allowed |
 | `ai/context`, `ai/memory` | `navori-redact` | required — nothing reaches an LLM or memory unredacted (ARCH-6) |
 | `ai/*` | `navori-secrets` | allowed — provider keys from the Keychain |
@@ -60,7 +63,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | Logging | `tracing`, `tracing-subscriber`, `tracing-appender` | — |
 | Storage | `rusqlite` (bundled SQLite) | `sqlite-vec` for memory search |
 | Text matching | `regex` | — |
-| FFI | `uniffi` 0.32 | `objc2-io-kit`, `libproc`, `libc` (R1) |
+| FFI | `uniffi` 0.32, `libc`, `objc2-io-kit`, `objc2-core-foundation` | — |
 | CLI | `clap` | — |
 | Secrets | — | `keyring` (apple-native) (R2) |
 | HTTP, SSE | — | `reqwest` (rustls), `eventsource-stream` (R2) |
