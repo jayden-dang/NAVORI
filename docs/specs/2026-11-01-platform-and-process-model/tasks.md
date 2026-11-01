@@ -428,9 +428,9 @@ _Requirements: PROCS-8.4_
 
 **Depends-on:** Task 8, Task 9, Task 11, Task 12
 
-- [ ] **Step 1:** Write `tests/no_leaks.rs`: a fake process with argv `["node", "/x/@anthropic-ai/claude-code/cli.js", concat!("--token=ghp_", "FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE00")]`, cwd `/Users/u/secret-project`, exe `/Users/u/bin/node`; capture `tracing` at `TRACE` with `tracing_subscriber::fmt().with_writer(<Arc<Mutex<Vec<u8>>> writer>)` as the default subscriber for the test; exercise `take`, `sessions`, `harness_of`, `activity`, every `Unavailable` path (exit, replace, denied), a `ProcWatcher` kqueue-failure path and an `AssertionGuard::new(|| Err(PowerError::ReleaseFailed { code: 1 }))` dropped unreleased; assert neither the captured log nor `format!("{e}")` / `format!("{e:?}")` of every returned error contains `ghp_`, `secret-project` or `/Users/u/bin`. Run `cargo nextest run -p navori-procs --test no_leaks` — expect: pass, or a failure naming the leaking text.
-- [ ] **Step 2:** Fix any leaking variant or log field. Run — expect: pass.
-- [ ] **Step 3:** `cargo xtask ci` — expect: pass. Commit `test(procs): prove argv, environment and paths never reach errors or logs`.
+- [x] **Step 1:** Write `tests/no_leaks.rs`: a fake process with argv `["node", "/x/@anthropic-ai/claude-code/cli.js", concat!("--token=ghp_", "FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE00")]`, cwd `/Users/u/secret-project`, exe `/Users/u/bin/node`; capture `tracing` at `TRACE` with `tracing_subscriber::fmt().with_writer(<Arc<Mutex<Vec<u8>>> writer>)` as the default subscriber for the test; exercise `take`, `sessions`, `harness_of`, `activity`, every `Unavailable` path (exit, replace, denied), a `ProcWatcher` kqueue-failure path and an `AssertionGuard::new(|| Err(PowerError::ReleaseFailed { code: 1 }))` dropped unreleased; assert neither the captured log nor `format!("{e}")` / `format!("{e:?}")` of every returned error contains `ghp_`, `secret-project` or `/Users/u/bin`. Run `cargo nextest run -p navori-procs --test no_leaks` — expect: pass, or a failure naming the leaking text.
+- [x] **Step 2:** Fix any leaking variant or log field. Run — expect: pass.
+- [x] **Step 3:** `cargo xtask ci` — expect: pass. Commit `test(procs): prove argv, environment and paths never reach errors or logs`.
 
 _Requirements: PROCS-8.5_
 
@@ -449,8 +449,8 @@ _Requirements: PROCS-8.5_
 
 **Depends-on:** Task 2, Task 7, Task 8, Task 9, Task 11, Task 12
 
-- [ ] **Step 1:** Apply the edits listed in design "Documentation updates".
-- [ ] **Step 2:** Check: `rg -n "libproc" docs/codebase/dependencies.md docs/ARCHITECTURE.md` — expect: no match; `rg -n "walking up the process tree" docs/ARCHITECTURE.md` — expect: no match; `rg -n "navori-macos" docs/architecture/INDEX.md` — expect: the ARCH-9 enforcement row. `cargo xtask ci` — expect: pass.
-- [ ] **Step 3:** Commit `docs(architecture): record the built platform layer and process model`.
+- [x] **Step 1:** Apply the edits listed in design "Documentation updates".
+- [x] **Step 2:** Check: `rg -n "libproc" docs/codebase/dependencies.md docs/ARCHITECTURE.md` — expect: no match; `rg -n "walking up the process tree" docs/ARCHITECTURE.md` — expect: no match; `rg -n "navori-macos" docs/architecture/INDEX.md` — expect: the ARCH-9 enforcement row. `cargo xtask ci` — expect: pass.
+- [x] **Step 3:** Commit `docs(architecture): record the built platform layer and process model`.
 
 _Requirements: none — infrastructure (design.md "Documentation updates" carries no requirement)_
