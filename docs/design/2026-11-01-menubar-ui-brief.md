@@ -1,118 +1,118 @@
 # UI brief — Navori menubar (level 0 + feature submenus)
 
 > Locked 2026-11-01 via `draft-ui`. Screenshot: [`2026-11-01-menubar-ui-brief.png`](2026-11-01-menubar-ui-brief.png).
-> **Provisional by design:** từng feature (R1 Awake, R3 Ports, R4 GitHub, R2/R5 AI) sẽ cập nhật section của mình khi được triển khai; layout tổng và các quy tắc dưới đây là cố định.
+> **Provisional by design:** each feature (R1 Awake, R3 Ports, R4 GitHub, R2/R5 AI) will update its own section when it is implemented; the overall layout and the rules below are fixed.
 
 ## Decision
 
-**Hướng A — "Menu" (NSMenu + cascading submenus), bản A5.** Chọn A thay vì B (Triage tabs) và C (Cockpit theo dự án), rồi tinh chỉnh qua 4 vòng review.
+**Direction A — "Menu" (NSMenu + cascading submenus), variant A5.** A was chosen over B (Triage tabs) and C (per-project Cockpit), then refined over 4 review rounds.
 
-Lời người dùng (nguyên văn, theo thứ tự):
-- "Tôi muốn đi theo hướng của A — nhưng A chưa đủ tốt, chưa đủ clean và modern"
-- "icons … cần đơn sắc để đồng bộ với macos hơn"
-- tham chiếu RepoBar: "vẫn cần tối ưu hơn nữa, đẹp hơn, gọn gàng hơn, dễ dùng hơn"
-- "phần awake, ports, PR cần đơn giản hơn, 1 dòng với info quan trọng only — không cần switch account github"; "trong trường hợp nhiều PR, nhiều repo … cần hiển thị rõ hơn"
-- "Bỏ dòng đầu … needs you … tương lai sẽ là nơi hiển thị notification từ AI, thông tin, to do … needs you ở đây là quyết định của tôi và AI, không phải là PR của git"
-- "Chốt, tạm thời như thế — khi triển khai features sẽ update thêm."
+The user's words (verbatim, in order; the Vietnamese quotes are kept as-is, with an English translation appended):
+- "Tôi muốn đi theo hướng của A — nhưng A chưa đủ tốt, chưa đủ clean và modern" (EN: "I want to go with direction A — but A isn't good enough yet, not clean and modern enough")
+- "icons … cần đơn sắc để đồng bộ với macos hơn" (EN: "icons … need to be monochrome to fit in better with macOS")
+- reference to RepoBar: "vẫn cần tối ưu hơn nữa, đẹp hơn, gọn gàng hơn, dễ dùng hơn" (EN: "still needs more optimization, nicer, tidier, easier to use")
+- "phần awake, ports, PR cần đơn giản hơn, 1 dòng với info quan trọng only — không cần switch account github"; "trong trường hợp nhiều PR, nhiều repo … cần hiển thị rõ hơn" (EN: "the awake, ports, PR parts need to be simpler, 1 line with important info only — no need to switch GitHub account"; "when there are many PRs, many repos … they need to be displayed more clearly")
+- "Bỏ dòng đầu … needs you … tương lai sẽ là nơi hiển thị notification từ AI, thông tin, to do … needs you ở đây là quyết định của tôi và AI, không phải là PR của git" (EN: "Remove the first line … needs you … in the future it will be where notifications from AI, information, to-dos are shown … needs you here means decisions by me and the AI, not git PRs")
+- "Chốt, tạm thời như thế — khi triển khai features sẽ update thêm." (EN: "Locked, for now like this — it will be updated further as features are implemented.")
 
 ## Grounding
 
-- **Token source of record:** macOS system semantics — `labelColor`, `secondaryLabelColor`, `tertiaryLabelColor`, `separatorColor`, `controlAccentColor` / `selectedContentBackgroundColor`, `systemGreen/Red/Orange/Blue`; system menu material. Repo chưa có `docs/standards/design-tokens.md`; không đề xuất token riêng.
-- **Kit hiện có** (`apps/macos/Navori`): `Banner`, `SectionTitle`, status dot (`Circle().fill`), borderless buttons. Ladder dùng bên dưới: `rung 1 — <native control>` = AppKit/SwiftUI có sẵn; `rung 2 — <kit piece>` = thành phần Navori đã có; `new (rung 7)` = thành phần mới, kèm lý do.
+- **Token source of record:** macOS system semantics — `labelColor`, `secondaryLabelColor`, `tertiaryLabelColor`, `separatorColor`, `controlAccentColor` / `selectedContentBackgroundColor`, `systemGreen/Red/Orange/Blue`; system menu material. The repo has no `docs/standards/design-tokens.md` yet; no custom tokens are proposed.
+- **Existing kit** (`apps/macos/Navori`): `Banner`, `SectionTitle`, status dot (`Circle().fill`), borderless buttons. Ladder used below: `rung 1 — <native control>` = built-in AppKit/SwiftUI; `rung 2 — <kit piece>` = an existing Navori component; `new (rung 7)` = a new component, with the reason given.
 
-## Job (màn hình làm việc)
+## Job (the working screen)
 
-- **Question:** Có gì cần tôi quyết định ngay, và máy tôi đang ở trạng thái nào?
-- **Finding:** (dữ liệu ngày lock) "2 quyết định đang chờ: dừng 3 server Claude để không trong openklynt-main; giữ máy thức cho Codex trong cargo-zip" — nằm ở đầu menu, dòng đầu tiên dưới ô Ask.
-- **Primary job:** trả lời quyết định đầu tiên bằng nút inline ngay trên dòng đó (`Stop 3` / `Keep`) — một click, không mở thêm gì.
+- **Question:** Is anything waiting on my decision right now, and what state is my machine in?
+- **Finding:** (data on the lock date) "2 decisions pending: stop 3 Claude servers so they don't sit idle in openklynt-main; keep the machine awake for Codex in cargo-zip" — at the top of the menu, the first row under the Ask field.
+- **Primary job:** answer the first decision with an inline button right on that row (`Stop 3` / `Keep`) — one click, nothing else opens.
 
 ## Signature
 
-**Mọi chi tiết cách một lần hover** — menu cấp 0 chỉ gồm *Ask → Needs you (inbox) → 3 dòng feature một dòng*, mọi thứ còn lại nằm trong submenu macOS thật, lật sang trái khi sát mép màn hình, tối đa 3 cấp.
+**Every detail is one hover away** — the level-0 menu contains only *Ask → Needs you (inbox) → 3 one-line feature rows*; everything else lives in real macOS submenus that flip left near the screen edge, at most 3 levels deep.
 
 ---
 
-## Surface 1 — Menu cấp 0
+## Surface 1 — Level-0 menu
 
-- **Layout:** rộng 360pt, padding 5pt. Thứ tự cố định:
-  1. Ô **Ask Navori…** (`⌥ Space`) — không có dòng tiêu đề/caption phía trên.
-  2. Separator → header **Needs you** + tổng số (căn phải).
-  3. Tối đa **3** mục inbox (xem quy tắc inbox), rồi `Show all N ›` khi N > 3.
-  4. Separator → 3 dòng feature, **mỗi dòng 1 dòng**: icon · tên · *một* thông tin quan trọng (căn phải) · `›`
-     - **Awake** — `● On · Claude, Codex` (chấm xanh khi bật; `Off` khi tắt)
+- **Layout:** 360pt wide, 5pt padding. Fixed order:
+  1. The **Ask Navori…** field (`⌥ Space`) — no title/caption row above it.
+  2. Separator → **Needs you** header + total count (right-aligned).
+  3. Up to **3** inbox items (see the inbox rules), then `Show all N ›` when N > 3.
+  4. Separator → 3 feature rows, **one line each**: icon · name · *one* important piece of info (right-aligned) · `›`
+     - **Awake** — `● On · Claude, Codex` (green dot when on; `Off` when off)
      - **Ports** — `17 open`
-     - **Pull Requests** — `1 to review · ● 2 failing` (phần failing chỉ hiện khi > 0)
+     - **Pull Requests** — `1 to review · ● 2 failing` (the failing part shows only when > 0)
   5. Separator → `Settings… ⌘,` · `About Navori` · `Quit Navori ⌘Q`.
-  - Không có account, API quota, hay dòng "updated" ở cấp 0.
+  - No account, API quota, or "updated" row at level 0.
 - **Components:**
-  - Menu + submenu cascade: `rung 1 — NSMenu / NSMenuItem.submenu` (cần spike, xem Open questions).
-  - Hàng tùy biến: `new (rung 7) — MenuRowView` (SwiftUI trong `NSMenuItem.view`): lead 20pt, title, end value, chevron, tối đa 2 dòng phụ, vùng action inline. Lý do: NSMenuItem chuẩn không có dòng phụ / nút inline.
-  - Ô Ask: `rung 1 — NSSearchField` trong item view.
-  - Inbox row: `new (rung 7) — InboxRowView` (xem Surface 2).
+  - Menu + submenu cascade: `rung 1 — NSMenu / NSMenuItem.submenu` (needs a spike, see Open questions).
+  - Custom row: `new (rung 7) — MenuRowView` (SwiftUI in `NSMenuItem.view`): 20pt lead, title, end value, chevron, up to 2 secondary lines, inline action area. Reason: a standard NSMenuItem has no secondary line / inline buttons.
+  - Ask field: `rung 1 — NSSearchField` in an item view.
+  - Inbox row: `new (rung 7) — InboxRowView` (see Surface 2).
   - Status dot: `rung 2 — status dot`.
-  - Icon: `rung 1 — SF Symbols` (monochrome rendering): `sparkle`, `cup.and.saucer`, `point.3.connected.trianglepath.dotted`, `arrow.triangle.pull`, `gearshape`, `bell`, `square`.
-- **States:** default · hover/selected (nền accent bo 8pt, chữ + icon trắng) · inbox rỗng (`✓ You're all caught up`, menu ngắn lại) · core không chạy (`rung 2 — Banner` style error ở vị trí inbox: "Navori core isn't running" + `Restart`) · GitHub offline (`Pull Requests  offline · 5 min ago`) · Awake off (`Off`, không chấm).
-- **Type & color:** SF Pro 14pt title/item, 13pt giá trị căn phải (`secondaryLabelColor`), 12pt dòng phụ. SF Mono 11.5pt cho số port, `#PR`, pid. Icon đơn sắc `secondaryLabelColor` (trắng khi selected). Màu ngữ nghĩa **chỉ** là chấm 7pt (`systemGreen` on/pass, `systemRed` fail, `systemOrange` conflict, `systemBlue` review/decision). Không có ô màu, gradient, hay icon nhiều màu.
-- **A11y:** điều hướng bàn phím kiểu NSMenu (↑↓, → mở submenu, ← đóng, Return, Esc); VoiceOver đọc gộp "title, dòng phụ, thời gian"; trạng thái không chỉ bằng màu (luôn có chữ: "2 failing", "On"); tôn trọng Reduce Transparency (material đục) và Reduce Motion; vùng bấm nút inline ≥ 24pt cao.
+  - Icons: `rung 1 — SF Symbols` (monochrome rendering): `sparkle`, `cup.and.saucer`, `point.3.connected.trianglepath.dotted`, `arrow.triangle.pull`, `gearshape`, `bell`, `square`.
+- **States:** default · hover/selected (accent background with 8pt corners, white text + icon) · empty inbox (`✓ You're all caught up`, the menu gets shorter) · core not running (`rung 2 — Banner` error style in the inbox position: "Navori core isn't running" + `Restart`) · GitHub offline (`Pull Requests  offline · 5 min ago`) · Awake off (`Off`, no dot).
+- **Type & color:** SF Pro 14pt title/item, 13pt right-aligned value (`secondaryLabelColor`), 12pt secondary line. SF Mono 11.5pt for port numbers, `#PR`, pid. Monochrome icons in `secondaryLabelColor` (white when selected). Semantic color is **only** the 7pt dot (`systemGreen` on/pass, `systemRed` fail, `systemOrange` conflict, `systemBlue` review/decision). No color tiles, gradients, or multicolor icons.
+- **A11y:** NSMenu-style keyboard navigation (↑↓, → opens a submenu, ← closes, Return, Esc); VoiceOver reads "title, secondary line, time" as one; state is never conveyed by color alone (always text: "2 failing", "On"); respects Reduce Transparency (opaque material) and Reduce Motion; inline button hit area ≥ 24pt tall.
 
-## Surface 2 — Needs you (inbox) — trên cấp 0 và submenu `Show all`
+## Surface 2 — Needs you (inbox) — on level 0 and in the `Show all` submenu
 
-Inbox là **nơi quyết định chung giữa người dùng và Navori AI** — *không* phải danh sách PR (PR chỉ nằm ở Surface 5).
+The inbox is **the shared decision place between the user and Navori AI** — it is *not* a PR list (PRs live only in Surface 5).
 
-- **Layout:** mỗi mục: lead (20pt) · title (1 dòng, cắt …) · tuổi căn phải · dòng phụ = *lý do* (1 dòng) · [Decision] hàng nút inline.
-  - Thứ tự: **Decision → To-do → Update**; trong cùng loại, mới nhất trước (Decision hết hạn sớm nhất trước).
-  - Cấp 0: tối đa 3 mục; submenu `Show all N`: header `Needs you N`, segmented **All · Decisions n · To-dos n · Updates n**, danh sách đầy đủ, ô **Add a to-do…**, nút inline **Clear updates** · **History**.
-- **Loại mục:**
+- **Layout:** each item: lead (20pt) · title (1 line, truncated …) · age right-aligned · secondary line = the *reason* (1 line) · [Decision] row of inline buttons.
+  - Order: **Decision → To-do → Update**; within a kind, newest first (for Decisions, earliest expiry first).
+  - Level 0: at most 3 items; `Show all N` submenu: header `Needs you N`, segmented **All · Decisions n · To-dos n · Updates n**, the full list, an **Add a to-do…** field, inline buttons **Clear updates** · **History**.
+- **Item kinds:**
 
-  | Loại | Lead | Hành vi |
+  | Kind | Lead | Behavior |
   |---|---|---|
-  | **Decision** (AI hỏi, người quyết) | `sparkle` | 1 nút primary + 1 nút phụ inline (vd. `Stop 3` / `Keep`, `Keep 1 h` / `Let it end`). Hành động `Risk::Destructive` hiện chú thích "needs your approval" và **không bao giờ** tự chạy. Trả lời xong → mục biến mất, kết quả thành một Update. |
-  | **To-do** (người hoặc AI tạo) | ô vuông bấm được | Tick → hoàn thành (biến mất, có Undo trong History). Dòng phụ: hạn + ai tạo ("Due today · added by you", "Suggested by Navori AI"). |
-  | **Update** (thông báo) | `bell`, mờ hơn | Không có nút; click mở ngữ cảnh. Tự ẩn sau khi xem / `Clear updates`. |
+  | **Decision** (AI asks, the person decides) | `sparkle` | 1 primary + 1 secondary inline button (e.g. `Stop 3` / `Keep`, `Keep 1 h` / `Let it end`). A `Risk::Destructive` action shows the note "needs your approval" and **never** runs on its own. Once answered → the item disappears and the result becomes an Update. |
+  | **To-do** (created by the person or the AI) | clickable square | Tick → completed (disappears, with Undo in History). Secondary line: due date + who created it ("Due today · added by you", "Suggested by Navori AI"). |
+  | **Update** (notification) | `bell`, dimmer | No buttons; click opens the context. Auto-hides after being viewed / `Clear updates`. |
 
-- **Components:** `new (rung 7) — InboxRowView` (lead, title, age, reason, action slot); nút inline: `new (rung 7) — CapsuleButton` (primary = accent, secondary = fill) — lý do: NSButton chuẩn không có kiểu capsule nhỏ trong menu; segmented: `rung 1 — NSSegmentedControl`; ô thêm to-do: `rung 1 — NSTextField`.
-- **States:** rỗng · nhiều (N > 3 → `Show all N`) · nút đang chạy (spinner trong nút, các nút khác disabled) · hành động lỗi (dòng phụ đổi thành lỗi + `Retry`) · Decision hết hạn (tự chuyển thành Update "expired").
-- **Type & color:** title 14pt regular (Update nhạt hơn: lead `tertiaryLabelColor`); lý do 12pt `secondaryLabelColor`; nút 12.5pt medium cao 24pt; khi row selected: nút primary đảo thành nền trắng chữ accent, nút phụ nền trắng 22%.
-- **A11y:** nút inline nằm trong thứ tự Tab của row; VoiceOver đọc loại mục ("Decision: Stop 3 idle servers…, needs your approval"); phím tắt: Return = nút primary, ⌘⌫ = dismiss.
+- **Components:** `new (rung 7) — InboxRowView` (lead, title, age, reason, action slot); inline button: `new (rung 7) — CapsuleButton` (primary = accent, secondary = fill) — reason: a standard NSButton has no small capsule style in a menu; segmented: `rung 1 — NSSegmentedControl`; to-do field: `rung 1 — NSTextField`.
+- **States:** empty · many (N > 3 → `Show all N`) · button running (spinner in the button, other buttons disabled) · action error (secondary line turns into the error + `Retry`) · Decision expired (automatically becomes an "expired" Update).
+- **Type & color:** title 14pt regular (Update is lighter: lead `tertiaryLabelColor`); reason 12pt `secondaryLabelColor`; buttons 12.5pt medium, 24pt tall; when the row is selected: the primary button inverts to a white background with accent text, the secondary button gets a 22% white background.
+- **A11y:** inline buttons are in the row's Tab order; VoiceOver reads the item kind ("Decision: Stop 3 idle servers…, needs your approval"); shortcuts: Return = primary button, ⌘⌫ = dismiss.
 
 ## Surface 3 — Awake submenu (+ Agent sessions, Integrations)
 
-- **Layout:** lệnh nhanh (`Keep awake for 1 hour`, `Keep awake until I turn it off`, `Let my Mac sleep now`) → **status block** `Awake · since 11:38` + "3 leases · system sleep blocked · display may sleep" với nút inline `Pause 15m · Display on · Release all` → header **Holding**: mỗi lease 2 dòng (`Claude · NAVORI/main` / `working · pid 23719`, thời gian căn phải; hover → nút `Release`) → `Agent sessions [6] ›`, `Integrations [3] ›`.
-  - Cấp 3 **Agent sessions:** mọi phiên harness đang mở (claude/codex/grok), trạng thái, thời gian; hover → `Show terminal`, `Keep awake for this session`.
-  - Cấp 3 **Integrations:** Claude Code / Grok Build / Codex với đường dẫn file hook và trạng thái `● installed`; click → Repair. Chú thích: Grok cũng đọc hook của Claude, sự kiện được khử trùng lặp theo session.
-- **Components:** `new (rung 7) — StatusBlockView` (icon, tiêu đề + phụ đề, dòng mô tả, hàng nút inline — dùng chung cho Ports/project); count capsule `new (rung 7) — CountBadge`; hover actions `new (rung 7) — RowActionButton` (icon 26×22).
-- **States:** off (status block "Awake off" + `Keep awake for 1 hour` nổi bật) · không có lease agent · hook chưa cài (Integrations hiện `● not installed` + inbox To-do "Install the Grok hook").
-- **Type & color / A11y:** như Surface 1; nút hover phải truy cập được bằng bàn phím (Tab trong row).
+- **Layout:** quick commands (`Keep awake for 1 hour`, `Keep awake until I turn it off`, `Let my Mac sleep now`) → **status block** `Awake · since 11:38` + "3 leases · system sleep blocked · display may sleep" with inline buttons `Pause 15m · Display on · Release all` → header **Holding**: each lease on 2 lines (`Claude · NAVORI/main` / `working · pid 23719`, time right-aligned; hover → `Release` button) → `Agent sessions [6] ›`, `Integrations [3] ›`.
+  - Level 3 **Agent sessions:** every open harness session (claude/codex/grok), status, time; hover → `Show terminal`, `Keep awake for this session`.
+  - Level 3 **Integrations:** Claude Code / Grok Build / Codex with the hook file path and `● installed` status; click → Repair. Note: Grok also reads Claude's hooks, so events are de-duplicated per session.
+- **Components:** `new (rung 7) — StatusBlockView` (icon, title + subtitle, description line, inline button row — shared with Ports/project); count capsule `new (rung 7) — CountBadge`; hover actions `new (rung 7) — RowActionButton` (icon 26×22).
+- **States:** off (status block "Awake off" + a prominent `Keep awake for 1 hour`) · no agent leases · hook not installed (Integrations shows `● not installed` + an inbox To-do "Install the Grok hook").
+- **Type & color / A11y:** as Surface 1; hover buttons must be keyboard-reachable (Tab within the row).
 
 ## Surface 4 — Ports submenu (+ Project)
 
-- **Layout:** `Open all web servers [5]`, `Stop all ports…` → header **Projects** (mỗi dự án 2 dòng: tên + badge số port; dòng phụ `⑂ main · by Claude · :5173 :3101 :3100` hoặc `2 worktrees`) → chú thích "4 macOS system ports hidden · refreshed 3 s ago".
-  - Cấp 3 **Project:** header tên + đường dẫn (mono); segmented lọc worktree khi > 1 (`All · dev · feat-lmedia`); mỗi tiến trình 2 dòng (`postgres` / `docker · klynt-postgres`, port mono căn phải; hover → `Open` (nếu web) · `Copy` · `Stop`); hàng inline cuối `Terminal · Finder · Stop N`.
-- **Components:** như Surface 3 + `rung 1 — NSSegmentedControl`.
-- **States:** không có port · port của UID khác/hệ thống luôn ẩn · `Stop` đang chạy / thất bại (dòng phụ báo lỗi) · `Stop all` luôn đi qua xác nhận (hoặc Decision trong inbox nếu do AI đề xuất).
+- **Layout:** `Open all web servers [5]`, `Stop all ports…` → header **Projects** (each project on 2 lines: name + port-count badge; secondary line `⑂ main · by Claude · :5173 :3101 :3100` or `2 worktrees`) → note "4 macOS system ports hidden · refreshed 3 s ago".
+  - Level 3 **Project:** header with name + path (mono); a worktree filter segmented control when > 1 (`All · dev · feat-lmedia`); each process on 2 lines (`postgres` / `docker · klynt-postgres`, port in mono right-aligned; hover → `Open` (if web) · `Copy` · `Stop`); a final inline row `Terminal · Finder · Stop N`.
+- **Components:** as Surface 3 + `rung 1 — NSSegmentedControl`.
+- **States:** no ports · ports of other UIDs/system always hidden · `Stop` running / failed (secondary line shows the error) · `Stop all` always goes through confirmation (or a Decision in the inbox if proposed by the AI).
 
 ## Surface 5 — Pull Requests submenu (+ lists, By repository)
 
-- **Layout:** `Open pull requests on GitHub`, `Open notifications [4]` → nhóm **Review requested · My pull requests · Failing checks · Merge conflicts** (badge + `›`) → header **By repository N**: top 6 repo theo số PR (badge + `›`), sau đó `All N repositories ›` → chú thích "@account · updated 40 s ago". **Không** có account block / Switch account.
-  - Cấp 3 **danh sách PR:** header + segmented khi hữu ích (`All · Ready · Drafts`); mỗi PR 2 dòng: avatar · tiêu đề · tuổi căn phải / `repo #n · author` (mono) + **một** trạng thái quan trọng nhất (thứ tự ưu tiên: checks fail › checks running › conflicts › review requested › approved › draft › checks pass); hover → `Open on GitHub` · `Copy link`.
-- **Components:** avatar `new (rung 7) — AvatarView` (ảnh GitHub, fallback chữ cái đầu trên nền fill); còn lại dùng chung.
-- **States:** chưa đăng nhập (một dòng `Sign in to GitHub…` thay toàn bộ submenu) · offline/rate-limited (chú thích cuối đổi thành lý do + thời điểm thử lại) · danh sách rỗng ("Nothing here.").
+- **Layout:** `Open pull requests on GitHub`, `Open notifications [4]` → groups **Review requested · My pull requests · Failing checks · Merge conflicts** (badge + `›`) → header **By repository N**: top 6 repos by PR count (badge + `›`), then `All N repositories ›` → note "@account · updated 40 s ago". **No** account block / Switch account.
+  - Level 3 **PR list:** header + segmented control when useful (`All · Ready · Drafts`); each PR on 2 lines: avatar · title · age right-aligned / `repo #n · author` (mono) + **one** most important status (priority order: checks fail › checks running › conflicts › review requested › approved › draft › checks pass); hover → `Open on GitHub` · `Copy link`.
+- **Components:** avatar `new (rung 7) — AvatarView` (GitHub image, fallback initial letter on a fill background); the rest is shared.
+- **States:** not signed in (a single row `Sign in to GitHub…` replaces the whole submenu) · offline/rate-limited (the footer note changes to the reason + retry time) · empty list ("Nothing here.").
 
 ---
 
-## Amendments (ràng buộc đã quyết trong review)
+## Amendments (constraints decided in review)
 
-1. Hướng **A** (NSMenu + submenu) — không dùng tabs (B) hay dashboard theo dự án (C).
-2. Gọn & hiện đại: hàng một dòng khi có thể, action chỉ hiện khi hover, icon kiểu SF Symbols.
-3. **Icon đơn sắc** — không ô màu, không gradient; màu ngữ nghĩa chỉ là chấm 7pt; switch dùng accent hệ thống.
-4. Pattern RepoBar: submenu nhiều cấp (≤ 3), status block có nút inline, count capsule xám, trạng thái dạng chấm + chữ, avatar thật, chữ 14pt.
-5. Cấp 0: Awake / Ports / Pull Requests mỗi mục **một dòng, một thông tin quan trọng**; bỏ account & Switch account ở mọi nơi.
-6. Chịu tải lớn: cấp 0 tối đa 3 mục inbox + `Show all N`; PR gom theo nhóm và **By repository** (top 6 + All); mỗi PR chỉ hiện 1 trạng thái.
-7. Bỏ dòng caption "Navori · N need you · time" — menu mở bằng ô Ask.
-8. **Needs you = inbox quyết định giữa người dùng và AI** (Decision / To-do / Update), không chứa PR.
-9. Brief tạm thời: mỗi feature cập nhật surface của mình khi ship; các ràng buộc 1–8 giữ nguyên trừ khi review lại.
+1. Direction **A** (NSMenu + submenus) — no tabs (B) or per-project dashboard (C).
+2. Tidy & modern: one-line rows where possible, actions shown only on hover, SF Symbols-style icons.
+3. **Monochrome icons** — no color tiles, no gradients; semantic color is only the 7pt dot; switches use the system accent.
+4. RepoBar patterns: multi-level submenus (≤ 3), status block with inline buttons, gray count capsules, dot + text states, real avatars, 14pt text.
+5. Level 0: Awake / Ports / Pull Requests are **one line, one important piece of info** each; drop the account & Switch account everywhere.
+6. Handles heavy load: level 0 has at most 3 inbox items + `Show all N`; PRs are grouped and shown **By repository** (top 6 + All); each PR shows only 1 status.
+7. Drop the caption row "Navori · N need you · time" — the menu opens with the Ask field.
+8. **Needs you = the decision inbox between the user and the AI** (Decision / To-do / Update), containing no PRs.
+9. The brief is provisional: each feature updates its own surface when it ships; constraints 1–8 stay unless re-reviewed.
 
-## Open questions cho `design-solution`
+## Open questions for `design-solution`
 
-- **NSMenu thật hay NSPanel tự vẽ cascade?** NSMenu cho hành vi native miễn phí (bàn phím, material, lật submenu) nhưng ô nhập (Ask, Add a to-do) và nút inline trong `NSMenuItem.view` cần spike để xác nhận focus/tracking. R0 hiện dùng `NSPanel` — quyết định này có thể thay thế `StatusPanel`.
-- Dữ liệu inbox (Decision/To-do/Update) cần một module mới trong kernel (đề xuất `navori-mod-inbox`, nhận Decision từ AI runtime qua `ActionSpec` + `Risk`).
+- **Real NSMenu or a custom-drawn NSPanel cascade?** NSMenu gives native behavior for free (keyboard, material, submenu flipping) but input fields (Ask, Add a to-do) and inline buttons inside `NSMenuItem.view` need a spike to confirm focus/tracking. R0 currently uses an `NSPanel` — this decision may replace `StatusPanel`.
+- Inbox data (Decision/To-do/Update) needs a new module in the kernel (proposed `navori-mod-inbox`, receiving Decisions from the AI runtime via `ActionSpec` + `Risk`).
