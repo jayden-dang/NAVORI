@@ -109,7 +109,13 @@ pub(crate) fn recognize(snapshot: &Snapshot, process: &Process) -> Option<Harnes
     if !is_runtime(path) {
         return None;
     }
-    let argv = snapshot.argv(process.id).ok()?;
+    let argv = match snapshot.argv(process.id) {
+        Ok(argv) => argv,
+        Err(_) => {
+            tracing::debug!(pid = process.id.pid, "arguments could not be read");
+            return None;
+        }
+    };
     runtime_hit(argv.get(1)?)
 }
 

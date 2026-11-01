@@ -107,7 +107,8 @@ fn argv_environment_and_paths_stay_out_of_errors_and_logs() -> Result<(), String
         Ok(snapshot) => snapshot,
         Err(err) => {
             note(&mut texts, &err);
-            return leaks(&writer, &texts);
+            leaks(&writer, &texts)?;
+            return Err("taking a snapshot failed".to_owned());
         }
     };
     let agent = identity(&snapshot, AGENT)?;
@@ -245,7 +246,8 @@ fn argv_environment_and_paths_stay_out_of_errors_and_logs() -> Result<(), String
         Ok(watcher) => watcher,
         Err(err) => {
             note(&mut texts, &err);
-            return leaks(&writer, &texts);
+            leaks(&writer, &texts)?;
+            return Err("starting the watcher failed".to_owned());
         }
     };
     match watcher.watch(agent) {

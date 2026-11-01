@@ -32,6 +32,7 @@ pub fn resolve_location(cwd: &Path) -> Location {
         if git.is_file() {
             return from_git_file(current, &git);
         }
+        note_unreadable(&git);
         dir = current.parent();
     }
     Location {
@@ -110,8 +111,24 @@ fn read_branch(head: &Path) -> Option<Branch> {
     None
 }
 
+fn note_unreadable(path: &Path) {
+    if let Err(err) = std::fs::metadata(path)
+        && err.kind() != std::io::ErrorKind::NotFound
+    {
+        tracing::debug!("unreadable git metadata");
+    }
+}
+
 fn first_line(path: &Path) -> Option<String> {
-    let text = std::fs::read_to_string(path).ok()?;
+    let text = match std::fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(err) => {
+            if err.kind() != std::io::ErrorKind::NotFound {
+                tracing::debug!("unreadable git metadata");
+            }
+            return None;
+        }
+    };
     let line = text.lines().next()?.trim();
     if line.is_empty() {
         None

@@ -1,6 +1,7 @@
 //! Live descendants of one process, each with the CPU time it has used.
 
-use std::sync::Arc;
+use std::io::Write;
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use navori_macos::StartTime;
@@ -105,5 +106,66 @@ fn activity_of_a_pid_not_in_the_snapshot_is_not_running() -> Result<(), String> 
     };
 
     assert_eq!(activity(&snapshot, missing), Err(NotRunning));
+    Ok(())
+}
+
+struct Captured(Arc<Mutex<Vec<u8>>>);
+
+impl Write for Captured {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+fn capture() -> Result<Arc<Mutex<Vec<u8>>>, String> {
+    let buf = Arc::new(Mutex::new(Vec::new()));
+    let captured = Arc::clone(&buf);
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .with_ansi(false)
+        .without_time()
+        .with_writer(move || Captured(Arc::clone(&captured)))
+        .try_init()
+        .map_err(|_| "tracing subscriber was already installed".to_owned())?;
+    Ok(buf)
+}
+
+fn log_text(buf: &Arc<Mutex<Vec<u8>>>) -> String {
+    let bytes = buf.lock().unwrap_or_else(PoisonError::into_inner).clone();
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
+#[test]
+fn a_child_whose_cpu_time_cannot_be_read_is_omitted_and_the_pid_is_logged() -> Result<(), String> {
+    let log = capture()?;
+    let fake = source();
+    fake.add(FakeProcess::new(100, 1, 501, 1_000, "/bin/claude").cpu(Duration::from_millis(1)));
+    fake.add(FakeProcess::new(4242, 100, 501, 4_242, "/usr/bin/cargo"));
+    fake.add(FakeProcess::new(4243, 100, 501, 4_243, "/bin/sleep").cpu(Duration::from_millis(4)));
+    let snapshot = take(&fake)?;
+    fake.exit(4243);
+
+    let listed =
+        activity(&snapshot, id(&snapshot, 100)?).map_err(|_| "activity failed".to_owned())?;
+
+    assert_eq!(listed, Vec::new());
+    let text = log_text(&log);
+    if text.contains("/usr/bin/cargo") || text.contains("/bin/sleep") {
+        return Err("log contains a path".to_owned());
+    }
+    if !text.contains("pid=4242") {
+        return Err("a denied cpu read was not logged".to_owned());
+    }
+    if text.contains("pid=4243") {
+        return Err("an exited child was logged".to_owned());
+    }
     Ok(())
 }

@@ -1,8 +1,11 @@
 //! Project, worktree and branch resolved from real temporary git trees.
 
 use std::fs;
-use std::path::Path;
+use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use navori_procs::{Branch, Location, resolve_location};
 
@@ -147,5 +150,174 @@ fn a_directory_outside_any_repository_reports_its_own_name() -> Result<(), Strin
             branch: None,
         }
     );
+    Ok(())
+}
+
+struct Captured(Arc<Mutex<Vec<u8>>>);
+
+impl Write for Captured {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+fn capture() -> Result<Arc<Mutex<Vec<u8>>>, String> {
+    let buf = Arc::new(Mutex::new(Vec::new()));
+    let captured = Arc::clone(&buf);
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .with_ansi(false)
+        .without_time()
+        .with_writer(move || Captured(Arc::clone(&captured)))
+        .try_init()
+        .map_err(|_| "tracing subscriber was already installed".to_owned())?;
+    Ok(buf)
+}
+
+fn log_text(buf: &Arc<Mutex<Vec<u8>>>) -> String {
+    let bytes = buf.lock().unwrap_or_else(PoisonError::into_inner).clone();
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
+/// Restores read permission so the temp directory can be removed.
+struct Readable(PathBuf);
+
+impl Drop for Readable {
+    fn drop(&mut self) {
+        let Ok(meta) = fs::metadata(&self.0) else {
+            return;
+        };
+        let mut perms = meta.permissions();
+        perms.set_mode(0o644);
+        let _ = fs::set_permissions(&self.0, perms);
+    }
+}
+
+fn deny_read(path: &Path) -> Result<Readable, String> {
+    let meta = fs::metadata(path).map_err(|_| "cannot stat the git file".to_owned())?;
+    let mut perms = meta.permissions();
+    perms.set_mode(0o0);
+    fs::set_permissions(path, perms).map_err(|_| "cannot deny the git file".to_owned())?;
+    let still = fs::read(path);
+    if still.is_ok() {
+        return Err("the git file stayed readable".to_owned());
+    }
+    Ok(Readable(path.to_path_buf()))
+}
+
+fn assert_logged_without_path(
+    log: &Arc<Mutex<Vec<u8>>>,
+    before: usize,
+    path: &Path,
+) -> Result<(), String> {
+    let text = log_text(log);
+    if text.len() <= before {
+        return Err("an unreadable git file was not logged".to_owned());
+    }
+    if let Some(text) = path.to_str()
+        && log_text(log).contains(text)
+    {
+        return Err("log contains a path".to_owned());
+    }
+    Ok(())
+}
+
+#[test]
+fn an_unreadable_git_file_head_or_commondir_is_logged() -> Result<(), String> {
+    let log = capture()?;
+    unreadable_git_file(&log)?;
+    unreadable_head(&log)?;
+    unreadable_commondir(&log)?;
+    Ok(())
+}
+
+fn unreadable_git_file(log: &Arc<Mutex<Vec<u8>>>) -> Result<(), String> {
+    let root = temp_root()?;
+    let notes = root.path().join("notes");
+    fs::create_dir(&notes).map_err(|_| "cannot create the directory".to_owned())?;
+
+    let before = log_text(log).len();
+    assert_eq!(
+        resolve_location(&notes),
+        Location {
+            project: "notes".to_owned(),
+            worktree: None,
+            branch: None,
+        }
+    );
+    if log_text(log).len() != before {
+        return Err("a missing git file was logged".to_owned());
+    }
+
+    let git = notes.join(".git");
+    fs::write(&git, "gitdir: SECRET_GITDIR\n")
+        .map_err(|_| "cannot write the git file".to_owned())?;
+    let _deny = deny_read(&git)?;
+    let before = log_text(log).len();
+    assert_eq!(
+        resolve_location(&notes),
+        Location {
+            project: "notes".to_owned(),
+            worktree: None,
+            branch: None,
+        }
+    );
+    assert_logged_without_path(log, before, &notes)?;
+    if log_text(log).contains("SECRET_GITDIR") {
+        return Err("log contains file contents".to_owned());
+    }
+    Ok(())
+}
+
+fn unreadable_head(log: &Arc<Mutex<Vec<u8>>>) -> Result<(), String> {
+    let root = temp_root()?;
+    let repo = root.path().join("navori");
+    init_repo(&repo)?;
+    let head = repo.join(".git").join("HEAD");
+    let _deny = deny_read(&head)?;
+    let before = log_text(log).len();
+
+    assert_eq!(
+        resolve_location(&repo),
+        Location {
+            project: "navori".to_owned(),
+            worktree: None,
+            branch: None,
+        }
+    );
+    assert_logged_without_path(log, before, &repo)?;
+    Ok(())
+}
+
+fn unreadable_commondir(log: &Arc<Mutex<Vec<u8>>>) -> Result<(), String> {
+    let root = temp_root()?;
+    let repo = root.path().join("navori");
+    init_repo(&repo)?;
+    git(&repo, &["worktree", "add", "../navori-feat", "-b", "feat"])?;
+    let common = repo
+        .join(".git")
+        .join("worktrees")
+        .join("navori-feat")
+        .join("commondir");
+    let _deny = deny_read(&common)?;
+    let before = log_text(log).len();
+
+    assert_eq!(
+        resolve_location(&root.path().join("navori-feat")),
+        Location {
+            project: String::new(),
+            worktree: Some("navori-feat".to_owned()),
+            branch: Some(Branch::Named("feat".to_owned())),
+        }
+    );
+    assert_logged_without_path(log, before, root.path())?;
     Ok(())
 }

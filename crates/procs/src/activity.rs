@@ -33,7 +33,13 @@ pub fn activity(snapshot: &Snapshot, id: ProcId) -> Result<Vec<ChildActivity>, N
                 process: descendant.id,
                 cpu_time,
             }),
-            Err(Unavailable::Exited | Unavailable::PermissionDenied | Unavailable::Malformed) => {}
+            Err(Unavailable::Exited) => {}
+            Err(Unavailable::PermissionDenied | Unavailable::Malformed) => {
+                tracing::debug!(
+                    pid = descendant.id.pid,
+                    "omitted a child whose cpu time could not be read"
+                );
+            }
         }
     }
     Ok(listed)

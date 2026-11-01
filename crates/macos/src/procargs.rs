@@ -86,15 +86,33 @@ fn argmax() -> Result<usize, i32> {
 }
 
 /// One scratch buffer, grown to the largest block read. The kernel's ceiling is `KERN_ARGMAX`.
+static SCRATCH: Mutex<Vec<u8>> = Mutex::new(Vec::new());
+
 fn copy_procargs(mib: &mut [i32], probed: usize) -> Result<Vec<u8>, i32> {
-    static SCRATCH: Mutex<Vec<u8>> = Mutex::new(Vec::new());
-    let mut scratch = SCRATCH
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if scratch.len() < probed {
-        scratch.resize(probed, 0);
+    let mut scratch = SCRATCH.lock().unwrap_or_else(|poisoned| {
+        let mut guard = poisoned.into_inner();
+        // A panic may have unlocked this buffer before it was cleared.
+        wipe(&mut guard);
+        guard
+    });
+    read_procargs(&mut scratch, mib, probed)
+}
+
+/// Zeroes the argument scratch, including spare capacity, when the read returns or panics.
+struct ClearOnDrop<'a>(&'a mut Vec<u8>);
+
+impl Drop for ClearOnDrop<'_> {
+    fn drop(&mut self) {
+        wipe(self.0);
     }
-    let Some(dest) = scratch.get_mut(..probed) else {
+}
+
+fn read_procargs(scratch: &mut Vec<u8>, mib: &mut [i32], probed: usize) -> Result<Vec<u8>, i32> {
+    let clear = ClearOnDrop(scratch);
+    if clear.0.len() < probed {
+        clear.0.resize(probed, 0);
+    }
+    let Some(dest) = clear.0.get_mut(..probed) else {
         return Ok(Vec::new());
     };
     let len = sysctl(mib, Some(dest))?;
@@ -102,7 +120,16 @@ fn copy_procargs(mib: &mut [i32], probed: usize) -> Result<Vec<u8>, i32> {
     if len > probed {
         return Ok(Vec::new());
     }
-    Ok(scratch.get(..len).unwrap_or_default().to_vec())
+    Ok(clear.0.get(..len).unwrap_or_default().to_vec())
+}
+
+/// `len` stays at capacity so the spare bytes are initialized zeros, not leftover arguments.
+fn wipe(buf: &mut Vec<u8>) {
+    let cap = buf.capacity();
+    if buf.len() < cap {
+        buf.resize(cap, 0);
+    }
+    buf.fill(0);
 }
 
 fn procargs_error(errno: i32, entry_failed: impl FnOnce() -> bool) -> ReadError {
@@ -147,4 +174,46 @@ fn sysctl(mib: &mut [i32], dest: Option<&mut [u8]>) -> Result<usize, i32> {
 
 fn last_errno() -> i32 {
     std::io::Error::last_os_error().raw_os_error().unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SCRATCH;
+
+    fn scratch_kept_a_byte() -> bool {
+        let scratch = SCRATCH
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        scratch.capacity() == 0
+            || scratch.len() != scratch.capacity()
+            || scratch.iter().any(|byte| *byte != 0)
+    }
+
+    #[test]
+    fn the_argument_scratch_does_not_keep_a_previous_environment_byte() {
+        let pid = std::process::id() as i32;
+        let read = super::read_argv(pid, || false);
+        assert!(read.is_ok(), "argument read failed");
+        assert!(
+            !scratch_kept_a_byte(),
+            "argument scratch kept a previous byte"
+        );
+
+        let poisoned = std::panic::catch_unwind(|| {
+            let mut scratch = SCRATCH
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            scratch.clear();
+            scratch.resize(32, 0xA5);
+            panic!("poison");
+        });
+        assert!(poisoned.is_err(), "argument scratch was not poisoned");
+
+        let read = super::read_argv(pid, || false);
+        assert!(read.is_ok(), "argument read failed");
+        assert!(
+            !scratch_kept_a_byte(),
+            "argument scratch kept a previous byte"
+        );
+    }
 }

@@ -96,12 +96,19 @@ impl ProcWatcher {
                 self.pending.push_back(Exited { id });
                 Ok(())
             }
-            Err(ReadError::Denied | ReadError::Malformed) => Ok(()),
+            Err(ReadError::Denied | ReadError::Malformed) => {
+                tracing::debug!(
+                    pid = id.pid,
+                    "kept a watch whose process record could not be read"
+                );
+                Ok(())
+            }
         }
     }
 
     /// Stop delivering exits for `id`. A late exit for its token is ignored.
     pub fn unwatch(&mut self, id: ProcId) {
+        self.pending.retain(|exited| exited.id != id);
         let watched = self
             .watched
             .get(&id.pid)

@@ -274,7 +274,7 @@ user/trigger ─► assemble context ─► Model Router ─► stream ─┬─
 Awake, Ports and the Context Engine all need to know "which project does this process belong to, and who started it":
 - **ProcessTable** (implemented in `navori-macos` behind `ProcessSource`; listed via `sysctl(KERN_PROC_ALL)`): pid, ppid, uid, exe, argv, cwd, start time.
 - **ProjectResolver**: cwd → `.git` → repo root; `.git` is a file → **worktree** → `{project, worktree, branch}`.
-- **HarnessCatalog**: recognizes ancestors such as `claude`, `codex`, `grok`, `gemini`, `opencode`, `cursor-agent`… (configurable) and the terminal host.
+- **HarnessCatalog**: recognizes Claude Code, Codex, and Grok, and the terminal host.
 - **ProcWatcher**: `kqueue EVFILT_PROC/NOTE_EXIT` → learns of a process death immediately, no polling.
 
 ### Seed: Awake (R1)

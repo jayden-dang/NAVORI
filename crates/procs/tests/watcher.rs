@@ -3,8 +3,11 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use std::io::Write;
+use std::sync::{Mutex, PoisonError};
+
 use navori_macos::fake::{FakeExitsHandle, FakeProcess, FakeProcesses};
-use navori_macos::{ProcessSource, StartTime, WatchError};
+use navori_macos::{ProcessSource, ReadError, StartTime, WatchError};
 use navori_procs::{Exited, ProcId, ProcWatcher, ProcsError};
 
 const PID: i32 = 10;
@@ -234,4 +237,78 @@ async fn next_is_cancel_safe() -> Result<(), String> {
 
     assert_eq!(next_within(&mut rig.watcher, 100).await?, Exited { id });
     Ok(())
+}
+
+struct Captured(Arc<Mutex<Vec<u8>>>);
+
+impl Write for Captured {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+fn capture() -> Result<Arc<Mutex<Vec<u8>>>, String> {
+    let buf = Arc::new(Mutex::new(Vec::new()));
+    let captured = Arc::clone(&buf);
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .with_ansi(false)
+        .without_time()
+        .with_writer(move || Captured(Arc::clone(&captured)))
+        .try_init()
+        .map_err(|_| "tracing subscriber was already installed".to_owned())?;
+    Ok(buf)
+}
+
+fn log_text(buf: &Arc<Mutex<Vec<u8>>>) -> String {
+    let bytes = buf.lock().unwrap_or_else(PoisonError::into_inner).clone();
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
+#[tokio::test]
+async fn a_denied_recheck_keeps_the_watch_and_logs_the_pid() -> Result<(), String> {
+    let log = capture()?;
+    let mut rig = rig()?;
+    let id = identity(START_US);
+    rig.processes.fail_entry(PID, ReadError::Denied);
+
+    rig.watcher
+        .watch(id)
+        .map_err(|_| "watch failed".to_owned())?;
+
+    assert!(
+        rig.exits.watched().contains(&PID),
+        "a denied re-check dropped the watch"
+    );
+    no_exit_within(&mut rig.watcher, 100).await?;
+    let text = log_text(&log);
+    if text.contains("/bin/zsh") {
+        return Err("log contains a path".to_owned());
+    }
+    if !text.contains("pid=10") {
+        return Err("a denied re-check was not logged".to_owned());
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn stopping_the_watch_drops_an_exit_already_queued() -> Result<(), String> {
+    let mut rig = rig()?;
+    let id = identity(START_US);
+    rig.exits.fail_next_watch(PID, WatchError::Gone);
+
+    rig.watcher
+        .watch(id)
+        .map_err(|_| "watch failed".to_owned())?;
+    rig.watcher.unwatch(id);
+
+    no_exit_within(&mut rig.watcher, 100).await
 }

@@ -27,7 +27,7 @@ Around that process:
 ```
  user ── menubar / Settings ──► Shell ──(UniFFI)──► Core ◄──(Unix socket, JSON-RPC)── navori CLI ◄── user, scripts,
                                                      │                                              harness hooks (R1)
-                                                     ├──► macOS: IOKit power, libproc, kqueue (R1, R3)
+                                                     ├──► macOS: IOKit power, sysctl / proc_pidinfo / proc_pidpath, kqueue (R1, R3)
                                                      ├──► GitHub API (R4)
                                                      ├──► cloud LLM providers, via the Context Gateway only (R2)
                                                      └──◄ MCP clients: Claude Code, Codex, Grok via `navori mcp` (R6)

@@ -2,9 +2,10 @@
 //! Working directories that are read point at real temporary git trees.
 
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 use std::process::Command;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use navori_macos::fake::{FakeProcess, FakeProcesses};
 use navori_procs::{
@@ -413,5 +414,66 @@ fn a_session_under_tmux_has_no_terminal_host() -> Result<(), String> {
     assert_eq!(found[0].process.pid, 2629);
     assert_eq!(found[0].harness, Harness::ClaudeCode);
     assert_eq!(found[0].terminal, None);
+    Ok(())
+}
+
+struct Captured(Arc<Mutex<Vec<u8>>>);
+
+impl Write for Captured {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+fn capture() -> Result<Arc<Mutex<Vec<u8>>>, String> {
+    let buf = Arc::new(Mutex::new(Vec::new()));
+    let captured = Arc::clone(&buf);
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .with_ansi(false)
+        .without_time()
+        .with_writer(move || Captured(Arc::clone(&captured)))
+        .try_init()
+        .map_err(|_| "tracing subscriber was already installed".to_owned())?;
+    Ok(buf)
+}
+
+fn log_text(buf: &Arc<Mutex<Vec<u8>>>) -> String {
+    let bytes = buf.lock().unwrap_or_else(PoisonError::into_inner).clone();
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
+#[test]
+fn a_node_process_whose_arguments_cannot_be_read_is_not_a_session() -> Result<(), String> {
+    let log = capture()?;
+    let fake = source();
+    fake.add(FakeProcess::new(
+        4242,
+        1,
+        501,
+        4_242,
+        "/opt/homebrew/Cellar/node/24.1.0/bin/node",
+    ));
+    let snapshot = take(&fake)?;
+
+    assert!(
+        sessions(&snapshot).is_empty(),
+        "an unreadable node process was a session"
+    );
+    let text = log_text(&log);
+    if text.contains("homebrew") || text.contains("node_modules") {
+        return Err("log contains a path".to_owned());
+    }
+    if !text.contains("pid=4242") {
+        return Err("a failed argument read was not logged".to_owned());
+    }
     Ok(())
 }

@@ -80,6 +80,8 @@ struct State {
     processes: Vec<FakeProcess>,
     pending: Vec<PendingReplace>,
     reads: Vec<(i32, &'static str)>,
+    /// `entry` for these pids fails with this error instead of returning the row.
+    entry_errors: Vec<(i32, ReadError)>,
 }
 
 /// [`ProcessSource`](crate::ProcessSource) backed by the processes added in this process.
@@ -107,8 +109,14 @@ impl FakeProcesses {
                 processes: Vec::new(),
                 pending: Vec::new(),
                 reads: Vec::new(),
+                entry_errors: Vec::new(),
             }),
         }
+    }
+
+    /// The next `entry` reads of `pid` fail with `err`. The row stays in `list`.
+    pub fn fail_entry(&self, pid: i32, err: ReadError) {
+        lock(&self.state).entry_errors.push((pid, err));
     }
 
     /// Append a process. A repeated pid is a second row; reads find the first.
@@ -176,7 +184,11 @@ impl ProcessSource for FakeProcesses {
     }
 
     fn entry(&self, pid: i32) -> Result<ProcEntry, ReadError> {
-        lock(&self.state)
+        let state = lock(&self.state);
+        if let Some((_, err)) = state.entry_errors.iter().find(|(id, _)| *id == pid) {
+            return Err(*err);
+        }
+        state
             .processes
             .iter()
             .find(|process| process.pid == pid)
