@@ -275,9 +275,9 @@ _Requirements: PROCS-2.1, PROCS-2.2, PROCS-2.8, PROCS-2.9, PROCS-2.10_
 
 **Depends-on:** Task 7
 
-- [ ] **Step 1:** Write `tests/harness_of.rs`: `a_hook_shell_resolves_to_its_claude_ancestor` (`claude(100) → sh(101) → navori(102)`: `harness_of(102)` → `Found { ClaudeCode, process.pid == 100 }`); `the_harness_process_itself_resolves_to_itself`; `the_nearest_harness_wins_when_two_are_nested` (`codex → sh → claude → sh → navori` → ClaudeCode); `a_process_with_no_harness_ancestor_is_not_a_harness`; `a_pid_not_in_the_snapshot_is_not_running`; `a_pid_that_exited_since_the_snapshot_is_not_running` (`exit(102)` after `take`). Run `cargo nextest run -p navori-procs --test harness_of` — expect: compile failure.
-- [ ] **Step 2:** Implement `harness_of` (snapshot membership; live `entry` with the same start, else `NotRunning`; self then ancestors nearest first through `recognize`). Run — expect: pass.
-- [ ] **Step 3:** `cargo xtask ci` — expect: pass. Commit `feat(procs): resolve the Harness behind a calling process`.
+- [x] **Step 1:** Write `tests/harness_of.rs`: `a_hook_shell_resolves_to_its_claude_ancestor` (`claude(100) → sh(101) → navori(102)`: `harness_of(102)` → `Found { ClaudeCode, process.pid == 100 }`); `the_harness_process_itself_resolves_to_itself`; `the_nearest_harness_wins_when_two_are_nested` (`codex → sh → claude → sh → navori` → ClaudeCode); `a_process_with_no_harness_ancestor_is_not_a_harness`; `a_pid_not_in_the_snapshot_is_not_running`; `a_pid_that_exited_since_the_snapshot_is_not_running` (`exit(102)` after `take`). Run `cargo nextest run -p navori-procs --test harness_of` — expect: compile failure.
+- [x] **Step 2:** Implement `harness_of` (snapshot membership; live `entry` with the same start, else `NotRunning`; self then ancestors nearest first through `recognize`). Run — expect: pass.
+- [x] **Step 3:** `cargo xtask ci` — expect: pass. Commit `feat(procs): resolve the Harness behind a calling process`.
 
 _Requirements: PROCS-3.1, PROCS-3.2, PROCS-3.3_
 
@@ -385,9 +385,9 @@ _Requirements: PROCS-6.1, PROCS-6.2, PROCS-6.3, PROCS-6.4, PROCS-6.5_
 
 **Depends-on:** Task 7, Task 12
 
-- [ ] **Step 1:** Write `tests/no_threads.rs` with exactly one `#[test]` `taking_a_snapshot_resolving_sessions_and_holding_an_assertion_starts_no_thread`: thread count = lines of `ps -M -p <std::process::id()>` output minus the header line; count, run `Snapshot::take(Arc::new(MacProcesses::new()?))`, `sessions`, `MacPower.hold(AssertionKind::System, "navori-test threads")` and `release()`, count again, assert equal. To see it fail first, add a temporary `std::thread::spawn(|| std::thread::park())` before the second count, run `cargo nextest run -p navori-procs --test no_threads` — expect: assertion failure; remove it.
-- [ ] **Step 2:** Run without the temporary thread — expect: pass. If a thread appears that `navori-macos`/`navori-procs` created, remove its source; if the extra thread is IOKit's own, stop and hand to `reroute-plan` (PROCS-8.1 would need re-wording).
-- [ ] **Step 3:** `cargo xtask ci` — expect: pass. Commit `test(procs): prove no thread starts without a watcher`.
+- [x] **Step 1:** Write `tests/no_threads.rs` with exactly one `#[test]` `taking_a_snapshot_resolving_sessions_and_holding_an_assertion_starts_no_thread`: thread count = lines of `ps -M -p <std::process::id()>` output minus the header line; count, run `Snapshot::take(Arc::new(MacProcesses::new()?))`, `sessions`, `MacPower.hold(AssertionKind::System, "navori-test threads")` and `release()`, count again, assert equal. To see it fail first, add a temporary `std::thread::spawn(|| std::thread::park())` before the second count, run `cargo nextest run -p navori-procs --test no_threads` — expect: assertion failure; remove it.
+- [x] **Step 2:** Run without the temporary thread — expect: pass. If a thread appears that `navori-macos`/`navori-procs` created, remove its source; if the extra thread is IOKit's own, stop and hand to `reroute-plan` (PROCS-8.1 would need re-wording).
+- [x] **Step 3:** `cargo xtask ci` — expect: pass. Commit `test(procs): prove no thread starts without a watcher`.
 
 _Requirements: PROCS-8.1_
 
@@ -406,9 +406,9 @@ _Requirements: PROCS-8.1_
 
 **Depends-on:** Task 7
 
-- [ ] **Step 1:** Write `tests/real_os.rs`: `a_snapshot_with_session_resolution_takes_under_ten_milliseconds` (5 runs of `Snapshot::take` + `sessions` on `MacProcesses`; median < 10 ms; print the median and the process count); `#[ignore]` `the_running_agent_sessions_on_this_mac_are_listed` (prints each session as `<harness> · <project>/<worktree or branch> · pid <pid> · <terminal or unknown>`; asserts at least one session). Run `cargo nextest run -p navori-procs --test real_os` — expect: pass (debug). Run `cargo test --release -p navori-procs --test real_os -- --nocapture` and `cargo test -p navori-procs --test real_os -- --ignored --nocapture` with Claude Code, Codex and Grok open; paste the release median and the session lines into the task report.
-- [ ] **Step 2:** If the debug median is ≥ 10 ms, profile `take` (the exe pass dominates per spike Q1) and fix. Run — expect: pass.
-- [ ] **Step 3:** `cargo xtask ci` — expect: pass. Commit `test(procs): bound snapshot cost and list real sessions on this Mac`.
+- [x] **Step 1:** Write `tests/real_os.rs`: `a_snapshot_with_session_resolution_takes_under_ten_milliseconds` (5 runs of `Snapshot::take` + `sessions` on `MacProcesses`; median < 10 ms; print the median and the process count); `#[ignore]` `the_running_agent_sessions_on_this_mac_are_listed` (prints each session as `<harness> · <project>/<worktree or branch> · pid <pid> · <terminal or unknown>`; asserts at least one session). Run `cargo nextest run -p navori-procs --test real_os` — expect: pass (debug). Run `cargo test --release -p navori-procs --test real_os -- --nocapture` and `cargo test -p navori-procs --test real_os -- --ignored --nocapture` with Claude Code, Codex and Grok open; paste the release median and the session lines into the task report.
+- [x] **Step 2:** If the debug median is ≥ 10 ms, profile `take` (the exe pass dominates per spike Q1) and fix. Run — expect: pass.
+- [x] **Step 3:** `cargo xtask ci` — expect: pass. Commit `test(procs): bound snapshot cost and list real sessions on this Mac`.
 
 _Requirements: PROCS-8.4_
 
