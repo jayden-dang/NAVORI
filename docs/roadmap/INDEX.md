@@ -30,7 +30,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 
 | ID | Milestone | Outcome | Depends-on | Commitment |
 |---|---|---|---|---|
-| MILE-1 | Foundation (R0) | The user installs Navori with one command, it starts at login as a menubar icon, and `navori doctor` reports every check green. | none | Committed |
+| MILE-1 | Foundation (R0) | The user installs Navori with one command, it starts at login as a menubar icon, and `navori doctor` reports every check green. | none | Closed |
 | MILE-2 | Awake (R1) | The Mac stays awake while any Claude Code, Codex or Grok session is working and goes back to normal sleep after they stop, with no manual action. | MILE-1 | Planned |
 | MILE-3 | AI Assistant (R2) | The user asks Navori AI anything from the menubar, a hotkey or the terminal with any configured model, and answers its Decisions in Needs you before anything destructive runs. | MILE-2 | Planned |
 | MILE-4 | Ports (R3) | The user sees every listening port grouped by project, worktree and harness, and frees a whole group in at most 2 actions. | MILE-3 | Planned |
@@ -48,8 +48,8 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 - **ROAD-3** cli-and-doctor — After: ROAD-1 — Surfaces: `apps/cli/`
 - **ROAD-4** build-sign-install — After: none — Surfaces: `xtask/`, `.cargo/config.toml`
 **Depends-on:** none
-**Commitment:** Committed 2026-11-01
-**Closed:** None
+**Commitment:** Closed 2026-11-01
+**Closed:** 5e66b16a85d2776ca98afbf0606c9c1f73a366b7 (assessment: `assessments/MILE-1.md` Assessment 2, achieved)
 **Deferred:** ROAD-27 open-source-distribution → unscheduled (2026-11-01, vision defers open source: license, Developer ID + notarization, Homebrew cask, download page, auto-update)
 **Blockers:** None
 
