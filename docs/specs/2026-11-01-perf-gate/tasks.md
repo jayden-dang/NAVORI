@@ -259,9 +259,9 @@ _Requirements: PERF-4.1, PERF-4.2, PERF-4.3_
 
 **Depends-on:** Task 5
 
-- [ ] **Step 1: Failing tests:** `wait_exit_times_out_while_the_process_runs` (`/bin/sleep 30`, 100 ms → false); `term_signal_ends_the_process` (signal `TERM` → `wait_exit(2 s)` true); `dropping_the_guard_kills_a_live_process` (pid gone after drop, checked with `/bin/kill -0`). Run `cargo test -p xtask perf::launch` — expect failures.
-- [ ] **Step 2: Implement.** Run tests — expect pass.
-- [ ] **Step 3: Gate and commit** — `cargo xtask ci` → `✓ ci passed`; `git commit -m "feat(xtask): add a launch guard for perf runs"`
+- [x] **Step 1: Failing tests:** `wait_exit_times_out_while_the_process_runs` (`/bin/sleep 30`, 100 ms → false); `term_signal_ends_the_process` (signal `TERM` → `wait_exit(2 s)` true); `dropping_the_guard_kills_a_live_process` (pid gone after drop, checked with `/bin/kill -0`). Run `cargo test -p xtask perf::launch` — expect failures.
+- [x] **Step 2: Implement.** Run tests — expect pass.
+- [x] **Step 3: Gate and commit** — `cargo xtask ci` → `✓ ci passed`; `git commit -m "feat(xtask): add a launch guard for perf runs"`
 
 _Requirements: PERF-3.4, PERF-3.5_
 
