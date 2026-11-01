@@ -281,11 +281,11 @@ _Requirements: PERF-3.4, PERF-3.5_
 
 **Depends-on:** Task 1, Task 3, Task 4, Task 6, Task 8, Task 9
 
-- [ ] **Step 1: Implement** `run` per design § xtask perf runner flow: build into `build/perf/` → sweep stale pids → `PerfHome::prepare(Path::new("/tmp"), uid)` → `LogStream::start()` (banner read) → warm-up (≤ 15 s exit, fail if `session.marker` remains) → phase A × 5 → phase B → `app_size_mb` → `judge` → print report and build/phase times → `finish(…, record, …)`.
-- [ ] **Step 2: Gate** — `cargo xtask ci` → `✓ ci passed` (no dead-code allowance left).
-- [ ] **Step 3: Full run** with `/Applications/Navori.app` and a `cargo xtask run` dev app both running: `cargo xtask perf`; expect 13 metric lines (8 gated, 4 baseline-only, 1 skipped) and printed phase times with measuring ≤ 3 min. During phase A, `lsof -p <perf pid>` lists no path under `~/Library/Application Support/Navori`, `…/Navori Dev`, `~/Library/Logs/Navori` or `…/Navori Dev`; both daily apps keep running with unchanged pids.
-- [ ] **Step 4: Failure paths.** Ctrl-C during phase A → `pgrep -fl build/perf` empty; `kill -9` the xtask process mid-run, rerun → the stale pid is swept first; an over-budget metric (expected today: `idle_footprint_mb`) → exit 1 naming metric, value and budget.
-- [ ] **Step 5: Commit** — `git commit -m "feat(xtask): add cargo xtask perf"`
+- [x] **Step 1: Implement** `run` per design § xtask perf runner flow: build into `build/perf/` → sweep stale pids → `PerfHome::prepare(Path::new("/tmp"), uid)` → `LogStream::start()` (banner read) → warm-up (≤ 15 s exit, fail if `session.marker` remains) → phase A × 5 → phase B → `app_size_mb` → `judge` → print report and build/phase times → `finish(…, record, …)`.
+- [x] **Step 2: Gate** — `cargo xtask ci` → `✓ ci passed` (no dead-code allowance left).
+- [x] **Step 3: Full run** with `/Applications/Navori.app` and a `cargo xtask run` dev app both running: `cargo xtask perf`; expect 13 metric lines (8 gated, 4 baseline-only, 1 skipped) and printed phase times with measuring ≤ 3 min. During phase A, `lsof -p <perf pid>` lists no path under `~/Library/Application Support/Navori`, `…/Navori Dev`, `~/Library/Logs/Navori` or `…/Navori Dev`; both daily apps keep running with unchanged pids.
+- [x] **Step 4: Failure paths.** Ctrl-C during phase A → `pgrep -fl build/perf` empty; `kill -9` the xtask process mid-run, rerun → the stale pid is swept first; an over-budget metric (expected today: `idle_footprint_mb`) → exit 1 naming metric, value and budget.
+- [x] **Step 5: Commit** — `git commit -m "feat(xtask): add cargo xtask perf"`
 
 _Requirements: PERF-1.1, PERF-1.5, PERF-1.6, PERF-1.10, PERF-3.1, PERF-3.2, PERF-6.1, PERF-6.2_
 
