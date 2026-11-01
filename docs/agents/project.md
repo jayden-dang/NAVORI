@@ -136,11 +136,13 @@ None — not deployed
 Run in order; `cut-release` executes exactly these and does not improvise.
 
 1. `cargo xtask ci` — the full gate.
-2. `cargo xtask install` — builds the release bundle, signs it with `Navori Local Signing`,
+2. `cargo xtask perf` — the GOAL-7 budget on release code packaged as the dev identity
+   (`docs/standards/performance.md`). `--record` is not part of a release.
+3. `cargo xtask install` — builds the release bundle, signs it with `Navori Local Signing`,
    runs `codesign --verify --strict --deep`, installs to `/Applications/Navori.app`
    (the previous install is kept as `/Applications/Navori.app.previous`) and launches it.
-3. Smoke: `/Applications/Navori.app/Contents/Helpers/navori doctor` — every check ✓, exit 0.
-4. Tag: `git tag v<version> && git push origin v<version>` — `<version>` is
+4. Smoke: `/Applications/Navori.app/Contents/Helpers/navori doctor` — every check ✓, exit 0.
+5. Tag: `git tag v<version> && git push origin v<version>` — `<version>` is
    `[workspace.package] version` in `Cargo.toml`.
 
 No notarization or public distribution yet (no Apple Developer ID).

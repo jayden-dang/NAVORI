@@ -21,7 +21,7 @@ Date: 2026-11-01
 
 ## Exempt
 
-- `xtask` (build tooling) and the Swift view layer are verified by building, signing and launching the app (`cargo xtask run`), not by unit tests. `CoreStore` logic that maps snapshots to state is not exempt once it grows beyond direct assignment.
+- `xtask` build tooling, other than its perf logic, and the Swift view layer are verified by building, signing and launching the app (`cargo xtask run`), not by unit tests. `xtask`'s perf logic is unit-tested. `CoreStore` logic that maps snapshots to state is not exempt once it grows beyond direct assignment.
 
 ## Gates
 
