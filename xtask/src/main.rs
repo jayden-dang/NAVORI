@@ -47,6 +47,12 @@ enum Cmd {
     Icon,
     /// Rust tests + clippy + fmt check + dependency rules + Swift build.
     Ci,
+    /// Measure release code in the dev app and judge it against the budget.
+    Perf {
+        /// Write perf-baseline.json when every metric passes.
+        #[arg(long)]
+        record: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -126,6 +132,12 @@ fn main() -> Result<()> {
         Cmd::Outdated => outdated(&root),
         Cmd::Icon => icon(&root),
         Cmd::Ci => ci(&root),
+        Cmd::Perf { record } => {
+            if !perf::run(&root, record)? {
+                bail!("perf gate failed");
+            }
+            Ok(())
+        }
     }
 }
 
