@@ -22,7 +22,7 @@ In scope: the app, its CLI, its local storage, and every path data or commands t
 ## Threats
 
 - **THR-1** A secret (API key, token, password, private key, `.env` value) reaches an LLM provider inside context sent across TB-1.
-- **THR-2** Instructions hidden in observed content (TB-4) steer the agent into a harmful Action, such as stopping processes, merging a PR or exfiltrating data.
+- **THR-2** Instructions hidden in observed content (TB-4) steer Navori AI into a harmful Action, such as stopping processes, merging a PR or exfiltrating data.
 - **THR-3** A secret is written in plain text to Navori's data at rest (TB-6) — Journal, memory, logs, backups or panic text.
 - **THR-4** Another local user or process drives Navori over the socket (TB-2) to read its Events or trigger Actions.
 - **THR-5** Navori stops the wrong process — another user's, a system service or a protected database — on a user or agent request.
@@ -35,7 +35,7 @@ In scope: the app, its CLI, its local storage, and every path data or commands t
 ## Mitigations (prose)
 
 - **THR-1 at TB-1** — the Sensitive Data Shield runs four layers before anything crosses TB-1 *(planned, R2; the text detector and path denylist are built)*: denylisted apps and private windows are never captured and are cut out of screenshots at capture time; nothing is captured while Secure Input is active; credential paths are never read; secret patterns are masked in text and blurred in images after on-device OCR. It fails closed: if OCR, detection or app identification fails, that part is not sent. An audit log records what kinds of data went to which provider, and a menubar switch pauses observation.
-- **THR-2 at TB-3/TB-4** — every Action carries a Risk; `Destructive` Actions always become a Decision in Needs you and never run without the user's explicit approval (ARCH-5); `Write` Actions run only under a user-granted allowlist or after asking *(planned, R2)*. Observed content is passed to the model as data, not as instructions, and the agent has a step limit per turn.
+- **THR-2 at TB-3/TB-4** — every Action carries a Risk; `Destructive` Actions always become a Decision in Needs you and never run without the user's explicit approval (ARCH-5); `Write` Actions run only under a user-granted allowlist or after asking *(planned, R2)*. Observed content is passed to the model as data, not as instructions, and Navori AI has a step limit per turn.
 - **THR-3 at TB-6** — Events, the Journal, memory and panic text pass the Shield before they are written (ARCH-6, built for Events, the Journal and panic text); logs never contain prompt content or secrets unless debug logging is on.
 - **THR-4 at TB-2** — the socket lives in a `0700` directory, the socket file is `0600`, and every connection's peer UID must equal the owner's (built); nothing listens on the network (ARCH-11).
 - **THR-5** — process actions only target the current user's UID, a configurable protected list is excluded from "stop all", and stopping is an approved `Destructive` Action *(planned, R3)*.

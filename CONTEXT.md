@@ -2,7 +2,7 @@
 
 Navori is an AI-first personal cockpit for macOS (Apple Silicon): a menubar app whose
 logic lives in a Rust **Core** and whose UI is a Swift **Shell**. Features plug into the
-Core as **Modules**; the UI, the `navori` CLI and AI agents all drive them through the same
+Core as **Modules**; the UI, the `navori` CLI, Navori AI and Harnesses over MCP all drive them through the same
 **Actions**, and everything that happens is recorded as **Events** in the **Journal**.
 Vision: `docs/product/vision.md` · Invariants: `docs/architecture/INDEX.md` ·
 System narrative: `docs/ARCHITECTURE.md`.
@@ -67,6 +67,23 @@ Which install is meant: `release` (`Navori.app`, daily use) or `dev` (`Navori De
 development). Profiles never share data, logs or sockets.
 _Avoid_: environment, build type
 
+### AI
+
+**Navori AI**:
+Navori's own built-in assistant: it answers the user, reads context through the Context
+Gateway and acts only by calling Actions.
+_Avoid_: the agent, assistant (alone), bot
+
+**Provider**:
+A cloud LLM service the user configures (Anthropic, OpenAI, DeepSeek, Google, xAI,
+OpenRouter or a custom OpenAI-compatible endpoint), reached through an adapter.
+_Avoid_: vendor, backend, LLM API
+
+**Model role**:
+A job Navori AI needs a model for — `chat`, `fast`, `vision`, `embedding` — to which the user
+assigns one model from any Provider.
+_Avoid_: role (alone — collides with a message's user/assistant role), tier
+
 ### Needs you
 
 **Needs you**:
@@ -91,7 +108,7 @@ _Avoid_: alert, notification
 
 **Harness**:
 An agentic CLI that Navori observes: Claude Code, Codex, Grok Build.
-_Avoid_: agent (for the tool itself), bot
+_Avoid_: agent (alone — say Harness, Agent session or Navori AI), bot
 
 **Agent session**:
 One running session of a Harness in a project or worktree.
@@ -101,6 +118,11 @@ _Avoid_: run, job
 A request to keep the Mac awake from one source (manual, timer, Agent session…). The Mac stays
 awake while at least one Lease is held.
 _Avoid_: hold, keep-awake request, assertion (that is the IOKit mechanism)
+
+**Integration**:
+Navori's entries installed into another tool's config — today a Harness's hooks, later its
+MCP server entry — installed, repaired and removed from Settings → Integrations.
+_Avoid_: plugin, extension, connector
 
 ### Privacy
 
@@ -123,4 +145,4 @@ _Avoid_: proxy, AI client
 
 ## Flagged ambiguities
 
-- none
+- "agent" alone was used for both an Agent session and any AI caller of Actions — resolved: never use it alone; say **Agent session**, **Harness** or **Navori AI**.

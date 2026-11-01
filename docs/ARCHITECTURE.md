@@ -35,7 +35,7 @@ The binding rules are the ARCH-N invariants; this table records why they exist.
 | P3 | **Rust owns logic, Swift owns experience** | Rust: kernel, modules, AI, store, IPC, low-level system FFI. Swift: UI and the Apple frameworks tied to the app bundle / permissions (Accessibility, ScreenCaptureKit, Notifications, Login item, Hotkey). Swift contains **no** business logic. |
 | P4 | **Narrow FFI boundary** | Swift talks to Rust through ~6 functions + a few listeners. No chatty calls. Data crossing the boundary is snapshots/commands, not object graphs. |
 | P5 | **Everything is a Module** | A feature = an independent module actor registered with the kernel. Modules do not import each other; they communicate via the Event Bus / Commands. |
-| P6 | **Actions carry a schema + risk** | A single action surface serves UI, CLI, IPC, the AI agent, and MCP. `Read` / `Write` / `Destructive` decides whether the AI must ask permission. |
+| P6 | **Actions carry a schema + risk** | A single action surface serves UI, CLI, IPC, Navori AI, and MCP. `Read` / `Write` / `Destructive` decides whether the AI must ask permission. |
 | P7 | **Every change is an Event** | The event journal in SQLite = the context timeline for the AI. |
 | P8 | **See everything except secrets** | The AI may see the full context (apps, windows, text, screen) **except** sensitive data (API keys, SSH keys, tokens, passwords, private keys, `.env`…). All data leaving the machine passes through **one** gate (Context Gateway + Sensitive Data Shield), **fail-closed**. Navori's own secrets live only in the Keychain. `unsafe` only in `navori-macos` and `navori-ffi`. |
 | P9 | **Frugal with resources & cost** | Idle CPU ≈ 0%. Adaptive polling. Proactive AI has a budget (tokens/day) and rate limits; cheap work uses a cheap model. |
@@ -56,7 +56,7 @@ No v1/v2 split. Each release adds **one** complete capability per the Definition
 | **R5 — Proactive** | GOAL-9, GOAL-1 | The AI speaks up on its own when it matters: CI fail, new review, agent session done, port conflict | triggers, budget, quiet hours |
 | **R6 — MCP** | GOAL-10 | Claude Code/Grok/Codex use Navori's tools; Navori uses external MCP servers | `navori-mcp` client + server |
 
-**Why AI is in R2 and not last**: AI is the core (P1). Placing it early lets the `Action` / `context()` / `Event` contracts be validated by a real agent before Ports and GitHub are written — those two features are born as AI tools. Screen observation (screenshot + OCR) is in R2 because the Sensitive Data Shield is a prerequisite for releasing AI.
+**Why AI is in R2 and not last**: AI is the core (P1). Placing it early lets the `Action` / `context()` / `Event` contracts be validated by Navori AI before Ports and GitHub are written — those two features are born as AI tools. Screen observation (screenshot + OCR) is in R2 because the Sensitive Data Shield is a prerequisite for releasing AI.
 
 ## Decisions locked
 
@@ -103,7 +103,7 @@ Three obligations for every module — these turn a "feature" into a "capability
 
 | Obligation | Used by |
 |---|---|
-| `Action` + JSON Schema + doc-comment written for the LLM + `Risk` | UI, CLI, IPC, **Agent tools**, **MCP server** |
+| `Action` + JSON Schema + doc-comment written for the LLM + `Risk` | UI, CLI, IPC, **Navori AI tools**, **MCP server** |
 | `context()` → `ContextFragment` | **Context Engine** (the AI knows your "now") |
 | Domain `Event` with `summary()` | Journal, **Triggers**, **Memory** (the AI knows "what happened") |
 
@@ -213,7 +213,7 @@ pub trait LlmProvider: Send + Sync {
 
 | Role | Used for | Suggestion |
 |---|---|---|
-| `chat` | conversation, multi-step agents | the strongest model the user picks |
+| `chat` | conversation, multi-step tool use | the strongest model the user picks |
 | `fast` | classification, event summaries, proactive decisions | a cheap/fast model |
 | `vision` | understanding screenshots | a model with vision |
 | `embedding` | memory search | any provider with embeddings |
@@ -272,12 +272,12 @@ user/trigger ─► assemble context ─► Model Router ─► stream ─┬─
 
 #### 6.6 `navori-triggers` — Proactive
 - Rules on the EventBus, for example: CI fails on my PR → summarize the error log · new review request → summarize the diff · a Claude Code session ends → notify + release awake · port conflict when starting a dev server.
-- Pipeline: event → rule match (cheap, no AI call) → the `fast` model decides "is this worth interrupting" → if so, the `chat` agent does the work → notification.
+- Pipeline: event → rule match (cheap, no AI call) → the `fast` model decides "is this worth interrupting" → if so, Navori AI does the work on the `chat` model → notification.
 - Daily token **budget**, **quiet hours**, per-rule rate limit, a "don't notify me about this again" button.
 
 #### 6.7 `navori-mcp` (`rmcp`)
 - **MCP client**: the user adds MCP servers (Linear, Notion, filesystem…) → their tools enter the Tool Registry, defaulting to `Risk::Write` unless the user lowers it.
-- **MCP server**: `navori mcp` (stdio) → Claude Code/Cursor can call Navori's tools ("which ports are running in this worktree?", "keep the machine awake until I'm done", "which PRs are waiting on me?"). Same policy engine as the internal agent.
+- **MCP server**: `navori mcp` (stdio) → Claude Code/Cursor can call Navori's tools ("which ports are running in this worktree?", "keep the machine awake until I'm done", "which PRs are waiting on me?"). Same policy engine as Navori AI.
 
 ### Seed: process model — `navori-procs` (R1, R3)
 

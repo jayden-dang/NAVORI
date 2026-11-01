@@ -5,7 +5,7 @@ Date: 2026-11-01
 
 ## Problem
 
-Everyday work on a Mac — including coding with several AI agents in parallel across projects and worktrees — is split across many apps, tabs and single-purpose menubar utilities. The Mac sleeps mid-run and stalls an agent; orphaned dev servers hold ports; pull-request pressure and CI failures sit scattered on GitHub; and no assistant sees the whole picture, so nothing tells the user "this is what needs your decision now" or helps proactively. Each fix today is another utility that costs memory, wake-ups and attention.
+Everyday work on a Mac — including coding with several Harnesses in parallel across projects and worktrees — is split across many apps, tabs and single-purpose menubar utilities. The Mac sleeps mid-run and stalls an Agent session; orphaned dev servers hold ports; pull-request pressure and CI failures sit scattered on GitHub; and no assistant sees the whole picture, so nothing tells the user "this is what needs your decision now" or helps proactively. Each fix today is another utility that costs memory, wake-ups and attention.
 
 ## Users
 
@@ -15,7 +15,7 @@ Later, when open-sourced, other developers may install it themselves for their o
 
 ## Goals
 
-- **GOAL-1** Every decision that needs the user — from Navori AI, an agent, or a module — reaches exactly one place, **Needs you**, and can be answered with one click from the menubar; no `Destructive` action ever runs without the user's explicit approval.
+- **GOAL-1** Every decision that needs the user — from Navori AI, an Agent session, or a module — reaches exactly one place, **Needs you**, and can be answered with one click from the menubar; no `Destructive` action ever runs without the user's explicit approval.
 - **GOAL-2** The Mac never sleeps while a Claude Code, Codex or Grok session is working, and returns to normal sleep within 5 minutes after every session has stopped — with no manual action.
 - **GOAL-3** Every port the user has open is shown with the project, worktree and harness that started it, and a whole group can be freed in at most 2 actions.
 - **GOAL-4** Pull requests needing review, failing checks and merge conflicts are counted in the menubar and refreshed within 2 minutes of a change on GitHub; open, approve and merge are reachable from the submenu.
@@ -23,7 +23,7 @@ Later, when open-sourced, other developers may install it themselves for their o
 - **GOAL-6** The AI sees the full context of what the user is doing, yet no secret (per the Sensitive Data Shield rules) ever leaves the machine or is written to disk; the user can see what the AI has seen.
 - **GOAL-7** The hardcore performance budget stays green in `cargo xtask perf` on every release: idle 0% CPU, ≤ 1 wakeup/s and ≤ 30 MB footprint; ≤ 60 MB with all features and the menu open; cold start to menubar icon ≤ 200 ms; menu open ≤ 50 ms; release `.app` ≤ 25 MB.
 - **GOAL-8** Every release ships one complete capability that meets the Definition of Done and is used daily by the user for at least 3 days without a blocking defect.
-- **GOAL-9** Navori AI proactively puts Decisions and Updates into Needs you when it is worth the interruption (CI failed, an agent finished, a port conflict), within a daily token budget and quiet hours.
+- **GOAL-9** Navori AI proactively puts Decisions and Updates into Needs you when it is worth the interruption (CI failed, an Agent session finished, a port conflict), within a daily token budget and quiet hours.
 - **GOAL-10** Claude Code, Grok Build and Codex can call Navori's tools over MCP, under the same approval policy as Navori's own AI.
 
 ## Non-goals

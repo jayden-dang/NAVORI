@@ -81,7 +81,7 @@ The inbox is **the shared decision place between the user and Navori AI** — it
   - Level 3 **Agent sessions:** every open harness session (claude/codex/grok), status, time; hover → `Show terminal`, `Keep awake for this session`.
   - Level 3 **Integrations:** Claude Code / Grok Build / Codex with the hook file path and `● installed` status; click → Repair. Note: Grok also reads Claude's hooks, so events are de-duplicated per session.
 - **Components:** `new (rung 7) — StatusBlockView` (icon, title + subtitle, description line, inline button row — shared with Ports/project); count capsule `new (rung 7) — CountBadge`; hover actions `new (rung 7) — RowActionButton` (icon 26×22).
-- **States:** off (status block "Awake off" + a prominent `Keep awake for 1 hour`) · no agent leases · hook not installed (Integrations shows `● not installed` + an inbox To-do "Install the Grok hook").
+- **States:** off (status block "Awake off" + a prominent `Keep awake for 1 hour`) · no Agent session Leases · hook not installed (Integrations shows `● not installed` + an inbox To-do "Install the Grok hook").
 - **Type & color / A11y:** as Surface 1; hover buttons must be keyboard-reachable (Tab within the row).
 
 ## Surface 4 — Ports submenu (+ Project)
