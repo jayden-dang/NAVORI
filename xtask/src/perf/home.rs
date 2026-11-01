@@ -1,7 +1,7 @@
 use std::fs;
 use std::io::{Read, Write};
 use std::os::unix::ffi::OsStrExt;
-use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Output, Stdio};
 use std::thread;
@@ -10,6 +10,9 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result, bail, ensure};
 
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(10);
+const REAP_TIMEOUT: Duration = Duration::from_secs(2);
+// macOS O_NOFOLLOW. open fails when the last component is a symlink.
+const O_NOFOLLOW: i32 = 0x0100;
 
 #[derive(Debug)]
 pub struct PerfHome {
@@ -65,13 +68,37 @@ impl PerfHome {
     }
 
     pub fn sweep_stale(&self, exe: &Path) -> Result<Vec<u32>> {
-        let path = self.root.join("pids");
-        let text = match fs::read_to_string(&path) {
-            Ok(text) => text,
+        let meta = match fs::symlink_metadata(&self.root) {
+            Ok(meta) => meta,
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
             Err(err) => {
-                return Err(err).with_context(|| format!("read {}", path.display()));
+                return Err(err)
+                    .with_context(|| format!("inspect perf home {}", self.root.display()));
             }
+        };
+        if meta.file_type().is_symlink() {
+            bail!(
+                "refusing to sweep symlinked perf home {}",
+                self.root.display()
+            );
+        }
+        if !meta.is_dir() {
+            bail!(
+                "refusing to sweep non-directory perf home {}",
+                self.root.display()
+            );
+        }
+        let uid = current_uid()?;
+        let owner = meta.uid();
+        if owner != uid {
+            bail!(
+                "refusing to sweep perf home {} owned by {owner}, not {uid}",
+                self.root.display()
+            );
+        }
+        let path = self.root.join("pids");
+        let Some(text) = read_pid_list(&path)? else {
+            return Ok(Vec::new());
         };
         let mut killed = Vec::new();
         for line in text.lines() {
@@ -189,6 +216,29 @@ fn copy_entry(src: &Path, dest: &Path) -> Result<()> {
     bail!("cannot copy {} into a perf run", src.display());
 }
 
+fn read_pid_list(path: &Path) -> Result<Option<String>> {
+    let meta = match fs::symlink_metadata(path) {
+        Ok(meta) => meta,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => return Err(err).with_context(|| format!("inspect {}", path.display())),
+    };
+    if meta.file_type().is_symlink() {
+        bail!("refusing to read symlinked pid list {}", path.display());
+    }
+    if !meta.is_file() {
+        bail!("pid list {} is not a file", path.display());
+    }
+    let mut file = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(O_NOFOLLOW)
+        .open(path)
+        .with_context(|| format!("open {}", path.display()))?;
+    let mut text = String::new();
+    file.read_to_string(&mut text)
+        .with_context(|| format!("read {}", path.display()))?;
+    Ok(Some(text))
+}
+
 fn process_comm(pid: u32) -> Result<Option<PathBuf>> {
     let out = command_output("/bin/ps", &["-o", "comm=", "-p", &pid.to_string()])?;
     if !out.status.success() {
@@ -259,7 +309,17 @@ fn wait_child(child: &mut Child, rendered: &str) -> Result<ExitStatus> {
         }
         if started.elapsed() >= COMMAND_TIMEOUT {
             let _ = child.kill();
-            let _ = child.wait();
+            let reap_started = Instant::now();
+            loop {
+                match child.try_wait() {
+                    Ok(Some(_)) => break,
+                    Ok(None) if reap_started.elapsed() >= REAP_TIMEOUT => break,
+                    Ok(None) => thread::sleep(Duration::from_millis(20)),
+                    Err(err) => {
+                        return Err(err).with_context(|| format!("reap {rendered}"));
+                    }
+                }
+            }
             bail!("{rendered} timed out after 10s");
         }
         thread::sleep(Duration::from_millis(20));
@@ -435,6 +495,77 @@ mod tests {
         assert!(still_alive(&mut other_exe), "recorded perl was killed");
     }
 
+    #[test]
+    fn sweep_refuses_a_symlinked_root_without_killing() {
+        let base = temp_base();
+        let target = base.path().join("outside-home");
+        fs::create_dir(&target).unwrap();
+        let mut sleep = Proc::spawn("/bin/sleep", &["30"]);
+        fs::write(target.join("pids"), format!("{}\n", sleep.id())).unwrap();
+        let link = base.path().join("navori-perf-link");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        let home = PerfHome { root: link };
+
+        let result = home.sweep_stale(Path::new("/bin/sleep"));
+
+        assert!(
+            stayed_alive(&mut sleep),
+            "sweep killed a sleep listed through a symlinked home"
+        );
+        let err = result.unwrap_err();
+        assert!(format!("{err:#}").contains("symlink"), "{err:#}");
+    }
+
+    #[test]
+    fn sweep_refuses_a_symlinked_pid_list_without_killing() {
+        let base = temp_base();
+        let uid = current_uid().unwrap();
+        let home = PerfHome::prepare(base.path(), uid).unwrap();
+        let listed = base.path().join("listed-pids");
+        let mut sleep = Proc::spawn("/bin/sleep", &["30"]);
+        fs::write(&listed, format!("{}\n", sleep.id())).unwrap();
+        std::os::unix::fs::symlink(&listed, home.root.join("pids")).unwrap();
+
+        let result = home.sweep_stale(Path::new("/bin/sleep"));
+
+        assert!(
+            stayed_alive(&mut sleep),
+            "sweep killed a sleep listed through a symlinked pid file"
+        );
+        let err = result.unwrap_err();
+        assert!(format!("{err:#}").contains("symlink"), "{err:#}");
+    }
+
+    #[test]
+    fn fresh_run_reproduces_a_symlink_without_copying_its_target() {
+        let base = temp_base();
+        let outside = temp_base();
+        let uid = current_uid().unwrap();
+        let home = PerfHome::prepare(base.path(), uid).unwrap();
+        let secret = outside.path().join("secret");
+        fs::write(&secret, b"outside").unwrap();
+        let template = home.template();
+        fs::create_dir(&template).unwrap();
+        std::os::unix::fs::symlink(&secret, template.join("linked")).unwrap();
+
+        let run = home.fresh_run(1).unwrap();
+        let link = run.join("linked");
+
+        assert!(
+            fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(fs::read_link(&link).unwrap(), secret);
+        assert_eq!(fs::read(&secret).unwrap(), b"outside");
+        assert!(
+            fs::read_dir(&run)
+                .unwrap()
+                .all(|entry| { entry.unwrap().file_name() != std::ffi::OsStr::new("secret") })
+        );
+    }
+
     const SOCKET_SUFFIX: &str = "Library/Application Support/Navori Dev/run/navori.sock";
 
     fn home_with_socket_len(prefix: &Path, total: usize) -> PathBuf {
@@ -480,6 +611,17 @@ mod tests {
 
     fn still_alive(proc: &mut Proc) -> bool {
         matches!(proc.0.try_wait(), Ok(None))
+    }
+
+    fn stayed_alive(proc: &mut Proc) -> bool {
+        let start = Instant::now();
+        while start.elapsed() < Duration::from_millis(200) {
+            match proc.0.try_wait() {
+                Ok(None) => thread::sleep(Duration::from_millis(20)),
+                _ => return false,
+            }
+        }
+        true
     }
 
     fn wait_until_exited(proc: &mut Proc) -> bool {
