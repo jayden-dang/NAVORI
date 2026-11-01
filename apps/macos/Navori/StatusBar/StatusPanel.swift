@@ -1,4 +1,5 @@
 import AppKit
+import NavoriPanel
 import QuartzCore
 import SwiftUI
 
@@ -82,8 +83,20 @@ final class StatusPanel: NSPanel {
         frameCallback = onFirstFrame
         store.setPanelVisible(true)
         makeKeyAndOrderFront(nil)
-        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            Task { @MainActor in self?.close() }
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self, weak button] event in
+            // Global monitors report screen coordinates in locationInWindow.
+            let clickPoint = event.locationInWindow
+            Task { @MainActor in
+                guard let self else { return }
+                if let button, let buttonWindow = button.window {
+                    let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+                    guard StatusPanelClickPolicy.shouldDismissPanel(
+                        clickScreenPoint: clickPoint,
+                        statusButtonScreenFrame: buttonFrame
+                    ) else { return }
+                }
+                self.close()
+            }
         }
         if frameCallback != nil {
             armFrameLink()

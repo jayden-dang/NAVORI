@@ -28,9 +28,14 @@ let package = Package(
             path: "NavoriBanner",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .target(
+            name: "NavoriPanel",
+            path: "NavoriPanel",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .executableTarget(
             name: "Navori",
-            dependencies: ["NavoriCore", "NavoriBanner"],
+            dependencies: ["NavoriCore", "NavoriBanner", "NavoriPanel"],
             path: "Navori",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
@@ -38,6 +43,12 @@ let package = Package(
             name: "NavoriBannerTests",
             dependencies: ["NavoriBanner", "NavoriCore"],
             path: "Tests/NavoriBannerTests",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "NavoriPanelTests",
+            dependencies: ["NavoriPanel"],
+            path: "Tests/NavoriPanelTests",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]
