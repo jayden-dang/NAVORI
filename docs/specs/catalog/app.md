@@ -12,3 +12,4 @@ notify (`@org/team`). A blank cell means nobody is notified (solo repo).
 | SHELL | The macOS menubar Shell: status item, panel, Settings window, launch at login and CLI install | — | Shipped |  | ROAD-2 | menubar, status item, panel, settings, login item, CoreStore | `apps/macos/` |
 | CLI | The `navori` command-line client over IPC: status, doctor, events, actions | — | Shipped |  | ROAD-3 | cli, doctor, status, events, actions, exit code | `apps/cli/` |
 | BUILD | Build, sign, bundle, install and CI tooling run as `cargo xtask` | — | Shipped |  | ROAD-4 | xtask, bundle, signing, install, ci, check-deps, outdated | `xtask/` |
+| PERF | Performance gate: `cargo xtask perf` measures release code against the GOAL-7 budget and a recorded baseline | [2026-11-01-perf-gate](../2026-11-01-perf-gate/) | Approved |  | ROAD-5 | perf, budget, baseline, footprint, wakeups, cold start, menu open, regression | `xtask/` |
