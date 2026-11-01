@@ -1,4 +1,5 @@
 import Foundation
+import NavoriBanner
 import NavoriCore
 import Observation
 import os
@@ -41,8 +42,9 @@ final class CoreStore {
             startupError = nil
             log.info("core started")
         } catch {
-            startupError = String(describing: error)
-            log.error("core failed to start: \(String(describing: error), privacy: .public)")
+            let message = CoreStartupBanner.message(for: error)
+            startupError = message
+            log.error("core failed to start: \(message, privacy: .public)")
         }
     }
 

@@ -184,6 +184,24 @@ fn a_second_instance_of_the_same_profile_refuses_to_start() {
 }
 
 #[test]
+fn a_corrupt_database_startup_error_display_starts_with_startup_failed() {
+    let home = home();
+    let data = home.path().join("Library/Application Support/Navori Dev");
+    std::fs::create_dir_all(&data).unwrap();
+    std::fs::write(data.join("navori.db"), "this is not a sqlite database\n").unwrap();
+    let err = NavoriCore::start(config(&home), Arc::new(Recorder::default())).unwrap_err();
+    let display = err.to_string();
+    assert!(
+        display.starts_with("startup failed:"),
+        "shell banner must surface Display, got {display:?}"
+    );
+    assert!(
+        display.contains("database"),
+        "expected database context in {display:?}"
+    );
+}
+
+#[test]
 fn clean_shutdown_removes_the_socket_and_an_unclean_previous_exit_is_reported() {
     let home = home();
     let (core, _) = start(&home);
