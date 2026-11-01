@@ -54,5 +54,5 @@ None — all invariants live in this file. Split into `docs/architecture/<domain
 | ARCH-6 | `navori-store` / `EventBus` redact on write; tests in `crates/store`, `crates/kernel` |
 | ARCH-10, ARCH-12, ARCH-13, ARCH-14 | tests in `crates/kernel`, `crates/store`, `crates/config`, `crates/ffi` |
 | ARCH-11 | tests in `crates/ipc` |
-| ARCH-15 – ARCH-18 | `cargo xtask perf` (planned) + design review |
+| ARCH-15 – ARCH-18 | design review (`inspect-invariants`). `cargo xtask perf` checks the GOAL-7 budgets, not these four |
 | ARCH-1, ARCH-4, ARCH-5, ARCH-7, ARCH-8 | design review (`inspect-invariants`) |

@@ -68,10 +68,10 @@ Design: ./design.md
 
 **Depends-on:** none
 
-- [ ] **Step 1: Capture the before-state.** `cargo xtask bundle --profile dev` and `--profile release`; save `plutil -p` of both `Contents/Info.plist` and `codesign -dvv` output to `/tmp/perf-t1-before/`.
-- [ ] **Step 2: Implement the split.** Move `cargo_dir`/`swift_config` to `Flavor`; replace both `profile == Profile::Release` checks with the flavour; existing callers pass `profile.default_flavor()` and `root.join("build").join(profile.name())`.
-- [ ] **Step 3: Prove nothing changed.** Rebundle both profiles and `diff` against Step 1 (only `CFBundleVersion` may differ); `cargo xtask ci` → `✓ ci passed`; `cargo xtask install`, then `/Applications/Navori.app/Contents/Helpers/navori doctor` → every check ✓.
-- [ ] **Step 4: Commit** — `git commit -m "refactor(xtask): split build flavour from Navori profile"`
+- [x] **Step 1: Capture the before-state.** `cargo xtask bundle --profile dev` and `--profile release`; save `plutil -p` of both `Contents/Info.plist` and `codesign -dvv` output to `/tmp/perf-t1-before/`.
+- [x] **Step 2: Implement the split.** Move `cargo_dir`/`swift_config` to `Flavor`; replace both `profile == Profile::Release` checks with the flavour; existing callers pass `profile.default_flavor()` and `root.join("build").join(profile.name())`.
+- [x] **Step 3: Prove nothing changed.** Rebundle both profiles and `diff` against Step 1 (only `CFBundleVersion` may differ); `cargo xtask ci` → `✓ ci passed`; `cargo xtask install`, then `/Applications/Navori.app/Contents/Helpers/navori doctor` → every check ✓.
+- [x] **Step 4: Commit** — `git commit -m "refactor(xtask): split build flavour from Navori profile"`
 
 _Requirements: PERF-5.1, PERF-5.2, PERF-5.6_
 
@@ -92,10 +92,10 @@ _Requirements: PERF-5.1, PERF-5.2, PERF-5.6_
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1: Failing tests:** `median_of_odd_and_even_counts` (`[3,1,2]`→2, `[4,1,3,2]`→2.5, `[]`→None); `all_within_budget_passes`; `over_budget_fails_naming_metric_value_and_budget` (`cold_start_ms` 201 → line contains `cold_start_ms`, `201`, `200`); `idle_cpu_rounds_to_one_decimal` (0.04 passes, 0.05 fails — `(x * 10.0).round() / 10.0`); `skipped_metric_prints_reason_and_does_not_fail`; `missing_enabled_metric_fails` (no `menu_reopen_ms` → `no line for an enabled metric: menu_reopen_ms`); `baseline_only_metric_is_labelled_and_never_budget_fails`; `menu_open_footprint_line_shows_running_modules` (`modules_running` 1 → line contains `modules: 1`). Run `cargo test -p xtask perf::judge` — expect failures.
-- [ ] **Step 2: Implement** `METRICS`, `median`, the type definitions and `judge` (budget part). Run `cargo test -p xtask perf::judge` — expect pass.
-- [ ] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
-- [ ] **Step 4: Commit** — `git commit -m "feat(xtask): judge perf metrics against the GOAL-7 budget"`
+- [x] **Step 1: Failing tests:** `median_of_odd_and_even_counts` (`[3,1,2]`→2, `[4,1,3,2]`→2.5, `[]`→None); `all_within_budget_passes`; `over_budget_fails_naming_metric_value_and_budget` (`cold_start_ms` 201 → line contains `cold_start_ms`, `201`, `200`); `idle_cpu_rounds_to_one_decimal` (0.04 passes, 0.05 fails — `(x * 10.0).round() / 10.0`); `skipped_metric_prints_reason_and_does_not_fail`; `missing_enabled_metric_fails` (no `menu_reopen_ms` → `no line for an enabled metric: menu_reopen_ms`); `baseline_only_metric_is_labelled_and_never_budget_fails`; `menu_open_footprint_line_shows_running_modules` (`modules_running` 1 → line contains `modules: 1`). Run `cargo test -p xtask perf::judge` — expect failures.
+- [x] **Step 2: Implement** `METRICS`, `median`, the type definitions and `judge` (budget part). Run `cargo test -p xtask perf::judge` — expect pass.
+- [x] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
+- [x] **Step 4: Commit** — `git commit -m "feat(xtask): judge perf metrics against the GOAL-7 budget"`
 
 _Requirements: PERF-1.2, PERF-1.3, PERF-1.4, PERF-1.7, PERF-1.8, PERF-1.9_
 
@@ -115,10 +115,10 @@ _Requirements: PERF-1.2, PERF-1.3, PERF-1.4, PERF-1.7, PERF-1.8, PERF-1.9_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Failing tests:** `regression_beyond_ten_percent_fails` (baseline 100, floor 10 → 110 passes, 111 fails); `floor_wins_for_small_values` (baseline 20, floor 5 → 25 passes, 25.1 fails); `zero_baseline_uses_floor` (baseline 0, floor 0.2 → 0.2 passes, 0.3 fails); `other_machine_or_macos_checks_budget_only_with_warning`; `missing_baseline_warns_and_checks_budget_only`; `baseline_round_trips_through_json` (temp dir); `record_writes_only_when_verdict_passed` (failed verdict + `record` → existing file byte-identical); `without_record_never_writes` (passed verdict, `record` false → file absent). Run `cargo test -p xtask perf::` — expect failures.
-- [ ] **Step 2: Implement** regression in `judge`, `Machine::current`, `Baseline::load/from_run/save`, `finish`. Run `cargo test -p xtask perf::` — expect pass.
-- [ ] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
-- [ ] **Step 4: Commit** — `git commit -m "feat(xtask): record a perf baseline and fail on regressions"`
+- [x] **Step 1: Failing tests:** `regression_beyond_ten_percent_fails` (baseline 100, floor 10 → 110 passes, 111 fails); `floor_wins_for_small_values` (baseline 20, floor 5 → 25 passes, 25.1 fails); `zero_baseline_uses_floor` (baseline 0, floor 0.2 → 0.2 passes, 0.3 fails); `other_machine_or_macos_checks_budget_only_with_warning`; `missing_baseline_warns_and_checks_budget_only`; `baseline_round_trips_through_json` (temp dir); `record_writes_only_when_verdict_passed` (failed verdict + `record` → existing file byte-identical); `without_record_never_writes` (passed verdict, `record` false → file absent). Run `cargo test -p xtask perf::` — expect failures.
+- [x] **Step 2: Implement** regression in `judge`, `Machine::current`, `Baseline::load/from_run/save`, `finish`. Run `cargo test -p xtask perf::` — expect pass.
+- [x] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
+- [x] **Step 4: Commit** — `git commit -m "feat(xtask): record a perf baseline and fail on regressions"`
 
 _Requirements: PERF-2.1, PERF-2.2, PERF-2.3, PERF-2.4, PERF-2.5, PERF-2.6_
 
@@ -139,10 +139,10 @@ _Requirements: PERF-2.1, PERF-2.2, PERF-2.3, PERF-2.4, PERF-2.5, PERF-2.6_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Failing tests** with literal ndjson lines shaped like `.skills/PERF/scan.md` §9: `parses_status_item_drawn` (`statusItemDrawn ms=142.5`); `parses_menu_opened` (`menuOpened ms=31.2 first=true modules=1`); `ignores_banner_and_finished_lines` (`Filtering the log data using …`, `{"count":3,"finished":1}`); `ignores_malformed_messages`; `wait_for_skips_marks_of_other_pids` (from_reader with pid 7 then pid 9 → `wait_for(9, …)` returns the pid-9 mark); `wait_for_times_out_with_none` (empty reader, 50 ms). Run `cargo test -p xtask perf::logstream` — expect failures.
-- [ ] **Step 2: Implement** `parse_line` (`serde_json::Value`), `LogStream::from_reader`, `start`, `wait_for`. Run tests — expect pass.
-- [ ] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
-- [ ] **Step 4: Commit** — `git commit -m "feat(xtask): read perf marks from the unified log"`
+- [x] **Step 1: Failing tests** with literal ndjson lines shaped like `.skills/PERF/scan.md` §9: `parses_status_item_drawn` (`statusItemDrawn ms=142.5`); `parses_menu_opened` (`menuOpened ms=31.2 first=true modules=1`); `ignores_banner_and_finished_lines` (`Filtering the log data using …`, `{"count":3,"finished":1}`); `ignores_malformed_messages`; `wait_for_skips_marks_of_other_pids` (from_reader with pid 7 then pid 9 → `wait_for(9, …)` returns the pid-9 mark); `wait_for_times_out_with_none` (empty reader, 50 ms). Run `cargo test -p xtask perf::logstream` — expect failures.
+- [x] **Step 2: Implement** `parse_line` (`serde_json::Value`), `LogStream::from_reader`, `start`, `wait_for`. Run tests — expect pass.
+- [x] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
+- [x] **Step 4: Commit** — `git commit -m "feat(xtask): read perf marks from the unified log"`
 
 _Requirements: PERF-4.6, PERF-1.9_
 
@@ -163,10 +163,10 @@ _Requirements: PERF-4.6, PERF-1.9_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Failing tests:** `creates_root_owned_by_user_with_mode_0700`; `replaces_a_stale_tree_it_owns`; `refuses_a_symlinked_root` (target untouched); `fresh_run_copies_template_contents`; `rejects_a_home_whose_socket_path_exceeds_103_bytes`; `sweep_kills_only_recorded_pids_running_the_given_exe` (spawn `/bin/sleep 30` twice by absolute path, record one → `sweep_stale(Path::new("/bin/sleep"))` kills the recorded one only; a recorded pid running another exe survives). The foreign-owner branch cannot be built without root; it is covered by review. Run `cargo test -p xtask perf::home` — expect failures.
-- [ ] **Step 2: Implement.** Run tests — expect pass.
-- [ ] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
-- [ ] **Step 4: Commit** — `git commit -m "feat(xtask): prepare a private perf home under /tmp"`
+- [x] **Step 1: Failing tests:** `creates_root_owned_by_user_with_mode_0700`; `replaces_a_stale_tree_it_owns`; `refuses_a_symlinked_root` (target untouched); `fresh_run_copies_template_contents`; `rejects_a_home_whose_socket_path_exceeds_103_bytes`; `sweep_kills_only_recorded_pids_running_the_given_exe` (spawn `/bin/sleep 30` twice by absolute path, record one → `sweep_stale(Path::new("/bin/sleep"))` kills the recorded one only; a recorded pid running another exe survives). The foreign-owner branch cannot be built without root; it is covered by review. Run `cargo test -p xtask perf::home` — expect failures.
+- [x] **Step 2: Implement.** Run tests — expect pass.
+- [x] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
+- [x] **Step 4: Commit** — `git commit -m "feat(xtask): prepare a private perf home under /tmp"`
 
 _Requirements: PERF-3.3, PERF-3.5, PERF-6.3, PERF-6.5_
 
@@ -187,10 +187,10 @@ _Requirements: PERF-3.3, PERF-3.5, PERF-6.3, PERF-6.5_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Failing tests** `parses_a_helper_line` (literal JSON → exact field values) and `rejects_a_line_missing_a_field`. Run `cargo test -p xtask perf::probe` — expect failures.
-- [ ] **Step 2: Implement** the Swift helper (CPU ns via `mach_timebase_info`, `ri_pkg_idle_wkups`, `ri_lifetime_max_phys_footprint`, `pti_threadnum`, `clock_gettime_nsec_np(CLOCK_UPTIME_RAW)`) and `probe.rs`. Run tests — expect pass.
-- [ ] **Step 3: Manual check** against the running daily app (read-only): `swiftc -O xtask/assets/perf-probe.swift -o /tmp/perf-probe && /tmp/perf-probe $(pgrep -f /Applications/Navori.app/Contents/MacOS/Navori)`; `footprint` equals `footprint -j` `phys_footprint`; `threads` equals `/usr/bin/top -l 1 -pid <pid> -stats th`.
-- [ ] **Step 4: Gate and commit** — `cargo xtask ci` → `✓ ci passed`; `git commit -m "feat(xtask): add a libproc counter helper for perf sampling"`
+- [x] **Step 1: Failing tests** `parses_a_helper_line` (literal JSON → exact field values) and `rejects_a_line_missing_a_field`. Run `cargo test -p xtask perf::probe` — expect failures.
+- [x] **Step 2: Implement** the Swift helper (CPU ns via `mach_timebase_info`, `ri_pkg_idle_wkups`, `ri_lifetime_max_phys_footprint`, `pti_threadnum`, `clock_gettime_nsec_np(CLOCK_UPTIME_RAW)`) and `probe.rs`. Run tests — expect pass.
+- [x] **Step 3: Manual check** against the running daily app (read-only): `swiftc -O xtask/assets/perf-probe.swift -o /tmp/perf-probe && /tmp/perf-probe $(pgrep -f /Applications/Navori.app/Contents/MacOS/Navori)`; `footprint` equals `footprint -j` `phys_footprint`; `threads` equals `/usr/bin/top -l 1 -pid <pid> -stats th`.
+- [x] **Step 4: Gate and commit** — `cargo xtask ci` → `✓ ci passed`; `git commit -m "feat(xtask): add a libproc counter helper for perf sampling"`
 
 _Requirements: PERF-1.3, PERF-6.2_
 
@@ -211,11 +211,11 @@ _Requirements: PERF-1.3, PERF-6.2_
 
 **Depends-on:** none
 
-- [ ] **Step 1: Implement** per design § Shell perf probe (env parsing; `CoreStore.start` uses `coreHome`; first-draw mark; `openMenuFresh` closes, lets the close finish, takes the trigger, shows with completion; SIGUSR1/SIGTERM sources only in perf mode; fault + terminate when `NAVORI_PERF=1` lacks `NAVORI_PERF_HOME`).
-- [ ] **Step 2: Gate** — `cargo xtask ci` → `✓ ci passed`.
-- [ ] **Step 3: Perf-mode check:** `cargo xtask bundle --profile dev`; `mkdir -m 700 /tmp/navori-perf-manual`; start `/usr/bin/log stream --predicate 'subsystem == "dev.navori" AND category == "perf"' --style ndjson` in one shell; run `NAVORI_PERF=1 NAVORI_PERF_HOME=/tmp/navori-perf-manual "$PWD/build/dev/Navori Dev.app/Contents/MacOS/Navori" &`; expect `statusItemDrawn`; `/bin/kill -USR1 <pid>` twice → `menuOpened … first=true` then `first=false`; Core data appears under `/tmp/navori-perf-manual/Library/`; `/bin/kill -TERM <pid>` → exits, no `session.marker` left.
-- [ ] **Step 4: Normal-mode check:** `cargo xtask run`; left click toggles the panel; right and control click show the context menu; a normal-mode instance receiving `/bin/kill -USR1` ends (default action); `NAVORI_PERF=1` without `NAVORI_PERF_HOME` → the app quits after a fault line.
-- [ ] **Step 5: Commit** — `git commit -m "feat(shell): add a perf-mode probe for launch and menu timings"`
+- [x] **Step 1: Implement** per design § Shell perf probe (env parsing; `CoreStore.start` uses `coreHome`; first-draw mark; `openMenuFresh` closes, lets the close finish, takes the trigger, shows with completion; SIGUSR1/SIGTERM sources only in perf mode; fault + terminate when `NAVORI_PERF=1` lacks `NAVORI_PERF_HOME`).
+- [x] **Step 2: Gate** — `cargo xtask ci` → `✓ ci passed`.
+- [x] **Step 3: Perf-mode check:** `cargo xtask bundle --profile dev`; `mkdir -m 700 /tmp/navori-perf-manual`; start `/usr/bin/log stream --predicate 'subsystem == "dev.navori" AND category == "perf"' --style ndjson` in one shell; run `NAVORI_PERF=1 NAVORI_PERF_HOME=/tmp/navori-perf-manual "$PWD/build/dev/Navori Dev.app/Contents/MacOS/Navori" &`; expect `statusItemDrawn`; `/bin/kill -USR1 <pid>` twice → `menuOpened … first=true` then `first=false`; Core data appears under `/tmp/navori-perf-manual/Library/`; `/bin/kill -TERM <pid>` → exits, no `session.marker` left.
+- [x] **Step 4: Normal-mode check:** `cargo xtask run`; left click toggles the panel; right and control click show the context menu; a normal-mode instance receiving `/bin/kill -USR1` ends (default action); `NAVORI_PERF=1` without `NAVORI_PERF_HOME` → the app quits after a fault line.
+- [x] **Step 5: Commit** — `git commit -m "feat(shell): add a perf-mode probe for launch and menu timings"`
 
 _Requirements: PERF-4.1, PERF-4.2, PERF-4.3, PERF-4.4, PERF-4.5, PERF-5.3, PERF-5.4, PERF-5.5_
 
@@ -235,10 +235,10 @@ _Requirements: PERF-4.1, PERF-4.2, PERF-4.3, PERF-4.4, PERF-4.5, PERF-5.3, PERF-
 
 **Depends-on:** Task 7
 
-- [ ] **Step 1: Instrument temporarily** (not committed): one-shot `NSView.displayLink(target:selector:)` on the status button and on the panel content view, logging the first callback time beside each mark.
-- [ ] **Step 2: Run 10 launches and 10 SIGUSR1 opens** in perf mode; record each pair's difference and whether the panel stays visible after SIGUSR1.
-- [ ] **Step 3: Decide.** All differences ≤ 5 ms → keep the marks. Otherwise move the marks to the display-link callback and repeat Step 2. If the panel does not stay visible after SIGUSR1, stop and raise it with the user — the menu metrics cannot be measured as designed.
-- [ ] **Step 4: Record and commit** — write `.skills/PERF/calibration.md`; if code changed, `cargo xtask ci` then `git commit -m "fix(shell): align perf marks with the first presented frame"`.
+- [x] **Step 1: Instrument temporarily** (not committed): one-shot `NSView.displayLink(target:selector:)` on the status button and on the panel content view, logging the first callback time beside each mark.
+- [x] **Step 2: Run 10 launches and 10 SIGUSR1 opens** in perf mode; record each pair's difference and whether the panel stays visible after SIGUSR1.
+- [x] **Step 3: Decide.** All differences ≤ 5 ms → keep the marks. Otherwise move the marks to the display-link callback and repeat Step 2. If the panel does not stay visible after SIGUSR1, stop and raise it with the user — the menu metrics cannot be measured as designed.
+- [x] **Step 4: Record and commit** — write `.skills/PERF/calibration.md`; if code changed, `cargo xtask ci` then `git commit -m "fix(shell): align perf marks with the first presented frame"`.
 
 _Requirements: PERF-4.1, PERF-4.2, PERF-4.3_
 
@@ -259,9 +259,9 @@ _Requirements: PERF-4.1, PERF-4.2, PERF-4.3_
 
 **Depends-on:** Task 5
 
-- [ ] **Step 1: Failing tests:** `wait_exit_times_out_while_the_process_runs` (`/bin/sleep 30`, 100 ms → false); `term_signal_ends_the_process` (signal `TERM` → `wait_exit(2 s)` true); `dropping_the_guard_kills_a_live_process` (pid gone after drop, checked with `/bin/kill -0`). Run `cargo test -p xtask perf::launch` — expect failures.
-- [ ] **Step 2: Implement.** Run tests — expect pass.
-- [ ] **Step 3: Gate and commit** — `cargo xtask ci` → `✓ ci passed`; `git commit -m "feat(xtask): add a launch guard for perf runs"`
+- [x] **Step 1: Failing tests:** `wait_exit_times_out_while_the_process_runs` (`/bin/sleep 30`, 100 ms → false); `term_signal_ends_the_process` (signal `TERM` → `wait_exit(2 s)` true); `dropping_the_guard_kills_a_live_process` (pid gone after drop, checked with `/bin/kill -0`). Run `cargo test -p xtask perf::launch` — expect failures.
+- [x] **Step 2: Implement.** Run tests — expect pass.
+- [x] **Step 3: Gate and commit** — `cargo xtask ci` → `✓ ci passed`; `git commit -m "feat(xtask): add a launch guard for perf runs"`
 
 _Requirements: PERF-3.4, PERF-3.5_
 
@@ -281,11 +281,11 @@ _Requirements: PERF-3.4, PERF-3.5_
 
 **Depends-on:** Task 1, Task 3, Task 4, Task 6, Task 8, Task 9
 
-- [ ] **Step 1: Implement** `run` per design § xtask perf runner flow: build into `build/perf/` → sweep stale pids → `PerfHome::prepare(Path::new("/tmp"), uid)` → `LogStream::start()` (banner read) → warm-up (≤ 15 s exit, fail if `session.marker` remains) → phase A × 5 → phase B → `app_size_mb` → `judge` → print report and build/phase times → `finish(…, record, …)`.
-- [ ] **Step 2: Gate** — `cargo xtask ci` → `✓ ci passed` (no dead-code allowance left).
-- [ ] **Step 3: Full run** with `/Applications/Navori.app` and a `cargo xtask run` dev app both running: `cargo xtask perf`; expect 13 metric lines (8 gated, 4 baseline-only, 1 skipped) and printed phase times with measuring ≤ 3 min. During phase A, `lsof -p <perf pid>` lists no path under `~/Library/Application Support/Navori`, `…/Navori Dev`, `~/Library/Logs/Navori` or `…/Navori Dev`; both daily apps keep running with unchanged pids.
-- [ ] **Step 4: Failure paths.** Ctrl-C during phase A → `pgrep -fl build/perf` empty; `kill -9` the xtask process mid-run, rerun → the stale pid is swept first; an over-budget metric (expected today: `idle_footprint_mb`) → exit 1 naming metric, value and budget.
-- [ ] **Step 5: Commit** — `git commit -m "feat(xtask): add cargo xtask perf"`
+- [x] **Step 1: Implement** `run` per design § xtask perf runner flow: build into `build/perf/` → sweep stale pids → `PerfHome::prepare(Path::new("/tmp"), uid)` → `LogStream::start()` (banner read) → warm-up (≤ 15 s exit, fail if `session.marker` remains) → phase A × 5 → phase B → `app_size_mb` → `judge` → print report and build/phase times → `finish(…, record, …)`.
+- [x] **Step 2: Gate** — `cargo xtask ci` → `✓ ci passed` (no dead-code allowance left).
+- [x] **Step 3: Full run** with `/Applications/Navori.app` and a `cargo xtask run` dev app both running: `cargo xtask perf`; expect 13 metric lines (8 gated, 4 baseline-only, 1 skipped) and printed phase times with measuring ≤ 3 min. During phase A, `lsof -p <perf pid>` lists no path under `~/Library/Application Support/Navori`, `…/Navori Dev`, `~/Library/Logs/Navori` or `…/Navori Dev`; both daily apps keep running with unchanged pids.
+- [x] **Step 4: Failure paths.** Ctrl-C during phase A → `pgrep -fl build/perf` empty; `kill -9` the xtask process mid-run, rerun → the stale pid is swept first; an over-budget metric (expected today: `idle_footprint_mb`) → exit 1 naming metric, value and budget.
+- [x] **Step 5: Commit** — `git commit -m "feat(xtask): add cargo xtask perf"`
 
 _Requirements: PERF-1.1, PERF-1.5, PERF-1.6, PERF-1.10, PERF-3.1, PERF-3.2, PERF-6.1, PERF-6.2_
 
@@ -294,7 +294,7 @@ _Requirements: PERF-1.1, PERF-1.5, PERF-1.6, PERF-1.10, PERF-3.1, PERF-3.2, PERF
 ### Task 11: Document the gate
 
 **Files:**
-- Modify: `docs/standards/performance.md`, `docs/standards/testing.md`, `README.md`, `AGENTS.md`, `docs/agents/project.md`
+- Modify: `docs/standards/performance.md`, `docs/standards/testing.md`, `README.md`, `AGENTS.md`, `docs/agents/project.md`, `docs/architecture/INDEX.md`
 - Test: none — documentation
 
 **Reuse:** rung 2 — edits the existing standard
@@ -305,8 +305,8 @@ _Requirements: PERF-1.1, PERF-1.5, PERF-1.6, PERF-1.10, PERF-3.1, PERF-3.2, PERF
 
 **Depends-on:** Task 10
 
-- [ ] **Step 1: Edit** `performance.md` (release code packaged as the dev identity; `proc_pid_rusage` counters, equal to `footprint` and `top` IDLEW; 5 × 12 s windows; `--record`; floors rule; baseline-only metrics; skip list; the shared `dev.navori.app.debug` preferences domain; drop "to be built with the next release"); `testing.md` Exempt (xtask's perf logic is unit-tested); `README.md` and `AGENTS.md` command lists; `docs/agents/project.md` release steps (`cargo xtask perf` after `ci`).
-- [ ] **Step 2: Commit** — `git commit -m "docs: document cargo xtask perf"`
+- [x] **Step 1: Edit** `performance.md` (release code packaged as the dev identity; `proc_pid_rusage` counters, equal to `footprint` and `top` IDLEW; 5 × 12 s windows; `--record`; floors rule; baseline-only metrics; skip list; the shared `dev.navori.app.debug` preferences domain; drop "to be built with the next release"); `testing.md` Exempt (xtask's perf logic is unit-tested); `README.md` and `AGENTS.md` command lists; `docs/agents/project.md` release steps (`cargo xtask perf` after `ci`).
+- [x] **Step 2: Commit** — `git commit -m "docs: document cargo xtask perf"`
 
 _Requirements: PERF-1.1_
 

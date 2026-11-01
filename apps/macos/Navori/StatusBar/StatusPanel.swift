@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import SwiftUI
 
 /// Borderless, non-activating panel anchored under the menubar item — the Navori "popover".
@@ -7,6 +8,8 @@ import SwiftUI
 final class StatusPanel: NSPanel {
     private let store: CoreStore
     private var outsideClickMonitor: Any?
+    private var frameLink: CADisplayLink?
+    private var frameCallback: (@MainActor () -> Void)?
     private static let width: CGFloat = 380
     private static let maxHeight: CGFloat = 560
 
@@ -54,7 +57,7 @@ final class StatusPanel: NSPanel {
         isVisible ? close() : show(relativeTo: button)
     }
 
-    func show(relativeTo button: NSStatusBarButton) {
+    func show(relativeTo button: NSStatusBarButton, onFirstFrame: (@MainActor () -> Void)? = nil) {
         guard let buttonWindow = button.window else { return }
         let fitting = contentView?.fittingSize.height ?? 420
         let height = min(max(fitting, 200), Self.maxHeight)
@@ -64,16 +67,33 @@ final class StatusPanel: NSPanel {
         var x = anchor.midX - Self.width / 2
         x = min(max(x, screen.minX + 8), screen.maxX - Self.width - 8)
         let y = anchor.minY - height - 6
-        setFrame(NSRect(x: x, y: y, width: Self.width, height: height), display: true)
+        var frame = NSRect(x: x, y: y, width: Self.width, height: height)
+        // A signal-opened button can report a window that is not the menu-bar slot.
+        // A click whose button has a real on-screen frame keeps this anchor.
+        let anchoredMissesScreens = !NSScreen.screens.contains { $0.frame.intersects(frame) }
+        if buttonWindow.screen == nil || button.bounds.height < 1 || anchoredMissesScreens,
+           let visible = NSScreen.main?.visibleFrame {
+            var fx = anchor.midX - Self.width / 2
+            fx = min(max(fx, visible.minX + 8), visible.maxX - Self.width - 8)
+            frame = NSRect(x: fx, y: visible.maxY - height - 6, width: Self.width, height: height)
+        }
+        setFrame(frame, display: true)
 
+        frameCallback = onFirstFrame
         store.setPanelVisible(true)
         makeKeyAndOrderFront(nil)
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             Task { @MainActor in self?.close() }
         }
+        if frameCallback != nil {
+            armFrameLink()
+        }
     }
 
     override func close() {
+        frameLink?.invalidate()
+        frameLink = nil
+        frameCallback = nil
         if let monitor = outsideClickMonitor {
             NSEvent.removeMonitor(monitor)
             outsideClickMonitor = nil
@@ -85,6 +105,29 @@ final class StatusPanel: NSPanel {
     override func resignKey() {
         super.resignKey()
         close()
+    }
+
+    private func armFrameLink() {
+        guard let callback = frameCallback else { return }
+        guard let contentView else {
+            frameCallback = nil
+            callback()
+            return
+        }
+        frameLink?.invalidate()
+        let link = contentView.displayLink(target: self, selector: #selector(firstPresentedFrame(_:)))
+        link.add(to: .main, forMode: .common)
+        frameLink = link
+    }
+
+    @objc nonisolated func firstPresentedFrame(_ link: CADisplayLink) {
+        link.invalidate()
+        MainActor.assumeIsolated {
+            frameLink = nil
+            let callback = frameCallback
+            frameCallback = nil
+            callback?()
+        }
     }
 
     override func cancelOperation(_ sender: Any?) {

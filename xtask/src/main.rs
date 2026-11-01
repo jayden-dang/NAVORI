@@ -1,6 +1,7 @@
 //! `cargo xtask <command>` — build, bundle, sign, install and check Navori.
 //!
-//! Profiles: `dev` → "Navori Dev.app" (`dev.navori.app.debug`, debug build);
+//! Profiles: `dev` → "Navori Dev.app" (`dev.navori.app.debug`; debug by default,
+//!           release when the perf gate bundles it);
 //!           `release` → "Navori.app" (`dev.navori.app`, release build).
 
 use std::path::{Path, PathBuf};
@@ -8,6 +9,8 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail, ensure};
 use clap::{Parser, Subcommand, ValueEnum};
+
+mod perf;
 
 const SIGNING_IDENTITY: &str = "Navori Local Signing";
 const MIN_MACOS: &str = "15.0";
@@ -47,6 +50,33 @@ enum Cmd {
     Icon,
     /// Rust tests + clippy + fmt check + dependency rules + Swift build.
     Ci,
+    /// Measure release code in the dev app and judge it against the budget.
+    Perf {
+        /// Write perf-baseline.json when every metric passes.
+        #[arg(long)]
+        record: bool,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Flavor {
+    Debug,
+    Release,
+}
+
+impl Flavor {
+    fn cargo_dir(self) -> &'static str {
+        match self {
+            Self::Debug => "debug",
+            Self::Release => "release",
+        }
+    }
+    fn swift_config(self) -> &'static str {
+        match self {
+            Self::Debug => "debug",
+            Self::Release => "release",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -56,16 +86,10 @@ enum Profile {
 }
 
 impl Profile {
-    fn cargo_dir(self) -> &'static str {
+    fn default_flavor(self) -> Flavor {
         match self {
-            Self::Dev => "debug",
-            Self::Release => "release",
-        }
-    }
-    fn swift_config(self) -> &'static str {
-        match self {
-            Self::Dev => "debug",
-            Self::Release => "release",
+            Self::Dev => Flavor::Debug,
+            Self::Release => Flavor::Release,
         }
     }
     fn app_name(self) -> &'static str {
@@ -98,9 +122,11 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let root = workspace_root()?;
     match cli.command {
-        Cmd::BuildCore { profile } => build_core(&root, profile),
+        Cmd::BuildCore { profile } => build_core(&root, profile.default_flavor()),
         Cmd::Bundle { profile } => {
-            bundle(&root, profile).map(|app| println!("✓ {}", app.display()))
+            let out_dir = root.join("build").join(profile.name());
+            bundle(&root, profile, profile.default_flavor(), &out_dir)
+                .map(|app| println!("✓ {}", app.display()))
         }
         Cmd::Run => run_dev(&root),
         Cmd::Install => install(&root),
@@ -110,6 +136,12 @@ fn main() -> Result<()> {
         Cmd::Outdated => outdated(&root),
         Cmd::Icon => icon(&root),
         Cmd::Ci => ci(&root),
+        Cmd::Perf { record } => {
+            if !perf::run(&root, record)? {
+                bail!("perf gate failed");
+            }
+            Ok(())
+        }
     }
 }
 
@@ -170,10 +202,10 @@ fn cargo(root: &Path) -> Command {
 
 // ── build-core ──────────────────────────────────────────────────────────────────────────
 
-fn build_core(root: &Path, profile: Profile) -> Result<()> {
+fn build_core(root: &Path, flavor: Flavor) -> Result<()> {
     let mut build = cargo(root);
     build.args(["build", "-p", "navori-ffi", "--lib"]);
-    if profile == Profile::Release {
+    if flavor == Flavor::Release {
         build.arg("--release");
     }
     sh(&mut build)?;
@@ -190,7 +222,7 @@ fn build_core(root: &Path, profile: Profile) -> Result<()> {
 
     let lib = root
         .join("target")
-        .join(profile.cargo_dir())
+        .join(flavor.cargo_dir())
         .join("libnavori_ffi.a");
     let bindgen = root.join("target/debug/uniffi-bindgen-swift");
     let staging = root.join("build/bindings");
@@ -241,12 +273,12 @@ fn build_core(root: &Path, profile: Profile) -> Result<()> {
 
 // ── bundle ─────────────────────────────────────────────────────────────────────────────
 
-fn bundle(root: &Path, profile: Profile) -> Result<PathBuf> {
-    build_core(root, profile)?;
+fn bundle(root: &Path, profile: Profile, flavor: Flavor, out_dir: &Path) -> Result<PathBuf> {
+    build_core(root, flavor)?;
 
     let mut cli = cargo(root);
     cli.args(["build", "-p", "navori-cli", "--bin", "navori"]);
-    if profile == Profile::Release {
+    if flavor == Flavor::Release {
         cli.arg("--release");
     }
     sh(&mut cli)?;
@@ -256,7 +288,7 @@ fn bundle(root: &Path, profile: Profile) -> Result<PathBuf> {
         .args([
             "build",
             "-c",
-            profile.swift_config(),
+            flavor.swift_config(),
             "--arch",
             "arm64",
             "--product",
@@ -269,7 +301,7 @@ fn bundle(root: &Path, profile: Profile) -> Result<PathBuf> {
             .args([
                 "build",
                 "-c",
-                profile.swift_config(),
+                flavor.swift_config(),
                 "--arch",
                 "arm64",
                 "--show-bin-path",
@@ -279,10 +311,7 @@ fn bundle(root: &Path, profile: Profile) -> Result<PathBuf> {
     )?;
     let swift_bin = PathBuf::from(bin_dir.trim()).join("Navori");
 
-    let app = root
-        .join("build")
-        .join(profile.name())
-        .join(format!("{}.app", profile.app_name()));
+    let app = out_dir.join(format!("{}.app", profile.app_name()));
     let _ = std::fs::remove_dir_all(&app);
     let contents = app.join("Contents");
     for d in ["MacOS", "Helpers", "Resources"] {
@@ -290,7 +319,7 @@ fn bundle(root: &Path, profile: Profile) -> Result<PathBuf> {
     }
     std::fs::copy(&swift_bin, contents.join("MacOS/Navori")).context("copy app binary")?;
     std::fs::copy(
-        root.join("target").join(profile.cargo_dir()).join("navori"),
+        root.join("target").join(flavor.cargo_dir()).join("navori"),
         contents.join("Helpers/navori"),
     )
     .context("copy CLI")?;
@@ -437,7 +466,13 @@ fn quit_app(bundle_id: &str, executable_hint: &str) {
 }
 
 fn run_dev(root: &Path) -> Result<()> {
-    let app = bundle(root, Profile::Dev)?;
+    let profile = Profile::Dev;
+    let app = bundle(
+        root,
+        profile,
+        profile.default_flavor(),
+        &root.join("build").join(profile.name()),
+    )?;
     quit_app(
         Profile::Dev.bundle_id(),
         "Navori Dev.app/Contents/MacOS/Navori",
@@ -448,7 +483,13 @@ fn run_dev(root: &Path) -> Result<()> {
 }
 
 fn install(root: &Path) -> Result<()> {
-    let app = bundle(root, Profile::Release)?;
+    let profile = Profile::Release;
+    let app = bundle(
+        root,
+        profile,
+        profile.default_flavor(),
+        &root.join("build").join(profile.name()),
+    )?;
     sh(Command::new("codesign")
         .args(["--verify", "--strict", "--deep"])
         .arg(&app))?;
@@ -944,7 +985,7 @@ fn ci(root: &Path) -> Result<()> {
     sh(cargo(root).args(["test", "--workspace"]))?;
     check_deps(root)?;
     lint_probe(root)?;
-    build_core(root, Profile::Dev)?;
+    build_core(root, Profile::Dev.default_flavor())?;
     sh(Command::new("swift")
         .args(["build", "--arch", "arm64", "--package-path"])
         .arg(root.join("apps/macos")))?;
