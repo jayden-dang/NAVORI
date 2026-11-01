@@ -115,10 +115,10 @@ _Requirements: PERF-1.2, PERF-1.3, PERF-1.4, PERF-1.7, PERF-1.8, PERF-1.9_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Failing tests:** `regression_beyond_ten_percent_fails` (baseline 100, floor 10 → 110 passes, 111 fails); `floor_wins_for_small_values` (baseline 20, floor 5 → 25 passes, 25.1 fails); `zero_baseline_uses_floor` (baseline 0, floor 0.2 → 0.2 passes, 0.3 fails); `other_machine_or_macos_checks_budget_only_with_warning`; `missing_baseline_warns_and_checks_budget_only`; `baseline_round_trips_through_json` (temp dir); `record_writes_only_when_verdict_passed` (failed verdict + `record` → existing file byte-identical); `without_record_never_writes` (passed verdict, `record` false → file absent). Run `cargo test -p xtask perf::` — expect failures.
-- [ ] **Step 2: Implement** regression in `judge`, `Machine::current`, `Baseline::load/from_run/save`, `finish`. Run `cargo test -p xtask perf::` — expect pass.
-- [ ] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
-- [ ] **Step 4: Commit** — `git commit -m "feat(xtask): record a perf baseline and fail on regressions"`
+- [x] **Step 1: Failing tests:** `regression_beyond_ten_percent_fails` (baseline 100, floor 10 → 110 passes, 111 fails); `floor_wins_for_small_values` (baseline 20, floor 5 → 25 passes, 25.1 fails); `zero_baseline_uses_floor` (baseline 0, floor 0.2 → 0.2 passes, 0.3 fails); `other_machine_or_macos_checks_budget_only_with_warning`; `missing_baseline_warns_and_checks_budget_only`; `baseline_round_trips_through_json` (temp dir); `record_writes_only_when_verdict_passed` (failed verdict + `record` → existing file byte-identical); `without_record_never_writes` (passed verdict, `record` false → file absent). Run `cargo test -p xtask perf::` — expect failures.
+- [x] **Step 2: Implement** regression in `judge`, `Machine::current`, `Baseline::load/from_run/save`, `finish`. Run `cargo test -p xtask perf::` — expect pass.
+- [x] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
+- [x] **Step 4: Commit** — `git commit -m "feat(xtask): record a perf baseline and fail on regressions"`
 
 _Requirements: PERF-2.1, PERF-2.2, PERF-2.3, PERF-2.4, PERF-2.5, PERF-2.6_
 
@@ -139,10 +139,10 @@ _Requirements: PERF-2.1, PERF-2.2, PERF-2.3, PERF-2.4, PERF-2.5, PERF-2.6_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Failing tests** with literal ndjson lines shaped like `.skills/PERF/scan.md` §9: `parses_status_item_drawn` (`statusItemDrawn ms=142.5`); `parses_menu_opened` (`menuOpened ms=31.2 first=true modules=1`); `ignores_banner_and_finished_lines` (`Filtering the log data using …`, `{"count":3,"finished":1}`); `ignores_malformed_messages`; `wait_for_skips_marks_of_other_pids` (from_reader with pid 7 then pid 9 → `wait_for(9, …)` returns the pid-9 mark); `wait_for_times_out_with_none` (empty reader, 50 ms). Run `cargo test -p xtask perf::logstream` — expect failures.
-- [ ] **Step 2: Implement** `parse_line` (`serde_json::Value`), `LogStream::from_reader`, `start`, `wait_for`. Run tests — expect pass.
-- [ ] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
-- [ ] **Step 4: Commit** — `git commit -m "feat(xtask): read perf marks from the unified log"`
+- [x] **Step 1: Failing tests** with literal ndjson lines shaped like `.skills/PERF/scan.md` §9: `parses_status_item_drawn` (`statusItemDrawn ms=142.5`); `parses_menu_opened` (`menuOpened ms=31.2 first=true modules=1`); `ignores_banner_and_finished_lines` (`Filtering the log data using …`, `{"count":3,"finished":1}`); `ignores_malformed_messages`; `wait_for_skips_marks_of_other_pids` (from_reader with pid 7 then pid 9 → `wait_for(9, …)` returns the pid-9 mark); `wait_for_times_out_with_none` (empty reader, 50 ms). Run `cargo test -p xtask perf::logstream` — expect failures.
+- [x] **Step 2: Implement** `parse_line` (`serde_json::Value`), `LogStream::from_reader`, `start`, `wait_for`. Run tests — expect pass.
+- [x] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
+- [x] **Step 4: Commit** — `git commit -m "feat(xtask): read perf marks from the unified log"`
 
 _Requirements: PERF-4.6, PERF-1.9_
 
