@@ -319,6 +319,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "navori-ipc"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "navori-protocol",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "navori-kernel"
 version = "0.1.0"
 dependencies = [
