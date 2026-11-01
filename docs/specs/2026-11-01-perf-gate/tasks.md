@@ -163,10 +163,10 @@ _Requirements: PERF-4.6, PERF-1.9_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Failing tests:** `creates_root_owned_by_user_with_mode_0700`; `replaces_a_stale_tree_it_owns`; `refuses_a_symlinked_root` (target untouched); `fresh_run_copies_template_contents`; `rejects_a_home_whose_socket_path_exceeds_103_bytes`; `sweep_kills_only_recorded_pids_running_the_given_exe` (spawn `/bin/sleep 30` twice by absolute path, record one → `sweep_stale(Path::new("/bin/sleep"))` kills the recorded one only; a recorded pid running another exe survives). The foreign-owner branch cannot be built without root; it is covered by review. Run `cargo test -p xtask perf::home` — expect failures.
-- [ ] **Step 2: Implement.** Run tests — expect pass.
-- [ ] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
-- [ ] **Step 4: Commit** — `git commit -m "feat(xtask): prepare a private perf home under /tmp"`
+- [x] **Step 1: Failing tests:** `creates_root_owned_by_user_with_mode_0700`; `replaces_a_stale_tree_it_owns`; `refuses_a_symlinked_root` (target untouched); `fresh_run_copies_template_contents`; `rejects_a_home_whose_socket_path_exceeds_103_bytes`; `sweep_kills_only_recorded_pids_running_the_given_exe` (spawn `/bin/sleep 30` twice by absolute path, record one → `sweep_stale(Path::new("/bin/sleep"))` kills the recorded one only; a recorded pid running another exe survives). The foreign-owner branch cannot be built without root; it is covered by review. Run `cargo test -p xtask perf::home` — expect failures.
+- [x] **Step 2: Implement.** Run tests — expect pass.
+- [x] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
+- [x] **Step 4: Commit** — `git commit -m "feat(xtask): prepare a private perf home under /tmp"`
 
 _Requirements: PERF-3.3, PERF-3.5, PERF-6.3, PERF-6.5_
 
@@ -235,10 +235,10 @@ _Requirements: PERF-4.1, PERF-4.2, PERF-4.3, PERF-4.4, PERF-4.5, PERF-5.3, PERF-
 
 **Depends-on:** Task 7
 
-- [ ] **Step 1: Instrument temporarily** (not committed): one-shot `NSView.displayLink(target:selector:)` on the status button and on the panel content view, logging the first callback time beside each mark.
-- [ ] **Step 2: Run 10 launches and 10 SIGUSR1 opens** in perf mode; record each pair's difference and whether the panel stays visible after SIGUSR1.
-- [ ] **Step 3: Decide.** All differences ≤ 5 ms → keep the marks. Otherwise move the marks to the display-link callback and repeat Step 2. If the panel does not stay visible after SIGUSR1, stop and raise it with the user — the menu metrics cannot be measured as designed.
-- [ ] **Step 4: Record and commit** — write `.skills/PERF/calibration.md`; if code changed, `cargo xtask ci` then `git commit -m "fix(shell): align perf marks with the first presented frame"`.
+- [x] **Step 1: Instrument temporarily** (not committed): one-shot `NSView.displayLink(target:selector:)` on the status button and on the panel content view, logging the first callback time beside each mark.
+- [x] **Step 2: Run 10 launches and 10 SIGUSR1 opens** in perf mode; record each pair's difference and whether the panel stays visible after SIGUSR1.
+- [x] **Step 3: Decide.** All differences ≤ 5 ms → keep the marks. Otherwise move the marks to the display-link callback and repeat Step 2. If the panel does not stay visible after SIGUSR1, stop and raise it with the user — the menu metrics cannot be measured as designed.
+- [x] **Step 4: Record and commit** — write `.skills/PERF/calibration.md`; if code changed, `cargo xtask ci` then `git commit -m "fix(shell): align perf marks with the first presented frame"`.
 
 _Requirements: PERF-4.1, PERF-4.2, PERF-4.3_
 
