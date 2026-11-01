@@ -132,6 +132,23 @@ fn init_repo(dir: &Path) -> Result<(), String> {
 }
 
 #[test]
+fn an_executable_named_grok_is_a_grok_session() -> Result<(), String> {
+    let rows = [Shape {
+        pid: 16,
+        exe: "/usr/local/bin/grok",
+        argv: None,
+        expected: Some(Harness::Grok),
+    }];
+    let (_fake, snapshot) = snapshot_of(&rows)?;
+    let found = sessions(&snapshot);
+
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].harness, Harness::Grok);
+    assert_eq!(found[0].process.pid, 16);
+    Ok(())
+}
+
+#[test]
 fn each_harness_shape_is_recognized() -> Result<(), String> {
     let rows = shapes();
     let (_fake, snapshot) = snapshot_of(&rows)?;

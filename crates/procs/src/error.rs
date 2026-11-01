@@ -33,7 +33,7 @@ pub enum ProcsError {
         /// The platform failure. It names the call and the errno, never a path.
         source: PlatformError,
     },
-    /// Registering or removing an exit watch failed in kqueue.
+    /// Registering an exit watch failed in kqueue. Removing a watch logs a kqueue failure and does not return it.
     #[error("kqueue failed with errno {errno}; the exit watch was not changed")]
     Watch {
         /// errno from `kevent`.

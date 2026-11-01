@@ -7,7 +7,7 @@
 > for tracking.
 
 Feature code: PROCS
-Status: Approved
+Status: Implemented
 Date: 2026-11-01
 Execution-mode: continuous
 Max-concurrency: auto
@@ -142,7 +142,7 @@ _Requirements: PROCS-7.1, PROCS-7.3, PROCS-7.5, PROCS-7.6, PROCS-7.7, PROCS-7.8_
 
 **Depends-on:** Task 1
 
-- [x] **Step 1:** Implement `fn lint_probe(root: &Path) -> Result<()>`: temp dir `std::env::temp_dir().join(format!("navori-lint-probe-{}", std::process::id()))`, removed on every exit path; root `Cargo.toml` = `[workspace] resolver = "3"`, `members = ["a", "b"]`, `[workspace.package] edition = "2024"`, plus the real root `[workspace.lints]` tables copied from `Cargo.toml`; member `a` copies the `[lints]` of `crates/procs/Cargo.toml` and member `b` the `[lints.*]` of `crates/macos/Cargo.toml`; both `src/lib.rs` hold one function — `a`: `pub fn probe() -> u8 { let x = 1u8; // SAFETY: x is a live local u8.` then `unsafe { std::ptr::read(&x) } }`; `b`: the same body without the `// SAFETY:` line; run `cargo clippy --message-format=json -- -D warnings` in each member dir and collect `message.code.code` of every `reason == "compiler-message"` with `message.level == "error"`.
+- [x] **Step 1:** Implement `fn lint_probe(root: &Path) -> Result<()>`: temp dir `std::env::temp_dir().join(format!("navori-lint-probe-{}", std::process::id()))`, removed on every exit path; root `Cargo.toml` = `[workspace] resolver = "3"`, `members = ["a", "b"]`, `[workspace.package] edition = "2024"`, plus the real root `[workspace.lints]` tables copied from `Cargo.toml`; member `a` copies the `[lints]` of `crates/procs/Cargo.toml` and member `b` the `[lints.*]` of `crates/macos/Cargo.toml`; both `src/lib.rs` hold one function — `a`: `pub fn probe() -> u8 { let x = 1u8;` then a following line `// SAFETY: x is a live local u8.` then `unsafe { std::ptr::read(&x) } }` (a trailing SAFETY comment on the `let` does not satisfy Clippy 1.97.1); `b`: the same body without the `// SAFETY:` line; run `cargo clippy --message-format=json -- -D warnings` in each member dir and collect `message.code.code` of every `reason == "compiler-message"` with `message.level == "error"`.
 - [x] **Step 2:** `cargo xtask lint-probe` — expect: failure "fixture b: expected [clippy::undocumented_unsafe_blocks], got []".
 - [x] **Step 3:** Add `undocumented_unsafe_blocks = "warn"` to both clippy tables. `cargo xtask lint-probe` — expect: pass. `cargo xtask check-deps` — expect: pass.
 - [x] **Step 4:** Wire `lint_probe(root)?` into `fn ci` after `check_deps(root)?`. `cargo xtask ci` — expect: pass. Commit `build(xtask): add lint-probe proving unsafe_code and SAFETY-comment lints fail CI`.

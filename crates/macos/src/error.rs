@@ -10,7 +10,7 @@ pub enum PlatformError {
     /// `sysctl` failed. Retry the read.
     #[error("sysctl failed with errno {errno}; retry the process read")]
     Sysctl { errno: i32 },
-    /// A kqueue change failed. `op` is the call that failed (`kqueue`, `kevent`, or `close`).
+    /// A kqueue change failed. `op` is the call that failed (`kqueue` or `kevent`). A failed `close` is logged and not returned.
     #[error("kqueue {op} failed with errno {errno}; the exit watch was not changed")]
     Kqueue { op: &'static str, errno: i32 },
     /// The `kinfo_proc` buffer is not the layout this reader checks at startup.

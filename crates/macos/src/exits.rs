@@ -105,17 +105,24 @@ impl ExitSource for KqueueExits {
 
 impl Drop for KqueueExits {
     fn drop(&mut self) {
+        let mut closed = false;
         if let Err(errno) = trigger_wake(self.kq) {
             tracing::warn!(
                 errno,
                 "kqueue kevent failed; the exit watch was not changed"
             );
+            // The thread is still blocked in kevent. Closing the queue makes that
+            // call return, so the join below can finish.
+            if let Err(errno) = close_fd(self.kq) {
+                tracing::warn!(errno, "kqueue close failed; the exit watch was not changed");
+            }
+            closed = true;
         }
         if let Some(thread) = self.thread.take() {
             // The thread may have panicked; joining still finishes it.
             let _ = thread.join();
         }
-        if let Err(errno) = close_fd(self.kq) {
+        if !closed && let Err(errno) = close_fd(self.kq) {
             tracing::warn!(errno, "kqueue close failed; the exit watch was not changed");
         }
     }

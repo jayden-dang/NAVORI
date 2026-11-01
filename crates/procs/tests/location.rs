@@ -114,6 +114,7 @@ fn a_submodule_is_its_own_project_and_not_a_worktree() -> Result<(), String> {
     let location = resolve_location(&repo.join("lib"));
     assert_eq!(location.project, "lib");
     assert_eq!(location.worktree, None);
+    assert_eq!(location.branch, Some(Branch::Named("main".to_owned())));
     Ok(())
 }
 

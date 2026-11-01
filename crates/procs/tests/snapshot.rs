@@ -22,6 +22,27 @@ fn process(snapshot: &Snapshot, pid: i32) -> Result<&Process, String> {
         .ok_or_else(|| format!("pid {pid} is not in the snapshot"))
 }
 
+#[test]
+fn a_recheck_that_is_denied_or_malformed_keeps_that_reason() -> Result<(), String> {
+    for (err, want) in [
+        (ReadError::Denied, Unavailable::PermissionDenied),
+        (ReadError::Malformed, Unavailable::Malformed),
+    ] {
+        let fake = source();
+        fake.add(FakeProcess::new(10, 1, 501, 1_000, "/usr/bin/git").argv(&["git"]));
+        let snapshot = take(&fake)?;
+        let id = process(&snapshot, 10)?.id;
+        fake.fail_entry_after(id.pid, 1, err);
+
+        assert_eq!(
+            snapshot.argv(id),
+            Err(want),
+            "a {err:?} re-check became the wrong reason"
+        );
+    }
+    Ok(())
+}
+
 fn pids(snapshot: &Snapshot) -> Vec<i32> {
     snapshot.processes().map(|process| process.id.pid).collect()
 }

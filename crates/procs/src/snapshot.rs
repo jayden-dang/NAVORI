@@ -176,7 +176,8 @@ impl Snapshot {
         };
         match source.entry(id.pid) {
             Ok(entry) if entry.start == id.start => Ok(value),
-            _ => Err(Unavailable::Exited),
+            Ok(_) | Err(ReadError::Gone) => Err(Unavailable::Exited),
+            Err(err) => Err(unavailable_from(err)),
         }
     }
 
