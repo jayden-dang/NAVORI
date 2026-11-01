@@ -63,6 +63,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 - **ROAD-7** kernel-contract-extensions — After: none — Surfaces: `crates/kernel/`, `crates/protocol/`, `crates/ffi/`
 - **ROAD-8** awake-leases — After: ROAD-6, ROAD-7 — Surfaces: `modules/awake/`, `crates/ffi/`, `apps/macos/Navori/Features/`, `apps/cli/`
 - **ROAD-9** harness-hooks — After: ROAD-8 — Surfaces: `apps/cli/`, `integrations/`, `apps/macos/Navori/Features/Settings/`
+- **ROAD-28** soak-and-hang-check — After: ROAD-5 — Surfaces: `xtask/`, `apps/macos/Navori/`
 **Depends-on:** MILE-1
 **Commitment:** Planned
 **Closed:** None
