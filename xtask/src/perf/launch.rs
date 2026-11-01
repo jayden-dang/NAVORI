@@ -57,11 +57,13 @@ impl Launched {
 
 impl Drop for Launched {
     fn drop(&mut self) {
-        let alive = matches!(self.child.try_wait(), Ok(None));
-        if alive {
-            let _ = signal_by_pid(self.pid, "KILL");
+        if matches!(self.child.try_wait(), Ok(Some(_))) {
+            return;
         }
-        reap_child(&mut self.child);
+        if let Err(err) = signal_by_pid(self.pid, "KILL") {
+            report_kill_failure(self.pid, &err);
+        }
+        reap_child(&mut self.child, self.pid);
     }
 }
 
@@ -123,7 +125,13 @@ fn wait_child(child: &mut Child, rendered: &str) -> Result<ExitStatus> {
             return Ok(status);
         }
         if started.elapsed() >= COMMAND_TIMEOUT {
-            let _ = child.kill();
+            if let Err(err) = child.kill()
+                && helper_kill_should_be_reported(&err)
+            {
+                eprintln!(
+                    "launch guard failed to kill timed-out helper `{rendered}`: {err}. It may still be running."
+                );
+            }
             let reap_started = Instant::now();
             loop {
                 match child.try_wait() {
@@ -141,15 +149,48 @@ fn wait_child(child: &mut Child, rendered: &str) -> Result<ExitStatus> {
     }
 }
 
-fn reap_child(child: &mut Child) {
+fn reap_child(child: &mut Child, pid: u32) {
     let started = Instant::now();
     loop {
         match child.try_wait() {
-            Ok(Some(_)) | Err(_) => return,
-            Ok(None) if started.elapsed() >= REAP_TIMEOUT => return,
+            Ok(Some(_)) => return,
+            Err(err) => {
+                report_wait_failure(pid, &err);
+                return;
+            }
+            Ok(None) if started.elapsed() >= REAP_TIMEOUT => {
+                eprintln!(
+                    "launch guard timed out waiting for {pid} to exit. Stop it with `/bin/kill -KILL {pid}` if it is still running."
+                );
+                return;
+            }
             Ok(None) => thread::sleep(POLL),
         }
     }
+}
+
+fn report_kill_failure(pid: u32, err: &anyhow::Error) {
+    if !cleanup_error_should_be_reported(err) {
+        return;
+    }
+    eprintln!(
+        "launch guard failed to kill {pid}: {err:#}. Stop it with `/bin/kill -KILL {pid}` if it is still running."
+    );
+}
+
+fn report_wait_failure(pid: u32, err: &std::io::Error) {
+    eprintln!(
+        "launch guard failed to wait for {pid}: {err}. Stop it with `/bin/kill -KILL {pid}` if it is still running."
+    );
+}
+
+fn cleanup_error_should_be_reported(err: &anyhow::Error) -> bool {
+    !format!("{err:#}").contains("No such process")
+}
+
+fn helper_kill_should_be_reported(err: &std::io::Error) -> bool {
+    let text = err.to_string();
+    !(text.contains("No such process") || text.contains("can't kill an exited process"))
 }
 
 fn join_reader(
@@ -168,7 +209,7 @@ mod tests {
     use std::process::{Command, Stdio};
     use std::time::Duration;
 
-    use super::Launched;
+    use super::{Launched, cleanup_error_should_be_reported, signal_by_pid};
 
     #[test]
     fn wait_exit_times_out_while_the_process_runs() {
@@ -201,5 +242,22 @@ mod tests {
             !status.success(),
             "pid {pid} still alive after the guard was dropped"
         );
+    }
+
+    #[test]
+    fn kill_of_an_exited_pid_is_not_a_cleanup_failure() {
+        let mut launched = Launched::spawn(Path::new("/bin/sleep"), &["30"], &[]).unwrap();
+        let pid = launched.pid;
+        launched.signal("TERM").unwrap();
+        assert!(launched.wait_exit(Duration::from_secs(2)).unwrap());
+        drop(launched);
+        let err = signal_by_pid(pid, "KILL").unwrap_err();
+        assert!(!cleanup_error_should_be_reported(&err), "{err:#}");
+    }
+
+    #[test]
+    fn unknown_signal_is_a_cleanup_failure() {
+        let err = signal_by_pid(2147483646, "NOTASIGNAL").unwrap_err();
+        assert!(cleanup_error_should_be_reported(&err), "{err:#}");
     }
 }
