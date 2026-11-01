@@ -1,5 +1,6 @@
 import AppKit
 import Observation
+import QuartzCore
 
 /// Owns the menubar item. Left click toggles the panel; right click shows a native menu.
 @MainActor
@@ -7,7 +8,12 @@ final class StatusBarController: NSObject {
     private let store: CoreStore
     private let openSettings: () -> Void
     private let item: NSStatusItem
-    private lazy var panel = StatusPanel(store: store, openSettings: { [weak self] in self?.showSettings() })
+    private var panelBuilt = false
+    private lazy var panel: StatusPanel = {
+        self.panelBuilt = true
+        return StatusPanel(store: self.store, openSettings: { [weak self] in self?.showSettings() })
+    }()
+    private var didScheduleStatusMark = false
 
     init(store: CoreStore, openSettings: @escaping () -> Void) {
         self.store = store
@@ -45,6 +51,15 @@ final class StatusBarController: NSObject {
         image?.isTemplate = true
         item.button?.image = image
         item.button?.appearsDisabled = health == .starting
+        guard AppEnvironment.perfMode, !didScheduleStatusMark else { return }
+        didScheduleStatusMark = true
+        CATransaction.begin()
+        CATransaction.setCompletionBlock {
+            MainActor.assumeIsolated {
+                PerfProbe.markStatusItemDrawn()
+            }
+        }
+        CATransaction.commit()
     }
 
     @objc private func clicked(_ sender: NSStatusBarButton) {
@@ -54,6 +69,21 @@ final class StatusBarController: NSObject {
             showMenu()
         } else if let button = item.button {
             panel.toggle(relativeTo: button)
+        }
+    }
+
+    func openMenuFresh(trigger: UInt64) {
+        let builtBefore = panelBuilt
+        if panelBuilt, panel.isVisible {
+            let behavior = panel.animationBehavior
+            panel.animationBehavior = .none
+            panel.close()
+            panel.animationBehavior = behavior
+        }
+        guard let button = item.button else { return }
+        panel.show(relativeTo: button) { [weak self] in
+            guard let self else { return }
+            PerfProbe.markMenuOpened(since: trigger, first: !builtBefore, modules: self.store.moduleCount)
         }
     }
 
