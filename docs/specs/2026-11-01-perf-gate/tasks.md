@@ -68,10 +68,10 @@ Design: ./design.md
 
 **Depends-on:** none
 
-- [ ] **Step 1: Capture the before-state.** `cargo xtask bundle --profile dev` and `--profile release`; save `plutil -p` of both `Contents/Info.plist` and `codesign -dvv` output to `/tmp/perf-t1-before/`.
-- [ ] **Step 2: Implement the split.** Move `cargo_dir`/`swift_config` to `Flavor`; replace both `profile == Profile::Release` checks with the flavour; existing callers pass `profile.default_flavor()` and `root.join("build").join(profile.name())`.
-- [ ] **Step 3: Prove nothing changed.** Rebundle both profiles and `diff` against Step 1 (only `CFBundleVersion` may differ); `cargo xtask ci` → `✓ ci passed`; `cargo xtask install`, then `/Applications/Navori.app/Contents/Helpers/navori doctor` → every check ✓.
-- [ ] **Step 4: Commit** — `git commit -m "refactor(xtask): split build flavour from Navori profile"`
+- [x] **Step 1: Capture the before-state.** `cargo xtask bundle --profile dev` and `--profile release`; save `plutil -p` of both `Contents/Info.plist` and `codesign -dvv` output to `/tmp/perf-t1-before/`.
+- [x] **Step 2: Implement the split.** Move `cargo_dir`/`swift_config` to `Flavor`; replace both `profile == Profile::Release` checks with the flavour; existing callers pass `profile.default_flavor()` and `root.join("build").join(profile.name())`.
+- [x] **Step 3: Prove nothing changed.** Rebundle both profiles and `diff` against Step 1 (only `CFBundleVersion` may differ); `cargo xtask ci` → `✓ ci passed`; `cargo xtask install`, then `/Applications/Navori.app/Contents/Helpers/navori doctor` → every check ✓.
+- [x] **Step 4: Commit** — `git commit -m "refactor(xtask): split build flavour from Navori profile"`
 
 _Requirements: PERF-5.1, PERF-5.2, PERF-5.6_
 
