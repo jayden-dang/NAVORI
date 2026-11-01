@@ -5,6 +5,7 @@ members = [
     "crates/redact",
     "crates/config",
     "crates/store",
+    "crates/kernel",
 ]
 
 [workspace.package]
@@ -19,6 +20,7 @@ navori-protocol = { path = "crates/protocol" }
 navori-redact = { path = "crates/redact" }
 navori-config = { path = "crates/config" }
 navori-store = { path = "crates/store" }
+navori-kernel = { path = "crates/kernel" }
 
 # Versions = latest stable on crates.io as of 2026-11-01 (`cargo xtask outdated` re-checks).
 anyhow = "1.0.104"
