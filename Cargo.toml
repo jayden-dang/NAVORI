@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "crates/protocol",
     "crates/redact",
+    "crates/config",
 ]
 
 [workspace.package]
@@ -15,6 +16,7 @@ publish = false
 [workspace.dependencies]
 navori-protocol = { path = "crates/protocol" }
 navori-redact = { path = "crates/redact" }
+navori-config = { path = "crates/config" }
 
 # Versions = latest stable on crates.io as of 2026-11-01 (`cargo xtask outdated` re-checks).
 anyhow = "1.0.104"
