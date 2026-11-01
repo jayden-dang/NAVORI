@@ -272,7 +272,7 @@ user/trigger ─► assemble context ─► Model Router ─► stream ─┬─
 ### Seed: process model — `navori-procs` (R1, R3)
 
 Awake, Ports and the Context Engine all need to know "which project does this process belong to, and who started it":
-- **ProcessTable** (implemented in `navori-macos`: libproc + `sysctl KERN_PROCARGS2`): pid, ppid, uid, exe, argv, cwd, start time.
+- **ProcessTable** (implemented in `navori-macos` behind `ProcessSource`; listed via `sysctl(KERN_PROC_ALL)`): pid, ppid, uid, exe, argv, cwd, start time.
 - **ProjectResolver**: cwd → `.git` → repo root; `.git` is a file → **worktree** → `{project, worktree, branch}`.
 - **HarnessCatalog**: recognizes ancestors such as `claude`, `codex`, `grok`, `gemini`, `opencode`, `cursor-agent`… (configurable) and the terminal host.
 - **ProcWatcher**: `kqueue EVFILT_PROC/NOTE_EXIT` → learns of a process death immediately, no polling.
@@ -298,7 +298,7 @@ struct Lease { id, source: Manual | Timer | Process{pid} | Agent{harness, sessio
 | Harness without hooks | — | auto-detect via HarnessCatalog | silent for N minutes | process dies |
 
 Important details:
-- **Harness identification**: `navori hook` determines the source on its own (the `GROK_*` environment variables of the Grok runner, then walking up the process tree looking for `claude` / `grok` / `codex`) → obtains the harness's real PID for kqueue to watch. No arguments needed.
+- **Harness identification**: `navori hook` sends its pid and ppid over IPC, and the Core walks the process tree while the request is open. Resolve the Harness on `UserPromptSubmit` and `Stop`, never on `SessionEnd` (1–1.5 s budgets; 2026-11-01 harness-hook research note). No arguments needed.
 - **Duplicate-count protection**: Grok **also reads the hooks in `~/.claude/settings.json`** (Claude-compatibility mode) → the same event may arrive twice. Every lease operation is **idempotent per `(harness, session_id)`**, so duplicates do no harm.
 - **"Stop" ≠ "work finished"**: a harness may still have background tasks (background bash, subagents, long-running tasks) after the turn ends. Before releasing the lease once the grace period elapses, Awake inspects the **harness's child process tree**; if a child is still running/consuming CPU, it extends the lease.
 - **Installation**: Settings → Integrations has Install/Repair/Remove buttons per harness. Navori **merges** into the existing config file (backup before writing, never overwriting other hooks), and `navori doctor` checks whether the hook is still correct.
@@ -309,7 +309,7 @@ Out of scope (decided): staying awake with the lid closed.
 
 ### Seed: Ports (R3)
 
-- **Scan** via libproc (no `lsof`): pids of the current UID → socket fds → TCP `LISTEN` + port. Usually < 50 ms.
+- **Scan** (no `lsof`): pids of the current UID → socket fds → TCP `LISTEN` + port. Usually < 50 ms.
 - **Enrich** via `navori-procs`: project · worktree · branch · harness · kind (dev server, database, docker).
 - **Display**: Project → Worktree → Process → Ports.
 - **Actions**: open `localhost:port` · copy · reveal in Finder · kill one / by worktree / project / all. Kill = `SIGTERM` to the process group → 3s → `SIGKILL`. Never touches other UIDs; a `protected` list is excluded from "kill all".

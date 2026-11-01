@@ -40,7 +40,7 @@ Main flows:
 
 ## Components
 
-Status: **Built** = in the tree at R0 · **Planned (Rn)** = committed in the roadmap, not yet in the tree.
+Status: **Built** = in the tree at R0 · **Built (Rn)** = in the tree since that release · **Planned (Rn)** = committed in the roadmap, not yet in the tree.
 
 | Component | Status | Responsibility | Where |
 |---|---|---|---|
@@ -58,8 +58,8 @@ Status: **Built** = in the tree at R0 · **Planned (Rn)** = committed in the roa
 | `navori` CLI | Built | `status`, `doctor`, `events`, `actions`, `dispatch`; later `hook`, `awake`, `ask`, `mcp`. | `apps/cli` |
 | xtask | Built | Build core + bindings, bundle, sign, install, CI gate, dependency rules. | `xtask` |
 | Scheduler | Planned (R1) | Periodic work for all modules: fast while the menu is open, slow in the background, paused during sleep (ARCH-16). | `crates/kernel` |
-| Platform FFI | Planned (R1) | IOKit power assertions, libproc, kqueue, sysctl — the only hand-written `unsafe` (ARCH-9). | `crates/macos` |
-| Process model | Planned (R1/R3) | Process graph, project/worktree resolver, harness catalog, process-exit watcher. | `crates/procs` |
+| Platform FFI | Built (R1) | Safe traits `ProcessSource`, `ExitSource` and `PowerAssertions` (`MacProcesses`, `KqueueExits`, `MacPower`). The only hand-written `unsafe` (ARCH-9). | `crates/macos` |
+| Process model | Built (R1) | Snapshot, project/worktree location, Harness table, child activity and process-exit watcher. No `unsafe`. Uses `ProcessSource` and `ExitSource`. | `crates/procs` |
 | Secrets | Planned (R2) | Keychain storage for tokens and API keys (ARCH-8). | `crates/secrets` |
 | Awake module | Planned (R1) | Leases → one power assertion; harness-session tracking. | `modules/awake` |
 | Ports module | Planned (R3) | Listening ports by project/worktree/harness; stop with approval. | `modules/ports` |
