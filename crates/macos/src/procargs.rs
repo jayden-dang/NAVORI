@@ -31,9 +31,9 @@ pub(crate) fn read_argv(
     pid: i32,
     entry_failed: impl FnOnce() -> bool,
 ) -> Result<Vec<String>, ReadError> {
-    let max = argmax().map_err(plain_error)?;
+    let max = argmax().map_err(crate::process::read_error)?;
     let mut mib = [libc::CTL_KERN, libc::KERN_PROCARGS2, pid];
-    let probed = match sysctl(&mut mib, None) {
+    let probed = match crate::process::sysctl(&mut mib, None) {
         Ok(len) if len > 0 && len <= max => len,
         Ok(_) => return Err(ReadError::Malformed),
         Err(errno) => return Err(procargs_error(errno, entry_failed)),
@@ -74,7 +74,7 @@ fn argmax() -> Result<usize, i32> {
     }
     let mut mib = [libc::CTL_KERN, libc::KERN_ARGMAX];
     let mut raw = [0u8; 4];
-    let len = sysctl(&mut mib, Some(&mut raw))?;
+    let len = crate::process::sysctl(&mut mib, Some(&mut raw))?;
     if len != raw.len() {
         return Err(libc::EINVAL);
     }
@@ -115,7 +115,7 @@ fn read_procargs(scratch: &mut Vec<u8>, mib: &mut [i32], probed: usize) -> Resul
     let Some(dest) = clear.0.get_mut(..probed) else {
         return Ok(Vec::new());
     };
-    let len = sysctl(mib, Some(dest))?;
+    let len = crate::process::sysctl(mib, Some(dest))?;
     // A reported length past the buffer we offered is not a readable block.
     if len > probed {
         return Ok(Vec::new());
@@ -134,46 +134,13 @@ fn wipe(buf: &mut Vec<u8>) {
 
 fn procargs_error(errno: i32, entry_failed: impl FnOnce() -> bool) -> ReadError {
     if errno != libc::EINVAL {
-        return plain_error(errno);
+        return crate::process::read_error(errno);
     }
     if entry_failed() {
         ReadError::Gone
     } else {
         ReadError::Denied
     }
-}
-
-fn plain_error(errno: i32) -> ReadError {
-    match errno {
-        libc::ESRCH => ReadError::Gone,
-        libc::EPERM => ReadError::Denied,
-        _ => ReadError::Malformed,
-    }
-}
-
-fn sysctl(mib: &mut [i32], dest: Option<&mut [u8]>) -> Result<usize, i32> {
-    let mut len = dest.as_ref().map_or(0, |buf| buf.len());
-    let ptr = dest
-        .map(|buf| buf.as_mut_ptr().cast::<libc::c_void>())
-        .unwrap_or(std::ptr::null_mut());
-    // SAFETY: mib is a live MIB of namelen ints. ptr is null for a size probe, or writable
-    // for `len` bytes. sysctl writes at most `len` bytes and stores the byte count in `len`.
-    // newp is null because this call only reads.
-    let rc = unsafe {
-        libc::sysctl(
-            mib.as_mut_ptr(),
-            mib.len() as libc::c_uint,
-            ptr,
-            &mut len,
-            std::ptr::null_mut(),
-            0,
-        )
-    };
-    if rc == 0 { Ok(len) } else { Err(last_errno()) }
-}
-
-fn last_errno() -> i32 {
-    std::io::Error::last_os_error().raw_os_error().unwrap_or(0)
 }
 
 #[cfg(test)]

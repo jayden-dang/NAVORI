@@ -1,7 +1,6 @@
 //! Exit notifications for watched processes.
 
 use std::fmt;
-use std::io;
 use std::ptr;
 use std::thread::JoinHandle;
 
@@ -130,7 +129,7 @@ fn open_kqueue() -> Result<i32, PlatformError> {
     if kq < 0 {
         return Err(PlatformError::Kqueue {
             op: "kqueue",
-            errno: last_errno(),
+            errno: crate::process::last_errno(),
         });
     }
     Ok(kq)
@@ -157,7 +156,11 @@ fn close_fd(fd: i32) -> Result<(), i32> {
         // SAFETY: fd is a kqueue descriptor this watcher owns. close releases that descriptor.
         libc::close(fd)
     };
-    if rc == 0 { Ok(()) } else { Err(last_errno()) }
+    if rc == 0 {
+        Ok(())
+    } else {
+        Err(crate::process::last_errno())
+    }
 }
 
 fn watch_loop(kq: i32, sink: ExitSink) {
@@ -225,7 +228,7 @@ fn kevent_change(
             libc::kevent(kq, change, 1, ptr, slots, ptr::null())
         };
         if n < 0 {
-            let errno = last_errno();
+            let errno = crate::process::last_errno();
             if errno == libc::EINTR {
                 continue;
             }
@@ -250,7 +253,7 @@ fn kevent_wait(kq: i32, events: &mut [libc::kevent]) -> Result<i32, i32> {
             )
         };
         if n < 0 {
-            let errno = last_errno();
+            let errno = crate::process::last_errno();
             if errno == libc::EINTR {
                 continue;
             }
@@ -284,8 +287,4 @@ fn user_event(flags: u16, fflags: u32) -> libc::kevent {
 
 fn blank_event() -> libc::kevent {
     user_event(0, 0)
-}
-
-fn last_errno() -> i32 {
-    io::Error::last_os_error().raw_os_error().unwrap_or(0)
 }

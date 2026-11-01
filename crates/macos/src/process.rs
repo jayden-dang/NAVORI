@@ -282,7 +282,7 @@ fn mach_timebase() -> Result<(u32, u32), ReadError> {
     Ok((info.numer, info.denom))
 }
 
-fn sysctl(mib: &mut [i32], dest: Option<&mut [u8]>) -> Result<usize, i32> {
+pub(crate) fn sysctl(mib: &mut [i32], dest: Option<&mut [u8]>) -> Result<usize, i32> {
     let mut len = dest.as_ref().map_or(0, |buf| buf.len());
     let ptr = dest
         .map(|buf| buf.as_mut_ptr().cast::<libc::c_void>())
@@ -303,7 +303,7 @@ fn sysctl(mib: &mut [i32], dest: Option<&mut [u8]>) -> Result<usize, i32> {
     if rc == 0 { Ok(len) } else { Err(last_errno()) }
 }
 
-fn read_error(errno: i32) -> ReadError {
+pub(crate) fn read_error(errno: i32) -> ReadError {
     match errno {
         libc::ESRCH => ReadError::Gone,
         libc::EPERM => ReadError::Denied,
@@ -311,6 +311,6 @@ fn read_error(errno: i32) -> ReadError {
     }
 }
 
-fn last_errno() -> i32 {
+pub(crate) fn last_errno() -> i32 {
     std::io::Error::last_os_error().raw_os_error().unwrap_or(0)
 }
