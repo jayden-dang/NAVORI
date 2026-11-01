@@ -10,11 +10,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         log.info("launching \(AppEnvironment.displayName, privacy: .public) \(AppEnvironment.version, privacy: .public)")
-        store.start()
+        if !AppEnvironment.perfFlagWithoutHome {
+            store.start()
+        }
         statusBar = StatusBarController(
             store: store,
             openSettings: { [weak self] in self?.settings.show() }
         )
+        if let statusBar {
+            PerfProbe.start(statusBar: statusBar, store: store)
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

@@ -29,7 +29,7 @@ final class CoreStore {
         guard core == nil else { return }
         let config = CoreConfig(
             profile: AppEnvironment.profile,
-            homeDir: NSHomeDirectory(),
+            homeDir: AppEnvironment.coreHome,
             uid: UInt32(getuid()),
             appVersion: AppEnvironment.version,
             logToFile: true
@@ -71,6 +71,10 @@ final class CoreStore {
     func dispatch(module: String, actionJSON: String) async throws -> String {
         guard let core else { throw StoreError.notRunning }
         return try await core.dispatch(module: module, actionJson: actionJSON)
+    }
+
+    var moduleCount: Int {
+        snapshot?.modules.count(where: { $0.state == "running" }) ?? 0
     }
 
     var health: Health {

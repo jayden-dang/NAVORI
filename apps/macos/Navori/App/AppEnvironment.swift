@@ -11,6 +11,24 @@ enum AppEnvironment {
     static var isDev: Bool { profile != "release" }
     static var displayName: String { isDev ? "Navori Dev" : "Navori" }
 
+    private static let perfFlag = ProcessInfo.processInfo.environment["NAVORI_PERF"] == "1"
+
+    static let perfHome: String? = {
+        guard let home = ProcessInfo.processInfo.environment["NAVORI_PERF_HOME"], !home.isEmpty else {
+            return nil
+        }
+        return home
+    }()
+
+    static let perfMode = perfFlag && perfHome != nil
+
+    static let coreHome: String = {
+        if perfMode, let perfHome { return perfHome }
+        return NSHomeDirectory()
+    }()
+
+    static let perfFlagWithoutHome = perfFlag && perfHome == nil
+
     /// The `navori` CLI shipped inside the bundle.
     static var cliURL: URL {
         Bundle.main.bundleURL.appending(path: "Contents/Helpers/navori")

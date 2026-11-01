@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import SwiftUI
 
 /// Borderless, non-activating panel anchored under the menubar item — the Navori "popover".
@@ -54,7 +55,7 @@ final class StatusPanel: NSPanel {
         isVisible ? close() : show(relativeTo: button)
     }
 
-    func show(relativeTo button: NSStatusBarButton) {
+    func show(relativeTo button: NSStatusBarButton, onFirstFrame: (@MainActor () -> Void)? = nil) {
         guard let buttonWindow = button.window else { return }
         let fitting = contentView?.fittingSize.height ?? 420
         let height = min(max(fitting, 200), Self.maxHeight)
@@ -66,10 +67,21 @@ final class StatusPanel: NSPanel {
         let y = anchor.minY - height - 6
         setFrame(NSRect(x: x, y: y, width: Self.width, height: height), display: true)
 
+        if onFirstFrame != nil {
+            CATransaction.begin()
+            CATransaction.setCompletionBlock {
+                MainActor.assumeIsolated {
+                    onFirstFrame?()
+                }
+            }
+        }
         store.setPanelVisible(true)
         makeKeyAndOrderFront(nil)
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             Task { @MainActor in self?.close() }
+        }
+        if onFirstFrame != nil {
+            CATransaction.commit()
         }
     }
 
