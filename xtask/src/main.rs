@@ -9,6 +9,8 @@ use std::process::Command;
 use anyhow::{Context, Result, bail, ensure};
 use clap::{Parser, Subcommand, ValueEnum};
 
+mod perf;
+
 const SIGNING_IDENTITY: &str = "Navori Local Signing";
 const MIN_MACOS: &str = "15.0";
 
