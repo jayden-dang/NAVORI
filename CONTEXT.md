@@ -1,0 +1,126 @@
+# Navori
+
+Navori is an AI-first personal cockpit for macOS (Apple Silicon): a menubar app whose
+logic lives in a Rust **Core** and whose UI is a Swift **Shell**. Features plug into the
+Core as **Modules**; the UI, the `navori` CLI and AI agents all drive them through the same
+**Actions**, and everything that happens is recorded as **Events** in the **Journal**.
+Vision: `docs/product/vision.md` · Invariants: `docs/architecture/INDEX.md` ·
+System narrative: `docs/ARCHITECTURE.md`.
+
+This glossary holds product concepts only. Implementation names (CoreStore, Snapshot,
+EventBus, ContextFragment, composition root…) are explained in code doc comments.
+Add or change terms through `define-domain`.
+
+## Language
+
+### Runtime
+
+**Core**:
+The Rust side of the app — kernel, modules, store and IPC server — linked into the app via
+UniFFI (`navori-ffi`). The single source of truth for state.
+_Avoid_: backend, daemon, server
+
+**Shell**:
+The Swift (AppKit + SwiftUI) menubar app in `apps/macos`. Renders Core state and sends
+Actions; holds no business logic.
+_Avoid_: frontend, client
+
+**Kernel**:
+The registry, router and supervisor of Modules inside the Core.
+_Avoid_: runtime, engine
+
+**Module**:
+One capability (Awake, Ports, GitHub…) running as a supervised actor in the Kernel, with its
+own Actions and state. A crashed Module is restarted with backoff and keeps its inbox.
+_Avoid_: plugin, service
+
+**Action**:
+A typed request a Module accepts: a name, a description written for people and LLMs, a JSON
+schema, and a **Risk**.
+_Avoid_: command, RPC (for the domain concept)
+
+**Risk**:
+How dangerous an Action is: `read` (observes only), `write` (recoverable change) or
+`destructive` (irreversible or disruptive — always needs explicit human approval).
+_Avoid_: severity, permission level
+
+**Envelope**:
+An untyped Action request `{ module, action }` sent from the UI, CLI, IPC, AI or MCP.
+_Avoid_: message, payload
+
+**Event**:
+Something that happened, emitted by a Module or the Core (e.g. `core.started`,
+`module.crashed`), with a severity and a one-sentence summary for people.
+_Avoid_: log line, notification
+
+**Journal**:
+The durable Event history in the SQLite store, written only after the Sensitive Data Shield,
+pruned by retention (default 30 days).
+_Avoid_: log, history
+
+**Owner**:
+A storage namespace (`core`, `github`…) that versions its own tables through migrations.
+_Avoid_: schema, tenant
+
+**Profile**:
+Which install is meant: `release` (`Navori.app`, daily use) or `dev` (`Navori Dev.app`,
+development). Profiles never share data, logs or sockets.
+_Avoid_: environment, build type
+
+### Needs you
+
+**Needs you**:
+The inbox of decisions between the user and Navori AI, holding Decisions, To-dos and
+Updates. Not a list of pull requests.
+_Avoid_: notifications, inbox of PRs, alerts
+
+**Decision**:
+A Needs you item where Navori AI asks and the user decides, answered with an inline button.
+_Avoid_: prompt, confirmation dialog
+
+**To-do**:
+A Needs you item that is the user's own task, created by the user or suggested by the AI;
+completed by ticking it.
+_Avoid_: task, reminder
+
+**Update**:
+A Needs you item for information only; it needs no action.
+_Avoid_: alert, notification
+
+### Agents & machine
+
+**Harness**:
+An agentic CLI that Navori observes: Claude Code, Codex, Grok Build.
+_Avoid_: agent (for the tool itself), bot
+
+**Agent session**:
+One running session of a Harness in a project or worktree.
+_Avoid_: run, job
+
+**Lease**:
+A request to keep the Mac awake from one source (manual, timer, Agent session…). The Mac stays
+awake while at least one Lease is held.
+_Avoid_: hold, keep-awake request, assertion (that is the IOKit mechanism)
+
+### Privacy
+
+**Sensitive Data Shield**:
+The layer (`navori-redact`) that detects and masks secrets before anything is stored or sent.
+_Avoid_: filter, sanitizer
+
+**Context Gateway**:
+The single path by which data reaches an LLM, with redaction and an audit log.
+_Avoid_: proxy, AI client
+
+## Relationships
+
+- The **Core** hosts one **Kernel**, which hosts many **Modules**; the **Shell**, the CLI, Navori AI and MCP clients send them **Envelopes**
+- A **Module** emits **Events**; every **Event** passes the **Sensitive Data Shield**, is written to the **Journal** and broadcast
+- Each **Profile** has its own **Journal**
+- An **Agent session** of a **Harness** may hold a **Lease**
+- Navori AI raises **Decisions**, **To-dos** and **Updates** in **Needs you**; a **Destructive** **Action** proposed by the AI always becomes a **Decision** first
+- Data reaches an LLM only through the **Context Gateway**
+
+## Flagged ambiguities
+
+- none
