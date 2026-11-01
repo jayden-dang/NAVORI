@@ -92,10 +92,10 @@ _Requirements: PERF-5.1, PERF-5.2, PERF-5.6_
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1: Failing tests:** `median_of_odd_and_even_counts` (`[3,1,2]`→2, `[4,1,3,2]`→2.5, `[]`→None); `all_within_budget_passes`; `over_budget_fails_naming_metric_value_and_budget` (`cold_start_ms` 201 → line contains `cold_start_ms`, `201`, `200`); `idle_cpu_rounds_to_one_decimal` (0.04 passes, 0.05 fails — `(x * 10.0).round() / 10.0`); `skipped_metric_prints_reason_and_does_not_fail`; `missing_enabled_metric_fails` (no `menu_reopen_ms` → `no line for an enabled metric: menu_reopen_ms`); `baseline_only_metric_is_labelled_and_never_budget_fails`; `menu_open_footprint_line_shows_running_modules` (`modules_running` 1 → line contains `modules: 1`). Run `cargo test -p xtask perf::judge` — expect failures.
-- [ ] **Step 2: Implement** `METRICS`, `median`, the type definitions and `judge` (budget part). Run `cargo test -p xtask perf::judge` — expect pass.
-- [ ] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
-- [ ] **Step 4: Commit** — `git commit -m "feat(xtask): judge perf metrics against the GOAL-7 budget"`
+- [x] **Step 1: Failing tests:** `median_of_odd_and_even_counts` (`[3,1,2]`→2, `[4,1,3,2]`→2.5, `[]`→None); `all_within_budget_passes`; `over_budget_fails_naming_metric_value_and_budget` (`cold_start_ms` 201 → line contains `cold_start_ms`, `201`, `200`); `idle_cpu_rounds_to_one_decimal` (0.04 passes, 0.05 fails — `(x * 10.0).round() / 10.0`); `skipped_metric_prints_reason_and_does_not_fail`; `missing_enabled_metric_fails` (no `menu_reopen_ms` → `no line for an enabled metric: menu_reopen_ms`); `baseline_only_metric_is_labelled_and_never_budget_fails`; `menu_open_footprint_line_shows_running_modules` (`modules_running` 1 → line contains `modules: 1`). Run `cargo test -p xtask perf::judge` — expect failures.
+- [x] **Step 2: Implement** `METRICS`, `median`, the type definitions and `judge` (budget part). Run `cargo test -p xtask perf::judge` — expect pass.
+- [x] **Step 3: Gate** — `cargo xtask ci` → `✓ ci passed`.
+- [x] **Step 4: Commit** — `git commit -m "feat(xtask): judge perf metrics against the GOAL-7 budget"`
 
 _Requirements: PERF-1.2, PERF-1.3, PERF-1.4, PERF-1.7, PERF-1.8, PERF-1.9_
 
@@ -211,11 +211,11 @@ _Requirements: PERF-1.3, PERF-6.2_
 
 **Depends-on:** none
 
-- [ ] **Step 1: Implement** per design § Shell perf probe (env parsing; `CoreStore.start` uses `coreHome`; first-draw mark; `openMenuFresh` closes, lets the close finish, takes the trigger, shows with completion; SIGUSR1/SIGTERM sources only in perf mode; fault + terminate when `NAVORI_PERF=1` lacks `NAVORI_PERF_HOME`).
-- [ ] **Step 2: Gate** — `cargo xtask ci` → `✓ ci passed`.
-- [ ] **Step 3: Perf-mode check:** `cargo xtask bundle --profile dev`; `mkdir -m 700 /tmp/navori-perf-manual`; start `/usr/bin/log stream --predicate 'subsystem == "dev.navori" AND category == "perf"' --style ndjson` in one shell; run `NAVORI_PERF=1 NAVORI_PERF_HOME=/tmp/navori-perf-manual "$PWD/build/dev/Navori Dev.app/Contents/MacOS/Navori" &`; expect `statusItemDrawn`; `/bin/kill -USR1 <pid>` twice → `menuOpened … first=true` then `first=false`; Core data appears under `/tmp/navori-perf-manual/Library/`; `/bin/kill -TERM <pid>` → exits, no `session.marker` left.
-- [ ] **Step 4: Normal-mode check:** `cargo xtask run`; left click toggles the panel; right and control click show the context menu; a normal-mode instance receiving `/bin/kill -USR1` ends (default action); `NAVORI_PERF=1` without `NAVORI_PERF_HOME` → the app quits after a fault line.
-- [ ] **Step 5: Commit** — `git commit -m "feat(shell): add a perf-mode probe for launch and menu timings"`
+- [x] **Step 1: Implement** per design § Shell perf probe (env parsing; `CoreStore.start` uses `coreHome`; first-draw mark; `openMenuFresh` closes, lets the close finish, takes the trigger, shows with completion; SIGUSR1/SIGTERM sources only in perf mode; fault + terminate when `NAVORI_PERF=1` lacks `NAVORI_PERF_HOME`).
+- [x] **Step 2: Gate** — `cargo xtask ci` → `✓ ci passed`.
+- [x] **Step 3: Perf-mode check:** `cargo xtask bundle --profile dev`; `mkdir -m 700 /tmp/navori-perf-manual`; start `/usr/bin/log stream --predicate 'subsystem == "dev.navori" AND category == "perf"' --style ndjson` in one shell; run `NAVORI_PERF=1 NAVORI_PERF_HOME=/tmp/navori-perf-manual "$PWD/build/dev/Navori Dev.app/Contents/MacOS/Navori" &`; expect `statusItemDrawn`; `/bin/kill -USR1 <pid>` twice → `menuOpened … first=true` then `first=false`; Core data appears under `/tmp/navori-perf-manual/Library/`; `/bin/kill -TERM <pid>` → exits, no `session.marker` left.
+- [x] **Step 4: Normal-mode check:** `cargo xtask run`; left click toggles the panel; right and control click show the context menu; a normal-mode instance receiving `/bin/kill -USR1` ends (default action); `NAVORI_PERF=1` without `NAVORI_PERF_HOME` → the app quits after a fault line.
+- [x] **Step 5: Commit** — `git commit -m "feat(shell): add a perf-mode probe for launch and menu timings"`
 
 _Requirements: PERF-4.1, PERF-4.2, PERF-4.3, PERF-4.4, PERF-4.5, PERF-5.3, PERF-5.4, PERF-5.5_
 
