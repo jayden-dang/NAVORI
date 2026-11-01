@@ -187,10 +187,10 @@ _Requirements: PERF-3.3, PERF-3.5, PERF-6.3, PERF-6.5_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Failing tests** `parses_a_helper_line` (literal JSON → exact field values) and `rejects_a_line_missing_a_field`. Run `cargo test -p xtask perf::probe` — expect failures.
-- [ ] **Step 2: Implement** the Swift helper (CPU ns via `mach_timebase_info`, `ri_pkg_idle_wkups`, `ri_lifetime_max_phys_footprint`, `pti_threadnum`, `clock_gettime_nsec_np(CLOCK_UPTIME_RAW)`) and `probe.rs`. Run tests — expect pass.
-- [ ] **Step 3: Manual check** against the running daily app (read-only): `swiftc -O xtask/assets/perf-probe.swift -o /tmp/perf-probe && /tmp/perf-probe $(pgrep -f /Applications/Navori.app/Contents/MacOS/Navori)`; `footprint` equals `footprint -j` `phys_footprint`; `threads` equals `/usr/bin/top -l 1 -pid <pid> -stats th`.
-- [ ] **Step 4: Gate and commit** — `cargo xtask ci` → `✓ ci passed`; `git commit -m "feat(xtask): add a libproc counter helper for perf sampling"`
+- [x] **Step 1: Failing tests** `parses_a_helper_line` (literal JSON → exact field values) and `rejects_a_line_missing_a_field`. Run `cargo test -p xtask perf::probe` — expect failures.
+- [x] **Step 2: Implement** the Swift helper (CPU ns via `mach_timebase_info`, `ri_pkg_idle_wkups`, `ri_lifetime_max_phys_footprint`, `pti_threadnum`, `clock_gettime_nsec_np(CLOCK_UPTIME_RAW)`) and `probe.rs`. Run tests — expect pass.
+- [x] **Step 3: Manual check** against the running daily app (read-only): `swiftc -O xtask/assets/perf-probe.swift -o /tmp/perf-probe && /tmp/perf-probe $(pgrep -f /Applications/Navori.app/Contents/MacOS/Navori)`; `footprint` equals `footprint -j` `phys_footprint`; `threads` equals `/usr/bin/top -l 1 -pid <pid> -stats th`.
+- [x] **Step 4: Gate and commit** — `cargo xtask ci` → `✓ ci passed`; `git commit -m "feat(xtask): add a libproc counter helper for perf sampling"`
 
 _Requirements: PERF-1.3, PERF-6.2_
 
