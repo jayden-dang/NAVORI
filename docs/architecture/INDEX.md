@@ -50,7 +50,7 @@ None — all invariants live in this file. Split into `docs/architecture/<domain
 | Invariant | Mechanical check |
 |---|---|
 | ARCH-3, ARCH-2 (crate side) | `cargo xtask check-deps` |
-| ARCH-9 | workspace lint `unsafe_code = "forbid"` (exceptions: `navori-ffi` for UniFFI scaffolding) |
+| ARCH-9 | workspace lint `unsafe_code = "forbid"` (exceptions: `navori-ffi` for UniFFI scaffolding, `navori-macos` for platform FFI); clippy `undocumented_unsafe_blocks = "warn"`; `cargo xtask check-deps` lint-drift check (`navori-macos` lint tables match the workspace tables minus `unsafe_code`; every member except `navori-ffi` and `navori-macos` inherits workspace lints) and rejects a public `unsafe` item in `crates/macos/src`; `cargo xtask lint-probe` |
 | ARCH-6 | `navori-store` / `EventBus` redact on write; tests in `crates/store`, `crates/kernel` |
 | ARCH-10, ARCH-12, ARCH-13, ARCH-14 | tests in `crates/kernel`, `crates/store`, `crates/config`, `crates/ffi` |
 | ARCH-11 | tests in `crates/ipc` |

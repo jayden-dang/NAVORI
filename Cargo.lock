@@ -720,6 +720,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "navori-macos"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "navori-macos",
+ "objc2-core-foundation",
+ "objc2-io-kit",
+ "tempfile",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "navori-procs"
+version = "0.1.0"
+dependencies = [
+ "navori-macos",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "navori-protocol"
 version = "0.1.0"
 dependencies = [
@@ -785,6 +810,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "objc2-core-foundation"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a180dd8642fa45cdb7dd721cd4c11b1cadd4929ce112ebd8b9f5803cc79d536"
+dependencies = [
+ "bitflags",
+]
+
+[[package]]
+name = "objc2-io-kit"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33fafba39597d6dc1fb709123dfa8289d39406734be322956a69f0931c73bb15"
+dependencies = [
+ "libc",
+ "objc2-core-foundation",
 ]
 
 [[package]]

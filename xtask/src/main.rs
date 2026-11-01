@@ -41,6 +41,8 @@ enum Cmd {
     SigningSetup,
     /// Enforce the architecture's crate dependency rules.
     CheckDeps,
+    /// Prove `unsafe_code` and `clippy::undocumented_unsafe_blocks` fail the build.
+    LintProbe,
     /// Compare workspace dependency versions with the latest stable releases on crates.io.
     Outdated,
     /// Regenerate the checked-in app icons (`xtask/assets/*.icns`) from `xtask/assets/make-icon.swift`.
@@ -129,6 +131,7 @@ fn main() -> Result<()> {
         Cmd::Install => install(&root),
         Cmd::SigningSetup => signing_setup(&root),
         Cmd::CheckDeps => check_deps(&root),
+        Cmd::LintProbe => lint_probe(&root),
         Cmd::Outdated => outdated(&root),
         Cmd::Icon => icon(&root),
         Cmd::Ci => ci(&root),
@@ -601,6 +604,24 @@ fn check_deps(root: &Path) -> Result<()> {
     let packages = meta["packages"]
         .as_array()
         .context("cargo metadata: packages")?;
+    let workspace: toml::Table = std::fs::read_to_string(root.join("Cargo.toml"))
+        .context("read workspace Cargo.toml")?
+        .parse()
+        .context("parse workspace Cargo.toml")?;
+    let workspace_lints = workspace
+        .get("workspace")
+        .and_then(|workspace| workspace.get("lints"))
+        .context("workspace lints missing")?;
+    let mut expected_rust = workspace_lints
+        .get("rust")
+        .and_then(toml::Value::as_table)
+        .context("workspace rust lints missing")?
+        .clone();
+    expected_rust.remove("unsafe_code");
+    let expected_clippy = workspace_lints
+        .get("clippy")
+        .and_then(toml::Value::as_table)
+        .context("workspace clippy lints missing")?;
 
     let mut violations = Vec::new();
     for p in packages {
@@ -637,6 +658,14 @@ fn check_deps(root: &Path) -> Result<()> {
                 && !["navori-config", "navori-ipc", "navori-protocol"].contains(dep)
             {
                 Some("the CLI is a thin client: only config, ipc and protocol")
+            } else if name == "navori-macos" {
+                Some("navori-macos has no internal dependencies")
+            } else if *dep == "navori-macos"
+                && name != "navori-procs"
+                && name != "navori-ffi"
+                && !is_module
+            {
+                Some("only navori-procs, navori-ffi, or a module may depend on navori-macos")
             } else if is_module && dep_is_module {
                 Some("modules must not depend on other modules (use the event bus)")
             } else if is_module && dep.starts_with("navori-ai") {
@@ -652,13 +681,251 @@ fn check_deps(root: &Path) -> Result<()> {
                 violations.push(format!("{name} → {dep}: {rule}"));
             }
         }
+
+        if name != "navori-ffi" && name != "navori-macos" {
+            let manifest = read_manifest(path)?;
+            let inherits = manifest
+                .get("lints")
+                .and_then(|lints| lints.get("workspace"))
+                .and_then(toml::Value::as_bool)
+                == Some(true);
+            if !inherits {
+                violations.push(format!("{name}: [lints] workspace = true is required"));
+            }
+        }
+        if name == "navori-macos" {
+            let manifest = read_manifest(path)?;
+            let rust_lints = manifest
+                .get("lints")
+                .and_then(|lints| lints.get("rust"))
+                .and_then(toml::Value::as_table);
+            let clippy_lints = manifest
+                .get("lints")
+                .and_then(|lints| lints.get("clippy"))
+                .and_then(toml::Value::as_table);
+            if rust_lints != Some(&expected_rust) {
+                violations.push(format!(
+                    "{name}: [lints.rust] must match the workspace rust lints minus unsafe_code"
+                ));
+            }
+            if clippy_lints != Some(expected_clippy) {
+                violations.push(format!(
+                    "{name}: [lints.clippy] must match the workspace clippy lints"
+                ));
+            }
+        }
     }
+    violations.extend(public_unsafe_items(root)?);
     if violations.is_empty() {
         println!("✓ dependency rules hold for {} packages", packages.len());
         Ok(())
     } else {
         bail!("dependency rule violations:\n  {}", violations.join("\n  "))
     }
+}
+
+fn read_manifest(path: &str) -> Result<toml::Table> {
+    std::fs::read_to_string(path)
+        .with_context(|| format!("read {path}"))?
+        .parse()
+        .with_context(|| format!("parse {path}"))
+}
+
+fn public_unsafe_items(root: &Path) -> Result<Vec<String>> {
+    let mut files = Vec::new();
+    rust_sources(&root.join("crates/macos/src"), &mut files)?;
+    let mut violations = Vec::new();
+    for file in files {
+        let text =
+            std::fs::read_to_string(&file).with_context(|| format!("read {}", file.display()))?;
+        for (idx, line) in text.lines().enumerate() {
+            if line.contains("pub unsafe fn")
+                || line.contains("pub unsafe trait")
+                || line.contains("pub(crate) unsafe trait")
+                || line.contains("pub unsafe extern")
+            {
+                let rel = file.strip_prefix(root).unwrap_or(file.as_path());
+                violations.push(format!(
+                    "navori-macos: public unsafe item at {}:{}: no pub unsafe fn, pub unsafe trait, pub(crate) unsafe trait, or pub unsafe extern",
+                    rel.display(),
+                    idx + 1
+                ));
+            }
+        }
+    }
+    Ok(violations)
+}
+
+fn rust_sources(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
+    if !dir.is_dir() {
+        return Ok(());
+    }
+    let mut entries = std::fs::read_dir(dir)
+        .with_context(|| format!("read {}", dir.display()))?
+        .collect::<std::io::Result<Vec<_>>>()
+        .with_context(|| format!("read {}", dir.display()))?;
+    entries.sort_by_key(std::fs::DirEntry::file_name);
+    for entry in entries {
+        let path = entry.path();
+        if path.is_dir() {
+            rust_sources(&path, out)?;
+        } else if path.extension().is_some_and(|ext| ext == "rs") {
+            out.push(path);
+        }
+    }
+    Ok(())
+}
+
+struct RemoveOnDrop(PathBuf);
+
+impl Drop for RemoveOnDrop {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+fn lint_probe(root: &Path) -> Result<()> {
+    let dir = std::env::temp_dir().join(format!("navori-lint-probe-{}", std::process::id()));
+    let _cleanup = RemoveOnDrop(dir.clone());
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).context("reset lint-probe directory")?;
+    }
+    std::fs::create_dir_all(&dir).context("create lint-probe directory")?;
+
+    let workspace_lints = workspace_lint_table(root)?;
+    std::fs::write(
+        dir.join("Cargo.toml"),
+        probe_workspace_manifest(&workspace_lints)?,
+    )
+    .context("write lint-probe workspace manifest")?;
+    write_probe_member(
+        &dir,
+        "a",
+        &member_lints(root, "crates/procs/Cargo.toml")?,
+        "pub fn probe() -> u8 { let x = 1u8;\n// SAFETY: x is a live local u8.\nunsafe { std::ptr::read(&x) } }\n",
+    )?;
+    write_probe_member(
+        &dir,
+        "b",
+        &member_lints(root, "crates/macos/Cargo.toml")?,
+        "pub fn probe() -> u8 { let x = 1u8;\nunsafe { std::ptr::read(&x) } }\n",
+    )?;
+
+    require_codes("a", &clippy_error_codes(&dir.join("a"))?, &["unsafe_code"])?;
+    require_codes(
+        "b",
+        &clippy_error_codes(&dir.join("b"))?,
+        &["clippy::undocumented_unsafe_blocks"],
+    )?;
+    println!("✓ lint-probe");
+    Ok(())
+}
+
+fn workspace_lint_table(root: &Path) -> Result<toml::Value> {
+    let workspace: toml::Table = std::fs::read_to_string(root.join("Cargo.toml"))
+        .context("read workspace Cargo.toml")?
+        .parse()
+        .context("parse workspace Cargo.toml")?;
+    workspace
+        .get("workspace")
+        .and_then(|workspace| workspace.get("lints"))
+        .cloned()
+        .context("workspace lints missing")
+}
+
+fn member_lints(root: &Path, rel: &str) -> Result<toml::Value> {
+    let path = root.join(rel);
+    let manifest = read_manifest(
+        path.to_str()
+            .with_context(|| format!("{rel} is not valid UTF-8"))?,
+    )?;
+    manifest
+        .get("lints")
+        .cloned()
+        .with_context(|| format!("{rel} has no [lints]"))
+}
+
+fn probe_workspace_manifest(lints: &toml::Value) -> Result<String> {
+    let mut package = toml::Table::new();
+    package.insert("edition".into(), "2024".into());
+    let mut workspace = toml::Table::new();
+    workspace.insert("resolver".into(), "3".into());
+    workspace.insert(
+        "members".into(),
+        toml::Value::Array(vec!["a".into(), "b".into()]),
+    );
+    workspace.insert("package".into(), toml::Value::Table(package));
+    workspace.insert("lints".into(), lints.clone());
+    let mut manifest = toml::Table::new();
+    manifest.insert("workspace".into(), toml::Value::Table(workspace));
+    toml::to_string(&manifest).context("serialize lint-probe workspace")
+}
+
+fn write_probe_member(dir: &Path, name: &str, lints: &toml::Value, src: &str) -> Result<()> {
+    let member = dir.join(name);
+    std::fs::create_dir_all(member.join("src")).context("create lint-probe member")?;
+    let mut edition = toml::Table::new();
+    edition.insert("workspace".into(), toml::Value::Boolean(true));
+    let mut package = toml::Table::new();
+    package.insert("name".into(), name.into());
+    package.insert("version".into(), "0.0.0".into());
+    package.insert("edition".into(), toml::Value::Table(edition));
+    let mut manifest = toml::Table::new();
+    manifest.insert("package".into(), toml::Value::Table(package));
+    manifest.insert("lints".into(), lints.clone());
+    std::fs::write(
+        member.join("Cargo.toml"),
+        toml::to_string(&manifest).context("serialize lint-probe member")?,
+    )
+    .context("write lint-probe member manifest")?;
+    std::fs::write(member.join("src/lib.rs"), src).context("write lint-probe fixture")?;
+    Ok(())
+}
+
+fn clippy_error_codes(dir: &Path) -> Result<Vec<String>> {
+    let mut cmd = Command::new(std::env::var("CARGO").unwrap_or_else(|_| "cargo".into()));
+    cmd.current_dir(dir)
+        .args(["clippy", "--message-format=json", "--", "-D", "warnings"])
+        .env("CARGO_TERM_COLOR", "never")
+        // The probe dir is deleted on drop; a inherited target dir would leak the build.
+        .env_remove("CARGO_TARGET_DIR");
+    let out = cmd
+        .output()
+        .context("cannot run cargo clippy for lint-probe")?;
+    let stdout = String::from_utf8(out.stdout).context("lint-probe clippy stdout is not UTF-8")?;
+    let mut codes = Vec::new();
+    for line in stdout.lines() {
+        if !line.starts_with('{') {
+            continue;
+        }
+        let value: serde_json::Value =
+            serde_json::from_str(line).context("lint-probe clippy JSON line")?;
+        if value["reason"] != "compiler-message" || value["message"]["level"] != "error" {
+            continue;
+        }
+        if let Some(code) = value["message"]["code"]["code"].as_str() {
+            codes.push(code.to_owned());
+        }
+    }
+    if !out.status.success() && codes.is_empty() {
+        bail!(
+            "lint-probe clippy failed with no error codes:\n{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    Ok(codes)
+}
+
+fn require_codes(fixture: &str, got: &[String], expected: &[&str]) -> Result<()> {
+    let same = got.len() == expected.len() && got.iter().zip(expected).all(|(got, exp)| got == exp);
+    if !same {
+        bail!(
+            "fixture {fixture}: expected [{}], got [{}]",
+            expected.join(", "),
+            got.join(", ")
+        );
+    }
+    Ok(())
 }
 
 // ── outdated ───────────────────────────────────────────────────────────────────────────
@@ -716,6 +983,7 @@ fn ci(root: &Path) -> Result<()> {
     ]))?;
     sh(cargo(root).args(["test", "--workspace"]))?;
     check_deps(root)?;
+    lint_probe(root)?;
     build_core(root, Profile::Dev.default_flavor())?;
     sh(Command::new("swift")
         .args(["build", "--arch", "arm64", "--package-path"])

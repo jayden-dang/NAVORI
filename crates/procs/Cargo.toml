@@ -1,0 +1,23 @@
+[package]
+name = "navori-procs"
+description = "Process snapshots, project location and coding-agent harnesses."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+navori-macos.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+navori-macos = { workspace = true, features = ["fake"] }
+tempfile.workspace = true
+tokio.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true

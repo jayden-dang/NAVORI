@@ -25,12 +25,17 @@ The inventory of code units in the repository — every Rust crate and Swift tar
 | Swift `Navori` (app target) | `apps/macos/Navori/` | The Shell: `App/` lifecycle, `Core/CoreStore`, `StatusBar/`, `Features/`, `Platform/`. Swift 6 mode. Verified by build and launch. |
 | Swift `NavoriCore` + `NavoriCoreFFI` | `apps/macos/Generated/` | Generated bindings (Swift 5 mode) and the Rust static library as an xcframework. Never edited by hand. |
 
+**Built (R1)**
+
+| Module | Path | Responsibility |
+|---|---|---|
+| `navori-macos` | `crates/macos/` | Platform FFI. Surface: traits `ProcessSource`, `ExitSource`, `PowerAssertions`; `MacProcesses`, `KqueueExits`, `MacPower`, `AssertionGuard`; errors `PlatformError`, `ReadError`, `WatchError`, `PowerError`. Feature `fake`: `FakeProcesses`, `FakeExitsHandle`, `FakePower`. The only hand-written `unsafe`. Tests: `tests/{process_source,procargs,exits,exits_latency,exits_drop,exits_idle,power}.rs`. |
+| `navori-procs` | `crates/procs/` | Process model. No `unsafe`. Surface: `Snapshot`, `ProcId`, `resolve_location`, `Harness`, `sessions`, `harness_of`, `activity`, `ProcWatcher`. Tests: `tests/{snapshot,location,sessions,harness_of,activity,watcher,no_threads,real_os}.rs`. |
+
 **Planned**
 
 | Module | Path | Responsibility |
 |---|---|---|
-| `navori-macos` | `crates/macos/` | Platform FFI behind safe traits: power assertions, process table, kqueue (R1). |
-| `navori-procs` | `crates/procs/` | Process graph, project/worktree resolver, harness catalog, process-exit watcher (R1). |
 | `navori-secrets` | `crates/secrets/` | Keychain store for tokens and API keys (R2). |
 | `navori-mod-awake` | `modules/awake/` | Feature Module: Leases and the power assertion (R1). |
 | `navori-mod-inbox` | `modules/inbox/` | Feature Module: Needs you — Decisions, To-dos, Updates (R2). |
