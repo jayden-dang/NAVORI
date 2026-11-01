@@ -8,3 +8,5 @@ apps/macos/Generated
 
 # draft-ui review scaffolding (real local data; never committed)
 /draft-ui
+.skills/
+.worktrees/
