@@ -8,6 +8,7 @@ members = [
     "crates/kernel",
     "crates/ipc",
     "crates/ffi",
+    "apps/cli",
 ]
 
 [workspace.package]
