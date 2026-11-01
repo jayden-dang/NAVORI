@@ -60,18 +60,18 @@ No v1/v2 split. Each release adds **one** complete capability per the Definition
 
 ## Decisions locked
 
-*Each decision moves to an ADR in `docs/adr/` through `define-domain`.*
+Hard-to-reverse decisions live as ADRs in `docs/adr/`; the rest are recorded where they bind.
 
-| # | Decision | Rationale |
+| # | Decision | Recorded in |
 |---|---|---|
-| D1 | **UI**: Swift (AppKit + SwiftUI) + Rust core via UniFFI | The most native for macOS, with logic still in Rust. |
-| D2 | **AI**: cloud models, any provider, the user chooses per role | AI-first, no lock-in to one vendor. |
-| D3 | **GitHub**: OAuth App + Device Flow (long-term) | (a) The Notifications API — the cheapest way to detect changes — supports only classic tokens, not GitHub App user tokens. (b) Access to every repo you have permission for, with no need to install an app into each org (a GitHub App is limited to installed repos, including search results). (c) No server needed: a GitHub App is only truly superior when it has webhooks, and a local app cannot receive webhooks. Trade-off: the `repo` scope is broader and the token does not expire → keep it in the Keychain, with a revoke button. This is also the model of the `gh` CLI. |
-| D4 | **CPU**: Apple Silicon only (`aarch64-apple-darwin`) | Faster builds, smaller binaries, no Intel testing. |
-| D5 | **Harness**: Claude Code, Grok Build, Codex via hooks; others auto-detected | Hooks of all three verified on the machine (2026-11-01). |
-| D6 | **Running with the lid closed**: not supported | Requires a privileged helper running as root — not worth it. |
-| D7 | **AI observation scope**: see everything except secrets | A 4-layer Sensitive Data Shield, fail-closed, with an audit log and a pause button. |
-| D8 | **App signing**: a self-signed code-signing certificate, no paid Apple Developer account yet | Single user (the author) now: the app runs only on the author's machine, built from source → Gatekeeper does not block it (no quarantine flag). Every API needed (IOKit, libproc, AX, ScreenCaptureKit, regular Keychain, notifications) requires no paid entitlement; the app is not sandboxed. Open source later: other developers install it themselves via `brew install --cask` or a download page, which requires a Developer ID + notarization at that time. |
+| D1 | **UI**: Swift (AppKit + SwiftUI) Shell + Rust Core via UniFFI, in one process | [ADR 0001](adr/0001-rust-core-swift-shell-in-process.md) |
+| D2 | **AI**: cloud models, any Provider, the user chooses a model per Model role | GOAL-5 in `docs/product/vision.md`; design in the AI runtime seed below |
+| D3 | **GitHub**: OAuth App + Device Flow | [ADR 0002](adr/0002-github-oauth-app-device-flow.md) |
+| D4 | **CPU**: Apple Silicon only (`aarch64-apple-darwin`) | Non-goals in `docs/product/vision.md` (cheap to reverse: build config only) |
+| D5 | **Harness**: Claude Code, Grok Build, Codex via hooks; others auto-detected | The Awake seed below (hooks verified on the machine 2026-11-01) |
+| D6 | **Running with the lid closed**: not supported | Non-goals in `docs/product/vision.md` |
+| D7 | **AI observation scope**: everything except secrets | [ADR 0003](adr/0003-ai-sees-everything-except-secrets.md) |
+| D8 | **App signing**: self-signed identity, no paid Apple Developer account yet | [ADR 0004](adr/0004-self-signed-code-signing.md) |
 
 ## Design seeds (pending feature specs)
 
@@ -329,7 +329,7 @@ Out of scope (decided): staying awake with the lid closed.
 ### Seed: GitHub pull requests (R4)
 
 - **Inbox**: Needs my review · My PRs · Involved. Per PR: repo, #, title, draft, review decision, CI rollup, mergeable, labels, updated.
-- **Auth — OAuth App + Device Flow** (a long-term decision, not a temporary one; see decision D3 under "Decisions locked"). Scopes: `repo`, `read:org`, `notifications`, `workflow`. No client secret, no redirect server — the same way `gh auth login` works. Token → Keychain.
+- **Auth — OAuth App + Device Flow** (a long-term decision, not a temporary one; see ADR 0002 in `docs/adr/`). Scopes: `repo`, `read:org`, `notifications`, `workflow`. No client secret, no redirect server — the same way `gh auth login` works. Token → Keychain.
   - Multiple accounts (personal + work) supported from day one: tokens are keyed by `account_id`.
   - Orgs with SAML SSO: guidance to authorize the token for the org inside the app; orgs that block OAuth Apps: send an approval request, or use a PAT (classic) as the fallback.
   - A `TokenProvider` trait (`OAuthDevice`, `ClassicPat`) reserves room for other methods without changing the module.

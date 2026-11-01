@@ -63,7 +63,7 @@ Status: **Built** = in the tree at R0 · **Planned (Rn)** = committed in the roa
 | Secrets | Planned (R2) | Keychain storage for tokens and API keys (ARCH-8). | `crates/secrets` |
 | Awake module | Planned (R1) | Leases → one power assertion; harness-session tracking. | `modules/awake` |
 | Ports module | Planned (R3) | Listening ports by project/worktree/harness; stop with approval. | `modules/ports` |
-| GitHub module | Planned (R4) | PR inbox, checks, approve/merge; OAuth device flow (D3). | `modules/github` |
+| GitHub module | Planned (R4) | PR inbox, checks, approve/merge; OAuth device flow (ADR 0002). | `modules/github` |
 | Needs you inbox | Planned (R2) | Decisions, To-dos and Updates between the user and Navori AI; approvals for Destructive Actions. | proposed `modules/inbox` |
 | PlatformServices | Planned (R2) | Swift-implemented services the Core calls: notifications, frontmost app/AX, screen capture + OCR + blur, permissions. | `apps/macos/Navori/Platform/` |
 | LLM providers | Planned (R2) | Canonical chat/tool/stream format; adapters `anthropic`, `openai`, `openai_compat`, `gemini`. | `ai/llm` |
