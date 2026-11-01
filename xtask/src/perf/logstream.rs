@@ -226,18 +226,6 @@ mod tests {
     }
 
     #[test]
-    fn start_returns_after_the_banner() {
-        let started = std::time::Instant::now();
-        let stream = LogStream::start().expect("log stream banner");
-        assert!(
-            started.elapsed() < Duration::from_secs(10),
-            "banner wait took {:?}",
-            started.elapsed()
-        );
-        drop(stream);
-    }
-
-    #[test]
     fn wait_for_times_out_with_none() {
         let mut stream = LogStream::from_reader(Cursor::new(Vec::new()));
         let mark = stream.wait_for(

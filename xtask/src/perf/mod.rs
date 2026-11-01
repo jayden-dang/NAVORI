@@ -31,7 +31,7 @@ const COMMAND_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub fn run(root: &Path, record: bool) -> Result<bool> {
     let (app, probe, build_elapsed) = build_bundle(root)?;
-    emit(&format!("build {}", format_elapsed(build_elapsed)));
+    emit(&format!("build {}", format_elapsed(build_elapsed)))?;
 
     let exe = app.join("Contents/MacOS/Navori");
     let home = prepare_home(&exe)?;
@@ -55,10 +55,12 @@ pub fn run(root: &Path, record: bool) -> Result<bool> {
     let baseline_path = root.join("perf-baseline.json");
     let loaded = Baseline::load(&baseline_path)?;
     let verdict = judge(&measured, loaded.as_ref(), &machine);
-    report(&verdict, phase_a_elapsed, phase_b_elapsed);
+    report(&verdict, phase_a_elapsed, phase_b_elapsed)?;
 
-    let baseline = Baseline::from_run(&measured, machine, git_revision(root)?, record_date()?);
-    let _wrote = finish(&baseline_path, &verdict, record, &baseline)?;
+    if record && verdict.passed {
+        let baseline = Baseline::from_run(&measured, machine, git_revision(root)?, record_date()?);
+        finish(&baseline_path, &verdict, record, &baseline)?;
+    }
     Ok(verdict.passed)
 }
 
@@ -78,7 +80,7 @@ fn prepare_home(exe: &Path) -> Result<PerfHome> {
     // prepare replaces the tree and would delete the pid file the sweep reads.
     let swept = sweep.sweep_stale(exe)?;
     for pid in swept {
-        emit(&format!("swept stale pid {pid}"));
+        emit(&format!("swept stale pid {pid}"))?;
     }
     let home = PerfHome::prepare(Path::new("/tmp"), uid)?;
     check_socket_len(&home.root.join("run-9"))?;
@@ -418,25 +420,27 @@ fn mib(bytes: u64) -> f64 {
     bytes as f64 / 1_048_576.0
 }
 
-fn report(verdict: &judge::Verdict, phase_a: Duration, phase_b: Duration) {
+fn report(verdict: &judge::Verdict, phase_a: Duration, phase_b: Duration) -> Result<()> {
     for line in &verdict.lines {
-        emit(line);
+        emit(line)?;
     }
     for warning in &verdict.warnings {
-        emit(warning);
+        emit(warning)?;
     }
-    emit(&format!("phase A {}", format_elapsed(phase_a)));
-    emit(&format!("phase B {}", format_elapsed(phase_b)));
+    emit(&format!("phase A {}", format_elapsed(phase_a)))?;
+    emit(&format!("phase B {}", format_elapsed(phase_b)))?;
+    Ok(())
 }
 
 fn format_elapsed(elapsed: Duration) -> String {
     format!("{:.3}s", elapsed.as_secs_f64())
 }
 
-fn emit(line: &str) {
+fn emit(line: &str) -> Result<()> {
     let mut out = std::io::stdout().lock();
-    let _ = writeln!(out, "{line}");
-    let _ = out.flush();
+    writeln!(out, "{line}").context("write the perf report")?;
+    out.flush().context("flush the perf report")?;
+    Ok(())
 }
 
 fn git_revision(root: &Path) -> Result<String> {
@@ -520,8 +524,29 @@ fn wait_bounded(child: &mut std::process::Child, rendered: &str) -> Result<ExitS
             return Ok(status);
         }
         if started.elapsed() >= COMMAND_TIMEOUT {
-            let _ = child.kill();
-            let _ = child.wait();
+            if let Err(err) = child.kill() {
+                let _ = writeln!(
+                    std::io::stderr().lock(),
+                    "{rendered} timed out and kill failed for pid {}: {err}",
+                    child.id()
+                );
+            }
+            let reap_started = Instant::now();
+            loop {
+                match child.try_wait() {
+                    Ok(Some(_)) => break,
+                    Ok(None) if reap_started.elapsed() >= Duration::from_secs(2) => {
+                        bail!(
+                            "{rendered} timed out after 10s and pid {} is still running",
+                            child.id()
+                        );
+                    }
+                    Ok(None) => thread::sleep(Duration::from_millis(20)),
+                    Err(err) => {
+                        return Err(err).with_context(|| format!("reap {rendered}"));
+                    }
+                }
+            }
             bail!("{rendered} timed out after 10s");
         }
         thread::sleep(Duration::from_millis(20));
