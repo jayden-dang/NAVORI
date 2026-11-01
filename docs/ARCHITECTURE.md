@@ -62,6 +62,9 @@
 - **Một process** chứa Swift shell + Rust core. **CLI** `navori` là binary Rust riêng, nằm trong bundle (`Navori.app/Contents/Helpers/navori`), nói với app qua socket.
 - Rust core khởi tạo **một lần** khi app launch (`NavoriCore::start`) và sở hữu tokio runtime riêng; Swift không biết tokio tồn tại.
 
+### Giao diện menubar
+Thiết kế đã chốt (2026-11-01): [`docs/design/2026-11-01-menubar-ui-brief.md`](design/2026-11-01-menubar-ui-brief.md) — NSMenu + submenu cascade; cấp 0 = Ask → **Needs you** (inbox quyết định giữa người dùng và AI: Decision / To-do / Update) → Awake / Ports / Pull Requests mỗi mục một dòng. Mỗi feature cập nhật surface của mình trong brief khi ship.
+
 ### Concurrency
 - **Swift**: main thread cho AppKit; mọi callback từ Rust được hop về `@MainActor` trong **một** lớp `CoreStore` — không chỗ nào khác chạm vào binding.
 - **Rust**: mỗi module/agent session là một **actor** (tokio task + `mpsc` inbox + `watch` snapshot + `broadcast` event). `CancellationToken` cho shutdown/cancel (bao gồm hủy một lượt AI đang stream).

@@ -5,3 +5,6 @@ apps/macos/.build
 apps/macos/.swiftpm
 apps/macos/Generated
 *.xcframework
+
+# draft-ui review scaffolding (real local data; never committed)
+/draft-ui
