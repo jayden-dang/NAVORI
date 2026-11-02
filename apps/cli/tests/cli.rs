@@ -194,3 +194,69 @@ fn an_unknown_profile_is_a_usage_error() {
         .assert()
         .code(2);
 }
+
+#[test]
+fn awake_hold_for_an_hour_shows_in_status() {
+    let r = running_core();
+    navori(&r.home)
+        .args(["awake", "hold", "--for", "1h"])
+        .assert()
+        .success();
+    navori(&r.home)
+        .args(["awake", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("1 Lease"))
+        .stdout(predicate::str::contains("1 hour"));
+}
+
+#[test]
+fn awake_hold_with_no_flag_is_until_off() {
+    let r = running_core();
+    navori(&r.home).args(["awake", "hold"]).assert().success();
+    navori(&r.home)
+        .args(["awake", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("1 Lease"))
+        .stdout(predicate::str::contains("Until off"));
+}
+
+#[test]
+fn awake_release_all_ends_the_lease() {
+    let r = running_core();
+    navori(&r.home)
+        .args(["awake", "hold", "--for", "1h"])
+        .assert()
+        .success();
+    navori(&r.home)
+        .args(["awake", "release-all"])
+        .assert()
+        .success();
+    navori(&r.home)
+        .args(["awake", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("0 Leases"))
+        .stdout(predicate::str::contains("1 hour").not());
+}
+
+#[test]
+fn a_bad_duration_is_a_usage_error() {
+    let home = short_home();
+    navori(&home)
+        .args(["awake", "hold", "--for", "nope"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("duration"));
+}
+
+#[test]
+fn awake_status_with_the_app_down_exits_3() {
+    let home = short_home();
+    navori(&home)
+        .args(["awake", "status"])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("not running"));
+}
