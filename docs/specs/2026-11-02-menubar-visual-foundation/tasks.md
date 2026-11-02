@@ -545,11 +545,11 @@ _Requirements: MENU-1.4, MENU-3.9_
 
 **Depends-on:** Task 18
 
-- [ ] **Step 1: Precondition** — KCONTRACT is on `main`. If it is not when every other task is done, stop and ask the user (design: KCONTRACT merges first).
-- [ ] **Step 2: Merge** with `git merge main`, not a rebase, because a rebase would replay each commit's conflict. In a conflict in `PanelView.swift`, keep the new layout; `configProblem` in `CoreStore.swift` takes `title` and `message` from `configNotice` with no Shell wording; keep `WakeObserver` in `AppDelegate` and the new `show(tab:)` call.
-- [ ] **Step 3: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 4: Check by hand**: `log_level = 42` shows a banner naming `log_level` and not saying the whole file is on defaults; an unparseable `config.toml` says the whole file is on defaults; a sleep and wake still pulses. `CoreStore.setPanelVisible` is still reached once per open and close.
-- [ ] **Step 5: Commit** the merge, then `git commit -m "feat(shell): show the core's config notice on the new banner"` if any change remains.
+- [x] **Step 1: Precondition** — KCONTRACT is on `main`. If it is not when every other task is done, stop and ask the user (design: KCONTRACT merges first).
+- [x] **Step 2: Merge** with `git merge main`, not a rebase, because a rebase would replay each commit's conflict. In a conflict in `PanelView.swift`, keep the new layout; `configProblem` in `CoreStore.swift` takes `title` and `message` from `configNotice` with no Shell wording; keep `WakeObserver` in `AppDelegate` and the new `show(tab:)` call.
+- [x] **Step 3: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 4: Check by hand**: `log_level = 42` shows a banner naming `log_level` and not saying the whole file is on defaults; an unparseable `config.toml` says the whole file is on defaults; a sleep and wake still pulses. `CoreStore.setPanelVisible` is still reached once per open and close.
+- [x] **Step 5: Commit** the merge, then `git commit -m "feat(shell): show the core's config notice on the new banner"` if any change remains.
 
 _Requirements: MENU-2.3, MENU-G6_
 
