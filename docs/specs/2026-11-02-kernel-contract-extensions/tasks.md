@@ -140,11 +140,11 @@ _Requirements: KCONTRACT-4.5, KCONTRACT-4.9, KCONTRACT-4.10, KCONTRACT-4.11_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Write failing tests:** `a_panel_change_ends_a_wait_with_a_deadline`; `a_panel_change_ends_a_wait_with_no_deadline`; `the_handle_reports_whether_the_panel_is_visible`; `a_panel_change_between_waits_is_not_lost`; `two_quick_panel_flips_still_end_the_wait`; `setting_the_same_visibility_changes_nothing`; `a_panel_change_does_not_count_toward_the_gap` (a timer wake, then a panel flip and back, then the next `Due` is still measured from the timer wake).
-- [ ] **Step 2: Run** `cargo nextest run -p navori-kernel --test scheduler` — expect: the first test fails, the wait does not end.
-- [ ] **Step 3: Implement** loop step 1 and the `panel_changes` counter.
-- [ ] **Step 4: Run** the same command — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(kernel): end a wait when the panel changes"`
+- [x] **Step 1: Write failing tests:** `a_panel_change_ends_a_wait_with_a_deadline`; `a_panel_change_ends_a_wait_with_no_deadline`; `the_handle_reports_whether_the_panel_is_visible`; `a_panel_change_between_waits_is_not_lost`; `two_quick_panel_flips_still_end_the_wait`; `setting_the_same_visibility_changes_nothing`; `a_panel_change_does_not_count_toward_the_gap` (a timer wake, then a panel flip and back, then the next `Due` is still measured from the timer wake).
+- [x] **Step 2: Run** `cargo nextest run -p navori-kernel --test scheduler` — expect: the first test fails, the wait does not end.
+- [x] **Step 3: Implement** loop step 1 and the `panel_changes` counter.
+- [x] **Step 4: Run** the same command — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "feat(kernel): end a wait when the panel changes"`
 
 _Requirements: KCONTRACT-5.1, KCONTRACT-5.2, KCONTRACT-5.3_
 
