@@ -183,8 +183,14 @@ impl NavoriCore {
 
         let store =
             Store::open(&paths.db_file, &paths.backups_dir).map_err(|e| startup("database", e))?;
-        let kernel = handle
-            .block_on(async { app::build_kernel(store.clone(), &loaded.config, loaded.sections) });
+        let kernel = handle.block_on(async {
+            app::build_kernel(
+                store.clone(),
+                &loaded.config,
+                loaded.sections,
+                &loaded.sweep,
+            )
+        });
         let config_notice = app::config_notice(
             &loaded.report,
             &loaded.sweep,

@@ -5,12 +5,13 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use navori_config::{ConfigReport, JournalSweep, WholeFileReason};
+use navori_config::{ConfigReport, JournalSweep, Paths, Profile, WholeFileReason};
 use navori_ffi::{
     CheckView, ConfigNotice, CoreConfig, CoreError, CoreSnapshot, NavoriCore, SnapshotListener,
 };
-use navori_protocol::CoreStatus;
 use navori_protocol::rpc::method;
+use navori_protocol::{CoreStatus, Event, Severity};
+use navori_store::Store;
 
 #[derive(Default)]
 struct Recorder(Mutex<Vec<CoreSnapshot>>);
@@ -243,7 +244,7 @@ fn invalid_toml_says_the_whole_file_is_on_defaults_and_names_it() {
         no_position,
         ConfigNotice {
             title: "config.toml is on defaults".into(),
-            message: "Not valid TOML.".into(),
+            message: "Not valid TOML. Journal cleanup is paused until the file is fixed and Navori is reopened.".into(),
         }
     );
 
@@ -256,7 +257,10 @@ fn invalid_toml_says_the_whole_file_is_on_defaults_and_names_it() {
         file,
     )
     .expect("a toml position is a notice");
-    assert_eq!(positioned.message, "Not valid TOML at line 3, column 7.");
+    assert_eq!(
+        positioned.message,
+        "Not valid TOML at line 3, column 7. Journal cleanup is paused until the file is fixed and Navori is reopened."
+    );
     assert_eq!(positioned.title, "config.toml is on defaults");
 
     let home = home();
@@ -276,7 +280,13 @@ fn invalid_toml_says_the_whole_file_is_on_defaults_and_names_it() {
     );
     assert!(notice.message.ends_with('.'), "{}", notice.message);
     assert!(!notice.message.contains("log_level"), "{}", notice.message);
-    assert!(!notice.message.contains("paused"), "{}", notice.message);
+    assert!(
+        notice
+            .message
+            .contains("Journal cleanup is paused until the file is fixed and Navori is reopened."),
+        "{}",
+        notice.message
+    );
     core.shutdown();
 }
 
@@ -295,7 +305,7 @@ fn an_unreadable_file_says_it_cannot_be_read() {
         notice,
         ConfigNotice {
             title: "config.toml is on defaults".into(),
-            message: "It cannot be read.".into(),
+            message: "It cannot be read. Journal cleanup is paused until the file is fixed and Navori is reopened.".into(),
         }
     );
     core.shutdown();
@@ -415,5 +425,175 @@ fn doctor_reports_a_healthy_core() {
         );
     }
     eventually(|| core.doctor().iter().all(|c| c.ok));
+    core.shutdown();
+}
+
+const PAUSE_SENTENCE: &str =
+    "Journal cleanup is paused until the file is fixed and Navori is reopened.";
+
+fn seed_event_from_forty_days_ago(home: &tempfile::TempDir) {
+    let uid = std::os::unix::fs::MetadataExt::uid(&std::fs::metadata(home.path()).unwrap());
+    let paths = Paths::new(Profile::Dev, home.path(), uid);
+    let store = Store::open(&paths.db_file, &paths.backups_dir).unwrap();
+    let day_ms: i64 = 24 * 60 * 60 * 1000;
+    let now_ms = i64::try_from(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+    )
+    .unwrap();
+    store
+        .journal_append(&Event {
+            id: "old".into(),
+            ts_ms: now_ms - 40 * day_ms,
+            module: "test".into(),
+            kind: "seed".into(),
+            severity: Severity::Info,
+            summary: "old".into(),
+            payload: serde_json::json!(null),
+        })
+        .unwrap();
+}
+
+fn journal_has_old_event(core: &NavoriCore) -> bool {
+    core.status()
+        .recent_events
+        .iter()
+        .any(|event| event.id == "old")
+}
+
+fn old_event_is_deleted_within_one_second(core: &NavoriCore) {
+    let deadline = Instant::now() + Duration::from_secs(1);
+    while Instant::now() < deadline {
+        if !journal_has_old_event(core) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    panic!("the 40-day event was still in the journal");
+}
+
+fn old_event_stays_for_one_second(core: &NavoriCore) {
+    let deadline = Instant::now() + Duration::from_secs(1);
+    while Instant::now() < deadline {
+        assert!(journal_has_old_event(core), "the 40-day event was deleted");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn pause_is_reported(core: &NavoriCore) {
+    let notice = core.status().config_notice.unwrap();
+    assert!(
+        notice.message.contains(PAUSE_SENTENCE),
+        "{}",
+        notice.message
+    );
+    let check = config_check(core);
+    assert!(
+        check.detail.contains("Journal cleanup is paused"),
+        "{}",
+        check.detail
+    );
+}
+
+#[test]
+fn absent_retention_deletes_events_older_than_30_days() {
+    let bodies: [Option<&str>; 3] = [
+        None,
+        Some("log_level = \"info\"\n"),
+        Some("[journal]\n# retention_days = 365\n"),
+    ];
+    for body in bodies {
+        let home = home();
+        if let Some(body) = body {
+            write_config(&home, body);
+        }
+        seed_event_from_forty_days_ago(&home);
+        let (core, _) = start(&home);
+        old_event_is_deleted_within_one_second(&core);
+        core.shutdown();
+    }
+}
+
+#[test]
+fn a_broken_retention_or_file_keeps_old_events_and_says_the_sweep_is_paused() {
+    let bodies = [
+        "[journal]\nretention_days = 0\n",
+        "[journal]\nretention_days = \"365\"\n",
+        "journal = 3\n",
+        "log_level = \n",
+    ];
+    for body in bodies {
+        let home = home();
+        write_config(&home, body);
+        seed_event_from_forty_days_ago(&home);
+        let (core, _) = start(&home);
+        old_event_stays_for_one_second(&core);
+        pause_is_reported(&core);
+        core.shutdown();
+    }
+}
+
+#[test]
+fn a_valid_retention_keeps_what_it_says() {
+    let home = home();
+    write_config(&home, "[journal]\nretention_days = 90\n");
+    seed_event_from_forty_days_ago(&home);
+    let (core, _) = start(&home);
+    old_event_stays_for_one_second(&core);
+    core.shutdown();
+}
+
+#[test]
+fn a_bad_log_level_alone_does_not_pause_the_sweep() {
+    let home = home();
+    write_config(&home, "log_level = \"loud\"\n");
+    seed_event_from_forty_days_ago(&home);
+    let (core, _) = start(&home);
+    old_event_is_deleted_within_one_second(&core);
+    let notice = core
+        .status()
+        .config_notice
+        .expect("bad log level is a notice");
+    assert!(
+        !notice.message.contains(PAUSE_SENTENCE),
+        "{}",
+        notice.message
+    );
+    core.shutdown();
+}
+
+#[test]
+fn a_paused_sweep_leaves_other_modules_running() {
+    let home = home();
+    write_config(&home, "[journal]\nretention_days = 0\n");
+    let (core, _) = start(&home);
+    eventually(|| {
+        core.doctor()
+            .into_iter()
+            .any(|check| check.name == "modules" && check.ok)
+    });
+    let out =
+        futures::executor::block_on(core.dispatch("system".into(), "\"ping\"".into())).unwrap();
+    assert_eq!(out, "\"pong\"");
+    core.shutdown();
+}
+
+#[test]
+fn fixing_the_file_keeps_the_pause_until_the_next_start() {
+    let home = home();
+    write_config(&home, "[journal]\nretention_days = 0\n");
+    seed_event_from_forty_days_ago(&home);
+    let (core, _) = start(&home);
+    pause_is_reported(&core);
+    old_event_stays_for_one_second(&core);
+    write_config(&home, "[journal]\nretention_days = 30\n");
+    pause_is_reported(&core);
+    core.shutdown();
+
+    let (core, _) = start(&home);
+    assert!(core.status().config_notice.is_none());
+    old_event_is_deleted_within_one_second(&core);
     core.shutdown();
 }

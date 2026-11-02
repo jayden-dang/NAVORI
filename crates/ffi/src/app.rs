@@ -170,9 +170,8 @@ pub fn config_notice(
     module_issues: &[&str],
     file: &Path,
 ) -> Option<crate::ConfigNotice> {
-    let _ = sweep;
     let name = file_label(file);
-    match report {
+    let mut notice = match report {
         ConfigReport::WholeFile(reason) => Some(crate::ConfigNotice {
             title: format!("{name} is on defaults"),
             message: whole_file_message(reason),
@@ -191,7 +190,16 @@ pub fn config_notice(
                 })
             }
         }
+    };
+    if let Some(notice) = notice.as_mut()
+        && matches!(sweep, JournalSweep::Paused)
+    {
+        notice.message.push(' ');
+        notice
+            .message
+            .push_str("Journal cleanup is paused until the file is fixed and Navori is reopened.");
     }
+    notice
 }
 
 fn file_label(file: &Path) -> std::borrow::Cow<'_, str> {
@@ -226,13 +234,15 @@ fn bad_keys(report: &ConfigReport, module_issues: &[&str]) -> Vec<String> {
 
 pub fn build_kernel(
     store: Store,
-    config: &Config,
+    _config: &Config,
     sections: serde_json::Map<String, serde_json::Value>,
+    sweep: &JournalSweep,
 ) -> Kernel {
-    Kernel::builder(store)
-        .journal_retention_days(config.journal.retention_days)
-        .config_sections(sections)
-        .start()
+    let builder = match sweep {
+        JournalSweep::KeepDays(days) => Kernel::builder(store).journal_retention_days(*days),
+        JournalSweep::Paused => Kernel::builder(store).pause_journal_sweep(),
+    };
+    builder.config_sections(sections).start()
 }
 
 /// JSON-RPC handler for the local socket.
