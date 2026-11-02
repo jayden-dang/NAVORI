@@ -7,7 +7,7 @@ use std::time::Duration;
 use navori_protocol::Risk;
 use serde::{Deserialize, Serialize};
 
-use crate::module::{ActionDoc, ActionError, Module, ModuleAction, ModuleCtx};
+use crate::module::{ActionDoc, ActionError, Module, ModuleAction, ModuleCtx, NoConfig};
 
 const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 const RETENTION_SWEEP: Duration = Duration::from_secs(6 * 60 * 60);
@@ -80,6 +80,7 @@ impl System {
 impl Module for System {
     const ID: &'static str = "system";
     type Action = SystemAction;
+    type Config = NoConfig;
     type State = SystemState;
 
     fn initial_state(&self) -> SystemState {

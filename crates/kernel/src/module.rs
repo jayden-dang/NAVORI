@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use navori_protocol::{Risk, Severity};
 use navori_store::Store;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
+use serde::de::{DeserializeOwned, IgnoredAny};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio_util::sync::CancellationToken;
@@ -31,10 +31,29 @@ pub trait ModuleAction: DeserializeOwned + schemars::JsonSchema + Send + 'static
     fn catalog() -> Vec<ActionDoc>;
 }
 
+pub trait ModuleConfig: DeserializeOwned + Default + Send + Sync + 'static {
+    fn check(&self) -> Result<(), &'static str> {
+        Ok(())
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct NoConfig;
+
+impl<'de> Deserialize<'de> for NoConfig {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        IgnoredAny::deserialize(deserializer)?;
+        Ok(Self)
+    }
+}
+
+impl ModuleConfig for NoConfig {}
+
 /// A feature module: an actor owning its state, driven by [`ModuleCtx`].
 pub trait Module: Send + Sized + 'static {
     const ID: &'static str;
     type Action: ModuleAction;
+    type Config: ModuleConfig;
     /// Snapshot published to the UI / AI. Must be cheap to clone.
     type State: Serialize + Clone + Send + Sync + 'static;
 
@@ -91,6 +110,7 @@ pub struct ModuleCtx<M: Module> {
     pub store: Store,
     pub shutdown: CancellationToken,
     pub(crate) scheduler: Scheduler,
+    pub(crate) config: Arc<M::Config>,
 }
 
 impl<M: Module> std::fmt::Debug for ModuleCtx<M> {
@@ -127,5 +147,9 @@ impl<M: Module> ModuleCtx<M> {
 
     pub fn wait_handle(&self) -> WaitHandle {
         self.scheduler.wait_handle()
+    }
+
+    pub fn config(&self) -> Arc<M::Config> {
+        Arc::clone(&self.config)
     }
 }

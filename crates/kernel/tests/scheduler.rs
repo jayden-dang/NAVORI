@@ -7,8 +7,8 @@ use std::task::Poll;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use navori_kernel::{
-    ActionDoc, DispatchError, Envelope, Kernel, Module, ModuleAction, ModuleCtx, RestartPolicy,
-    Risk, Wake, WallClock,
+    ActionDoc, DispatchError, Envelope, Kernel, Module, ModuleAction, ModuleCtx, NoConfig,
+    RestartPolicy, Risk, Wake, WallClock,
 };
 use navori_store::Store;
 use serde::{Deserialize, Serialize};
@@ -132,6 +132,7 @@ struct Pinger {
 impl Module for Pinger {
     const ID: &'static str = "pinger";
     type Action = PingAction;
+    type Config = NoConfig;
     type State = PingState;
 
     fn initial_state(&self) -> PingState {
@@ -197,6 +198,7 @@ struct Crasher {
 impl Module for Crasher {
     const ID: &'static str = "crasher";
     type Action = CrashAction;
+    type Config = NoConfig;
     type State = CrashState;
 
     fn initial_state(&self) -> CrashState {

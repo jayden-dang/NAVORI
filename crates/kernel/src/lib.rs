@@ -13,7 +13,9 @@ mod scheduler;
 mod system;
 
 pub use bus::EventBus;
-pub use module::{ActionDoc, ActionError, Module, ModuleAction, ModuleCtx, Request};
+pub use module::{
+    ActionDoc, ActionError, Module, ModuleAction, ModuleConfig, ModuleCtx, NoConfig, Request,
+};
 pub use navori_protocol::{
     ActionSpec, CoreStatus, Envelope, Event, ModuleInfo, ModuleState, Risk, Severity,
 };
