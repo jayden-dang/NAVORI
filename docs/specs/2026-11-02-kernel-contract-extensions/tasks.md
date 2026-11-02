@@ -187,9 +187,9 @@ _Requirements: KCONTRACT-5.3, KCONTRACT-6.2, KCONTRACT-6.3, KCONTRACT-6.4, KCONT
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Write the test** `due_is_never_returned_before_the_deadline_by_the_wall_clock`: a fixed seed, 1,000 runs, each a random sequence of tokio advances, fake wall advances and retreats, pulses and panel flips. Whenever `wait_until` returns `Due`, assert `clock.now() >= deadline`; on `PanelChanged`, wait again.
-- [ ] **Step 2: Run** `cargo nextest run -p navori-kernel --test scheduler due_is_never` — expect: pass. To check the test can fail, temporarily remove the step 6 wall-clock comparison, expect a failure, and restore it.
-- [ ] **Step 3: Commit** `git commit -m "test(kernel): prove a wait never returns due before its deadline"`
+- [x] **Step 1: Write the test** `due_is_never_returned_before_the_deadline_by_the_wall_clock`: a fixed seed, 1,000 runs, each a random sequence of tokio advances, fake wall advances and retreats, pulses and panel flips. Whenever `wait_until` returns `Due`, assert `clock.now() >= deadline`; on `PanelChanged`, wait again.
+- [x] **Step 2: Run** `cargo nextest run -p navori-kernel --test scheduler due_is_never` — expect: pass. To check the test can fail, temporarily remove the step 6 wall-clock comparison, expect a failure, and restore it.
+- [x] **Step 3: Commit** `git commit -m "test(kernel): prove a wait never returns due before its deadline"`
 
 _Requirements: KCONTRACT-7.3_
 
