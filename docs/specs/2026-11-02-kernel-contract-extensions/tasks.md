@@ -164,11 +164,11 @@ _Requirements: KCONTRACT-5.1, KCONTRACT-5.2, KCONTRACT-5.3_
 
 **Depends-on:** Task 3
 
-- [ ] **Step 1: Write failing tests.** Sleep is simulated by advancing the fake wall clock without advancing tokio. `a_pulse_after_the_deadline_passed_in_sleep_returns_due`; `a_pulse_returns_due_without_waiting_for_the_gap`; `a_pulse_before_the_deadline_returns_nothing_and_waits_the_remaining_wall_time`; `a_pulse_with_no_deadline_keeps_waiting` (`futures::poll!` is `Pending`); `a_pulse_seen_with_no_deadline_answers_the_next_deadline_without_the_gap`; `with_no_pulse_a_deadline_across_sleep_returns_at_a_later_timer_wake`; `a_pulse_with_no_handle_is_recorded_without_error`; `a_wall_clock_moved_back_defers_due_and_moved_forward_brings_it_on`; `a_pulse_does_not_count_toward_the_gap`.
-- [ ] **Step 2: Run** `cargo nextest run -p navori-kernel --test scheduler` — expect: the first test fails, no `Due` until tokio time advances.
-- [ ] **Step 3: Implement** the pulse branch and `wake_pulse`.
-- [ ] **Step 4: Run** the same command — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(kernel): return an overdue deadline on a wake pulse"`
+- [x] **Step 1: Write failing tests.** Sleep is simulated by advancing the fake wall clock without advancing tokio. `a_pulse_after_the_deadline_passed_in_sleep_returns_due`; `a_pulse_returns_due_without_waiting_for_the_gap`; `a_pulse_before_the_deadline_returns_nothing_and_waits_the_remaining_wall_time`; `a_pulse_with_no_deadline_keeps_waiting` (`futures::poll!` is `Pending`); `a_pulse_seen_with_no_deadline_answers_the_next_deadline_without_the_gap`; `with_no_pulse_a_deadline_across_sleep_returns_at_a_later_timer_wake`; `a_pulse_with_no_handle_is_recorded_without_error`; `a_wall_clock_moved_back_defers_due_and_moved_forward_brings_it_on`; `a_pulse_does_not_count_toward_the_gap`.
+- [x] **Step 2: Run** `cargo nextest run -p navori-kernel --test scheduler` — expect: the first test fails, no `Due` until tokio time advances.
+- [x] **Step 3: Implement** the pulse branch and `wake_pulse`.
+- [x] **Step 4: Run** the same command — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "feat(kernel): return an overdue deadline on a wake pulse"`
 
 _Requirements: KCONTRACT-5.3, KCONTRACT-6.2, KCONTRACT-6.3, KCONTRACT-6.4, KCONTRACT-6.5, KCONTRACT-6.6, KCONTRACT-6.7_
 
