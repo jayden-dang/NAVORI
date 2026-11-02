@@ -378,11 +378,11 @@ _Requirements: AWAKE-2.3, AWAKE-2.4, AWAKE-6.1, AWAKE-6.2, AWAKE-6.3, AWAKE-6.4,
 
 **Depends-on:** Task 10
 
-- [ ] **Step 1: Write failing tests:** `display_on_holds_one_display_and_one_system_assertion`, `display_off_with_another_lease_keeps_system_with_no_gap` (`FakePower::releases` is 1 with System still in `held`), `display_on_with_no_other_lease_holds_system_too`, `display_off_with_no_other_lease_releases_both`, `a_refused_display_keeps_system_and_reports_display_not_held`, `a_refused_system_still_tries_display`, `release_all_ends_the_display_lease`, `display_writes_no_row`, `display_off_is_the_only_other_action_that_ends_a_manual_lease`.
+- [x] **Step 1: Write failing tests:** `display_on_holds_one_display_and_one_system_assertion`, `display_off_with_another_lease_keeps_system_with_no_gap` (`FakePower::releases` is 1 with System still in `held`), `display_on_with_no_other_lease_holds_system_too`, `display_off_with_no_other_lease_releases_both`, `a_refused_display_keeps_system_and_reports_display_not_held`, `a_refused_system_still_tries_display`, `release_all_ends_the_display_lease`, `display_writes_no_row`, `display_off_is_the_only_other_action_that_ends_a_manual_lease`.
 Run: `cargo nextest run -p navori-mod-awake --test display` — expect: no such variant.
-- [ ] **Step 2: Implement.** System holds before Display; Display releases before System.
+- [x] **Step 2: Implement.** System holds before Display; Display releases before System.
 Run: same command — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(awake): keep the display on with its own Lease"`
+- [x] **Step 3: Commit** `git commit -m "feat(awake): keep the display on with its own Lease"`
 
 _Requirements: AWAKE-7.1, AWAKE-7.2, AWAKE-7.3, AWAKE-7.4, AWAKE-7.5_
 
