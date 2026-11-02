@@ -383,7 +383,7 @@ _Requirements: none of its own; documentation for the IDs in Tasks 1–11._
 
 **Depends-on:** Task 12
 
-- [ ] **Step 1: Run** `cargo xtask perf` — expect: every gated line within budget, including `idle_wakeups_per_s` ≤ 1/s, `menu_open_after_launch_ms` ≤ 80 and `menu_reopen_ms` ≤ 50. `regression check skipped: no baseline` is expected while `perf-baseline.json` is absent.
-- [ ] **Step 2: Record** the printed values in the task report. A missed budget stops the plan and goes to the user: a budget is never loosened here.
+- [x] **Step 1: Run** `cargo xtask perf` — expect: every gated line within budget, including `idle_wakeups_per_s` ≤ 1/s, `menu_open_after_launch_ms` ≤ 80 and `menu_reopen_ms` ≤ 50. `regression check skipped: no baseline` is expected while `perf-baseline.json` is absent.
+- [x] **Step 2: Record** the printed values in the task report. A missed budget stops the plan and goes to the user: a budget is never loosened here.
 
 _Requirements: KCONTRACT-7.1_
