@@ -86,20 +86,27 @@ public struct CascadeState: Sendable {
     }
 
     private mutating func handlePointerLeft(_ row: String) -> [CascadeEffect] {
-        pendingRow = nil
         if selection == row, openPath.contains(row) == false {
             selection = nil
         }
+        guard pendingRow == row else { return [] }
+        pendingRow = nil
         return [.cancelHoverTimer]
     }
 
     private mutating func handleClick(_ row: String) -> [CascadeEffect] {
-        guard let node = node(id: row) else { return [] }
-        if node.children.isEmpty == false {
-            return apply(row, shouldOpen: mayOpen(node))
+        var effects: [CascadeEffect] = []
+        if pendingRow != nil {
+            pendingRow = nil
+            effects.append(.cancelHoverTimer)
         }
-        guard isActionable(node) else { return [] }
-        var effects = apply(row, shouldOpen: false)
+        guard let node = node(id: row) else { return effects }
+        if node.children.isEmpty == false {
+            effects.append(contentsOf: apply(row, shouldOpen: mayOpen(node)))
+            return effects
+        }
+        guard isActionable(node) else { return effects }
+        effects.append(contentsOf: apply(row, shouldOpen: false))
         effects.append(.activate(row: row))
         return effects
     }
