@@ -5,9 +5,9 @@ Date: 2026-11-01
 
 ## Purpose and boundary
 
-The trust boundaries of Navori, the threats that cross them, and how each is mitigated — for a single-user, local-first macOS app that observes almost everything the user does and can act on the machine and on GitHub through an AI agent. The asset that matters most is the user's secrets and machine state; the second is the integrity of actions taken on the user's behalf.
+The trust boundaries of Navori, the threats that cross them, and how each is mitigated — for a single-user, local-first macOS app that observes almost everything the user does and can act on the machine, on GitHub and on the user's Connected accounts through an AI agent. The asset that matters most is the user's secrets and machine state; the second is the integrity of actions taken on the user's behalf.
 
-In scope: the app, its CLI, its local storage, and every path data or commands take in or out (`docs/architecture/integrations.md`). Out of scope: macOS itself, the security of the cloud providers and GitHub, physical access to an unlocked Mac, and anything already running as the user with full privileges (see accepted risks). Mitigations marked *(planned, Rn)* arrive with that release and must exist before it ships.
+In scope: the app, its CLI, its local storage, and every path data or commands take in or out (`docs/architecture/integrations.md`). Out of scope: macOS itself, the security of the cloud providers, GitHub and the services behind Connected accounts, physical access to an unlocked Mac, and anything already running as the user with full privileges (see accepted risks). Mitigations marked *(planned, Rn)* arrive with that release and must exist before it ships.
 
 ## Trust boundaries
 
@@ -18,6 +18,7 @@ In scope: the app, its CLI, its local storage, and every path data or commands t
 - **TB-5** External MCP servers whose tools Navori's agent may call.
 - **TB-6** Navori's data at rest on disk: database, Journal, backups, logs, config and session marker.
 - **TB-7** Configuration files of other tools that Navori writes into, such as the harness hook files.
+- **TB-8** The services behind Connected accounts: user data leaving the Mac for them, and content arriving from them that other people wrote.
 
 ## Threats
 
@@ -31,6 +32,8 @@ In scope: the app, its CLI, its local storage, and every path data or commands t
 - **THR-8** A malicious or compromised external MCP server (TB-5) returns poisoned tool results or advertises a harmful tool.
 - **THR-9** Installing or repairing hooks corrupts or removes the user's existing configuration in another tool (TB-7).
 - **THR-10** Context leaves the machine through a path other than the Context Gateway, bypassing redaction and the audit log.
+- **THR-11** A stranger's mail or message arriving through TB-8 carries hidden instructions that reach Navori AI with no action by the user, steering it to read other private content or act on the user's behalf.
+- **THR-12** Navori AI sends mail or a message to another person as the user — wrong recipient, wrong content or exfiltrated data — which cannot be taken back.
 
 ## Mitigations (prose)
 
@@ -44,6 +47,9 @@ In scope: the app, its CLI, its local storage, and every path data or commands t
 - **THR-8 at TB-5** — tools from external MCP servers default to `Risk::Write` and go through the same approval policy; their descriptions and results are treated as untrusted observed content (THR-2) *(planned, R6)*.
 - **THR-9 at TB-7** — hook installation backs up the target file first and merges only Navori's entries, never removing others; `navori doctor` verifies them *(planned, R1)*.
 - **THR-10 at TB-1** — data may leave only through the Context Gateway or a module's declared API client (ARCH-7); `ai/context` and `ai/memory` must depend on `navori-redact`, and feature Modules cannot import the AI crates (`docs/codebase/dependencies.md`).
+- **THR-11 at TB-8** — content from a Connected account is untrusted observed content: it passes the Shield and reaches the model as data under the THR-2 rules, and a turn started by incoming content cannot run a `Write` or `Destructive` Action without asking, even when that Action is allowlisted *(planned, before the first such service ships)*.
+- **THR-12 at TB-8** — an Action that sends content to another person is `Destructive`, so it always becomes a Decision showing the recipient and the content (ARCH-5). An MCP tool defaults to `Write` (THR-8), so the user raises its sending tools to `Destructive` when adding the server *(planned, before the first such service ships)*.
+- **Connected account credentials** — they follow THR-7 (ARCH-8), request the narrowest scope the service offers, and can be revoked from Settings *(planned, before the first such service ships)*.
 - **Supply chain** — `Cargo.lock` is committed, dependencies are declared once and updated deliberately (`cargo xtask outdated`), and the release is signed with a stable local identity.
 
 **Accepted risks** (single user, local-first):

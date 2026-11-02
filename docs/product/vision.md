@@ -5,7 +5,7 @@ Date: 2026-11-01
 
 ## Problem
 
-Everyday work on a Mac — including coding with several Harnesses in parallel across projects and worktrees — is split across many apps, tabs and single-purpose menubar utilities. The Mac sleeps mid-run and stalls an Agent session; orphaned dev servers hold ports; pull-request pressure and CI failures sit scattered on GitHub; and no assistant sees the whole picture, so nothing tells the user "this is what needs your decision now" or helps proactively. Each fix today is another utility that costs memory, wake-ups and attention.
+Everyday work on a Mac — including coding with several Harnesses in parallel across projects and worktrees — is split across many apps, tabs and single-purpose menubar utilities. The Mac sleeps mid-run and stalls an Agent session; orphaned dev servers hold ports; pull-request pressure and CI failures sit scattered on GitHub; mail and chat that need an answer sit in yet more apps; and no assistant sees the whole picture, so nothing tells the user "this is what needs your decision now" or helps proactively. Each fix today is another utility that costs memory, wake-ups and attention.
 
 ## Users
 
@@ -26,6 +26,7 @@ Later, when open-sourced, other developers may install it themselves for their o
 - **GOAL-8** Every release ships one complete capability that meets the Definition of Done and is used daily by the user for at least 3 days without a blocking defect.
 - **GOAL-9** Navori AI proactively puts Decisions and Updates into Needs you when it is worth the interruption (CI failed, an Agent session finished, a port conflict), within a daily token budget and quiet hours.
 - **GOAL-10** Claude Code, Grok Build and Codex can call Navori's tools over MCP, under the same approval policy as Navori's own AI.
+- **GOAL-12** The user can connect their own accounts on external services beyond GitHub (such as Gmail, Slack and Telegram) and revoke each one from Settings; what needs the user from them reaches Needs you, and Navori AI reads and acts on them through the same Actions and approval policy as every Module.
 
 ## Non-goals
 
@@ -34,7 +35,7 @@ Later, when open-sourced, other developers may install it themselves for their o
 - Windows, Linux, or Intel Macs.
 - Keeping the Mac running with the lid closed (needs a privileged root helper).
 - Letting the AI perform a `Destructive` action without approval.
-- Telemetry, analytics, or any Navori-owned account or server — the only network calls go to GitHub and the AI providers the user configures.
+- Telemetry, analytics, or any Navori-owned account or server — the only network calls go to GitHub, the AI providers the user configures and the external services the user explicitly connects (a Connected account or an MCP server).
 - Distributing builds to other people for now.
 
 ## Scope boundaries
@@ -44,6 +45,7 @@ Later, when open-sourced, other developers may install it themselves for their o
   - Open source: choose a license (the workspace is `UNLICENSED` today), Developer ID signing + notarization, a Homebrew cask, a download page, auto-update.
   - "Life" utility modules beyond the developer workflow (calendar, notes, clipboard…) — each must pass a check against this vision before it is planned.
   - Multiple GitHub accounts.
+  - Connected accounts beyond GitHub (Gmail, Slack, Telegram…): direction accepted in ADR 0005, not yet scheduled. Reach each service through the MCP client (R6) first; build a native Module only when the service must be counted in the menubar or trigger proactively.
 - **Hard constraints:**
   - Local-first: no Navori server; data leaves the machine only through the Context Gateway or a module's declared API client.
   - Navori's secrets live only in the macOS Keychain.

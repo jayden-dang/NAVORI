@@ -160,4 +160,8 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 
 ## Goal dispositions
 
-None — every live `GOAL-N` in `docs/product/vision.md` (GOAL-1 … GOAL-11, except the superseded GOAL-7) is cited by a milestone.
+Every live `GOAL-N` in `docs/product/vision.md` that no milestone cites belongs here, so that a goal is never silently dropped (S6).
+
+| Goal | Disposition | Date | Reason |
+|---|---|---|---|
+| GOAL-12 | Deferred | 2026-11-02 | Returns when Navori AI, Needs you and the MCP client (ROAD-14, ROAD-13, ROAD-25) exist and the user picks the first service beyond GitHub (ADR 0005). |

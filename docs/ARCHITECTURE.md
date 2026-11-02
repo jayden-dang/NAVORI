@@ -320,7 +320,7 @@ Out of scope (decided): staying awake with the lid closed.
 
 - **Inbox**: Needs my review · My PRs · Involved. Per PR: repo, #, title, draft, review decision, CI rollup, mergeable, labels, updated.
 - **Auth — OAuth App + Device Flow** (a long-term decision, not a temporary one; see ADR 0002 in `docs/adr/`). Scopes: `repo`, `read:org`, `notifications`, `workflow`. No client secret, no redirect server — the same way `gh auth login` works. Token → Keychain.
-  - Multiple accounts (personal + work) supported from day one: tokens are keyed by `account_id`.
+  - One account for now (multiple accounts are deferred, ROAD-26): tokens are still keyed by `account_id`, so adding a second account needs no migration.
   - Orgs with SAML SSO: guidance to authorize the token for the org inside the app; orgs that block OAuth Apps: send an approval request, or use a PAT (classic) as the fallback.
   - A `TokenProvider` trait (`OAuthDevice`, `ClassicPat`) reserves room for other methods without changing the module.
 - **Data**: a single GraphQL request (3 aliased search queries) via `reqwest` + `graphql_client`; track rate-limit headers; SQLite cache → opening the app shows data immediately.

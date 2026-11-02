@@ -124,6 +124,11 @@ Navori's entries installed into another tool's config — today a Harness's hook
 MCP server entry — installed, repaired and removed from Settings → Integrations.
 _Avoid_: plugin, extension, connector
 
+**Connected account**:
+The user's own account on an external service (GitHub, Gmail, Slack…) that Navori may reach
+with the user's authorization and that the user can revoke.
+_Avoid_: connector, connection, integration, linked account
+
 ### Privacy
 
 **Sensitive Data Shield**:
