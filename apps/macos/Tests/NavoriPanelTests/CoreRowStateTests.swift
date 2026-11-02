@@ -30,4 +30,11 @@ struct CoreRowStateTests {
             #expect(ModuleDot.color(state: state) == expected)
         }
     }
+
+    @Test func each_health_maps_to_the_core_row_status() {
+        #expect(CoreStatus(health: .starting) == .starting)
+        #expect(CoreStatus(health: .ok) == .running)
+        #expect(CoreStatus(health: .degraded) == .needsAttention)
+        #expect(CoreStatus(health: .down) == .notRunning)
+    }
 }

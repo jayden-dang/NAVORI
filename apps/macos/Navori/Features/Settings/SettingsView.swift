@@ -1,5 +1,4 @@
 import AppKit
-import NavoriCore
 import Observation
 import SwiftUI
 

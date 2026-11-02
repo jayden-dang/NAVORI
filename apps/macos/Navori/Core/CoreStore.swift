@@ -107,10 +107,10 @@ final class CoreStore {
 
     var coreStatus: CoreStatus {
         switch health {
-        case .starting: .starting
-        case .ok: .running
-        case .degraded: .needsAttention
-        case .down: .notRunning
+        case .starting: CoreStatus(health: .starting)
+        case .ok: CoreStatus(health: .ok)
+        case .degraded: CoreStatus(health: .degraded)
+        case .down: CoreStatus(health: .down)
         }
     }
 

@@ -160,7 +160,7 @@ private struct PreviewRootView: View {
 private struct PreviewTintRow: View {
     let setTint: (NSColor) -> Void
     @Environment(\.colorScheme) private var colorScheme
-    @State private var percent: Double = 65
+    @State private var percent: Double = 69
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -180,7 +180,7 @@ private struct PreviewTintRow: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .onAppear {
-            percent = colorScheme == .dark ? 65 : 55
+            percent = colorScheme == .dark ? 69 : 57
             apply(percent)
         }
         .onChange(of: percent) { _, value in

@@ -17,6 +17,8 @@ final class GlassSurfaceView: NSView {
     private let content: NSView
     private var showingOpaque = false
     private var didApply = false
+    private var glassEdges: [NSLayoutConstraint] = []
+    private var contentEdges: [NSLayoutConstraint] = []
     private var observer: (any NSObjectProtocol)?
 
     init(content: NSView) {
@@ -89,13 +91,8 @@ final class GlassSurfaceView: NSView {
         }
         if glass.superview !== self {
             addSubview(glass)
-            NSLayoutConstraint.activate([
-                glass.leadingAnchor.constraint(equalTo: leadingAnchor),
-                glass.trailingAnchor.constraint(equalTo: trailingAnchor),
-                glass.topAnchor.constraint(equalTo: topAnchor),
-                glass.bottomAnchor.constraint(equalTo: bottomAnchor),
-            ])
         }
+        replace(&glassEdges, pinning: glass, to: self)
         pin(content, to: glass)
         glass.isHidden = false
     }
@@ -112,12 +109,22 @@ final class GlassSurfaceView: NSView {
     }
 
     private func pin(_ child: NSView, to parent: NSView) {
-        NSLayoutConstraint.activate([
+        replace(&contentEdges, pinning: child, to: parent)
+    }
+
+    private func replace(
+        _ stored: inout [NSLayoutConstraint],
+        pinning child: NSView,
+        to parent: NSView
+    ) {
+        NSLayoutConstraint.deactivate(stored)
+        stored = [
             child.leadingAnchor.constraint(equalTo: parent.leadingAnchor),
             child.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
             child.topAnchor.constraint(equalTo: parent.topAnchor),
             child.bottomAnchor.constraint(equalTo: parent.bottomAnchor),
-        ])
+        ]
+        NSLayoutConstraint.activate(stored)
     }
 
 }

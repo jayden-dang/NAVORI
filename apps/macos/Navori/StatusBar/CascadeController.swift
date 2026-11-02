@@ -61,7 +61,7 @@ final class CascadeController {
     }
 
     func setRowFrame(_ row: String, _ frameInPanel: CGRect) {
-        rowFrames[row] = screenFrame(fromSwiftUI: frameInPanel)
+        rowFrames[row] = screenFrame(fromSwiftUI: frameInPanel, row: row)
         if state.openPath.contains(row) {
             schedulePlace(row)
         }
@@ -72,6 +72,10 @@ final class CascadeController {
     }
 
     func open(_ row: String, onFirstFrame: (@MainActor () -> Void)? = nil) {
+        guard panel?.isOpen == true else {
+            log.error("submenu open for \(row, privacy: .public) has no panel presented")
+            return
+        }
         pendingFirstFrame = onFirstFrame
         if state.openPath.contains(row) {
             presentSubmenu(row)
@@ -79,6 +83,7 @@ final class CascadeController {
         }
         apply(state.handle(.click(row: row)))
         if pendingFirstFrame != nil {
+            log.error("submenu open for \(row, privacy: .public) presented no panel")
             pendingFirstFrame = nil
         }
     }
@@ -199,11 +204,21 @@ final class CascadeController {
     }
 
     private func frameForSubmenu(_ row: String, child: CascadePanel) -> CGRect {
-        let parentFrame = panel?.frame ?? .zero
-        let rowFrame = rowFrames[row] ?? parentFrame
+        let depth = (state.openPath.firstIndex(of: row) ?? 0) + 1
+        var ancestors: [CGRect] = []
+        if depth > 1 {
+            for level in 1..<depth {
+                if let ancestor = panels[level] {
+                    ancestors.append(ancestor.frame)
+                }
+            }
+        }
+        let levelZero = panel?.frame ?? .zero
+        let rowFrame = rowFrames[row] ?? ancestors.last ?? levelZero
         let visible = panel?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
-        return CascadePlacement.frame(
-            parent: parentFrame,
+        return CascadePlacement.submenuFrame(
+            levelZero: levelZero,
+            ancestorFrames: ancestors,
             row: rowFrame,
             size: child.idealSize,
             visible: visible
@@ -230,15 +245,34 @@ final class CascadeController {
         return child.frame
     }
 
-    private func screenFrame(fromSwiftUI rect: CGRect) -> CGRect {
-        guard let panel else { return rect }
+    private func screenFrame(fromSwiftUI rect: CGRect, row: String) -> CGRect {
+        guard let owner = window(containing: row) else { return rect }
         let windowRect = CGRect(
             x: rect.origin.x,
-            y: panel.frame.height - rect.origin.y - rect.height,
+            y: owner.frame.height - rect.origin.y - rect.height,
             width: rect.width,
             height: rect.height
         )
-        return panel.convertToScreen(windowRect)
+        return owner.convertToScreen(windowRect)
+    }
+
+    private func window(containing row: String) -> NSWindow? {
+        guard let depth = treeDepth(of: row) else { return panel }
+        if depth == 0 { return panel }
+        return panels[depth] ?? panel
+    }
+
+    private func treeDepth(of row: String) -> Int? {
+        func search(_ nodes: [CascadeNode], depth: Int) -> Int? {
+            for node in nodes {
+                if node.id == row { return depth }
+                if let found = search(node.children, depth: depth + 1) {
+                    return found
+                }
+            }
+            return nil
+        }
+        return search(tree(), depth: 0)
     }
 
     private func armHoverTimer() {

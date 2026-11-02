@@ -60,4 +60,39 @@ struct CascadePlacementTests {
         )
         #expect(frame == CGRect(x: 1364, y: 0, width: 360, height: 900))
     }
+
+    @Test func a_third_panel_opens_beside_its_parent_not_level_zero() {
+        let visible = CGRect(x: 0, y: 0, width: 1800, height: 900)
+        let levelZero = CGRect(x: 100, y: 400, width: 360, height: 300)
+        let parent = CGRect(x: 464, y: 450, width: 360, height: 200)
+        let row = CGRect(x: 464, y: 572, width: 360, height: 28)
+        let size = CGSize(width: 360, height: 180)
+        let third = CascadePlacement.submenuFrame(
+            levelZero: levelZero,
+            ancestorFrames: [parent],
+            row: row,
+            size: size,
+            visible: visible
+        )
+        let againstLevelZero = CascadePlacement.frame(
+            parent: levelZero,
+            row: row,
+            size: size,
+            visible: visible
+        )
+        #expect(third == CGRect(x: 828, y: 420, width: 360, height: 180))
+        #expect(third != againstLevelZero)
+    }
+
+    @Test func a_level_zero_panel_that_fits_keeps_its_fitting_height() {
+        #expect(CascadePlacement.levelZeroHeight(fitting: 180, visibleHeight: 900) == 180)
+    }
+
+    @Test func a_level_zero_panel_taller_than_the_visible_frame_uses_that_height() {
+        #expect(CascadePlacement.levelZeroHeight(fitting: 1400, visibleHeight: 400) == 400)
+    }
+
+    @Test func a_level_zero_panel_is_not_given_a_two_hundred_point_floor() {
+        #expect(CascadePlacement.levelZeroHeight(fitting: 36, visibleHeight: 900) == 36)
+    }
 }

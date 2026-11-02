@@ -23,4 +23,23 @@ public enum CascadePlacement {
         }
         return CGRect(x: x, y: y, width: size.width, height: height)
     }
+
+    public static func submenuFrame(
+        levelZero: CGRect,
+        ancestorFrames: [CGRect],
+        row: CGRect,
+        size: CGSize,
+        visible: CGRect
+    ) -> CGRect {
+        frame(
+            parent: ancestorFrames.last ?? levelZero,
+            row: row,
+            size: size,
+            visible: visible
+        )
+    }
+
+    public static func levelZeroHeight(fitting: CGFloat, visibleHeight: CGFloat) -> CGFloat {
+        min(max(fitting, 1), max(visibleHeight, 1))
+    }
 }

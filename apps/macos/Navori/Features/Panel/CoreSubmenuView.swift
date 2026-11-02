@@ -89,10 +89,9 @@ private struct ActivitySection: View {
             } else {
                 ForEach(Array(events.prefix(8))) { event in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Image(systemName: icon(event.severity))
-                            .foregroundStyle(tint(event.severity))
-                            .font(.system(size: 12))
-                            .frame(width: 12)
+                        Circle()
+                            .fill(Color(nsColor: .secondaryLabelColor))
+                            .frame(width: 7, height: 7)
                         Text(event.summary)
                             .font(.system(size: 13))
                             .foregroundStyle(Color(nsColor: .labelColor))
@@ -104,26 +103,16 @@ private struct ActivitySection: View {
                     }
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(event.summary)
-                    .accessibilityValue(Self.relative(event.tsMs))
+                    .accessibilityValue(spoken(event))
                 }
             }
         }
     }
 
-    private func icon(_ severity: String) -> String {
-        switch severity {
-        case "error": "xmark.octagon.fill"
-        case "warn": "exclamationmark.triangle.fill"
-        default: "circle.fill"
-        }
-    }
-
-    private func tint(_ severity: String) -> Color {
-        switch severity {
-        case "error": Color(nsColor: .systemRed)
-        case "warn": Color(nsColor: .systemOrange)
-        default: Color(nsColor: .secondaryLabelColor)
-        }
+    private func spoken(_ event: EventRow) -> String {
+        let age = Self.relative(event.tsMs)
+        guard event.severity.isEmpty == false else { return age }
+        return "\(event.severity), \(age)"
     }
 
     private static func relative(_ ms: Int64) -> String {

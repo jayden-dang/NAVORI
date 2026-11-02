@@ -14,21 +14,40 @@ final class StatusPanel: NSPanel {
     private var frameLink: CADisplayLink?
     private var frameCallback: (@MainActor () -> Void)?
     private var refitPending = false
+    private var measuring = false
     /// Exact-once flag. `super.close()` can re-enter through `resignKey`.
     private(set) var isOpen = false
     /// Extra click can resign key (async close) then fire `toggle` and reopen.
     private var closedAt: CFTimeInterval = 0
     private static let width: CGFloat = 360
-    private static let maxHeight: CGFloat = 560
+    private let hosting: MenuHostingView<AnyView>
+    private let scroll: NSScrollView
 
     init(content: CascadeContent, onVisibility: @escaping (Bool) -> Void) {
         self.content = content
         self.onVisibility = onVisibility
-        self.cascade = CascadeController(
+        let cascade = CascadeController(
             tree: content.tree,
             submenu: content.submenu,
             activate: content.activate
         )
+        self.cascade = cascade
+        let hosting = MenuHostingView(rootView: AnyView(content.root.environment(cascade)))
+        hosting.sizingOptions = [.intrinsicContentSize]
+        self.hosting = hosting
+        let clip = LevelZeroClipView()
+        clip.drawsBackground = false
+        let scroll = NSScrollView()
+        scroll.contentView = clip
+        scroll.drawsBackground = false
+        scroll.backgroundColor = .clear
+        scroll.borderType = .noBorder
+        scroll.hasVerticalScroller = true
+        scroll.hasHorizontalScroller = false
+        scroll.autohidesScrollers = true
+        scroll.automaticallyAdjustsContentInsets = false
+        scroll.documentView = hosting
+        self.scroll = scroll
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: Self.width, height: 420),
             styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
@@ -47,12 +66,11 @@ final class StatusPanel: NSPanel {
         hasShadow = true
         animationBehavior = .utilityWindow
 
-        let hosting = MenuHostingView(rootView: self.content.root.environment(self.cascade))
-        hosting.sizingOptions = [.intrinsicContentSize]
         hosting.onFittingSizeChange = { [weak self] in
-            self?.scheduleRefit()
+            guard let self, !self.measuring else { return }
+            self.scheduleRefit()
         }
-        contentView = GlassSurfaceView(content: hosting)
+        contentView = GlassSurfaceView(content: scroll)
     }
 
     override var canBecomeKey: Bool { true }
@@ -77,23 +95,29 @@ final class StatusPanel: NSPanel {
     func show(relativeTo button: NSStatusBarButton, onFirstFrame: (@MainActor () -> Void)? = nil) {
         cascade.reset()
         guard let buttonWindow = button.window else { return }
-        contentView?.layoutSubtreeIfNeeded()
-        let height = fittedHeight()
         let anchor = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let screen = buttonWindow.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        let height = fittedHeight(visibleHeight: screen.height)
 
         var x = anchor.midX - Self.width / 2
         x = min(max(x, screen.minX + 8), screen.maxX - Self.width - 8)
         let y = anchor.minY - height - 6
-        var frame = NSRect(x: x, y: y, width: Self.width, height: height)
+        var frame = clampVertically(
+            NSRect(x: x, y: y, width: Self.width, height: height),
+            to: screen
+        )
         // A signal-opened button can report a window that is not the menu-bar slot.
         // A click whose button has a real on-screen frame keeps this anchor.
         let anchoredMissesScreens = !NSScreen.screens.contains { $0.frame.intersects(frame) }
         if buttonWindow.screen == nil || button.bounds.height < 1 || anchoredMissesScreens,
            let visible = NSScreen.main?.visibleFrame {
+            let fitted = fittedHeight(visibleHeight: visible.height)
             var fx = anchor.midX - Self.width / 2
             fx = min(max(fx, visible.minX + 8), visible.maxX - Self.width - 8)
-            frame = NSRect(x: fx, y: visible.maxY - height - 6, width: Self.width, height: height)
+            frame = clampVertically(
+                NSRect(x: fx, y: visible.maxY - fitted - 6, width: Self.width, height: fitted),
+                to: visible
+            )
         }
         setFrame(frame, display: true)
         scheduleRefit()
@@ -163,9 +187,38 @@ final class StatusPanel: NSPanel {
         }
     }
 
-    private func fittedHeight() -> CGFloat {
-        let fitting = contentView?.fittingSize.height ?? 420
-        return min(max(fitting, 1), Self.maxHeight)
+    private func fittedHeight(visibleHeight: CGFloat) -> CGFloat {
+        layoutDocument()
+        let limit = visibleHeight > 1 ? visibleHeight : contentFittingHeight()
+        return CascadePlacement.levelZeroHeight(
+            fitting: contentFittingHeight(),
+            visibleHeight: limit
+        )
+    }
+
+    private func contentFittingHeight() -> CGFloat {
+        measuring = true
+        defer { measuring = false }
+        hosting.invalidateIntrinsicContentSize()
+        hosting.layoutSubtreeIfNeeded()
+        return max(hosting.fittingSize.height, 1)
+    }
+
+    private func layoutDocument() {
+        let height = contentFittingHeight()
+        hosting.frame = NSRect(x: 0, y: 0, width: Self.width, height: height)
+    }
+
+    private func clampVertically(_ frame: NSRect, to visible: CGRect) -> NSRect {
+        guard visible.height > 1 else { return frame }
+        var next = frame
+        if next.minY < visible.minY {
+            next.origin.y = visible.minY
+        }
+        if next.maxY > visible.maxY {
+            next.size.height = max(visible.maxY - next.minY, 1)
+        }
+        return next
     }
 
     private func scheduleRefit() {
@@ -180,11 +233,13 @@ final class StatusPanel: NSPanel {
 
     private func refitKeepingTop() {
         guard isVisible else { return }
-        let height = fittedHeight()
+        let visible = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        let height = fittedHeight(visibleHeight: visible.height)
         guard abs(height - frame.height) > 0.5 else { return }
         var next = frame
         next.origin.y = frame.maxY - height
         next.size.height = height
+        next = clampVertically(next, to: visible)
         setFrame(next, display: true)
     }
 
@@ -275,6 +330,10 @@ final class StatusPanel: NSPanel {
         }
         cascade.click(id)
     }
+}
+
+private final class LevelZeroClipView: NSClipView {
+    override var isFlipped: Bool { true }
 }
 
 private final class MenuHostingView<Content: View>: NSHostingView<Content> {

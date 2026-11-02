@@ -2,8 +2,21 @@ public enum StatusDot: Equatable, Sendable {
     case green, yellow, orange, red, gray
 }
 
-public enum CoreStatus: Sendable {
+public enum CoreHealth: Sendable {
+    case starting, ok, degraded, down
+}
+
+public enum CoreStatus: Equatable, Sendable {
     case starting, running, needsAttention, notRunning
+
+    public init(health: CoreHealth) {
+        switch health {
+        case .starting: self = .starting
+        case .ok: self = .running
+        case .degraded: self = .needsAttention
+        case .down: self = .notRunning
+        }
+    }
 }
 
 public struct CoreRowState: Equatable, Sendable {

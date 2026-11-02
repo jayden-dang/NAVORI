@@ -38,7 +38,7 @@ struct PanelView: View {
         let state = CoreRowState(status: store.coreStatus)
         return MenuRow(
             id: "core",
-            icon: nil,
+            icon: "sparkle",
             title: "Core",
             value: state.label,
             dot: state.dot,
