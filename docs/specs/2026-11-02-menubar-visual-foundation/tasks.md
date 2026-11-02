@@ -406,10 +406,10 @@ _Requirements: MENU-3.1, MENU-3.3, MENU-3.4, MENU-3.5, MENU-3.6, MENU-3.7, MENU-
 
 **Depends-on:** Task 12
 
-- [ ] **Step 1: Implement** the close order: return if `!isOpen`; `isOpen = false`; `cascade.reset()`; `onVisibility(false)`; `super.close()`. `show` sets `isOpen = true` and calls `onVisibility(true)` once. `toggle` reads `isOpen`, not `isVisible`. The timer closure does nothing when `isOpen` is false. `closeAll` calls `close()`. The outside-click policy gets `cascade.openFrames`.
-- [ ] **Step 2: Temporarily log** each `onVisibility` call in the dev build. Run `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand** that each path logs exactly one `true` then one `false`, with a Submenu open each time: click outside; click the status button; click inside the Submenu (nothing closes); switch app; right-click the status item; `Settings…`; Esc from level 0. A click on the status button does not reopen it. Closing with the hover timer armed opens nothing afterward. Remove the log.
-- [ ] **Step 4: Commit** `git commit -m "fix(shell): close the whole cascade once on every path"`
+- [x] **Step 1: Implement** the close order: return if `!isOpen`; `isOpen = false`; `cascade.reset()`; `onVisibility(false)`; `super.close()`. `show` sets `isOpen = true` and calls `onVisibility(true)` once. `toggle` reads `isOpen`, not `isVisible`. The timer closure does nothing when `isOpen` is false. `closeAll` calls `close()`. The outside-click policy gets `cascade.openFrames`.
+- [x] **Step 2: Temporarily log** each `onVisibility` call in the dev build. Run `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand** that each path logs exactly one `true` then one `false`, with a Submenu open each time: click outside; click the status button; click inside the Submenu (nothing closes); switch app; right-click the status item; `Settings…`; Esc from level 0. A click on the status button does not reopen it. Closing with the hover timer armed opens nothing afterward. Remove the log.
+- [x] **Step 4: Commit** `git commit -m "fix(shell): close the whole cascade once on every path"`
 
 _Requirements: MENU-4.9, MENU-4.10, MENU-4.11, MENU-4.12, MENU-4.13, MENU-4.14, MENU-4.15, MENU-G6_
 
