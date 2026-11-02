@@ -37,6 +37,7 @@ impl LeaseKey {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LeaseSource {
     Duration { started: SystemTime },
+    UntilOff,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,22 +74,42 @@ pub struct Wants {
 }
 
 #[derive(Debug, Clone)]
-struct DurationLease {
-    started: SystemTime,
-    deadline: SystemTime,
+enum Manual {
+    Duration {
+        started: SystemTime,
+        deadline: SystemTime,
+    },
+    UntilOff {
+        started: SystemTime,
+    },
+}
+
+impl Manual {
+    fn started(&self) -> SystemTime {
+        match *self {
+            Self::Duration { started, .. } | Self::UntilOff { started } => started,
+        }
+    }
+
+    fn deadline(&self) -> Option<SystemTime> {
+        match *self {
+            Self::Duration { deadline, .. } => Some(deadline),
+            Self::UntilOff { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct LeaseTable {
     timing: Timing,
-    duration: Option<DurationLease>,
+    manual: Option<Manual>,
 }
 
 impl LeaseTable {
     pub fn new(timing: Timing) -> Self {
         Self {
             timing,
-            duration: None,
+            manual: None,
         }
     }
 
@@ -97,15 +118,22 @@ impl LeaseTable {
     }
 
     pub(crate) fn hold_for(&mut self, started: SystemTime, deadline: SystemTime) -> Option<Ended> {
-        let previous = self.duration.replace(DurationLease { started, deadline });
-        previous.map(|lease| Ended {
+        self.replace_manual(Manual::Duration { started, deadline })
+    }
+
+    pub(crate) fn hold_until_off(&mut self, started: SystemTime) -> Option<Ended> {
+        self.replace_manual(Manual::UntilOff { started })
+    }
+
+    fn replace_manual(&mut self, next: Manual) -> Option<Ended> {
+        self.manual.replace(next).map(|lease| Ended {
             lease: to_lease(&lease),
             reason: EndReason::Replaced,
         })
     }
 
     pub(crate) fn release_all(&mut self) -> Vec<Ended> {
-        self.duration
+        self.manual
             .take()
             .into_iter()
             .map(|lease| Ended {
@@ -118,10 +146,11 @@ impl LeaseTable {
     pub fn settle(&mut self, now: SystemTime) -> Settled {
         let mut ended = Vec::new();
         let due = self
-            .duration
+            .manual
             .as_ref()
-            .is_some_and(|lease| now >= lease.deadline);
-        if due && let Some(lease) = self.duration.take() {
+            .and_then(Manual::deadline)
+            .is_some_and(|deadline| now >= deadline);
+        if due && let Some(lease) = self.manual.take() {
             ended.push(Ended {
                 lease: to_lease(&lease),
                 reason: EndReason::Deadline,
@@ -135,54 +164,75 @@ impl LeaseTable {
 
     pub fn wants(&self) -> Wants {
         Wants {
-            system: self.duration.is_some(),
+            system: self.manual.is_some(),
             display: false,
         }
     }
 
     pub(crate) fn next_deadline(&self) -> Option<SystemTime> {
-        self.duration.as_ref().map(|lease| lease.deadline)
+        self.manual.as_ref().and_then(Manual::deadline)
     }
 
     pub(crate) fn snapshot(&self, system_held: bool, display_held: bool) -> AwakeState {
         let leases = self
-            .duration
-            .iter()
-            .map(|lease| LeaseState {
-                key: LeaseKey::Manual.as_str().to_owned(),
-                kind: "duration".to_owned(),
-                harness: None,
-                label: hour_label(lease),
-                pid: None,
-                stopped: false,
-                ends_at_ms: Some(wall_ms(lease.deadline)),
+            .manual
+            .as_ref()
+            .map(|lease| match lease {
+                Manual::Duration { deadline, .. } => LeaseState {
+                    key: LeaseKey::Manual.as_str().to_owned(),
+                    kind: "duration".to_owned(),
+                    harness: None,
+                    label: manual_label(lease),
+                    pid: None,
+                    stopped: false,
+                    ends_at_ms: Some(wall_ms(*deadline)),
+                },
+                Manual::UntilOff { .. } => LeaseState {
+                    key: LeaseKey::Manual.as_str().to_owned(),
+                    kind: "until_off".to_owned(),
+                    harness: None,
+                    label: manual_label(lease),
+                    pid: None,
+                    stopped: false,
+                    ends_at_ms: None,
+                },
             })
+            .into_iter()
             .collect();
         AwakeState {
             leases,
             system_held,
             display_held,
-            since_ms: self.duration.as_ref().map(|lease| wall_ms(lease.started)),
+            since_ms: self.manual.as_ref().map(|lease| wall_ms(lease.started())),
             problem: None,
         }
     }
 }
 
-fn hour_label(lease: &DurationLease) -> Option<String> {
-    match lease.deadline.duration_since(lease.started) {
-        Ok(span) if span == Duration::from_secs(3_600) => Some("1 hour".to_owned()),
-        _ => None,
+fn manual_label(lease: &Manual) -> Option<String> {
+    match lease {
+        Manual::Duration { started, deadline } => match deadline.duration_since(*started) {
+            Ok(span) if span == Duration::from_secs(3_600) => Some("1 hour".to_owned()),
+            _ => None,
+        },
+        Manual::UntilOff { .. } => Some("Until off".to_owned()),
     }
 }
 
-fn to_lease(lease: &DurationLease) -> Lease {
-    Lease {
-        key: LeaseKey::Manual,
-        source: LeaseSource::Duration {
-            started: lease.started,
+fn to_lease(lease: &Manual) -> Lease {
+    match lease {
+        Manual::Duration { started, deadline } => Lease {
+            key: LeaseKey::Manual,
+            source: LeaseSource::Duration { started: *started },
+            deadline: Some(*deadline),
+            label: manual_label(lease),
         },
-        deadline: Some(lease.deadline),
-        label: hour_label(lease),
+        Manual::UntilOff { .. } => Lease {
+            key: LeaseKey::Manual,
+            source: LeaseSource::UntilOff,
+            deadline: None,
+            label: manual_label(lease),
+        },
     }
 }
 

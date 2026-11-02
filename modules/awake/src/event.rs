@@ -9,6 +9,10 @@ pub(crate) fn started(source: &str) -> String {
     format!("Keeping this Mac awake: {source}.")
 }
 
+pub(crate) fn until_off_source() -> &'static str {
+    "until off"
+}
+
 pub(crate) fn duration_source(seconds: u64) -> String {
     if seconds == HOUR {
         return "1 hour".to_owned();
