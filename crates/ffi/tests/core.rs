@@ -1,10 +1,14 @@
 //! NavoriCore driven from Rust exactly as Swift drives it: plain threads, no ambient runtime.
 #![allow(clippy::unwrap_used)]
 
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use navori_ffi::{CoreConfig, CoreError, CoreSnapshot, NavoriCore, SnapshotListener};
+use navori_config::{ConfigReport, JournalSweep, WholeFileReason};
+use navori_ffi::{
+    CheckView, ConfigNotice, CoreConfig, CoreError, CoreSnapshot, NavoriCore, SnapshotListener,
+};
 use navori_protocol::CoreStatus;
 use navori_protocol::rpc::method;
 
@@ -33,6 +37,12 @@ fn config(home: &tempfile::TempDir) -> CoreConfig {
         app_version: "0.1.0-test".into(),
         log_to_file: false,
     }
+}
+
+fn write_config(home: &tempfile::TempDir, body: &str) {
+    let data = home.path().join("Library/Application Support/Navori Dev");
+    std::fs::create_dir_all(&data).unwrap();
+    std::fs::write(data.join("config.toml"), body).unwrap();
 }
 
 fn start(home: &tempfile::TempDir) -> (Arc<NavoriCore>, Arc<Recorder>) {
@@ -68,7 +78,7 @@ fn starting_creates_the_profile_layout_and_reports_status() {
     );
     assert!(std::path::Path::new(&s.data_dir).join("navori.db").exists());
     assert!(std::path::Path::new(&s.socket_path).exists());
-    assert!(s.config_error.is_none());
+    assert!(s.config_notice.is_none());
     assert!(s.last_unclean_exit.is_none());
     eventually(|| {
         core.status()
@@ -159,16 +169,175 @@ fn the_ipc_socket_serves_core_status() {
 #[test]
 fn an_invalid_config_falls_back_to_defaults_and_is_reported() {
     let home = home();
+    write_config(&home, "log_level = 42\n");
+    let (core, _) = start(&home);
+    let notice = core
+        .status()
+        .config_notice
+        .expect("config notice must be surfaced");
+    assert!(notice.title.contains("config.toml"), "{}", notice.title);
+    assert!(notice.message.contains("log_level"), "{}", notice.message);
+    core.shutdown();
+}
+
+#[test]
+fn a_bad_value_is_named_and_does_not_claim_the_whole_file() {
+    let home = home();
+    write_config(&home, "log_level = \"loud\"\n");
+    let (core, _) = start(&home);
+    let notice = core.status().config_notice.expect("bad value is a notice");
+    assert_eq!(
+        notice,
+        ConfigNotice {
+            title: "config.toml has bad values".into(),
+            message: "log_level use their defaults. Fix them and reopen Navori.".into(),
+        }
+    );
+    core.shutdown();
+}
+
+#[test]
+fn a_bad_module_section_is_named() {
+    let file = Path::new("/tmp/nv/config.toml");
+    let alone = navori_ffi::config_notice(
+        &ConfigReport::Clean,
+        &JournalSweep::KeepDays(30),
+        &["awake"],
+        file,
+    )
+    .expect("a module section on its default is a notice");
+    assert_eq!(
+        alone,
+        ConfigNotice {
+            title: "config.toml has bad values".into(),
+            message: "awake use their defaults. Fix them and reopen Navori.".into(),
+        }
+    );
+
+    let both = navori_ffi::config_notice(
+        &ConfigReport::BadValues(vec!["log_level".into()]),
+        &JournalSweep::KeepDays(30),
+        &["awake"],
+        file,
+    )
+    .expect("a value and a module section are both named");
+    assert_eq!(
+        both.message,
+        "log_level, awake use their defaults. Fix them and reopen Navori."
+    );
+    assert!(!both.title.contains("is on defaults"));
+    assert!(!both.message.contains("is on defaults"));
+}
+
+#[test]
+fn invalid_toml_says_the_whole_file_is_on_defaults_and_names_it() {
+    let file = Path::new("/tmp/nv/config.toml");
+    let no_position = navori_ffi::config_notice(
+        &ConfigReport::WholeFile(WholeFileReason::NotToml { position: None }),
+        &JournalSweep::Paused,
+        &[],
+        file,
+    )
+    .expect("invalid toml is a notice");
+    assert_eq!(
+        no_position,
+        ConfigNotice {
+            title: "config.toml is on defaults".into(),
+            message: "Not valid TOML.".into(),
+        }
+    );
+
+    let positioned = navori_ffi::config_notice(
+        &ConfigReport::WholeFile(WholeFileReason::NotToml {
+            position: Some((3, 7)),
+        }),
+        &JournalSweep::Paused,
+        &[],
+        file,
+    )
+    .expect("a toml position is a notice");
+    assert_eq!(positioned.message, "Not valid TOML at line 3, column 7.");
+    assert_eq!(positioned.title, "config.toml is on defaults");
+
+    let home = home();
+    write_config(&home, "log_level = \n");
+    let (core, _) = start(&home);
+    let notice = core
+        .status()
+        .config_notice
+        .expect("broken toml is a notice");
+    assert_eq!(notice.title, "config.toml is on defaults");
+    assert!(
+        notice
+            .message
+            .starts_with("Not valid TOML at line 1, column "),
+        "{}",
+        notice.message
+    );
+    assert!(notice.message.ends_with('.'), "{}", notice.message);
+    assert!(!notice.message.contains("log_level"), "{}", notice.message);
+    assert!(!notice.message.contains("paused"), "{}", notice.message);
+    core.shutdown();
+}
+
+#[test]
+fn an_unreadable_file_says_it_cannot_be_read() {
+    let home = home();
     let data = home.path().join("Library/Application Support/Navori Dev");
     std::fs::create_dir_all(&data).unwrap();
-    std::fs::write(data.join("config.toml"), "log_level = 42\n").unwrap();
+    std::fs::create_dir(data.join("config.toml")).unwrap();
     let (core, _) = start(&home);
-    let err = core
+    let notice = core
         .status()
-        .config_error
-        .expect("config error must be surfaced");
-    assert!(err.contains("config.toml"), "{err}");
+        .config_notice
+        .expect("unreadable file is a notice");
+    assert_eq!(
+        notice,
+        ConfigNotice {
+            title: "config.toml is on defaults".into(),
+            message: "It cannot be read.".into(),
+        }
+    );
     core.shutdown();
+}
+
+#[test]
+fn doctor_fails_the_config_check_on_a_bad_value() {
+    let home = home();
+    write_config(&home, "log_level = \"loud\"\n");
+    let (core, _) = start(&home);
+    let check = config_check(&core);
+    assert!(!check.ok);
+    assert_eq!(
+        check.detail,
+        "config.toml has bad values. log_level use their defaults. Fix them and reopen Navori."
+    );
+    core.shutdown();
+}
+
+#[test]
+fn a_bad_value_does_not_stop_the_core() {
+    let home = home();
+    write_config(&home, "log_level = \"loud\"\n");
+    let (core, _) = start(&home);
+    assert!(core.status().config_notice.is_some());
+    let out =
+        futures::executor::block_on(core.dispatch("system".into(), "\"ping\"".into())).unwrap();
+    assert_eq!(out, "\"pong\"");
+    eventually(|| {
+        core.status()
+            .modules
+            .iter()
+            .any(|m| m.id == "system" && m.state == "running")
+    });
+    core.shutdown();
+}
+
+fn config_check(core: &NavoriCore) -> CheckView {
+    core.doctor()
+        .into_iter()
+        .find(|check| check.name == "config")
+        .unwrap()
 }
 
 #[test]

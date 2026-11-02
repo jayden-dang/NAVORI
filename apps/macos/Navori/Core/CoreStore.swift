@@ -88,8 +88,8 @@ final class CoreStore {
         if let restarting = snapshot.modules.first(where: { $0.state == "restarting" }) {
             return .degraded("\(restarting.id) is restarting")
         }
-        if let configError = snapshot.configError {
-            return .degraded("config.toml is invalid — using defaults. \(configError)")
+        if let notice = snapshot.configNotice {
+            return .degraded("\(notice.title). \(notice.message)")
         }
         return .ok
     }

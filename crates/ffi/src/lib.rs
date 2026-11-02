@@ -25,6 +25,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::app::{Inner, IpcBridge};
 
+pub use app::config_notice;
+
 uniffi::setup_scaffolding!();
 
 const RECENT_EVENTS_IN_SNAPSHOT: usize = 20;
@@ -71,6 +73,12 @@ pub struct ActionView {
 }
 
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct ConfigNotice {
+    pub title: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct CheckView {
     pub name: String,
     pub ok: bool,
@@ -87,8 +95,8 @@ pub struct CoreSnapshot {
     pub data_dir: String,
     pub logs_dir: String,
     pub socket_path: String,
-    /// Set when `config.toml` is invalid; the core then runs with defaults.
-    pub config_error: Option<String>,
+    /// Set when `config.toml` has bad values or fell back as a whole file.
+    pub config_notice: Option<ConfigNotice>,
     /// Set when the previous session crashed or was killed.
     pub last_unclean_exit: Option<String>,
     pub modules: Vec<ModuleView>,
@@ -158,14 +166,11 @@ impl NavoriCore {
             std::fs::create_dir_all(dir).map_err(|e| startup(&dir.display().to_string(), e))?;
         }
 
-        let (cfg, config_error) = app::load_config(&paths);
+        let loaded = app::load_config(&paths);
         if config.log_to_file
-            && let Err(e) = logging::init(&paths.logs_dir, &cfg.log_level)
+            && let Err(e) = logging::init(&paths.logs_dir, &loaded.config.log_level)
         {
             eprintln!("navori: {e}");
-        }
-        if let Some(detail) = &config_error {
-            tracing::warn!(detail = %detail, "invalid config; using defaults");
         }
 
         let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -178,7 +183,17 @@ impl NavoriCore {
 
         let store =
             Store::open(&paths.db_file, &paths.backups_dir).map_err(|e| startup("database", e))?;
-        let kernel = handle.block_on(async { app::build_kernel(store.clone(), &cfg) });
+        let kernel = handle
+            .block_on(async { app::build_kernel(store.clone(), &loaded.config, loaded.sections) });
+        let config_notice = app::config_notice(
+            &loaded.report,
+            &loaded.sweep,
+            kernel.config_issues(),
+            &paths.config_file,
+        );
+        if let Some(notice) = &config_notice {
+            tracing::warn!("{}. {}", notice.title, notice.message);
+        }
 
         // The socket doubles as the single-instance lock: bind before touching the session marker.
         let pid = std::process::id();
@@ -189,7 +204,7 @@ impl NavoriCore {
             profile,
             version: config.app_version.clone(),
             pid,
-            config_error,
+            config_notice,
             last_unclean_exit: OnceLock::new(),
             panel_visible: AtomicBool::new(false),
         });
@@ -345,7 +360,7 @@ fn snapshot(inner: &Inner) -> CoreSnapshot {
         data_dir: status.data_dir,
         logs_dir: inner.paths.logs_dir.display().to_string(),
         socket_path: status.socket_path,
-        config_error: inner.config_error.clone(),
+        config_notice: inner.config_notice.clone(),
         last_unclean_exit: inner.last_unclean_exit.get().cloned().flatten(),
         modules: status
             .modules
