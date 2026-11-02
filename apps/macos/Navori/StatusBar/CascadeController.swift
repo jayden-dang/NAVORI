@@ -96,6 +96,19 @@ final class CascadeController {
         closeSubmenus()
     }
 
+    var openFrames: [CGRect] {
+        var frames: [CGRect] = []
+        if let panel, panel.isOpen {
+            frames.append(panel.frame)
+        }
+        for (index, _) in state.openPath.enumerated() {
+            if let child = panels[index + 1], child.isVisible {
+                frames.append(child.frame)
+            }
+        }
+        return frames
+    }
+
     private func apply(_ effects: [CascadeEffect]) {
         for effect in effects {
             switch effect {
@@ -211,7 +224,7 @@ final class CascadeController {
 
     private func hoverTimerFired() {
         hoverTimer = nil
-        guard let panel, panel.isVisible else { return }
+        guard let panel, panel.isOpen else { return }
         apply(state.handle(.hoverTimerFired))
     }
 }

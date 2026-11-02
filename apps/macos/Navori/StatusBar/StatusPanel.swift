@@ -14,6 +14,8 @@ final class StatusPanel: NSPanel {
     private var frameLink: CADisplayLink?
     private var frameCallback: (@MainActor () -> Void)?
     private var refitPending = false
+    /// Exact-once flag. `super.close()` can re-enter through `resignKey`.
+    private(set) var isOpen = false
     private static let width: CGFloat = 360
     private static let maxHeight: CGFloat = 560
 
@@ -54,7 +56,7 @@ final class StatusPanel: NSPanel {
     override var canBecomeKey: Bool { true }
 
     func toggle(relativeTo button: NSStatusBarButton) {
-        isVisible ? close() : show(relativeTo: button)
+        isOpen ? close() : show(relativeTo: button)
     }
 
     func show(relativeTo button: NSStatusBarButton, onFirstFrame: (@MainActor () -> Void)? = nil) {
@@ -82,8 +84,16 @@ final class StatusPanel: NSPanel {
         scheduleRefit()
 
         frameCallback = onFirstFrame
-        onVisibility(true)
+        let opening = !isOpen
+        isOpen = true
+        if opening {
+            onVisibility(true)
+        }
         makeKeyAndOrderFront(nil)
+        if let monitor = outsideClickMonitor {
+            NSEvent.removeMonitor(monitor)
+            outsideClickMonitor = nil
+        }
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self, weak button] event in
             // Global monitors report screen coordinates in locationInWindow.
             let clickPoint = event.locationInWindow
@@ -94,7 +104,7 @@ final class StatusPanel: NSPanel {
                     guard StatusPanelClickPolicy.shouldDismissPanel(
                         clickScreenPoint: clickPoint,
                         statusButtonScreenFrame: buttonFrame,
-                        cascadeFrames: [self.frame]
+                        cascadeFrames: self.cascade.openFrames
                     ) else { return }
                 }
                 self.close()
@@ -106,6 +116,8 @@ final class StatusPanel: NSPanel {
     }
 
     override func close() {
+        guard isOpen else { return }
+        isOpen = false
         frameLink?.invalidate()
         frameLink = nil
         frameCallback = nil
@@ -176,6 +188,10 @@ final class StatusPanel: NSPanel {
     }
 
     override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown, event.keyCode == 53 {
+            close()
+            return
+        }
         super.sendEvent(event)
         guard event.type == .leftMouseUp else { return }
         activateRow(at: event.locationInWindow)

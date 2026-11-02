@@ -89,7 +89,7 @@ final class StatusBarController: NSObject {
 
     func openMenuFresh() {
         let builtBefore = panelBuilt
-        if panelBuilt, panel.isVisible {
+        if panelBuilt, panel.isOpen {
             let behavior = panel.animationBehavior
             panel.animationBehavior = .none
             panel.close()
@@ -134,7 +134,7 @@ final class StatusBarController: NSObject {
     private func onSnapshotChange() {
         guard store.hasSnapshot, !didReplaceCoreTree else { return }
         didReplaceCoreTree = true
-        guard panelBuilt, panel.isVisible else { return }
+        guard panelBuilt, panel.isOpen else { return }
         panel.cascade.replaceTree()
     }
 
