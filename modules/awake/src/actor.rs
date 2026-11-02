@@ -6,10 +6,10 @@ use serde_json::{Value, json};
 
 use crate::action::AwakeAction;
 use crate::domain::{
-    EndReason, Ended, Held, Lease, LeaseKey, LeaseSource, LeaseTable, Reconciler, Timing,
+    self, EndReason, Ended, Held, Lease, LeaseKey, LeaseSource, LeaseTable, Reconciler, Timing,
 };
 use crate::event::{self, LEASE_ENDED, LEASE_STARTED};
-use crate::infra::{ExecutableName, Platform, ProcessClass};
+use crate::infra::{ExecutableName, Platform, ProcessClass, Rejected};
 use crate::state::AwakeState;
 
 const MAX_SECONDS: u64 = 7 * 24 * 60 * 60;
@@ -70,7 +70,7 @@ impl Awake {
                     let Some(req) = req else {
                         return Ok(());
                     };
-                    self.on_request(ctx, &wait, req);
+                    self.on_request(ctx, &wait, req).await;
                 }
                 wake = wait.wait_until(deadline) => {
                     match wake {
@@ -89,7 +89,12 @@ impl Awake {
         }
     }
 
-    fn on_request(&mut self, ctx: &ModuleCtx<Self>, wait: &WaitHandle, req: Request<AwakeAction>) {
+    async fn on_request(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        wait: &WaitHandle,
+        req: Request<AwakeAction>,
+    ) {
         let now = wait.now();
         let started = match &req.action {
             AwakeAction::Status => Ok(None),
@@ -101,6 +106,15 @@ impl Awake {
                 Ok(Some(Started::UntilOff))
             }
             AwakeAction::HoldCommand { pid } => self.hold_command(now, *pid),
+            AwakeAction::HoldSession {
+                session_id,
+                pid,
+                ppid,
+            } => {
+                self.hold_session(now, session_id.clone(), *pid, *ppid)
+                    .await
+            }
+            AwakeAction::EndSession { session_id } => self.end_session(ctx, session_id),
             AwakeAction::ReleaseAll => {
                 let ended = self.table.release_all();
                 let ids: Vec<ProcId> = ended
@@ -177,7 +191,7 @@ impl Awake {
             }
             ExecutableName::Known(name) => name,
         };
-        if self.table.leases_on(id) > 0 {
+        if self.table.has_command(id) {
             return Ok(None);
         }
         self.arm(id)?;
@@ -191,6 +205,94 @@ impl Awake {
             key,
             name: label.unwrap_or_else(|| "command".to_owned()),
         }))
+    }
+
+    async fn hold_session(
+        &mut self,
+        now: SystemTime,
+        session_id: String,
+        pid: i32,
+        ppid: i32,
+    ) -> Result<Option<Started>, ActionError> {
+        if !valid_session_id(&session_id) {
+            return Err(ActionError::Invalid(
+                "session_id must be 1 to 128 bytes of letters, digits, '.', '_', ':', or '-'"
+                    .to_owned(),
+            ));
+        }
+        if pid <= 0 {
+            return Err(ActionError::Invalid(format!(
+                "pid must be positive, not {pid}"
+            )));
+        }
+        if ppid < 0 {
+            return Err(ActionError::Invalid(format!(
+                "ppid must be zero or positive, not {ppid}"
+            )));
+        }
+        // First hold is this arrival, before the snapshot.
+        let arrived = truncate_us(now);
+        let found = match self.platform.resolve_session(pid, ppid).await {
+            Ok(Ok(found)) => found,
+            Ok(Err(rejected)) => return Err(rejected_hold(rejected, pid, ppid)),
+            Err(err) => {
+                tracing::error!(%err, "session snapshot task stopped");
+                return Err(ActionError::Failed(
+                    "the process list could not be read (snapshot task stopped); retry the hold"
+                        .to_owned(),
+                ));
+            }
+        };
+        let (harness, process, label) = found;
+        let Some(deadline) = arrived.checked_add(self.table.timing().session_ttl) else {
+            return Err(ActionError::Invalid(
+                "session ttl does not fit on the clock; retry the hold".to_owned(),
+            ));
+        };
+        let deadline = truncate_us(deadline);
+        let previous = self.table.session_process(&session_id);
+        if previous != Some(process) {
+            self.arm(process)?;
+        }
+        let created = self.table.hold_session(
+            session_id.clone(),
+            harness,
+            process,
+            arrived,
+            deadline,
+            label,
+        );
+        if let Some(old) = previous.filter(|old| *old != process) {
+            self.unwatch_if_idle(old);
+        }
+        if !created {
+            return Ok(None);
+        }
+        Ok(Some(Started::Session {
+            key: LeaseKey::Session { session_id }.text(),
+            name: domain::harness_name(harness).to_owned(),
+        }))
+    }
+
+    fn end_session(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        session_id: &str,
+    ) -> Result<Option<Started>, ActionError> {
+        if !valid_session_id(session_id) {
+            return Err(ActionError::Invalid(
+                "session_id must be 1 to 128 bytes of letters, digits, '.', '_', ':', or '-'"
+                    .to_owned(),
+            ));
+        }
+        if let Some(ended) = self.table.end_session(session_id) {
+            if let Some(id) = process_of(&ended.lease) {
+                self.unwatch_if_idle(id);
+            }
+            // No locked end sentence is true for EndSession.
+            self.emit_ended(ctx, &[ended]);
+        }
+        Ok(None)
     }
 
     fn arm(&mut self, id: ProcId) -> Result<(), ActionError> {
@@ -292,6 +394,11 @@ impl Awake {
 
     fn turn(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime) -> AwakeState {
         let settled = self.table.settle(now);
+        for end in &settled.ended {
+            if let Some(id) = process_of(&end.lease) {
+                self.unwatch_if_idle(id);
+            }
+        }
         self.emit_ended(ctx, &settled.ended);
         let held = self.reconciler.apply(self.table.wants());
         if let Some(code) = held.release_failed {
@@ -324,6 +431,7 @@ impl Awake {
                 "until_off",
             ),
             Started::Command { key, name } => (key, name, "command"),
+            Started::Session { key, name } => (key, name, "session"),
         };
         ctx.emit(
             LEASE_STARTED,
@@ -358,7 +466,7 @@ impl Awake {
                         payload(&end.lease.key.text(), kind_of(&end.lease)),
                     );
                 }
-                EndReason::ReleaseAll | EndReason::Replaced => {}
+                EndReason::EndSession | EndReason::ReleaseAll | EndReason::Replaced => {}
             }
         }
     }
@@ -368,6 +476,7 @@ enum Started {
     Duration(u64),
     UntilOff,
     Command { key: String, name: String },
+    Session { key: String, name: String },
 }
 
 async fn watcher_next(watcher: &mut Option<ProcWatcher>) -> Option<Exited> {
@@ -405,6 +514,7 @@ fn source_text(lease: &Lease) -> String {
         }
         LeaseSource::UntilOff => event::until_off_source().to_owned(),
         LeaseSource::Command { .. } => lease.label.clone().unwrap_or_else(|| "command".to_owned()),
+        LeaseSource::Session { harness, .. } => domain::harness_name(*harness).to_owned(),
     }
 }
 
@@ -413,13 +523,34 @@ fn kind_of(lease: &Lease) -> &'static str {
         LeaseSource::Duration { .. } => "duration",
         LeaseSource::UntilOff => "until_off",
         LeaseSource::Command { .. } => "command",
+        LeaseSource::Session { .. } => "session",
     }
 }
 
 fn process_of(lease: &Lease) -> Option<ProcId> {
     match lease.source {
-        LeaseSource::Command { process } => Some(process),
+        LeaseSource::Command { process } | LeaseSource::Session { process, .. } => Some(process),
         LeaseSource::Duration { .. } | LeaseSource::UntilOff => None,
+    }
+}
+
+fn valid_session_id(session_id: &str) -> bool {
+    let len = session_id.len();
+    (1..=128).contains(&len)
+        && session_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-'))
+}
+
+fn rejected_hold(rejected: Rejected, pid: i32, ppid: i32) -> ActionError {
+    match rejected {
+        Rejected::NotRunning => ActionError::Invalid(format!(
+            "pid {pid} and parent {ppid} are not running; no session lease was held"
+        )),
+        Rejected::NotAHarness => ActionError::Invalid(format!(
+            "pid {pid} is not inside a harness; no session lease was held"
+        )),
+        Rejected::Platform(err) => platform_failed(err),
     }
 }
 

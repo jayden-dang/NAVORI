@@ -4,7 +4,10 @@ use navori_macos::{
     ExitSink, ExitSource, KqueueExits, MacPower, MacProcesses, PlatformError, PowerAssertions,
     ProcessSource, ReadError,
 };
-use navori_procs::{ProcId, ProcWatcher, ProcsError};
+use navori_procs::{
+    Branch, Harness, HarnessLookup, Location, ProcId, ProcWatcher, ProcsError, Snapshot,
+    harness_of, resolve_location,
+};
 
 pub type ProcessFactory = Box<dyn FnMut() -> Result<Arc<dyn ProcessSource>, PlatformError> + Send>;
 pub type ExitsFactory =
@@ -24,6 +27,14 @@ pub(crate) enum ProcessClass {
 pub(crate) enum ExecutableName {
     Known(Option<String>),
     Gone,
+}
+
+/// Why a session hold could not name a harness process.
+#[derive(Debug)]
+pub enum Rejected {
+    NotRunning,
+    NotAHarness,
+    Platform(PlatformError),
 }
 
 pub struct Platform {
@@ -73,6 +84,22 @@ impl Platform {
 
     pub fn open_exits(&mut self, sink: ExitSink) -> Result<Box<dyn ExitSource>, PlatformError> {
         (self.exits)(sink)
+    }
+
+    /// Harness for `pid`, or for `ppid` when `pid` is not running.
+    ///
+    /// The snapshot runs on a blocking thread. The label is the project location, or `None`
+    /// when the working directory cannot be read. `Err` from the join means that task stopped.
+    pub(crate) async fn resolve_session(
+        &mut self,
+        pid: i32,
+        ppid: i32,
+    ) -> Result<Result<(Harness, ProcId, Option<String>), Rejected>, tokio::task::JoinError> {
+        let source = match self.ensure_processes() {
+            Ok(source) => source,
+            Err(err) => return Ok(Err(Rejected::Platform(err))),
+        };
+        tokio::task::spawn_blocking(move || resolve_open(source, pid, ppid)).await
     }
 
     /// One `entry`, kept only when it is this user's live process.
@@ -135,4 +162,51 @@ impl Platform {
         self.open = Some(Arc::clone(&open));
         Ok(open)
     }
+}
+
+fn resolve_open(
+    source: Arc<dyn ProcessSource>,
+    pid: i32,
+    ppid: i32,
+) -> Result<(Harness, ProcId, Option<String>), Rejected> {
+    let snapshot = Snapshot::take(source).map_err(|err| match err {
+        ProcsError::Platform { source } => Rejected::Platform(source),
+        ProcsError::Watch { errno } => Rejected::Platform(PlatformError::Kqueue {
+            op: "kevent",
+            errno,
+        }),
+    })?;
+    let (harness, process) = match harness_of(&snapshot, pid) {
+        HarnessLookup::Found { harness, process } => (harness, process),
+        HarnessLookup::NotAHarness => return Err(Rejected::NotAHarness),
+        HarnessLookup::NotRunning => match harness_of(&snapshot, ppid) {
+            HarnessLookup::Found { harness, process } => (harness, process),
+            HarnessLookup::NotAHarness => return Err(Rejected::NotAHarness),
+            HarnessLookup::NotRunning => return Err(Rejected::NotRunning),
+        },
+    };
+    Ok((harness, process, location_label(&snapshot, process)))
+}
+
+fn location_label(snapshot: &Snapshot, process: ProcId) -> Option<String> {
+    match snapshot.cwd(process) {
+        Ok(cwd) => Some(place(&resolve_location(&cwd))),
+        Err(_) => {
+            tracing::debug!(pid = process.pid, "the working directory could not be read");
+            None
+        }
+    }
+}
+
+/// `project/worktree`, or `project/branch` when the checkout is not a linked worktree.
+fn place(location: &Location) -> String {
+    let second = location
+        .worktree
+        .clone()
+        .unwrap_or_else(|| match &location.branch {
+            Some(Branch::Named(name)) => name.clone(),
+            Some(Branch::Detached { abbrev }) => abbrev.clone(),
+            None => "unknown".to_owned(),
+        });
+    format!("{}/{}", location.project, second)
 }

@@ -1,6 +1,6 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use navori_procs::ProcId;
+use navori_procs::{Harness, ProcId};
 
 use crate::state::{AwakeState, LeaseState};
 
@@ -21,10 +21,11 @@ impl Timing {
     };
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LeaseKey {
     Manual,
     Command { pid: i32, start_us: u64 },
+    Session { session_id: String },
 }
 
 impl LeaseKey {
@@ -32,15 +33,26 @@ impl LeaseKey {
         match self {
             Self::Manual => "manual".to_owned(),
             Self::Command { pid, start_us } => format!("command:{pid}:{start_us}"),
+            Self::Session { session_id } => format!("session:{session_id}"),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LeaseSource {
-    Duration { started: SystemTime },
+    Duration {
+        started: SystemTime,
+    },
     UntilOff,
-    Command { process: ProcId },
+    Command {
+        process: ProcId,
+    },
+    Session {
+        session_id: String,
+        harness: Harness,
+        process: ProcId,
+        first_hold: SystemTime,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,6 +67,7 @@ pub struct Lease {
 pub enum EndReason {
     Deadline,
     ProcessExited,
+    EndSession,
     ReleaseAll,
     Replaced,
 }
@@ -111,10 +124,21 @@ struct CommandLease {
 }
 
 #[derive(Debug, Clone)]
+struct SessionLease {
+    session_id: String,
+    harness: Harness,
+    process: ProcId,
+    first_hold: SystemTime,
+    deadline: SystemTime,
+    label: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct LeaseTable {
     timing: Timing,
     manual: Option<Manual>,
     commands: Vec<CommandLease>,
+    sessions: Vec<SessionLease>,
 }
 
 impl LeaseTable {
@@ -123,6 +147,7 @@ impl LeaseTable {
             timing,
             manual: None,
             commands: Vec::new(),
+            sessions: Vec::new(),
         }
     }
 
@@ -156,11 +181,74 @@ impl LeaseTable {
         });
     }
 
+    /// One session key. A repeated hold keeps First hold and moves the deadline.
+    /// Returns whether this created the lease.
+    pub(crate) fn hold_session(
+        &mut self,
+        session_id: String,
+        harness: Harness,
+        process: ProcId,
+        first_hold: SystemTime,
+        deadline: SystemTime,
+        label: Option<String>,
+    ) -> bool {
+        if let Some(existing) = self
+            .sessions
+            .iter_mut()
+            .find(|lease| lease.session_id == session_id)
+        {
+            existing.harness = harness;
+            existing.process = process;
+            existing.deadline = deadline;
+            existing.label = label;
+            return false;
+        }
+        self.sessions.push(SessionLease {
+            session_id,
+            harness,
+            process,
+            first_hold,
+            deadline,
+            label,
+        });
+        true
+    }
+
+    pub(crate) fn session_process(&self, session_id: &str) -> Option<ProcId> {
+        self.sessions
+            .iter()
+            .find(|lease| lease.session_id == session_id)
+            .map(|lease| lease.process)
+    }
+
+    pub(crate) fn end_session(&mut self, session_id: &str) -> Option<Ended> {
+        let index = self
+            .sessions
+            .iter()
+            .position(|lease| lease.session_id == session_id)?;
+        let lease = self.sessions.remove(index);
+        Some(Ended {
+            lease: session_as_lease(&lease),
+            reason: EndReason::EndSession,
+        })
+    }
+
+    pub(crate) fn has_command(&self, process: ProcId) -> bool {
+        self.commands.iter().any(|lease| lease.process == process)
+    }
+
     pub fn leases_on(&self, process: ProcId) -> usize {
-        self.commands
+        let commands = self
+            .commands
             .iter()
             .filter(|lease| lease.process == process)
-            .count()
+            .count();
+        let sessions = self
+            .sessions
+            .iter()
+            .filter(|lease| lease.process == process)
+            .count();
+        commands + sessions
     }
 
     pub fn on_exit(&mut self, process: ProcId) -> Vec<Ended> {
@@ -177,14 +265,31 @@ impl LeaseTable {
             }
         }
         self.commands = kept;
+        let mut kept_sessions = Vec::new();
+        for lease in self.sessions.drain(..) {
+            if lease.process == process {
+                ended.push(Ended {
+                    lease: session_as_lease(&lease),
+                    reason: EndReason::ProcessExited,
+                });
+            } else {
+                kept_sessions.push(lease);
+            }
+        }
+        self.sessions = kept_sessions;
         ended
     }
 
     pub(crate) fn process_ids(&self) -> Vec<ProcId> {
         let mut ids = Vec::new();
-        for lease in &self.commands {
-            if !ids.contains(&lease.process) {
-                ids.push(lease.process);
+        for process in self
+            .commands
+            .iter()
+            .map(|lease| lease.process)
+            .chain(self.sessions.iter().map(|lease| lease.process))
+        {
+            if !ids.contains(&process) {
+                ids.push(process);
             }
         }
         ids
@@ -211,6 +316,10 @@ impl LeaseTable {
             lease: command_as_lease(&lease),
             reason: EndReason::ReleaseAll,
         }));
+        ended.extend(self.sessions.drain(..).map(|lease| Ended {
+            lease: session_as_lease(&lease),
+            reason: EndReason::ReleaseAll,
+        }));
         ended
     }
 
@@ -227,6 +336,18 @@ impl LeaseTable {
                 reason: EndReason::Deadline,
             });
         }
+        let mut kept = Vec::new();
+        for lease in self.sessions.drain(..) {
+            if now >= lease.deadline {
+                ended.push(Ended {
+                    lease: session_as_lease(&lease),
+                    reason: EndReason::Deadline,
+                });
+            } else {
+                kept.push(lease);
+            }
+        }
+        self.sessions = kept;
         Settled {
             ended,
             to_check: Vec::new(),
@@ -235,13 +356,20 @@ impl LeaseTable {
 
     pub fn wants(&self) -> Wants {
         Wants {
-            system: self.manual.is_some() || !self.commands.is_empty(),
+            system: self.manual.is_some() || !self.commands.is_empty() || !self.sessions.is_empty(),
             display: false,
         }
     }
 
     pub(crate) fn next_deadline(&self) -> Option<SystemTime> {
-        self.manual.as_ref().and_then(Manual::deadline)
+        let manual = self.manual.as_ref().and_then(Manual::deadline);
+        let session = self.sessions.iter().map(|lease| lease.deadline).min();
+        match (manual, session) {
+            (Some(manual), Some(session)) => Some(manual.min(session)),
+            (Some(manual), None) => Some(manual),
+            (None, Some(session)) => Some(session),
+            (None, None) => None,
+        }
     }
 
     pub(crate) fn snapshot(&self, system_held: bool, display_held: bool) -> AwakeState {
@@ -251,6 +379,9 @@ impl LeaseTable {
         }
         for lease in &self.commands {
             leases.push(command_state(lease));
+        }
+        for lease in &self.sessions {
+            leases.push(session_state(lease));
         }
         AwakeState {
             leases,
@@ -264,12 +395,16 @@ impl LeaseTable {
     fn earliest_start(&self) -> Option<SystemTime> {
         let manual = self.manual.as_ref().map(Manual::started);
         let command = self.commands.iter().map(|lease| lease.started).min();
-        match (manual, command) {
-            (Some(manual), Some(command)) => Some(manual.min(command)),
-            (Some(manual), None) => Some(manual),
-            (None, Some(command)) => Some(command),
-            (None, None) => None,
-        }
+        let session = self.sessions.iter().map(|lease| lease.first_hold).min();
+        [manual, command, session].into_iter().flatten().min()
+    }
+}
+
+pub(crate) fn harness_name(harness: Harness) -> &'static str {
+    match harness {
+        Harness::ClaudeCode => "Claude Code",
+        Harness::Codex => "Codex",
+        Harness::Grok => "Grok",
     }
 }
 
@@ -324,6 +459,37 @@ fn command_key(process: ProcId) -> String {
         start_us: process.start.0,
     }
     .text()
+}
+
+fn session_state(lease: &SessionLease) -> LeaseState {
+    LeaseState {
+        key: LeaseKey::Session {
+            session_id: lease.session_id.clone(),
+        }
+        .text(),
+        kind: "session".to_owned(),
+        harness: Some(harness_name(lease.harness).to_owned()),
+        label: lease.label.clone(),
+        pid: Some(lease.process.pid),
+        stopped: false,
+        ends_at_ms: Some(wall_ms(lease.deadline)),
+    }
+}
+
+fn session_as_lease(lease: &SessionLease) -> Lease {
+    Lease {
+        key: LeaseKey::Session {
+            session_id: lease.session_id.clone(),
+        },
+        source: LeaseSource::Session {
+            session_id: lease.session_id.clone(),
+            harness: lease.harness,
+            process: lease.process,
+            first_hold: lease.first_hold,
+        },
+        deadline: Some(lease.deadline),
+        label: lease.label.clone(),
+    }
 }
 
 fn command_as_lease(lease: &CommandLease) -> Lease {

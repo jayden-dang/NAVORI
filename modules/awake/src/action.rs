@@ -12,6 +12,14 @@ pub enum AwakeAction {
     HoldUntilOff,
     /// Keep this Mac awake while process `pid` is still running.
     HoldCommand { pid: i32 },
+    /// Keep this Mac awake for the harness session `session_id`.
+    HoldSession {
+        session_id: String,
+        pid: i32,
+        ppid: i32,
+    },
+    /// End the session lease for `session_id`.
+    EndSession { session_id: String },
     /// End every lease Navori is holding.
     ReleaseAll,
 }
@@ -23,6 +31,8 @@ impl ModuleAction for AwakeAction {
             Self::HoldFor { .. }
             | Self::HoldUntilOff
             | Self::HoldCommand { .. }
+            | Self::HoldSession { .. }
+            | Self::EndSession { .. }
             | Self::ReleaseAll => Risk::Write,
         }
     }
@@ -47,6 +57,16 @@ impl ModuleAction for AwakeAction {
             ActionDoc {
                 name: "hold_command",
                 description: "Keep this Mac awake while process `pid` is still running. The lease has no deadline.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "hold_session",
+                description: "Keep this Mac awake for one harness session. The harness is resolved from `pid`, then `ppid`. A repeated hold keeps one lease, moves the deadline, and keeps the first hold.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "end_session",
+                description: "End the session lease for `session_id` without reading the process list.",
                 risk: Risk::Write,
             },
             ActionDoc {
