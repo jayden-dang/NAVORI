@@ -212,7 +212,6 @@ impl NavoriCore {
             pid,
             config_notice,
             last_unclean_exit: OnceLock::new(),
-            panel_visible: AtomicBool::new(false),
         });
         let server = match handle.block_on(Server::bind(
             &paths.socket,
@@ -316,7 +315,13 @@ impl NavoriCore {
 
     /// Faster snapshot pushes while the menubar panel is open.
     pub fn set_panel_visible(&self, visible: bool) {
-        self.inner.panel_visible.store(visible, Ordering::Relaxed);
+        self.inner.kernel.scheduler().set_panel_visible(visible);
+    }
+
+    /// One wake pulse after macOS reports that the Mac woke.
+    pub fn system_did_wake(&self) {
+        self.inner.kernel.scheduler().wake_pulse();
+        tracing::info!("system did wake");
     }
 
     /// Stops modules, closes the socket, removes the session marker. Idempotent.

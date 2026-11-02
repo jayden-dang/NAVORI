@@ -3,7 +3,6 @@
 use std::os::unix::net::UnixStream as StdUnixStream;
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use futures::FutureExt;
@@ -31,7 +30,6 @@ pub struct Inner {
     pub config_notice: Option<crate::ConfigNotice>,
     /// Set once, right after the single-instance check passes.
     pub last_unclean_exit: std::sync::OnceLock<Option<String>>,
-    pub panel_visible: AtomicBool,
 }
 
 impl Inner {
@@ -351,7 +349,7 @@ pub async fn snapshot_pump(
             changed = revision.changed() => if changed.is_err() { return },
             ev = events.recv() => if matches!(ev, Err(RecvError::Closed)) { return },
         }
-        let delay = if inner.panel_visible.load(Ordering::Relaxed) {
+        let delay = if inner.kernel.scheduler().panel_visible() {
             Duration::from_millis(33)
         } else {
             Duration::from_millis(250)

@@ -597,3 +597,87 @@ fn fixing_the_file_keeps_the_pause_until_the_next_start() {
     old_event_is_deleted_within_one_second(&core);
     core.shutdown();
 }
+
+fn snapshot_count(rec: &Recorder) -> usize {
+    rec.0.lock().unwrap().len()
+}
+
+fn wait_until_snapshots_are_quiet(rec: &Recorder) {
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let mut last = snapshot_count(rec);
+    let mut quiet_since = Instant::now();
+    while Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(20));
+        let count = snapshot_count(rec);
+        if count != last {
+            last = count;
+            quiet_since = Instant::now();
+            continue;
+        }
+        if quiet_since.elapsed() > Duration::from_millis(250) {
+            return;
+        }
+    }
+    panic!("snapshots did not stay quiet for over 250 ms");
+}
+
+fn ms_until_prune_snapshot(core: &NavoriCore, rec: &Recorder) -> u128 {
+    let before = snapshot_count(rec);
+    let started = Instant::now();
+    futures::executor::block_on(core.dispatch(
+        "system".into(),
+        r#"{"prune_journal":{"older_than_days":1}}"#.into(),
+    ))
+    .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while Instant::now() < deadline {
+        if snapshot_count(rec) > before {
+            return started.elapsed().as_millis();
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    panic!("prune_journal produced no snapshot");
+}
+
+#[test]
+fn snapshot_pushes_coalesce_at_33ms_with_the_panel_open_and_250ms_closed() {
+    let home = home();
+    let (core, rec) = start(&home);
+    wait_until_snapshots_are_quiet(&rec);
+    let closed = ms_until_prune_snapshot(&core, &rec);
+    assert!(
+        closed >= 240,
+        "a closed panel delivered the snapshot in {closed} ms"
+    );
+
+    wait_until_snapshots_are_quiet(&rec);
+    core.set_panel_visible(true);
+    let open = ms_until_prune_snapshot(&core, &rec);
+    assert!(
+        open < 200,
+        "an open panel delivered the snapshot in {open} ms"
+    );
+    core.shutdown();
+}
+
+#[test]
+fn a_system_wake_with_a_running_core_is_harmless() {
+    let home = home();
+    let (core, _) = start(&home);
+    core.system_did_wake();
+    let out =
+        futures::executor::block_on(core.dispatch("system".into(), "\"ping\"".into())).unwrap();
+    assert_eq!(out, "\"pong\"");
+    core.shutdown();
+}
+
+#[test]
+fn calling_shutdown_twice_is_harmless() {
+    let home = home();
+    let (core, _) = start(&home);
+    core.shutdown();
+    core.shutdown();
+    let err =
+        futures::executor::block_on(core.dispatch("system".into(), "\"ping\"".into())).unwrap_err();
+    assert_eq!(err, CoreError::ShutDown);
+}

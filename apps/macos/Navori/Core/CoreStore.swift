@@ -58,6 +58,10 @@ final class CoreStore {
         core?.setPanelVisible(visible: visible)
     }
 
+    func systemDidWake() {
+        core?.systemDidWake()
+    }
+
     func runChecks() {
         guard let core, !isRunningChecks else { return }
         isRunningChecks = true
