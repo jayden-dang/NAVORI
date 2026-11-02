@@ -106,10 +106,10 @@ Retrieval (`load-subgraph`, schema 1.1, recipe `fsubr-1.2`, run once on the File
 
 **Depends-on:** none
 
-- [ ] **Step 1: Edit** the pins and the docs. Keep `.swiftLanguageMode(.v5)` on `NavoriCore`. Add row `D9` to the decisions table in `docs/ARCHITECTURE.md`, linking ADR 0006. Edit `docs/product/vision.md:43` through `define-project` update mode: minimum macOS only.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass, which proves UniFFI's target builds under tools 6.2.
-- [ ] **Step 3: Verify** `cargo xtask run`, then `plutil -extract LSMinimumSystemVersion raw "build/dev/Navori Dev.app/Contents/Info.plist"` — expect: `26.0`. `grep -rn "macOS 15\|15\.0" README.md docs/product docs/architecture docs/standards/INDEX.md docs/ops .cargo apps/macos/Package.swift` — expect: no minimum-version hit.
-- [ ] **Step 4: Commit** `git commit -m "build: require macOS 26 for the glass menu"`
+- [x] **Step 1: Edit** the pins and the docs. Keep `.swiftLanguageMode(.v5)` on `NavoriCore`. Add row `D9` to the decisions table in `docs/ARCHITECTURE.md`, linking ADR 0006. Edit `docs/product/vision.md:43` through `define-project` update mode: minimum macOS only.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass, which proves UniFFI's target builds under tools 6.2.
+- [x] **Step 3: Verify** `cargo xtask run`, then `plutil -extract LSMinimumSystemVersion raw "build/dev/Navori Dev.app/Contents/Info.plist"` — expect: `26.0`. `grep -rn "macOS 15\|15\.0" README.md docs/product docs/architecture docs/standards/INDEX.md docs/ops .cargo apps/macos/Package.swift` — expect: no minimum-version hit.
+- [x] **Step 4: Commit** `git commit -m "build: require macOS 26 for the glass menu"`
 
 _Requirements: MENU-10.1, MENU-10.2, MENU-10.3_
 
