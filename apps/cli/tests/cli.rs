@@ -33,7 +33,20 @@ fn short_home() -> tempfile::TempDir {
 }
 
 fn running_core() -> Running {
+    start_core(None)
+}
+
+fn running_core_with_config(body: &str) -> Running {
+    start_core(Some(body))
+}
+
+fn start_core(config_toml: Option<&str>) -> Running {
     let home = short_home();
+    if let Some(body) = config_toml {
+        let data = home.path().join("Library/Application Support/Navori Dev");
+        std::fs::create_dir_all(&data).unwrap();
+        std::fs::write(data.join("config.toml"), body).unwrap();
+    }
     let core = NavoriCore::start(
         CoreConfig {
             profile: "dev".into(),
@@ -132,6 +145,19 @@ fn events_show_the_journal_newest_first() {
     let v: Vec<Value> = serde_json::from_slice(&out).unwrap();
     assert!(v.len() <= 5);
     assert!(v.iter().any(|e| e["kind"] == "core.started"), "{v:?}");
+}
+
+#[test]
+fn doctor_fails_on_a_bad_config_value() {
+    let r = running_core_with_config("log_level = \"loud\"\n");
+    navori(&r.home)
+        .arg("doctor")
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains(
+            "config.toml has bad values. log_level use their defaults. Fix them and reopen Navori.",
+        ))
+        .stdout(predicate::str::contains("✗").and(predicate::str::contains("config")));
 }
 
 #[test]
