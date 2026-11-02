@@ -7,7 +7,7 @@ Requirements: ./requirements.md
 
 ## Context
 
-No Awake code exists. PROCS built everything below the Lease: `PowerAssertions`, `ProcWatcher`, `harness_of`, `Snapshot`, and fakes for each. KCONTRACT built the wait: `WaitHandle::wait_until` with absolute `SystemTime` deadlines, a 30-second closed-menu gap and wake pulses. `build_kernel` registers no Module today (`crates/ffi/src/app.rs:233`), `CoreSnapshot` carries lifecycle only (`crates/ffi/src/lib.rs:89`), and `Store` has one Owner (`core`). MENU, unmerged on `feat/menu`, owns the cascade that story 11 sits on.
+No Awake code exists. PROCS built everything below the Lease: `PowerAssertions`, `ProcWatcher`, `harness_of`, `Snapshot`, and fakes for each. KCONTRACT built the wait: `WaitHandle::wait_until` with absolute `SystemTime` deadlines, a 30-second closed-menu gap and wake pulses. `build_kernel` registers no Module today (`crates/ffi/src/app.rs:233`), `CoreSnapshot` carries lifecycle only (`crates/ffi/src/lib.rs:89`), and `Store` has one Owner (`core`). MENU, merged at `030774d`, owns the cascade that story 11 sits on.
 
 The binding constraint is that a Lease's truth must survive three different deaths at zero idle cost: a panic inside `run`, an app quit, and a process that exits with no message to anyone. Idle means 0% CPU, ≤ 1 wakeup/s and no timer (GOAL-11, ARCH-16). The design is therefore one actor whose whole state lives in `self`, one wait on one computed deadline, kqueue for exits, and rows on disk only for Leases a process owns.
 
@@ -15,7 +15,7 @@ That rules out a reconciling tick, which is what a simple "every N seconds compa
 
 Fresh retrieval (`fsubr-1.2`, OWNS coverage 4/9; CORE, SHELL, CLI and BUILD have no `tasks.md`, so this is not exhaustive): KCONTRACT `via both` on `crates/ffi/src/app.rs`, `crates/ffi/src/lib.rs`, `apps/macos/Navori/Core/CoreStore.swift`; MENU `via both` on `CoreStore.swift`, `PanelView.swift`, `StatusBarController.swift`, `StatusPanel.swift`; PERF `via both` on `CoreStore.swift`, `StatusBarController.swift`, `StatusPanel.swift`; PROCS `via both` on `crates/macos/src/fake/power.rs`, `fake/processes.rs`. Observations: none.
 
-Delivery: Wave 1 is everything except story 11 and runs alongside MENU, because MENU touches no file under `crates/`, `modules/` or `apps/cli/`. Wave 2 is story 11 and the Swift half of its guards, and starts after MENU merges, including MENU's Task 19.
+Delivery: Wave 1 is everything except story 11. Wave 2 is story 11 and the Swift half of its guards. MENU changed no file under `crates/`, `modules/` or `apps/cli/`, so nothing here had to change for Wave 1.
 
 ## Decisions
 
@@ -212,11 +212,11 @@ Reuse: rung 2 — `Kernel::state`, `Kernel::modules`, `snapshot()`, `Inner::doct
 Respects: ARCH-1, ARCH-2, ARCH-14
 Surface:
 - `build_kernel` caller `crates/ffi/src/lib.rs:187` — `replace`: passes the Profile; every test core now registers Awake. Holds nothing and starts no thread until a Lease (Decision 8).
-- `CoreSnapshot` readers in `crates/ffi/tests/core.rs`, `crates/ffi/tests/config_privacy.rs`, `apps/cli/tests/cli.rs`, `apps/macos/Navori/Core/CoreStore.swift`, `PanelView.swift`, `SettingsView.swift` — `frozen`: built around; the field is additive and these keep passing unedited.
+- `CoreSnapshot` readers in `crates/ffi/tests/core.rs`, `crates/ffi/tests/config_privacy.rs`, `apps/cli/tests/cli.rs`, `apps/macos/Navori/Core/CoreStore.swift`, `SettingsView.swift` — `frozen`: built around; the field is additive and these keep passing unedited.
 - `core.doctor` over IPC, and `doctor` readers `crates/ffi/tests/core.rs:407-421` and `:568`, `apps/cli/tests/cli.rs:150-187`, `crates/ffi/tests/config_privacy.rs:58` — `frozen`: built around; the five rows stay, one row is added and is ok when idle. The `modules` row text becomes `2 running`; nothing asserts it.
 - `core.status` over IPC, `apps/cli/src/main.rs:256-274`, `crates/ffi/tests/core.rs:84-89` — `frozen`: built around; a second module row, and tests look for `system`.
 - `navori actions` output, `apps/cli/tests/cli.rs:101-108` — `frozen`: built around; it only asserts `system.ping`. `--json` grows by nine copies of the enum schema.
-- `SettingsView.swift:115` help text, `docs/agents/verify.md`, `README.md:27`, which name the doctor rows — `replace`: add `awake`. `docs/standards/errors-logging.md:30` already says every Module has a doctor check, so it stays. The Swift line waits for Wave 2.
+- `SettingsView.swift:129` help text, `docs/agents/verify.md`, `README.md:27`, which name the doctor rows — `replace`: add `awake`. `docs/standards/errors-logging.md:30` already says every Module has a doctor check, so it stays. The Swift line waits for Wave 2.
 - `CoreStore.moduleCount`, `PerfProbe`'s `modules=`, `modules_running` in `xtask/src/perf/mod.rs:248` and `judge.rs:163` — `frozen`: built around; informational only, no gate.
 - `CoreStore.health` — `frozen`: built around; a `failed` or `restarting` `awake` turns the icon to the warning state, which is correct, since the Core has a failing Module.
 Interface: `CoreSnapshot.awake: Option<AwakeView>`, `AwakeView`, `LeaseView`. `pub fn awake_view(&Kernel) -> Option<AwakeView>`, used by both `snapshot()` and `Inner::doctor`.
@@ -247,32 +247,35 @@ Locality: `apps/cli/src/main.rs`. extend. Deps stay `config`, `ipc`, `protocol`.
 
 ## UI design
 
-Grounding: the user's locks, then `docs/design/2026-11-01-menubar-ui-brief.md` Surfaces 1 and 3, then `feat/menu`'s glass and `MenuRow` system. Story 11 is a native surface, not a browser one; the section is filled because MENU's design set that precedent. Tokens are the AppKit semantic colors MENU uses. Unverified until MENU merges: exact file lines, cited as of `feat/menu`.
+Grounding: the user's locks, then `docs/design/2026-11-01-menubar-ui-brief.md` Surfaces 1 and 3, then `feat/menu`'s glass and `MenuRow` system. Story 11 is a native surface, not a browser one; the section is filled because MENU's design set that precedent. Tokens are the AppKit semantic colors MENU uses. The Awake sample in `Features/Preview/PreviewMenu.swift`, which the user judged in the Preview, sets the row's icon and the Submenu's shape.
 
 Respects: ARCH-1, ARCH-2
 Satisfies: AWAKE-1.8, AWAKE-11.1, AWAKE-11.2, AWAKE-11.3, AWAKE-11.4, AWAKE-11.5, AWAKE-11.6, AWAKE-11.7, AWAKE-11.8, AWAKE-11.9, AWAKE-11.10, AWAKE-12.7, AWAKE-12.8, AWAKE-12.9, AWAKE-13.10
 Reuse: rung 2 — `MenuRow`, `CascadeNode`, `CascadeContent`, `CoreRowState` pattern, `CoreStore.dispatch`; new (rung 7): `AwakeRowState` in `NavoriPanel`, `AwakeSubmenuView`, `StatusBlockView`.
 Surface:
 - MENU-1.2 and MENU-1.4 in MENU's `requirements.md`, and MENU's "Comes back if" line — `replace`: amended as story 11 states.
-- MENU Task 18's grep for `"Awake"` (`tasks.md:526`) — `replace`: the check drops `"Awake"` for the Awake row's own files. Coordinate if MENU has not closed it.
-- `menuTree()` and `PanelView` in `feat/menu`, which must agree on ids — `replace`: both gain `awake`.
+- MENU Task 18's grep for `"Awake"` (`tasks.md:527`) — `frozen`: built around; a closed task's record of what was true at delivery, not a live gate.
+- `Features/Preview/` sample rows, including `Let my Mac sleep now` — `frozen`: built around; dev-only sample data marked `NAVORI-PREVIEW-SAMPLE`, not the Awake Submenu.
+- `menuTree()` and `PanelView`, which must agree on ids — `replace`: both gain `awake`.
+- The `submenu` closure in `StatusBarController.swift:19-22`, which guards on `id == "core"` — `replace`: it switches on `core` and `awake`.
+- `MenuRow` memberwise init, at every call site in `PanelView.swift`, `PreviewMenu.swift` and `CoreSubmenuView.swift` — `frozen`: built around; `isDimmed` defaults to `false`.
 - The perf probe's `open("core")` — `frozen`: built around, the Core row keeps its id.
 Interface: `CoreStore.awakeStatus: AwakeStatus`, and plain `AwakeLeaseInput` for the Submenu, so no generated types pass `CoreStore`.
 Depth: If `AwakeRowState` vanished, callers would still need only a status enum; the label, dot and submenu rules are hidden and tested.
-Locality: wave 2 only. new: `NavoriPanel/AwakeRowState.swift`, `NavoriPanel/AwakeSubmenuState.swift`, `Features/Panel/AwakeSubmenuView.swift`. extend: `PanelView.swift`, `StatusBarController.swift`, `CoreStore.swift`. leave: `CascadeState`.
+Locality: wave 2 only. new: `NavoriPanel/AwakeRowState.swift`, `NavoriPanel/AwakeSubmenuState.swift`, `Features/Panel/AwakeSubmenuView.swift`. extend: `PanelView.swift`, `MenuRowView.swift`, `StatusBarController.swift`, `CoreStore.swift`. leave: `CascadeState`, `CascadeController`, `Features/Preview/`.
 
 ### Awake row (level 0)
 
-Layout: one `MenuRow` directly above the Core row, with a chevron.
+Layout: one `MenuRow` directly above the Core row, with icon `cup.and.saucer`, title `Awake` and a chevron.
 Components: rung 2 — `MenuRow`; new — `AwakeRowState`, tested like `CoreRowState`.
 States: no Lease → `Off`, no dot · held → green dot, `On · <sources>` · a Lease with System not held → orange dot, `Not held` · Awake record missing or Module failed → `Unavailable`, no Submenu.
 Type & color: as the Core row; color only in the dot.
-A11y: read as one sentence, for example `Awake, on, Claude Code and 1 hour`.
+A11y: `MenuRowView` reads title then value as one sentence, for example `Awake, On · Claude Code, 1 hour`.
 
 ### Awake Submenu (level 1)
 
-Layout: `Keep awake for 1 hour`, `Keep awake until I turn it off`, then the status block with `Display on` and `Release all` inline, then a `Holding` header and rows.
-Components: rung 2 — `MenuRow` for commands; new — `StatusBlockView` (brief Surface 3), a plain Holding row. The tree holds the four command ids (`awake.hold_hour`, `awake.hold_until_off`, `awake.display`, `awake.release_all`) and is static, so a changing Holding list needs no `replaceTree`.
+Layout: `Keep awake for 1 hour`, `Keep awake until I turn it off`, then the status block, `Display on`, `Release all`, then a `Holding` header and rows. The commands are `MenuRowView` rows, as in the Preview, because the cascade's selection and keyboard work on rows; the brief's inline buttons would need a second selection path.
+Components: rung 2 — `MenuRowView` for commands, gaining `MenuRow.isDimmed`; `SectionTitle` for `Holding`; new — `StatusBlockView` (brief Surface 3, as drawn in the Preview), a plain Holding row. The tree holds the four command ids (`awake.hold_hour`, `awake.hold_until_off`, `awake.display`, `awake.release_all`) and is static, so a changing Holding list needs no `replaceTree`. `awake` has children whenever `store.hasSnapshot`, as `core` does, and the row's `hasSubmenu` flipping calls `replaceTree`.
 States: off → `Awake off` / `No Leases`, with `Release all` shown dimmed and doing nothing · on → `Awake · since 11:38` / `2 Leases · idle sleep blocked`, plus `· display kept on` with a `display` Lease · not held → `Can't hold this Mac awake` / `macOS refused the request. Navori keeps trying.` · display refused → `Display not held` · `Display on` pressed → reads `Display off`.
 Holding rows: Manual → `1 hour` / `Until off` / `Display`, right-aligned `until 11:38` when it has an end · Command → `<exe name>`, `running · pid 23719` · Session → `Claude Code · NAVORI/main`, `working · pid 23719`, or `stopped · background work · pid 23719` when stopped.
 Type & color: as MENU; secondary text for line two.

@@ -14,7 +14,7 @@ Rules:
 
 Roadmap item: ROAD-8 (MILE-2) · Tracker: #7 · Decisions: frame-change close package (2026-11-02), confirmed by the user.
 
-Delivery order: stories 1–10 ship first and do not wait for MENU. Story 11 starts only after MENU (ROAD-34) merges.
+Delivery order: stories 1–10 ship first. Story 11 builds on MENU (ROAD-34), which merged at `030774d`.
 
 Terms used below:
 - **The system** — the Awake Module, `navori-ffi`, the `navori` CLI and the Shell code that shows Awake.
@@ -169,7 +169,7 @@ Terms used below:
 
 **Story:** As the user, I want to open the Awake row, press `Keep awake for 1 hour`, see the Lease under Holding and press `Release all`, so that I do all of this from the menubar.
 
-This story starts only after MENU merges. It changes three things in MENU's spec: MENU-1.2 gains the Awake row before the Core row; MENU-1.4 no longer lists the Awake row among what Release code hides; and MENU's "The Awake row ships: decide whether the Core row stays" is answered: it stays.
+It changes three things in MENU's spec: MENU-1.2 gains the Awake row before the Core row; MENU-1.4 no longer lists the Awake row among what Release code hides; and MENU's "The Awake row ships: decide whether the Core row stays" is answered: it stays.
 
 - **AWAKE-11.1** THE SYSTEM SHALL lay out level 0 in this order: any banners, the Awake row, the Core row, a separator, `Settings…`, `About Navori`, `Quit Navori`.
 - **AWAKE-11.2** WHILE no Lease exists THE SYSTEM SHALL show `Off` on the Awake row.
@@ -198,7 +198,7 @@ Files this feature touches, with what they guard:
 | `crates/macos/src/fake/power.rs`, `crates/macos/src/fake/processes.rs` (gain per-kind refusal, lifting a refusal, a failing release and a `list` counter, so AWAKE-7.4, 8.4, 8.8 and 13.3 can be tested) | AWAKE-12.12 |
 | `apps/cli/src/main.rs` | AWAKE-12.5, AWAKE-12.6 |
 | `apps/macos/Navori/Core/CoreStore.swift` | AWAKE-12.7 |
-| `apps/macos/Navori/Features/Panel/`, `apps/macos/Navori/StatusBar/`, `apps/macos/NavoriPanel/` | AWAKE-12.8, AWAKE-12.9, from the MENU merge |
+| `apps/macos/Navori/Features/Panel/`, `apps/macos/Navori/StatusBar/`, `apps/macos/NavoriPanel/` | AWAKE-12.8, AWAKE-12.9 |
 | `docs/ARCHITECTURE.md`, `docs/architecture/integrations.md`, `docs/design/2026-11-01-menubar-ui-brief.md`, MENU's `requirements.md` | no behavior to guard |
 
 - **AWAKE-12.1** (guard) WHEN `navori doctor` runs THE SYSTEM SHALL CONTINUE TO report the `config`, `database`, `ipc`, `modules` and `logs` checks.
@@ -207,9 +207,9 @@ Files this feature touches, with what they guard:
 - **AWAKE-12.4** (guard) WHEN snapshots are pushed THE SYSTEM SHALL CONTINUE TO coalesce them at 33 ms while the panel is visible and 250 ms while it is not.
 - **AWAKE-12.5** (guard) WHEN a `navori` command other than `awake run` finds the app not running THE SYSTEM SHALL CONTINUE TO exit 3.
 - **AWAKE-12.6** (guard) WHEN `cargo xtask check-deps` runs THE SYSTEM SHALL CONTINUE TO allow the CLI only `navori-config`, `navori-ipc` and `navori-protocol`.
-- **AWAKE-12.7** THE SYSTEM SHALL NOT import the generated bindings in any new Awake Swift file, reading Awake through `CoreStore` (ARCH-2). Three existing files outside `CoreStore` import them today; that is out of scope here.
-- **AWAKE-12.8** (guard) WHERE MENU has merged, WHEN the Core row is shown THE SYSTEM SHALL CONTINUE TO open its Submenu with module states and at most 8 recent Events.
-- **AWAKE-12.9** (guard) WHERE MENU has merged and the app runs the dev profile THE SYSTEM SHALL CONTINUE TO show the `DEV` chip on the Core row.
+- **AWAKE-12.7** (guard) WHEN Swift reads Awake THE SYSTEM SHALL CONTINUE TO import the generated bindings only in `CoreStore` and `NavoriBanner` (ARCH-2).
+- **AWAKE-12.8** (guard) WHEN the Core row is shown THE SYSTEM SHALL CONTINUE TO open its Submenu with module states and at most 8 recent Events.
+- **AWAKE-12.9** (guard) WHERE the app runs the dev profile THE SYSTEM SHALL CONTINUE TO show the `DEV` chip on the Core row.
 - **AWAKE-12.10** (guard) WHEN a Module fails and restarts THE SYSTEM SHALL CONTINUE TO restart it with backoff, keeping `self`, its State and its queued requests.
 - **AWAKE-12.11** (guard) WHILE two Profiles run THE SYSTEM SHALL CONTINUE TO keep their databases, sockets and logs separate.
 - **AWAKE-12.12** (guard) WHEN an existing test calls `FakePower::refuse` THE SYSTEM SHALL CONTINUE TO refuse every assertion kind.
@@ -220,7 +220,7 @@ Files this feature touches, with what they guard:
 
 **Story:** As a stakeholder, I want measurable quality targets for this feature, so that how-well is not left implicit.
 
-- **Performance:** **AWAKE-13.1** WHEN `cargo xtask perf` runs with Awake registered and no Lease THE SYSTEM SHALL stay inside the GOAL-11 budget in `docs/standards/performance.md`: idle 0% CPU, ≤ 1 wakeup/s, ≤ 30 MB footprint, cold start ≤ 200 ms, first menu open ≤ 80 ms and later opens ≤ 50 ms.
+- **Performance:** **AWAKE-13.1** WHEN `cargo xtask perf` runs with Awake registered and no Lease THE SYSTEM SHALL stay inside the GOAL-11 budget in `docs/standards/performance.md`: idle 0% CPU, ≤ 1 wakeup/s, ≤ 30 MB footprint, cold start ≤ 200 ms, first menu open ≤ 80 ms, later opens ≤ 50 ms and Core Submenu open ≤ 16 ms.
 - **Performance:** **AWAKE-13.2** WHILE no Lease exists THE SYSTEM SHALL give the wait handle no deadline — verified by a Module test on paused tokio time: advancing one hour causes no process read and no assertion call.
 - **Performance:** **AWAKE-13.3** WHEN the panel opens THE SYSTEM SHALL NOT take a process snapshot — verified by a test counting `list` calls on the fake process source.
 - **Performance:** **AWAKE-13.4** WHILE the menu is closed THE SYSTEM SHALL wake the Awake Module's timer no sooner than 30 seconds after its previous timer wake (ARCH-16), waiting on one wait handle for the life of `run` — verified by a Module test on paused tokio time with a fake `WallClock`.

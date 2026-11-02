@@ -7,7 +7,7 @@
 > for tracking.
 
 Feature code: AWAKE
-Status: Draft
+Status: Approved
 Date: 2026-11-02
 Execution-mode: unset
 Max-concurrency: auto
@@ -16,11 +16,11 @@ Design: ./design.md
 
 **Goal:** Let the user keep the Mac awake by hand from the terminal and the menu, for a time, until turned off or for a command's life, and give the hook work a session Lease Action that needs no Module change.
 
-**Architecture:** A new Module crate, `navori-mod-awake`, keeps a pure `LeaseTable`, a `Reconciler` over `PowerAssertions`, stored rows for process-owned Leases and a lazy `Platform`, all as fields of `self`, in one `select!` over the inbox, kqueue exits and one computed deadline. `navori-ffi` registers it, carries a typed `AwakeView` on `CoreSnapshot` and adds one `awake` doctor row. The CLI drives it over IPC; Swift renders it after MENU merges.
+**Architecture:** A new Module crate, `navori-mod-awake`, keeps a pure `LeaseTable`, a `Reconciler` over `PowerAssertions`, stored rows for process-owned Leases and a lazy `Platform`, all as fields of `self`, in one `select!` over the inbox, kqueue exits and one computed deadline. `navori-ffi` registers it, carries a typed `AwakeView` on `CoreSnapshot` and adds one `awake` doctor row. The CLI drives it over IPC; Swift renders it on MENU's cascade.
 
 **Tech Stack:** Rust 2024, tokio 1.54.1 (`test-util` in tests), rusqlite 0.41 through `Store::with_conn`, schemars, clap 4, UniFFI 0.32, Swift (AppKit, SwiftUI). No new third-party dependency.
 
-**Delivery:** Tasks 1–17 are Wave 1 and run alongside MENU. Tasks 18–19 are Wave 2. Each starts only when `apps/macos/Navori/Features/Panel/CoreSubmenuView.swift` exists on `main`, which means MENU merged, including its Task 19.
+**Delivery:** Tasks 1–17 are Wave 1. Tasks 18–19 are Wave 2. MENU merged at `030774d`, so nothing waits on it; Task 18 needs only Task 4.
 
 ## Global Constraints
 
@@ -28,10 +28,10 @@ Source of truth (referenced, not copied — read before every task):
 
 | Source | Content hash (`git hash-object`, first 12) |
 |---|---|
-| `docs/standards/INDEX.md` | `54e6a749595a` |
+| `docs/standards/INDEX.md` | `f83e09733ee4` |
 | `docs/standards/testing.md` | `b1a9b42fc1d3` |
 | `docs/standards/errors-logging.md` | `c34f3f15f450` |
-| `docs/standards/performance.md` | `a6c770a2d2a9` |
+| `docs/standards/performance.md` | `ebf1670ff150` |
 | `docs/architecture/INDEX.md` (ARCH-N) | `2e318bd23ff5` |
 
 Compact delta every task inherits:
@@ -39,18 +39,18 @@ Compact delta every task inherits:
 - **Locks** — `.skills/AWAKE/close-package.md`, locks 1–19, and `design.md` Decisions 1–14 are settled. The `## Not locked` and `## Must measure` lists in `requirements.md` are not facts: do not build on them and do not write them into code comments as facts.
 - **ARCH-3** — `navori-mod-awake` depends on no other Module. `cargo xtask check-deps` is part of `cargo xtask ci`.
 - **ARCH-9** — no new `unsafe` in this plan.
-- **ARCH-2** — no new Swift file imports `NavoriCore`.
+- **ARCH-2** — no new Swift file imports `NavoriCore`. Only `CoreStore.swift` and `NavoriBanner` import it, and that stays so.
 - **ARCH-16** — one `WaitHandle` per `run` entry; no `tokio::time::interval`. Time comes only from `wait.now()`.
 - **THR-3, ARCH-6** — no argv, environment or cwd in a row, an assertion name, or a log. Event `<source>` is the Harness name, `1 hour`, `until off`, `display` or the executable name, never a project or branch name.
 - **Testing** — test-first. Tests go in each crate's `tests/` through the public API, with real `Store::open_in_memory`. Fake only `PowerAssertions`, `ProcessSource`, `ExitSource` and `WallClock`. Test names are sentences in domain language. No requirement IDs in source or test names.
 - **Lints** — no `unwrap`/`expect` outside tests. `missing_debug_implementations` is on, and CI denies warnings: every new public type has `Debug`, by hand when it holds `dyn` fields. Rust doc comments on UniFFI items never contain `*/`.
-- **Commands** — task gate: `cargo nextest run -p <crate> --test <file>`. Before each commit: `cargo xtask ci`. It is the only command that compiles the Swift Shell.
+- **Commands** — task gate: `cargo nextest run -p <crate> --test <file>`. Before each commit: `cargo xtask ci`. It is the only command that compiles the Swift Shell, and it runs `swift test`.
 - **Commits** — Conventional Commits, English, one logical change. Commit only when the user asked for the build.
 - **Team** — Solo band (`docs/agents/project.md`): one contributor; no assignee or reviewer theater.
 
 Consulted: `docs/codebase/map.md` (Approved) for layout, so the crate follows its `lib.rs`, `actor.rs`, `action.rs`, `state.rs`, `event.rs`, `domain/`, `infra/` shape. `design.md` Locality lines match. `context.rs` is omitted (lock 19). `docs/codebase/dependencies.md` allows every new edge.
 
-Retrieval (`load-subgraph`, schema 1.1, recipe `fsubr-1.2`, run once on the File Structure below; OWNS coverage 4/9, since CORE, SHELL, CLI and BUILD have no `tasks.md`): `blast_radius` → KCONTRACT on `apps/cli/tests/cli.rs`, `crates/ffi/src/app.rs`, `crates/ffi/src/lib.rs`, `crates/ffi/tests/core.rs`, `apps/macos/Navori/Core/CoreStore.swift`, `apps/macos/Navori/Features/Panel/PanelView.swift`, `docs/ARCHITECTURE.md`, `docs/architecture/data.md`; MENU on `apps/macos/Navori/Core/CoreStore.swift`, `PanelView.swift`, `SettingsView.swift`, `StatusBarController.swift`, `docs/ARCHITECTURE.md`, `docs/design/2026-11-01-menubar-ui-brief.md`; PROCS on `crates/macos/src/fake/power.rs`, `fake/processes.rs`, `docs/ARCHITECTURE.md`; PERF on `CoreStore.swift`, `StatusBarController.swift`. `cluster(AWAKE)` is empty because this is its first `tasks.md`. Observations: none. Advisory.
+Retrieval (`load-subgraph`, schema 1.1, recipe `fsubr-1.2`, run on the File Structure below at `c69c895`; OWNS coverage 4/9, since CORE, SHELL, CLI and BUILD have no `tasks.md`): `blast_radius` → KCONTRACT on `apps/cli/tests/cli.rs`, `crates/ffi/src/app.rs`, `crates/ffi/src/lib.rs`, `crates/ffi/tests/core.rs`, `CoreStore.swift`, `PanelView.swift` and docs; MENU on `CoreStore.swift`, `MenuRowView.swift`, `PanelView.swift`, `SettingsView.swift`, `StatusBarController.swift`, `docs/ARCHITECTURE.md`, `docs/design/2026-11-01-menubar-ui-brief.md`; PROCS on `crates/macos/src/fake/exits.rs`, `fake/power.rs`, `fake/processes.rs` and docs; PERF on `CoreStore.swift`, `StatusBarController.swift`. `cluster(AWAKE)` overlaps the same four. Observations: none. Advisory.
 
 ## File Structure
 
@@ -107,7 +107,8 @@ Retrieval (`load-subgraph`, schema 1.1, recipe `fsubr-1.2`, run once on the File
 | `apps/macos/Tests/NavoriPanelTests/AwakeSubmenuStateTests.swift` | new | those rules | 19 |
 | `apps/macos/Navori/Core/CoreStore.swift` | changed | plain `AwakeRowInput`, Awake Action calls | 18, 19 |
 | `apps/macos/Navori/Features/Panel/PanelView.swift` | changed | Awake row above the Core row | 18 |
-| `apps/macos/Navori/StatusBar/StatusBarController.swift` | changed | `menuTree()`, `submenu`, `activate` | 18, 19 |
+| `apps/macos/Navori/Features/Panel/MenuRowView.swift` | changed | `MenuRow.isDimmed`, defaulting to `false` | 19 |
+| `apps/macos/Navori/StatusBar/StatusBarController.swift` | changed | `menuTree()`, the `submenu` closure, `activate`, `replaceTree` when the row's Submenu appears or goes | 18, 19 |
 | `apps/macos/Navori/Features/Panel/AwakeSubmenuView.swift` | new | commands, status block, Holding | 19 |
 | `apps/macos/Navori/Features/Settings/SettingsView.swift` | changed | doctor help text names `awake` | 19 |
 | `docs/specs/2026-11-02-menubar-visual-foundation/requirements.md` | changed | MENU-1.2, MENU-1.4, "Comes back if" answered | 18 |
@@ -476,7 +477,7 @@ _Requirements: AWAKE-9.1, AWAKE-9.2, AWAKE-9.3, AWAKE-9.4, AWAKE-9.5, AWAKE-13.7
 
 - [ ] **Step 1: Write tests:** `an_hour_with_no_lease_reads_nothing_and_calls_nothing`, `opening_the_panel_takes_no_snapshot` (with a session Lease held: `list_calls` unchanged across a panel toggle), `with_the_menu_closed_two_timer_wakes_are_30_seconds_apart`. Fix any defect they find in `modules/awake/src/actor.rs`.
 Run: `cargo nextest run -p navori-mod-awake --test idle` — expect: pass.
-- [ ] **Step 2: Run** `cargo xtask perf` with no Lease held — expect: every GOAL-11 budget passes. No `perf-baseline.json` exists unless PERF Task 12 ran, so the regression check may skip and print why; report that. Do not record a baseline.
+- [ ] **Step 2: Run** `cargo xtask perf` with no Lease held — expect: every GOAL-11 budget passes, including `submenu_open_ms` ≤ 16 ms on the Core Submenu. No `perf-baseline.json` exists unless PERF Task 12 ran, so the regression check may skip and print why; report that. Do not record a baseline.
 - [ ] **Step 3: Commit** `git commit -m "test(awake): prove the idle Module reads nothing and arms nothing"`
 
 _Requirements: AWAKE-13.1, AWAKE-13.2, AWAKE-13.3, AWAKE-13.4_
@@ -521,7 +522,7 @@ _Requirements: AWAKE-1.2, AWAKE-1.7, AWAKE-7.1, AWAKE-7.3_
 
 **Depends-on:** Task 16
 
-- [ ] **Step 1: Edit.** `integrations.md:26` and `ARCHITECTURE.md:295` become at most one assertion per kind. `ARCHITECTURE.md:296` says the assertion follows the process, and rows for process-owned Leases survive. `ARCHITECTURE.md:153` describes the record in `navori-ffi`. Replace `ProcessTable`, `ProjectResolver` and `HarnessCatalog` in the seed with `Snapshot`, `resolve_location` and `harness_of`. `data.md:33` states what persists. `system.md:64`, `modules.md`, `map.md` and `dependencies.md` say Built. `verify.md` and `README.md:27` list `awake`, and `verify.md` gains a Drive entry for `navori awake`. Do not touch `docs/standards/errors-logging.md`: its line 30 already says every Module has a doctor check.
+- [ ] **Step 1: Edit.** `integrations.md:26` and `ARCHITECTURE.md:296` become at most one assertion per kind. `ARCHITECTURE.md:297` says the assertion follows the process, and rows for process-owned Leases survive. `ARCHITECTURE.md:154` describes the record in `navori-ffi`. Replace `ProcessTable`, `ProjectResolver` and `HarnessCatalog` at `ARCHITECTURE.md:284-286` and `:307` with `Snapshot`, `resolve_location` and `harness_of`. `data.md:33` states what persists. `system.md:64`, `modules.md`, `map.md` and `dependencies.md` say Built. `verify.md` and `README.md:27` list `awake`, and `verify.md` gains a Drive entry for `navori awake`. Do not touch `docs/standards/errors-logging.md`: its line 30 already says every Module has a doctor check.
 - [ ] **Step 2: Write** `docs/features/awake.md`: what it does, the commands, what it does not do, the DoD item 5 gap in the wording of `requirements.md`, and which Must-measure items stay open, since `.skills/AWAKE/measurements.md` is git-ignored.
 - [ ] **Step 3: Verify** `grep -rnE "exactly one|ProcessTable|HarnessCatalog|ProjectResolver" docs/ARCHITECTURE.md docs/architecture/integrations.md` — expect: no match on an assertion line, and none of the three old names. `grep -n "Comes back if" -c docs/features/awake.md` — expect: 0.
 - [ ] **Step 4: Commit** `git commit -m "docs(awake): align the seed, spine and feature note with what shipped"`
@@ -532,7 +533,7 @@ _Requirements: AWAKE-12.1_
 
 ### Task 18: Show the Awake row at level 0
 
-Wave 2. Before starting, confirm `apps/macos/Navori/Features/Panel/CoreSubmenuView.swift` exists on `main`. If not, stop.
+Wave 2.
 
 **Files:**
 - Create: `apps/macos/NavoriPanel/AwakeRowState.swift`
@@ -542,17 +543,17 @@ Wave 2. Before starting, confirm `apps/macos/Navori/Features/Panel/CoreSubmenuVi
 **Reuse:** rung 2 — `MenuRow`, `CascadeNode`, `CascadeContent`, `CoreRowState` pattern, `CoreStore.dispatch`; new (rung 7): `AwakeRowState` in `NavoriPanel`, `AwakeSubmenuView`, `StatusBlockView`.
 
 **Interfaces:**
-- Consumes: `CoreSnapshot.awake`, `AwakeView`, `MenuRow`, `CascadeNode`
-- Produces: `AwakeRowState(status: AwakeStatus)` with `label`, `dot`, `hasSubmenu`; `AwakeStatus` as `.off`, `.on(sources: [String])`, `.notHeld`, `.unavailable`; `CoreStore.awakeStatus: AwakeStatus`; row id `awake`
+- Consumes: `CoreSnapshot.awake`, `AwakeView`, `MenuRow { id, icon, title, value, dot, opensSubmenu, shortcut }`, `CascadeNode(id:isActionable:children:)`, `StatusDot`
+- Produces: `AwakeRowState(status: AwakeStatus)` with `label`, `dot`, `hasSubmenu`; `AwakeStatus` as `.off`, `.on(sources: [String])`, `.notHeld`, `.unavailable`; `CoreStore.awakeStatus: AwakeStatus`; row id `awake`, icon `cup.and.saucer`, title `Awake`
 
 **Depends-on:** Task 4
 
 - [ ] **Step 1: Write failing tests:** table over the four statuses: `Off` with no dot; green dot and `On · Claude Code, 1 hour`; orange dot and `Not held`; `Unavailable` with no Submenu.
 Run `cargo xtask build-core` first, so `apps/macos/Generated` carries `AwakeView`.
 Run: `swift test --package-path apps/macos --filter AwakeRowStateTests` — expect: no such type.
-- [ ] **Step 2: Implement** the state, `CoreStore.awakeStatus`, the row directly above the Core row in `PanelView`, and the head of `menuTree()`, with matching ids. No new file imports `NavoriCore`.
-- [ ] **Step 3: Amend MENU's spec:** MENU-1.2's order gains the Awake row; MENU-1.4 stops listing the Awake row; answer "The Awake row ships" with: the Core row stays. Update MENU's Task 18 grep if MENU's spec still carries it as open.
-- [ ] **Step 4: Verify** `swift test --package-path apps/macos --filter AwakeRowStateTests` — expect: pass. `cargo xtask ci` — expect: pass. By hand on `cargo xtask run`: level 0 order is banners, Awake, Core, separator, Settings, About, Quit; `DEV` is on the Core row; the Core Submenu still shows modules, now including `awake`, and at most 8 Events. `cargo xtask perf` — expect: `submenu_open_ms` still gated on the Core row.
+- [ ] **Step 2: Implement** the state and `CoreStore.awakeStatus`, mapping `snapshot?.awake` only inside `CoreStore`. Add the row directly above `coreRow` in `PanelView`. Add `awake` at the head of `menuTree()`, with `store.hasSnapshot ? children : []` as `core` does, and matching ids. Change the `submenu` closure's `guard id == "core"` (`StatusBarController.swift:19-22`) to a switch returning `EmptyView()` for `awake` until Task 19. Call `panel.cascade.replaceTree()` when the row's `hasSubmenu` flips, beside the one-shot `didReplaceCoreTree`. No new file imports `NavoriCore`. Do not edit `Features/Preview/`.
+- [ ] **Step 3: Amend MENU's spec in place, keeping its IDs,** so its `tasks.md` citations stay live: MENU-1.2's order gains the Awake row, noting `amended by AWAKE-11.1`; MENU-1.4 stops listing the Awake row, noting the same; answer "The Awake row ships" with: the Core row stays. Leave MENU's `Status: Implemented` and its ticked Task 18, which records what was true at delivery.
+- [ ] **Step 4: Verify** `swift test --package-path apps/macos --filter AwakeRowStateTests` — expect: pass. `cargo xtask ci` — expect: pass. `grep -rln 'import NavoriCore' apps/macos --include='*.swift' | grep -v Generated | grep -v Tests` — expect: only `Core/CoreStore.swift` and `NavoriBanner/CoreStartupBanner.swift`. By hand on `cargo xtask run`: level 0 order is banners, Awake, Core, separator, Settings, About, Quit; `DEV` is on the Core row; the Core Submenu still shows modules, now including `awake`, and at most 8 Events. `cargo xtask perf` — expect: `submenu_open_ms` ≤ 16 ms, still opening `core`, and later opens ≤ 50 ms with the extra row.
 - [ ] **Step 5: Commit** `git commit -m "feat(menu): show the Awake row above the Core row"`
 
 _Requirements: AWAKE-11.1, AWAKE-11.2, AWAKE-11.3, AWAKE-11.4, AWAKE-12.7, AWAKE-12.8, AWAKE-12.9_
@@ -565,21 +566,21 @@ Wave 2.
 
 **Files:**
 - Create: `apps/macos/Navori/Features/Panel/AwakeSubmenuView.swift`, `apps/macos/NavoriPanel/AwakeSubmenuState.swift`
-- Modify: `apps/macos/Navori/Core/CoreStore.swift`, `apps/macos/Navori/StatusBar/StatusBarController.swift`, `apps/macos/Navori/Features/Settings/SettingsView.swift`, `docs/design/2026-11-01-menubar-ui-brief.md`, `docs/features/awake.md`
+- Modify: `apps/macos/Navori/Core/CoreStore.swift`, `apps/macos/Navori/Features/Panel/MenuRowView.swift`, `apps/macos/Navori/StatusBar/StatusBarController.swift`, `apps/macos/Navori/Features/Settings/SettingsView.swift`, `docs/design/2026-11-01-menubar-ui-brief.md`, `docs/features/awake.md`
 - Test: `apps/macos/Tests/NavoriPanelTests/AwakeSubmenuStateTests.swift`
 
 **Reuse:** rung 2 — `MenuRow`, `CascadeNode`, `CascadeContent`, `CoreRowState` pattern, `CoreStore.dispatch`; new (rung 7): `AwakeRowState` in `NavoriPanel`, `AwakeSubmenuView`, `StatusBlockView`.
 
 **Interfaces:**
 - Consumes: `CoreStore.dispatch(module:actionJSON:)`, `AwakeView`, `LeaseView`
-- Produces: tree ids `awake.hold_hour`, `awake.hold_until_off`, `awake.display`, `awake.release_all`; `CoreStore.holdOneHour()`, `holdUntilOff()`, `setDisplay(on:)`, `releaseAll()`; constant `AwakeSubmenuState.menuHoldSeconds = 3600`; `AwakeSubmenuState(status:leases:displayHeld:displayWanted:)` with `statusTitle`, `statusDetail`, `releaseAllEnabled`, `displayLabel`, `holdingRows: [HoldingRow]`; `HoldingRow { line1, line2, accessibilitySentence }`, built from a plain `AwakeLeaseInput` that `CoreStore` maps from `LeaseView`
+- Produces: `MenuRow.isDimmed: Bool = false`; tree ids `awake.hold_hour`, `awake.hold_until_off`, `awake.display`, `awake.release_all`; `CoreStore.holdOneHour()`, `holdUntilOff()`, `setDisplay(on:)`, `releaseAll()`; constant `AwakeSubmenuState.menuHoldSeconds = 3600`; `AwakeSubmenuState(status:leases:displayHeld:displayWanted:)` with `statusTitle`, `statusDetail`, `releaseAllEnabled`, `displayLabel`, `holdingRows: [HoldingRow]`; `HoldingRow { line1, line2, accessibilitySentence }`, built from a plain `AwakeLeaseInput` that `CoreStore` maps from `LeaseView`
 
 **Depends-on:** Task 5, Task 12, Task 17, Task 18
 
 - [ ] **Step 1: Write failing tests:** `the_menu_hold_is_one_hour`; a table over each status block state and Holding row in `design.md`, with its exact text; `release_all_is_disabled_with_no_lease`; `no_text_says_the_mac_will_sleep_or_names_another_app`.
 Run: `swift test --package-path apps/macos --filter AwakeSubmenuStateTests` — expect: no such type.
-- [ ] **Step 2: Implement** the Submenu from `design.md` `## UI design`, with its exact text. `Release all` is always shown, dimmed and doing nothing when no Lease exists. Holding rows are not tree nodes. Nothing here reads the process table or the system's assertions.
-- [ ] **Step 3: Update** the brief's Surface 3 and level 0 to what shipped, removing `Pause 15m`, `Let my Mac sleep now`, per-Lease release and the two level 3 rows. Add `awake` to `SettingsView.swift`'s doctor help text. Add the menu to `docs/features/awake.md`.
+- [ ] **Step 2: Implement** the Submenu from `design.md` `## UI design`, with its exact text. Commands are `MenuRowView` rows, using `@Environment(CascadeController.self)` as `PanelView` does, and the four ids are the `awake` node's children, each `isActionable: true`. `activate` gains four cases that call `CoreStore` in a `Task` and leave the Cascade open, logging a failed dispatch through `CoreStore`'s `log`. `Release all` is always shown; with no Lease it is dimmed and its `activate` case does nothing. Holding rows are not tree nodes. The `awake` case of the `submenu` closure returns `AwakeSubmenuView`. Nothing here reads the process table or the system's assertions.
+- [ ] **Step 3: Update** the brief's Surface 3 and level 0 to what shipped, removing `Pause 15m`, `Let my Mac sleep now`, per-Lease release and the two level 3 rows. Add `awake` to the doctor help text at `SettingsView.swift:129`. Add the menu to `docs/features/awake.md`.
 - [ ] **Step 4: Verify** `swift test --package-path apps/macos --filter AwakeSubmenuStateTests` — expect: pass. `cargo xtask ci` — expect: pass. `grep -nE "will sleep|Pause|sleep now|another app|other app" apps/macos/Navori/Features/Panel/AwakeSubmenuView.swift apps/macos/NavoriPanel/AwakeRowState.swift apps/macos/NavoriPanel/AwakeSubmenuState.swift` — expect: no match. In review of the diff, no Awake Swift code decodes JSON: state comes from `AwakeView`, and `dispatch` answers are ignored. By hand on `cargo xtask run`: run story 11's demo; ↑ and ↓ reach all four commands; VoiceOver reads each row and button as one sentence; each state in `design.md` shows, using `navori dispatch` to reach it.
 - [ ] **Step 5: Commit** `git commit -m "feat(menu): keep the Mac awake from the Awake Submenu"`
 
