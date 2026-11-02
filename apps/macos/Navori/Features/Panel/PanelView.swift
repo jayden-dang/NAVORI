@@ -1,4 +1,3 @@
-import NavoriCore
 import SwiftUI
 
 /// Content of the menubar panel.
@@ -13,9 +12,9 @@ struct PanelView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     banners
-                    if let snapshot = store.snapshot {
-                        ModulesSection(modules: snapshot.modules)
-                        ActivitySection(events: snapshot.recentEvents)
+                    if store.hasSnapshot {
+                        ModulesSection(modules: store.moduleRows)
+                        ActivitySection(events: store.eventRows)
                     }
                 }
                 .padding(14)
@@ -51,11 +50,11 @@ struct PanelView: View {
         if let error = store.startupError {
             Banner(style: .error, title: "The core did not start", message: error)
         }
-        if let unclean = store.snapshot?.lastUncleanExit {
+        if let unclean = store.uncleanExit {
             Banner(style: .warning, title: "Navori quit unexpectedly last time", message: unclean)
         }
-        if let configError = store.snapshot?.configError {
-            Banner(style: .warning, title: "config.toml is invalid — using defaults", message: configError)
+        if let problem = store.configProblem {
+            Banner(style: .warning, title: problem.title, message: problem.message)
         }
     }
 
@@ -74,7 +73,7 @@ struct PanelView: View {
 }
 
 private struct ModulesSection: View {
-    let modules: [ModuleView]
+    let modules: [ModuleRow]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -100,13 +99,13 @@ private struct ModulesSection: View {
         }
     }
 
-    private func label(_ m: ModuleView) -> String {
+    private func label(_ m: ModuleRow) -> String {
         m.restarts > 0 ? "\(m.state) · \(m.restarts) restarts" : m.state
     }
 }
 
 private struct ActivitySection: View {
-    let events: [EventView]
+    let events: [EventRow]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
