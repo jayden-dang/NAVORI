@@ -57,6 +57,13 @@ final class StatusPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
 
+    func setTint(_ tint: NSColor) {
+        if let glass = contentView as? GlassSurfaceView {
+            glass.tint = tint
+        }
+        cascade.setTint(tint)
+    }
+
     func toggle(relativeTo button: NSStatusBarButton) {
         if isOpen {
             close()

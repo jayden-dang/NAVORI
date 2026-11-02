@@ -26,6 +26,9 @@ final class StatusBarController: NSObject {
             self?.store.setPanelVisible(visible)
         })
     }()
+    #if DEBUG
+    private var previewPanel: StatusPanel?
+    #endif
     private var didScheduleStatusMark = false
     private var didReplaceCoreTree = false
 
@@ -83,6 +86,9 @@ final class StatusBarController: NSObject {
         if isRightClick {
             showMenu()
         } else if let button = item.button {
+            #if DEBUG
+            previewPanel?.close()
+            #endif
             panel.toggle(relativeTo: button)
         }
     }
@@ -108,8 +114,14 @@ final class StatusBarController: NSObject {
 
     private func showMenu() {
         panel.close()
+        #if DEBUG
+        previewPanel?.close()
+        #endif
         let menu = NSMenu()
         menu.addItem(withTitle: "Open \(AppEnvironment.displayName)", action: #selector(openPanel), keyEquivalent: "").target = self
+        #if DEBUG
+        menu.addItem(withTitle: "Open Menu Preview", action: #selector(openPreview), keyEquivalent: "").target = self
+        #endif
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(settingsFromMenu), keyEquivalent: ",").target = self
         menu.addItem(withTitle: "Open Logs Folder", action: #selector(openLogs), keyEquivalent: "").target = self
@@ -165,12 +177,36 @@ final class StatusBarController: NSObject {
 
     private func showSettings(_ tab: SettingsTab = .general) {
         panel.close()
+        #if DEBUG
+        previewPanel?.close()
+        #endif
         openSettings(tab)
     }
 
     @objc private func openPanel() {
+        #if DEBUG
+        previewPanel?.close()
+        #endif
         if let button = item.button { panel.show(relativeTo: button) }
     }
+
+    #if DEBUG
+    @objc private func openPreview() {
+        panel.close()
+        if previewPanel == nil {
+            let created = StatusPanel(
+                content: PreviewMenu.content(setTint: { [weak self] tint in
+                    self?.previewPanel?.setTint(tint)
+                }),
+                onVisibility: { _ in }
+            )
+            previewPanel = created
+        }
+        if let button = item.button {
+            previewPanel?.show(relativeTo: button)
+        }
+    }
+    #endif
 
     @objc private func settingsFromMenu() { showSettings() }
 

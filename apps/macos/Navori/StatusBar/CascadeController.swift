@@ -24,6 +24,7 @@ final class CascadeController {
     @ObservationIgnored private let activateRow: (String) -> Void
     @ObservationIgnored private let log = Logger(subsystem: "dev.navori", category: "cascade")
     @ObservationIgnored weak var panel: StatusPanel?
+    @ObservationIgnored private var surfaceTint: NSColor = GlassTint.standard
 
     private static let hoverDelay: TimeInterval = 0.150
 
@@ -119,6 +120,13 @@ final class CascadeController {
         return frames
     }
 
+    func setTint(_ tint: NSColor) {
+        surfaceTint = tint
+        for child in panels.values {
+            (child.contentView as? GlassSurfaceView)?.tint = tint
+        }
+    }
+
     private func apply(_ effects: [CascadeEffect]) {
         for effect in effects {
             switch effect {
@@ -159,6 +167,7 @@ final class CascadeController {
         pendingFirstFrame = nil
         placing = true
         child.show(frame: frameForSubmenu(row, child: child), onFirstFrame: firstFrame)
+        (child.contentView as? GlassSurfaceView)?.tint = surfaceTint
         placing = false
         schedulePlace(row)
     }
