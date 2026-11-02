@@ -473,11 +473,11 @@ _Requirements: MENU-6.1, MENU-6.2, MENU-6.4, MENU-11.3_
 
 **Depends-on:** Task 15
 
-- [ ] **Step 1: Implement** the Preview from the brief's Surfaces 1 and 2 in files wrapped whole in `#if DEBUG`: Ask field, Needs you with capsule buttons with no action, Awake, Ports and Pull Requests rows, and a tint slider row showing its value. Awake opens `Agent sessions`, which opens a level 3 row. `onVisibility` does nothing. `activate` does nothing.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand** in `cargo xtask run`: the right-click item opens the Preview; 3 levels open; the slider retints every open panel; typing works in the Ask field; `Navori Dev` logs no dispatched Action.
-- [ ] **Step 4: Verify the compile-out**: `swift build -c release --arch arm64 --package-path apps/macos`, then `BIN=$(swift build -c release --arch arm64 --package-path apps/macos --show-bin-path)`, `test -f "$BIN/Navori"` — expect: exit 0, so the search cannot pass on a missing file. `strings "$BIN/Navori" | grep -c NAVORI-PREVIEW-SAMPLE` — expect: `0`. The same with `-c debug` — expect: at least `1`. The marker is over 15 bytes so Swift stores it as a real string in the binary.
-- [ ] **Step 5: Commit** `git commit -m "feat(shell): add a dev-only preview of the full menu"`
+- [x] **Step 1: Implement** the Preview from the brief's Surfaces 1 and 2 in files wrapped whole in `#if DEBUG`: Ask field, Needs you with capsule buttons with no action, Awake, Ports and Pull Requests rows, and a tint slider row showing its value. Awake opens `Agent sessions`, which opens a level 3 row. `onVisibility` does nothing. `activate` does nothing.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand** in `cargo xtask run`: the right-click item opens the Preview; 3 levels open; the slider retints every open panel; typing works in the Ask field; `Navori Dev` logs no dispatched Action.
+- [x] **Step 4: Verify the compile-out**: `swift build -c release --arch arm64 --package-path apps/macos`, then `BIN=$(swift build -c release --arch arm64 --package-path apps/macos --show-bin-path)`, `test -f "$BIN/Navori"` — expect: exit 0, so the search cannot pass on a missing file. `strings "$BIN/Navori" | grep -c NAVORI-PREVIEW-SAMPLE` — expect: `0`. The same with `-c debug` — expect: at least `1`. The marker is over 15 bytes so Swift stores it as a real string in the binary.
+- [x] **Step 5: Commit** `git commit -m "feat(shell): add a dev-only preview of the full menu"`
 
 _Requirements: MENU-7.1, MENU-7.2, MENU-7.3, MENU-7.4, MENU-7.5, MENU-7.6_
 
