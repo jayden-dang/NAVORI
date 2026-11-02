@@ -33,7 +33,7 @@ final class StatusPanel: NSPanel {
         hidesOnDeactivate = false
         isMovable = false
         acceptsMouseMovedEvents = true
-        backgroundColor = .clear
+        backgroundColor = NSColor.black.withAlphaComponent(0.01)
         isOpaque = false
         hasShadow = true
         animationBehavior = .utilityWindow
@@ -84,7 +84,7 @@ final class StatusPanel: NSPanel {
                     guard StatusPanelClickPolicy.shouldDismissPanel(
                         clickScreenPoint: clickPoint,
                         statusButtonScreenFrame: buttonFrame,
-                        cascadeFrames: []
+                        cascadeFrames: [self.frame]
                     ) else { return }
                 }
                 self.close()
@@ -139,8 +139,38 @@ final class StatusPanel: NSPanel {
     override func cancelOperation(_ sender: Any?) {
         close()
     }
+
+    override func sendEvent(_ event: NSEvent) {
+        super.sendEvent(event)
+        guard event.type == .leftMouseUp else { return }
+        activateRow(at: event.locationInWindow)
+    }
+
+    /// SwiftUI Button does not see first mouse-up in this non-activating panel.
+    private func activateRow(at windowPoint: CGPoint) {
+        let pad: CGFloat = 5
+        let row: CGFloat = 26
+        let x = windowPoint.x
+        let y = windowPoint.y
+        guard x >= pad, x <= frame.width - pad else { return }
+        let quit = pad..<(pad + row)
+        let about = quit.upperBound..<(quit.upperBound + row)
+        let settings = about.upperBound..<(about.upperBound + row)
+        let id: String
+        switch y {
+        case quit: id = "quit"
+        case about: id = "about"
+        case settings: id = "settings"
+        default: return
+        }
+        cascade.click(id)
+    }
 }
 
 private final class MenuHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        super.hitTest(point) ?? self
+    }
 }

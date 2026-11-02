@@ -13,7 +13,7 @@ final class GlassSurfaceView: NSView {
         didSet { glass.tintColor = tint }
     }
 
-    private let glass = NSGlassEffectView()
+    private let glass = FirstMouseGlassView()
     private let content: NSView
     private var showingOpaque = false
     private var didApply = false
@@ -51,6 +51,12 @@ final class GlassSurfaceView: NSView {
 
     required init?(coder: NSCoder) { nil }
 
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        super.hitTest(point) ?? self
+    }
+
     override var fittingSize: NSSize { content.fittingSize }
 
     override var wantsUpdateLayer: Bool { true }
@@ -58,7 +64,9 @@ final class GlassSurfaceView: NSView {
     override func updateLayer() {
         layer?.cornerRadius = 12
         layer?.masksToBounds = true
-        layer?.backgroundColor = showingOpaque ? NSColor.windowBackgroundColor.cgColor : nil
+        layer?.backgroundColor = showingOpaque
+            ? NSColor.windowBackgroundColor.cgColor
+            : NSColor.black.withAlphaComponent(0.01).cgColor
     }
 
     private func applySurface() {
@@ -112,4 +120,18 @@ final class GlassSurfaceView: NSView {
         ])
     }
 
+}
+
+private final class FirstMouseGlassView: NSGlassEffectView {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        if let contentView {
+            let local = convert(point, to: contentView)
+            if let hit = contentView.hitTest(local) {
+                return hit
+            }
+        }
+        return super.hitTest(point) ?? self
+    }
 }

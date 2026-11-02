@@ -116,13 +116,8 @@ final class StatusBarController: NSObject {
     }
 
     private func menuTree() -> [CascadeNode] {
-        let core = CoreRowState(status: store.coreStatus)
         return [
-            CascadeNode(
-                id: "core",
-                isActionable: true,
-                children: core.hasSubmenu ? [CascadeNode(id: "core.submenu", isActionable: false)] : []
-            ),
+            CascadeNode(id: "core", isActionable: true),
             CascadeNode(id: "settings", isActionable: true),
             CascadeNode(id: "about", isActionable: true),
             CascadeNode(id: "quit", isActionable: true),

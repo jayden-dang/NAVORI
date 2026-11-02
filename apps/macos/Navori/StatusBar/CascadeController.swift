@@ -2,6 +2,7 @@ import AppKit
 import NavoriPanel
 import Observation
 import os
+import QuartzCore
 
 @MainActor
 @Observable
@@ -11,6 +12,8 @@ final class CascadeController {
     @ObservationIgnored private var state: CascadeState
     @ObservationIgnored private var hoverTimer: DispatchWorkItem?
     @ObservationIgnored private var rowFrames: [String: CGRect] = [:]
+    @ObservationIgnored private var lastClickRow: String?
+    @ObservationIgnored private var lastClickAt: CFTimeInterval = 0
     @ObservationIgnored private let tree: () -> [CascadeNode]
     @ObservationIgnored private let activateRow: (String) -> Void
     @ObservationIgnored private let log = Logger(subsystem: "dev.navori", category: "cascade")
@@ -34,6 +37,10 @@ final class CascadeController {
     }
 
     func click(_ row: String) {
+        let now = CACurrentMediaTime()
+        if lastClickRow == row, now - lastClickAt < 0.25 { return }
+        lastClickRow = row
+        lastClickAt = now
         apply(state.handle(.click(row: row)))
     }
 
