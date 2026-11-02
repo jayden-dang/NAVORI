@@ -402,11 +402,11 @@ _Requirements: AWAKE-7.1, AWAKE-7.2, AWAKE-7.3, AWAKE-7.4, AWAKE-7.5_
 
 **Depends-on:** Task 4, Task 11
 
-- [ ] **Step 1: Write failing tests:** in `refusal.rs`: `a_refused_system_keeps_the_lease_and_records_the_problem`, `a_hold_answers_with_system_held_false`, `refusal_retries_about_every_60_seconds`, `a_successful_retry_clears_only_that_problem`, `no_retry_with_no_lease`, `a_failed_explicit_release_records_the_problem`, `a_store_problem_survives_a_system_recovery`. In `crates/ffi/tests/awake.rs`, on a Kernel with a fake Awake: `the_awake_row_fails_while_system_is_refused`, `the_view_never_reports_held_while_refused`.
+- [x] **Step 1: Write failing tests:** in `refusal.rs`: `a_refused_system_keeps_the_lease_and_records_the_problem`, `a_hold_answers_with_system_held_false`, `refusal_retries_about_every_60_seconds`, `a_successful_retry_clears_only_that_problem`, `no_retry_with_no_lease`, `a_failed_explicit_release_records_the_problem`, `a_store_problem_survives_a_system_recovery`. In `crates/ffi/tests/awake.rs`, on a Kernel with a fake Awake: `the_awake_row_fails_while_system_is_refused`, `the_view_never_reports_held_while_refused`.
 Run: `cargo nextest run -p navori-mod-awake --test refusal` and `cargo nextest run -p navori-ffi --test awake` — expect: fail on the assertions.
-- [ ] **Step 2: Implement.**
+- [x] **Step 2: Implement.**
 Run: same commands — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(awake): report and retry a refused assertion"`
+- [x] **Step 3: Commit** `git commit -m "feat(awake): report and retry a refused assertion"`
 
 _Requirements: AWAKE-8.1, AWAKE-8.2, AWAKE-8.3, AWAKE-8.4, AWAKE-8.5, AWAKE-8.6, AWAKE-8.7, AWAKE-8.8_
 
