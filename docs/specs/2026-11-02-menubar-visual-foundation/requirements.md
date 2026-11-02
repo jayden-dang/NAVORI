@@ -1,7 +1,7 @@
 # Requirements: Menubar visual foundation
 
 Feature code: MENU
-Status: Approved
+Status: In-progress
 Date: 2026-11-02
 
 <!--
