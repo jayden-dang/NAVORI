@@ -1,48 +1,22 @@
+import NavoriPanel
 import SwiftUI
 
 /// Content of the menubar panel.
 struct PanelView: View {
     let store: CoreStore
-    let openSettings: (SettingsTab) -> Void
+    @Environment(CascadeController.self) private var cascade
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
-            Divider().padding(.horizontal, 12)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    banners
-                    if store.hasSnapshot {
-                        ModulesSection(modules: store.moduleRows)
-                        ActivitySection(events: store.eventRows)
-                    }
-                }
-                .padding(14)
-            }
-            .frame(maxHeight: 440)
-            Divider().padding(.horizontal, 12)
-            footer
+            banners
+            MenuRowView(row: coreRow, cascade: cascade)
+            Divider()
+            MenuRowView(row: settingsRow, cascade: cascade)
+            MenuRowView(row: aboutRow, cascade: cascade)
+            MenuRowView(row: quitRow, cascade: cascade)
         }
+        .padding(5)
         .frame(width: 360)
-    }
-
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("Navori").font(.headline)
-            if AppEnvironment.isDev {
-                Text("DEV")
-                    .font(.caption2.weight(.bold))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(.orange.opacity(0.25), in: Capsule())
-            }
-            Spacer()
-            Text("v\(AppEnvironment.version)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
     }
 
     @ViewBuilder
@@ -58,17 +32,53 @@ struct PanelView: View {
         }
     }
 
-    private var footer: some View {
-        HStack {
-            Button("Settings…") { openSettings(.general) }
-                .keyboardShortcut(",", modifiers: .command)
-            Spacer()
-            Button("Quit") { NSApp.terminate(nil) }
-                .keyboardShortcut("q", modifiers: .command)
-        }
-        .buttonStyle(.borderless)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
+    private var coreRow: MenuRow {
+        let state = CoreRowState(status: store.coreStatus)
+        return MenuRow(
+            id: "core",
+            icon: nil,
+            title: "Core",
+            value: state.label,
+            dot: state.dot,
+            opensSubmenu: state.hasSubmenu,
+            shortcut: nil
+        )
+    }
+
+    private var settingsRow: MenuRow {
+        MenuRow(
+            id: "settings",
+            icon: "gearshape",
+            title: "Settings…",
+            value: nil,
+            dot: nil,
+            opensSubmenu: false,
+            shortcut: ","
+        )
+    }
+
+    private var aboutRow: MenuRow {
+        MenuRow(
+            id: "about",
+            icon: nil,
+            title: "About Navori",
+            value: nil,
+            dot: nil,
+            opensSubmenu: false,
+            shortcut: nil
+        )
+    }
+
+    private var quitRow: MenuRow {
+        MenuRow(
+            id: "quit",
+            icon: nil,
+            title: "Quit Navori",
+            value: nil,
+            dot: nil,
+            opensSubmenu: false,
+            shortcut: "q"
+        )
     }
 }
 

@@ -14,23 +14,10 @@ final class StatusBarController: NSObject {
     private lazy var panel: StatusPanel = {
         self.panelBuilt = true
         let content = CascadeContent(
-            tree: {
-                [
-                    CascadeNode(id: "settings", isActionable: true),
-                    CascadeNode(id: "quit", isActionable: true),
-                ]
-            },
-            root: AnyView(PanelView(store: self.store, openSettings: { [weak self] tab in
-                self?.showSettings(tab)
-            })),
+            tree: { [weak self] in self?.menuTree() ?? [] },
+            root: AnyView(PanelView(store: self.store)),
             submenu: { _ in AnyView(EmptyView()) },
-            activate: { [weak self] id in
-                switch id {
-                case "settings": self?.showSettings(.general)
-                case "quit": NSApp.terminate(nil)
-                default: break
-                }
-            }
+            activate: { [weak self] id in self?.activate(id) }
         )
         return StatusPanel(content: content, onVisibility: { [weak self] visible in
             self?.store.setPanelVisible(visible)
@@ -126,6 +113,29 @@ final class StatusBarController: NSObject {
         item.menu = menu
         item.button?.performClick(nil)
         item.menu = nil  // keep left click for the panel
+    }
+
+    private func menuTree() -> [CascadeNode] {
+        let core = CoreRowState(status: store.coreStatus)
+        return [
+            CascadeNode(
+                id: "core",
+                isActionable: true,
+                children: core.hasSubmenu ? [CascadeNode(id: "core.submenu", isActionable: false)] : []
+            ),
+            CascadeNode(id: "settings", isActionable: true),
+            CascadeNode(id: "about", isActionable: true),
+            CascadeNode(id: "quit", isActionable: true),
+        ]
+    }
+
+    private func activate(_ id: String) {
+        switch id {
+        case "settings": showSettings(.general)
+        case "about": showSettings(.about)
+        case "quit": NSApp.terminate(nil)
+        default: break
+        }
     }
 
     private func showSettings(_ tab: SettingsTab = .general) {

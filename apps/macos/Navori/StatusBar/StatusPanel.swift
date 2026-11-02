@@ -7,6 +7,7 @@ import SwiftUI
 /// Closes on Escape, on click outside, and when it loses key status.
 @MainActor
 final class StatusPanel: NSPanel {
+    let cascade: CascadeController
     private let content: CascadeContent
     private let onVisibility: (Bool) -> Void
     private var outsideClickMonitor: Any?
@@ -18,23 +19,26 @@ final class StatusPanel: NSPanel {
     init(content: CascadeContent, onVisibility: @escaping (Bool) -> Void) {
         self.content = content
         self.onVisibility = onVisibility
+        self.cascade = CascadeController(tree: content.tree, activate: content.activate)
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: Self.width, height: 420),
             styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
             backing: .buffered,
             defer: true
         )
+        cascade.panel = self
         isFloatingPanel = true
         level = .popUpMenu
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         hidesOnDeactivate = false
         isMovable = false
+        acceptsMouseMovedEvents = true
         backgroundColor = .clear
         isOpaque = false
         hasShadow = true
         animationBehavior = .utilityWindow
 
-        let hosting = NSHostingView(rootView: self.content.root)
+        let hosting = MenuHostingView(rootView: self.content.root.environment(self.cascade))
         contentView = GlassSurfaceView(content: hosting)
     }
 
@@ -45,9 +49,10 @@ final class StatusPanel: NSPanel {
     }
 
     func show(relativeTo button: NSStatusBarButton, onFirstFrame: (@MainActor () -> Void)? = nil) {
+        cascade.reset()
         guard let buttonWindow = button.window else { return }
         let fitting = contentView?.fittingSize.height ?? 420
-        let height = min(max(fitting, 200), Self.maxHeight)
+        let height = min(max(fitting, 1), Self.maxHeight)
         let anchor = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let screen = buttonWindow.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
 
@@ -98,6 +103,7 @@ final class StatusPanel: NSPanel {
             NSEvent.removeMonitor(monitor)
             outsideClickMonitor = nil
         }
+        cascade.reset()
         onVisibility(false)
         super.close()
     }
@@ -133,4 +139,8 @@ final class StatusPanel: NSPanel {
     override func cancelOperation(_ sender: Any?) {
         close()
     }
+}
+
+private final class MenuHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
