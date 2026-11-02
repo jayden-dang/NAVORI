@@ -10,6 +10,7 @@ struct PanelView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             banners
+            MenuRowView(row: awakeRow, cascade: cascade)
             MenuRowView(row: coreRow, cascade: cascade)
             Divider()
             MenuRowView(row: settingsRow, cascade: cascade)
@@ -32,6 +33,19 @@ struct PanelView: View {
         if let problem = store.configProblem {
             Banner(style: .warning, title: problem.title, message: problem.message)
         }
+    }
+
+    private var awakeRow: MenuRow {
+        let state = AwakeRowState(status: store.awakeStatus)
+        return MenuRow(
+            id: "awake",
+            icon: "cup.and.saucer",
+            title: "Awake",
+            value: state.label,
+            dot: state.dot,
+            opensSubmenu: state.hasSubmenu,
+            shortcut: nil
+        )
     }
 
     private var coreRow: MenuRow {

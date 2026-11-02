@@ -114,6 +114,24 @@ final class CoreStore {
         }
     }
 
+    /// Missing record, or the module stopped, is `Unavailable`. A lease with no system assertion is `Not held`.
+    var awakeStatus: AwakeStatus {
+        guard let awake = snapshot?.awake else { return .unavailable }
+        if awake.problem == Self.moduleStopped { return .unavailable }
+        if awake.leases.isEmpty { return .off }
+        guard awake.systemHeld else { return .notHeld }
+        return .on(sources: awake.leases.compactMap(awakeSourceName))
+    }
+
+    private static let moduleStopped = "The Awake module stopped."
+
+    /// Session rows name the harness only. Other leases use the label the module already published.
+    private func awakeSourceName(_ lease: LeaseView) -> String? {
+        let name = lease.kind == "session" ? lease.harness : lease.label
+        guard let name, name.isEmpty == false else { return nil }
+        return name
+    }
+
     var health: Health {
         if let startupError { return .down(startupError) }
         guard let snapshot else { return .starting }
