@@ -18,9 +18,9 @@ Paths are shown for `release`; `dev` uses `Navori Dev` in place of `Navori`. Not
 | Database `~/Library/Application Support/Navori/navori.db` | SQLite, WAL mode. One file shared by every Owner; each Owner prefixes its own tables (for example `github_*` and `ai_session_*`). Opened by `navori-store`. |
 | `schema_migrations` (owner, version) | Records every applied migration per Owner, with its name and time. The source of an Owner's schema version. |
 | `kv` (ns, key → JSON value) | Small namespaced settings and cursors; a namespace per module. |
-| `events` — the Journal (id, ts_ms, module, kind, severity, summary, payload) | ULID ids, indexed by time. Redacted before insert. Pruned by retention (`journal.retention_days`, default 30). |
+| `events` — the Journal (id, ts_ms, module, kind, severity, summary, payload) | ULID ids, indexed by time. Redacted before insert. Pruned by retention (`journal.retention_days`, default 30). A bad `journal` value, or a file that cannot be read or is not TOML, pauses the sweep so it deletes nothing. |
 | Backups `~/Library/Application Support/Navori/backups/` | Full-database copies taken before an Owner's existing data is migrated: `<epoch-ms>-<owner>-v<from-version>.db`; the 5 newest are kept. |
-| Config `~/Library/Application Support/Navori/config.toml` | User-editable TOML, optional; sections per module/AI. Read at start-up. |
+| Config `~/Library/Application Support/Navori/config.toml` | User-editable TOML, optional; sections per module/AI. Read at start-up. A bad value falls back alone and the rest of the file is kept. |
 | Session marker `~/Library/Application Support/Navori/session.marker` | Exists while the Core runs (pid, start time, redacted panic text); a leftover one means the last session ended uncleanly. |
 | Logs `~/Library/Logs/Navori/navori.YYYY-MM-DD.log` | `tracing` output, daily rotation, 14 files kept; no prompt content or secrets unless debug is on. |
 | Socket `~/Library/Application Support/Navori/run/navori.sock` | Not data at rest — the IPC endpoint and single-instance lock, in a `0700` directory. |
@@ -46,7 +46,7 @@ Paths are shown for `release`; `dev` uses `Navori Dev` in place of `Navori`. Not
 - A module reads and writes only its own Owner's tables and KV namespace; it learns about other modules' data through Events and Actions, never by querying their tables (ARCH-3).
 - Journal ids are ULIDs (time-sortable); re-inserting the same id replaces the row, so replays are idempotent.
 - SQLite runs with `synchronous = NORMAL`, `foreign_keys = ON` and a 5 s busy timeout; all access goes through one connection guarded by the Store.
-- A missing config file means defaults; an invalid one means defaults plus a reported error (ARCH-13). Unknown keys are ignored so older builds can read newer configs.
+- A missing file means defaults; a bad value falls back alone and the rest of the file is kept; a bad `journal` value, or a file that cannot be read or is not TOML, pauses the journal sweep and is reported (ARCH-13). Unknown keys stay ignored so older builds can read newer configs.
 - `release` and `dev` never read each other's files (ARCH-14).
 
 ## Not the invariant spine

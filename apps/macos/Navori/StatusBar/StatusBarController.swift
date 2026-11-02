@@ -62,7 +62,7 @@ final class StatusBarController: NSObject {
         let (symbol, description): (String, String) = switch health {
         case .starting: ("circle.dotted", "Starting")
         case .ok: ("sparkle", "Navori")
-        case .degraded: ("exclamationmark.triangle", "Needs attention")
+        case .degraded(let sentence): ("exclamationmark.triangle", sentence)
         case .down: ("xmark.octagon", "Core not running")
         }
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: description)

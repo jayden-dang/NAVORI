@@ -1,13 +1,15 @@
 //! Composition root: wires config, store, kernel, IPC and the snapshot pump together.
 
 use std::os::unix::net::UnixStream as StdUnixStream;
+use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use futures::FutureExt;
 use futures::future::BoxFuture;
-use navori_config::{Config, Paths, Profile};
+use navori_config::{
+    Config, ConfigLoad, ConfigReport, JournalSweep, Paths, Profile, WholeFileReason,
+};
 use navori_ipc::Handler;
 use navori_kernel::{DispatchError, Kernel, ModuleState};
 use navori_protocol::{Check, CoreStatus, Envelope, Event, ModuleInfo, Severity, rpc};
@@ -25,10 +27,9 @@ pub struct Inner {
     pub profile: Profile,
     pub version: String,
     pub pid: u32,
-    pub config_error: Option<String>,
+    pub config_notice: Option<crate::ConfigNotice>,
     /// Set once, right after the single-instance check passes.
     pub last_unclean_exit: std::sync::OnceLock<Option<String>>,
-    pub panel_visible: AtomicBool,
 }
 
 impl Inner {
@@ -56,13 +57,17 @@ impl Inner {
     pub fn doctor(&self) -> Vec<Check> {
         let mut checks = Vec::new();
 
-        checks.push(match &self.config_error {
+        checks.push(match &self.config_notice {
             None => check(
                 "config",
                 true,
                 format!("{} is valid", self.paths.config_file.display()),
             ),
-            Some(e) => check("config", false, format!("{e} — running with defaults")),
+            Some(notice) => check(
+                "config",
+                false,
+                format!("{}. {}", notice.title, notice.message),
+            ),
         });
 
         checks.push(match self.store.integrity_ok() {
@@ -152,18 +157,89 @@ pub fn state_detail(info: &ModuleInfo) -> Option<String> {
     }
 }
 
-/// Loads config; an invalid file falls back to defaults and is reported, never fatal.
-pub fn load_config(paths: &Paths) -> (Config, Option<String>) {
-    match Config::load(&paths.config_file) {
-        Ok(cfg) => (cfg, None),
-        Err(e) => (Config::default(), Some(e.to_string())),
+/// The load is infallible: a bad value falls back alone, and a bad journal or a whole-file fallback pauses the sweep.
+pub fn load_config(paths: &Paths) -> ConfigLoad {
+    Config::load(&paths.config_file)
+}
+
+pub fn config_notice(
+    report: &ConfigReport,
+    sweep: &JournalSweep,
+    module_issues: &[&str],
+    file: &Path,
+) -> Option<crate::ConfigNotice> {
+    let name = file_label(file);
+    let mut notice = match report {
+        ConfigReport::WholeFile(reason) => Some(crate::ConfigNotice {
+            title: format!("{name} is on defaults"),
+            message: whole_file_message(reason),
+        }),
+        ConfigReport::Clean | ConfigReport::BadValues(_) => {
+            let keys = bad_keys(report, module_issues);
+            if keys.is_empty() {
+                None
+            } else {
+                Some(crate::ConfigNotice {
+                    title: format!("{name} has bad values"),
+                    message: format!(
+                        "{} use their defaults. Fix them and reopen Navori.",
+                        keys.join(", ")
+                    ),
+                })
+            }
+        }
+    };
+    if let Some(notice) = notice.as_mut()
+        && matches!(sweep, JournalSweep::Paused)
+    {
+        notice.message.push(' ');
+        notice
+            .message
+            .push_str("Journal cleanup is paused until the file is fixed and Navori is reopened.");
+    }
+    notice
+}
+
+fn file_label(file: &Path) -> std::borrow::Cow<'_, str> {
+    match file.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => file.to_string_lossy(),
     }
 }
 
-pub fn build_kernel(store: Store, config: &Config) -> Kernel {
-    Kernel::builder(store)
-        .journal_retention_days(config.journal.retention_days)
-        .start()
+fn whole_file_message(reason: &WholeFileReason) -> String {
+    match reason {
+        WholeFileReason::Unreadable => "It cannot be read.".to_owned(),
+        WholeFileReason::NotToml {
+            position: Some((line, column)),
+        } => format!("Not valid TOML at line {line}, column {column}."),
+        WholeFileReason::NotToml { position: None } => "Not valid TOML.".to_owned(),
+    }
+}
+
+fn bad_keys(report: &ConfigReport, module_issues: &[&str]) -> Vec<String> {
+    let mut keys = match report {
+        ConfigReport::BadValues(keys) => keys.clone(),
+        ConfigReport::Clean | ConfigReport::WholeFile(_) => Vec::new(),
+    };
+    for issue in module_issues {
+        if !keys.iter().any(|key| key == issue) {
+            keys.push((*issue).to_owned());
+        }
+    }
+    keys
+}
+
+pub fn build_kernel(
+    store: Store,
+    sections: serde_json::Map<String, serde_json::Value>,
+    sweep: &JournalSweep,
+) -> Kernel {
+    let builder = match sweep {
+        JournalSweep::KeepDays(days) => Kernel::builder(store).journal_retention_days(*days),
+        JournalSweep::Paused => Kernel::builder(store).pause_journal_sweep(),
+    };
+    builder.config_sections(sections).start()
 }
 
 /// JSON-RPC handler for the local socket.
@@ -272,7 +348,7 @@ pub async fn snapshot_pump(
             changed = revision.changed() => if changed.is_err() { return },
             ev = events.recv() => if matches!(ev, Err(RecvError::Closed)) { return },
         }
-        let delay = if inner.panel_visible.load(Ordering::Relaxed) {
+        let delay = if inner.kernel.scheduler().panel_visible() {
             Duration::from_millis(33)
         } else {
             Duration::from_millis(250)

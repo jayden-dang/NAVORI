@@ -37,7 +37,7 @@ R0 baseline (debug build, 2026-11-01): 0.0% CPU, 0 wake-ups/s, 21 MB footprint, 
 ## Design rules (from the architecture spine)
 
 - ARCH-15 — no WebView, Electron or JS runtime.
-- ARCH-16 — menu closed: no timer faster than 30 s; periodic work goes through the Scheduler (adaptive: faster while the menu is open, paused during sleep, refresh on wake).
+- ARCH-16 — menu closed: no timer faster than 30 s; periodic work goes through the Scheduler (adaptive: faster while the menu is open, a timer parks on uptime, and an overdue timer may fire during dark wake, refresh on wake).
 - ARCH-17 — the AI runtime and provider HTTP clients start on first use.
 - ARCH-18 — network data (avatars, GitHub) is cached on disk; opening the menu never refetches.
 - Snapshots pushed to Swift are coalesced (≤ 30/s while the menu is open, slower when closed).

@@ -59,6 +59,10 @@ final class CoreStore {
         core?.setPanelVisible(visible: visible)
     }
 
+    func systemDidWake() {
+        core?.systemDidWake()
+    }
+
     func runChecks() {
         guard let core, !isRunningChecks else { return }
         isRunningChecks = true
@@ -95,8 +99,8 @@ final class CoreStore {
     var uncleanExit: String? { snapshot?.lastUncleanExit }
 
     var configProblem: ConfigProblem? {
-        guard let message = snapshot?.configError else { return nil }
-        return ConfigProblem(title: "config.toml is invalid — using defaults", message: message)
+        guard let notice = snapshot?.configNotice else { return nil }
+        return ConfigProblem(title: notice.title, message: notice.message)
     }
 
     var hasSnapshot: Bool { snapshot != nil }
@@ -119,8 +123,8 @@ final class CoreStore {
         if let restarting = snapshot.modules.first(where: { $0.state == "restarting" }) {
             return .degraded("\(restarting.id) is restarting")
         }
-        if let configError = snapshot.configError {
-            return .degraded("config.toml is invalid — using defaults. \(configError)")
+        if let notice = snapshot.configNotice {
+            return .degraded("\(notice.title). \(notice.message)")
         }
         return .ok
     }

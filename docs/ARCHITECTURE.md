@@ -71,22 +71,28 @@ Design notes for capabilities that are planned but not yet specified. When a fea
 ### Seed: kernel contract extensions (R1–R2)
 
 ```rust
-pub trait Module: Send + 'static {
+pub trait Module: Send + Sized + 'static {
     const ID: &'static str;                                  // "github"
-    type Action: DeserializeOwned + JsonSchema + ActionMeta + Send;
-    type State:  Serialize + Clone + Send + Sync + 'static;
-    type Config: DeserializeOwned + Default + Send + Sync + 'static;
+    type Action: ModuleAction;
+    type Config: ModuleConfig;
+    /// Snapshot published to the UI / AI. Must be cheap to clone.
+    type State: Serialize + Clone + Send + Sync + 'static;
 
-    /// AI-readable: the current state, concise, with sensitive data filtered out.
-    fn context(state: &Self::State) -> ContextFragment;
-    /// Badge / icon hint for the menubar.
-    fn tray(state: &Self::State) -> TrayContribution { TrayContribution::none() }
+    fn initial_state(&self) -> Self::State;
 
-    async fn run(self, ctx: ModuleCtx<Self>) -> anyhow::Result<()>;
+    fn run(&mut self, ctx: &mut ModuleCtx<Self>) -> impl Future<Output = anyhow::Result<()>> + Send;
 }
 
-pub trait ActionMeta {
+pub trait ModuleAction: DeserializeOwned + JsonSchema + Send + 'static {
     fn risk(&self) -> Risk;                  // Read | Write | Destructive
+    /// One entry per variant, in display order.
+    fn catalog() -> Vec<ActionDoc>;
+}
+
+pub trait ModuleConfig: DeserializeOwned + Default + Send + Sync + 'static {
+    fn check(&self) -> Result<(), &'static str> {
+        Ok(())
+    }
 }
 ```
 
@@ -98,9 +104,10 @@ Three obligations for every module — these turn a "feature" into a "capability
 | `context()` → `ContextFragment` | **Context Engine** (the AI knows your "now") |
 | Domain `Event` with `summary()` | Journal, **Triggers**, **Memory** (the AI knows "what happened") |
 
+For MILE-3, `context()` and `tray()` stay obligations — `tray()` is a badge or icon hint for the menubar. They are not on the trait yet.
+
 - **Typed inside, erased at the edge**: the kernel wraps a module into `ModuleHandle { id, actions: Vec<ActionSpec>, dispatch, state_json, context }`. The Swift UI uses typed values (via UniFFI); AI/IPC/MCP use JSON `Envelope`s.
 - **Supervisor**: a failing module is restarted with backoff, without crashing the app.
-- **Shared Scheduler**: panel open → fast; background → slow; on battery → slower; sleep → stopped; wake → refresh.
 - **EventBus**: realtime `broadcast` + an `events` table (configurable retention).
 
 ### Seed: Rust ⇄ Swift surface for AI and platform services (R2)
@@ -121,6 +128,7 @@ impl NavoriCore {
     async fn resolve_approval(&self, id: String, decision: ApprovalDecision);
 
     fn set_panel_visible(&self, visible: bool);                          // throttles polling / coalescing
+    fn system_did_wake(&self);                                           // one wake pulse after the Mac wakes
     async fn shutdown(&self);
 }
 ```

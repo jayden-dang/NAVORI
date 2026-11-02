@@ -1,7 +1,7 @@
 # Requirements: Kernel contract extensions
 
 Feature code: KCONTRACT
-Status: In-progress
+Status: Implemented
 Date: 2026-11-02
 
 <!--
@@ -122,8 +122,8 @@ Terms used below:
 | `crates/kernel/src/system.rs` | `Ping`; `PruneJournal`; sweep at start and every 6 h; a failed sweep only logs a warning | KCONTRACT-3.1, KCONTRACT-3.9, KCONTRACT-G4, KCONTRACT-G11 |
 | `crates/kernel/src/lib.rs` | Re-exports only | no behavior to guard |
 | `crates/kernel/tests/kernel.rs` | Assertions stay as they are; a test Module may gain a declaration that it takes no config | KCONTRACT-G1 |
-| `crates/config/src/lib.rs` | Missing file, partial file, unknown keys, malformed TOML names the file. Today's messages hold the raw value and the TOML source line; KCONTRACT-7.2 removes that on purpose | KCONTRACT-2.6, KCONTRACT-2.7, KCONTRACT-2.8, KCONTRACT-G5, KCONTRACT-7.2 |
-| `crates/config/tests/config_file.rs` | `out_of_range_values_are_rejected` asserts today's whole-file error; KCONTRACT-2.1 replaces that behavior on purpose | KCONTRACT-2.1 |
+| `crates/config/src/lib.rs` | Missing file, partial file, unknown keys, malformed TOML names the file. Before this change, messages held the raw value and the TOML source line; KCONTRACT-7.2 removes that on purpose | KCONTRACT-2.6, KCONTRACT-2.7, KCONTRACT-2.8, KCONTRACT-G5, KCONTRACT-7.2 |
+| `crates/config/tests/config_file.rs` | `out_of_range_values_are_rejected` asserted the old whole-file error; KCONTRACT-2.1 replaces that behavior on purpose | KCONTRACT-2.1 |
 | `crates/ffi/src/app.rs` | `load_config`, `doctor`, `build_kernel`, `snapshot_pump` | KCONTRACT-2.9, KCONTRACT-2.10, KCONTRACT-5.4 |
 | `crates/ffi/tests/core.rs` | `an_invalid_config_falls_back_to_defaults_and_is_reported` asserts a report that names `config.toml`; KCONTRACT-2.3 keeps that, and the test changes only if the field's type changes | KCONTRACT-2.3, KCONTRACT-2.9 |
 | `crates/ffi/src/lib.rs` | `CoreSnapshot` module views unchanged; `config_error` field changes to carry KCONTRACT-2.3; `set_panel_visible`; `shutdown` idempotent | KCONTRACT-5.4, KCONTRACT-G6 |

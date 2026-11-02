@@ -7,14 +7,16 @@ use std::time::{Duration, Instant};
 use futures::FutureExt;
 use navori_protocol::{ActionSpec, Envelope, Event, ModuleInfo, ModuleState, Severity};
 use navori_store::{Store, StoreError};
+use serde::Deserialize;
 use serde_json::{Value, json};
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::bus::{EventBus, now_ms};
-use crate::module::{ActionError, Module, ModuleAction, ModuleCtx, Reply, Request};
-use crate::system::System;
+use crate::module::{ActionError, Module, ModuleAction, ModuleConfig, ModuleCtx, Reply, Request};
+use crate::scheduler::{Scheduler, SystemClock, WallClock};
+use crate::system::{SweepPolicy, System};
 
 const INBOX_CAPACITY: usize = 256;
 /// A module that ran this long before crashing gets its restart budget back.
@@ -55,7 +57,14 @@ impl Default for RestartPolicy {
 
 type SendFn = Box<dyn Fn(Value) -> Result<oneshot::Receiver<Reply>, DispatchError> + Send + Sync>;
 type StateFn = Box<dyn Fn() -> Value + Send + Sync>;
-type Launcher = Box<dyn FnOnce(RestartPolicy) -> JoinHandle<()> + Send>;
+type Launcher = Box<
+    dyn FnOnce(
+            RestartPolicy,
+            &serde_json::Map<String, Value>,
+            &mut Vec<&'static str>,
+        ) -> JoinHandle<()>
+        + Send,
+>;
 
 struct Registered {
     id: &'static str,
@@ -72,6 +81,7 @@ struct Plumbing {
     bus: EventBus,
     revision: Arc<watch::Sender<u64>>,
     shutdown: CancellationToken,
+    scheduler: Scheduler,
 }
 
 pub struct KernelBuilder {
@@ -80,7 +90,8 @@ pub struct KernelBuilder {
     launchers: Vec<Launcher>,
     policy: RestartPolicy,
     dispatch_timeout: Duration,
-    retention_days: Arc<std::sync::atomic::AtomicU32>,
+    sweep_policy: Arc<Mutex<SweepPolicy>>,
+    sections: serde_json::Map<String, Value>,
 }
 
 impl std::fmt::Debug for KernelBuilder {
@@ -100,13 +111,23 @@ impl KernelBuilder {
 
     /// Days of journal history the built-in `system` module keeps (minimum 1).
     pub fn journal_retention_days(self, days: u32) -> Self {
-        self.retention_days
-            .store(days.max(1), std::sync::atomic::Ordering::Relaxed);
+        *lock(&self.sweep_policy) = SweepPolicy::KeepDays(days.max(1));
+        self
+    }
+
+    /// Leave the built-in journal sweep paused for this process.
+    pub fn pause_journal_sweep(self) -> Self {
+        *lock(&self.sweep_policy) = SweepPolicy::Paused;
         self
     }
 
     pub fn dispatch_timeout(mut self, timeout: Duration) -> Self {
         self.dispatch_timeout = timeout;
+        self
+    }
+
+    pub fn config_sections(mut self, sections: serde_json::Map<String, Value>) -> Self {
+        self.sections = sections;
         self
     }
 
@@ -154,19 +175,24 @@ impl KernelBuilder {
         let state: StateFn =
             Box::new(move || serde_json::to_value(&*state_rx.borrow()).unwrap_or(Value::Null));
 
-        let ctx = ModuleCtx::<M> {
-            inbox: inbox_rx,
-            state: state_tx,
-            revision: self.plumbing.revision.clone(),
-            bus: self.plumbing.bus.clone(),
-            store: self.plumbing.store.clone(),
-            shutdown: self.plumbing.shutdown.clone(),
-        };
         let sup_info = info.clone();
         let plumbing = self.plumbing.clone();
-        self.launchers.push(Box::new(move |policy| {
-            tokio::spawn(supervise(module, ctx, sup_info, policy, plumbing))
-        }));
+        self.launchers
+            .push(Box::new(move |policy, sections, issues| {
+                let config = module_config::<M>(sections, issues);
+                let _ = state_tx.send(module.initial_state());
+                let ctx = ModuleCtx::<M> {
+                    inbox: inbox_rx,
+                    state: state_tx,
+                    revision: plumbing.revision.clone(),
+                    bus: plumbing.bus.clone(),
+                    store: plumbing.store.clone(),
+                    shutdown: plumbing.shutdown.clone(),
+                    scheduler: plumbing.scheduler.clone(),
+                    config,
+                };
+                tokio::spawn(supervise(module, ctx, sup_info, policy, plumbing))
+            }));
         self.modules.push(Registered {
             id: M::ID,
             specs,
@@ -178,11 +204,12 @@ impl KernelBuilder {
     }
 
     /// Spawns every module on the current tokio runtime.
-    pub fn start(self) -> Kernel {
-        let tasks = self
-            .launchers
+    pub fn start(mut self) -> Kernel {
+        let sections = std::mem::take(&mut self.sections);
+        let mut config_issues = Vec::new();
+        let tasks = std::mem::take(&mut self.launchers)
             .into_iter()
-            .map(|launch| launch(self.policy))
+            .map(|launch| launch(self.policy, &sections, &mut config_issues))
             .collect();
         Kernel {
             modules: self.modules,
@@ -191,8 +218,27 @@ impl KernelBuilder {
             tasks: Mutex::new(tasks),
             started_at_ms: now_ms(),
             started: Instant::now(),
+            config_issues,
         }
     }
+}
+
+fn module_config<M: Module>(
+    sections: &serde_json::Map<String, Value>,
+    issues: &mut Vec<&'static str>,
+) -> Arc<M::Config> {
+    let Some(value) = sections.get(M::ID) else {
+        return Arc::new(M::Config::default());
+    };
+    let Ok(config) = M::Config::deserialize(value) else {
+        issues.push(M::ID);
+        return Arc::new(M::Config::default());
+    };
+    if config.check().is_err() {
+        issues.push(M::ID);
+        return Arc::new(M::Config::default());
+    }
+    Arc::new(config)
 }
 
 pub struct Kernel {
@@ -202,6 +248,7 @@ pub struct Kernel {
     tasks: Mutex<Vec<JoinHandle<()>>>,
     started_at_ms: i64,
     started: Instant,
+    config_issues: Vec<&'static str>,
 }
 
 impl std::fmt::Debug for Kernel {
@@ -215,12 +262,17 @@ impl std::fmt::Debug for Kernel {
 impl Kernel {
     /// A builder with the built-in `system` module already registered.
     pub fn builder(store: Store) -> KernelBuilder {
+        Self::builder_with_clock(store, Arc::new(SystemClock))
+    }
+
+    pub fn builder_with_clock(store: Store, clock: Arc<dyn WallClock>) -> KernelBuilder {
         let (revision, _) = watch::channel(0);
         let plumbing = Plumbing {
             bus: EventBus::new(store.clone()),
             store,
             revision: Arc::new(revision),
             shutdown: CancellationToken::new(),
+            scheduler: Scheduler::new(clock),
         };
         let system = System::default();
         KernelBuilder {
@@ -229,9 +281,18 @@ impl Kernel {
             launchers: Vec::new(),
             policy: RestartPolicy::default(),
             dispatch_timeout: Duration::from_secs(30),
-            retention_days: system.retention_days.clone(),
+            sweep_policy: Arc::clone(&system.sweep_policy),
+            sections: serde_json::Map::new(),
         }
         .register(system)
+    }
+
+    pub fn config_issues(&self) -> &[&'static str] {
+        &self.config_issues
+    }
+
+    pub fn scheduler(&self) -> &Scheduler {
+        &self.plumbing.scheduler
     }
 
     pub fn actions(&self) -> Vec<ActionSpec> {
