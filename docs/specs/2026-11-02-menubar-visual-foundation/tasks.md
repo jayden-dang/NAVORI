@@ -568,9 +568,9 @@ _Requirements: MENU-2.3, MENU-G6_
 
 **Depends-on:** Task 19
 
-- [ ] **Step 1: Pick with the user** in the Preview on their real wallpaper. Measure screenshots of the chosen tint: dark appearance on a white background and light appearance on a black one. Expect primary text ≥ 4.5:1 and secondary ≥ 3:1. A tint the user prefers that misses this goes back to them with the numbers; it is not silently raised.
-- [ ] **Step 2: Set** `GlassTint.standard` and record the value in the brief's Amendment 11.
-- [ ] **Step 3: Run** `cargo xtask ci`, then `cargo xtask perf` — expect: every GOAL-11 budget met. Confirm from the idle metrics that the closed menu holds 0% CPU, and by reading `CascadeController` that the only timer is the one-shot hover work item.
-- [ ] **Step 4: Commit** `git commit -m "feat(shell): set the menu's glass tint"`
+- [x] **Step 1: Pick with the user** in the Preview on their real wallpaper. Measure screenshots of the chosen tint: dark appearance on a white background and light appearance on a black one. Expect primary text ≥ 4.5:1 and secondary ≥ 3:1. A tint the user prefers that misses this goes back to them with the numbers; it is not silently raised.
+- [x] **Step 2: Set** `GlassTint.standard` and record the value in the brief's Amendment 11.
+- [x] **Step 3: Run** `cargo xtask ci`, then `cargo xtask perf` — expect: every GOAL-11 budget met. Confirm from the idle metrics that the closed menu holds 0% CPU, and by reading `CascadeController` that the only timer is the one-shot hover work item.
+- [x] **Step 4: Commit** `git commit -m "feat(shell): set the menu's glass tint"`
 
 _Requirements: MENU-11.1, MENU-11.2, MENU-11.4_
