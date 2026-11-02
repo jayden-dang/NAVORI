@@ -12,12 +12,12 @@ Rules:
 - IDs are immutable once Status is Approved. Retire by strikethrough — never renumber.
 -->
 
-Roadmap item: ROAD-5 (MILE-2) · Tracker: #1 · Budget source: GOAL-7 in `docs/product/vision.md`, method in `docs/standards/performance.md`.
+Roadmap item: ROAD-5 (MILE-2) · Tracker: #1 · Budget source: GOAL-11 in `docs/product/vision.md`, method in `docs/standards/performance.md`.
 
 Terms used below:
 - **Perf build** — the app built from release code (Rust `--release`, Swift `-c release`) and packaged with the dev identity: bundle id `dev.navori.app.debug`, `NavoriProfile=dev`.
 - **The menu** — what a left click on the status item opens (today the `StatusPanel`; later the A5 NSMenu).
-- **Gated metric** — has a GOAL-7 budget and is also regression-checked. **Baseline-only metric** — regression-checked, no budget yet.
+- **Gated metric** — has a GOAL-11 budget and is also regression-checked. **Baseline-only metric** — regression-checked, no budget yet.
 - **Perf mode** — the app was started with the environment variable `NAVORI_PERF=1`.
 
 ## 1. Run the gate and get a verdict
@@ -25,7 +25,7 @@ Terms used below:
 **Story:** As the developer, I want to run `cargo xtask perf` and get one pass/fail verdict with every metric shown against its budget, so that I know whether a release is fast enough before shipping it.
 
 - **PERF-1.1** WHEN `cargo xtask perf` runs THE SYSTEM SHALL build the Perf build and measure that bundle.
-- **PERF-1.2** THE SYSTEM SHALL report these gated metrics with their GOAL-7 budgets: `cold_start_ms` ≤ 200 (process start to status item drawn), `menu_open_after_launch_ms` ≤ 50 (first open of the menu in a process, trigger to first frame), `menu_reopen_ms` ≤ 50 (later opens in the same process), `footprint_menu_open_mb` ≤ 60 (phys_footprint with the menu open, printed with the number of running modules), `idle_cpu_pct` = 0.0 (rounded to one decimal), `idle_wakeups_per_s` ≤ 1, `idle_footprint_mb` ≤ 30, `app_size_mb` ≤ 25 (bundle on disk).
+- **PERF-1.2** THE SYSTEM SHALL report these gated metrics with their GOAL-11 budgets: `cold_start_ms` ≤ 200 (process start to status item drawn), `menu_open_after_launch_ms` ≤ 80 (first open of the menu in a process, trigger to first frame), `menu_reopen_ms` ≤ 50 (later opens in the same process), `footprint_menu_open_mb` ≤ 60 (phys_footprint with the menu open, printed with the number of running modules), `idle_cpu_pct` = 0.0 (rounded to one decimal), `idle_wakeups_per_s` ≤ 1, `idle_footprint_mb` ≤ 30, `app_size_mb` ≤ 25 (bundle on disk).
 - **PERF-1.3** THE SYSTEM SHALL report these baseline-only metrics, labelled as baseline-only: `peak_footprint_mb` (highest phys_footprint seen during the run), `idle_disk_writes_kb` (logical bytes written during the idle windows), `menu_open_cpu_ms` (CPU time consumed per menu open), `thread_count` (threads while idle).
 - **PERF-1.4** THE SYSTEM SHALL list every metric it does not measure in a skip list declared in the tool, each with a reason, and print each as `skipped: <reason>`; initially `submenu_open_ms` with the reason "no submenu until the A5 menu".
 - **PERF-1.5** WHEN measuring THE SYSTEM SHALL run phase A as 5 separate app processes — taking `cold_start_ms`, `menu_open_after_launch_ms` and `footprint_menu_open_mb` once per process and `menu_reopen_ms` as the median of 5 reopens per process — and report the median across the 5 processes for each.
@@ -104,7 +104,7 @@ Files this change touches, with what each must keep doing:
 - A new Profile value, or any change to the glossary's Profile or ARCH-14.
 - Any action, FFI function, IPC method, CLI command or URL scheme that exists only for measurement.
 - `powermetrics`, `sudo`, or synthetic clicks through Accessibility.
-- Absolute budgets for the four baseline-only metrics (set later through `define-project`, which amends GOAL-7).
+- Absolute budgets for the four baseline-only metrics (set later through `define-project`, which amends GOAL-11).
 - Hang detection and long-running leak/soak checks (ROAD-28).
 - Prebuilding the panel or any optimisation to make a metric pass — this feature measures; fixing a miss is separate work.
 - Measuring the installed `/Applications/Navori.app` itself, or any machine other than the author's Mac.

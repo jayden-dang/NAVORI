@@ -17,7 +17,7 @@ Neighbors (catalog `docs/specs/catalog/app.md`, OWNS coverage 0 of 5 cards — n
 
 Known before the first run: the installed release app idles at **42 MB** phys_footprint with 6 threads, above the 30 MB `idle_footprint_mb` budget. The gate will report that miss; fixing it is out of scope (requirements, Out of Scope).
 
-Measured on this Mac (`Mac17,9`, macOS 27.0.1) at `dab5a48` on 2026-11-02: `idle_footprint_mb` was about 19 MB, inside the 30 MB budget. The gated miss is `menu_open_after_launch_ms`, which landed at 49.2, 51.8, 51.9 and 49.4 across four runs. One `--record` run exited 0 and wrote `perf-baseline.json`; the file was not committed because the next three runs did not share a verdict (exit 1, 1, 0). No run printed a regression line. The 50 ms budget was not changed.
+Measured on this Mac (`Mac17,9`, macOS 27.0.1) at `dab5a48` on 2026-11-02: `idle_footprint_mb` was about 19 MB, inside the 30 MB budget. `menu_open_after_launch_ms` landed at 49.2, 51.8, 51.9 and 49.4 across four runs, and earlier samples on the same Mac reached 63.7. That spread made the 50 ms line fail some runs and pass others, so no baseline was committed. GOAL-11 then set the first-open budget to 80 ms. Later opens stay at 50 ms. `menu_reopen_ms` on those runs was about 8–11 ms.
 
 ## Decisions
 

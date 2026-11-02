@@ -104,7 +104,7 @@ Terms used below:
 
 **Story:** As a stakeholder, I want measurable quality targets for this feature, so that how-well is not left implicit.
 
-- **Performance:** (GOAL-7, `docs/standards/performance.md`, ARCH-16; no `docs/product/metrics.md` or `docs/ops/reliability.md` exists)
+- **Performance:** (GOAL-11, `docs/standards/performance.md`, ARCH-16; no `docs/product/metrics.md` or `docs/ops/reliability.md` exists)
   - **PROCS-8.1** WHILE no watcher exists THE SYSTEM SHALL run no thread and no timer of its own — verified by a test that counts the process's threads before and after taking a snapshot, resolving sessions and holding an assertion.
   - **PROCS-8.2** WHILE a watcher exists and no watched process exits THE SYSTEM SHALL cause no wakeup — verified by a test that registers a watch on a sleeping child and measures, over 10 s, zero events, no idle package wakeups and a process CPU-time increase below 2 ms (no CPU time = below measurement noise).
   - **PROCS-8.3** WHEN a watched process exits THE SYSTEM SHALL deliver its exit event from an OS exit notification, never from polling — verified by a real-OS test that kills a child and receives the event within 10 ms on this Mac (spike: 0.2 ms median) while the watcher registers no timer.

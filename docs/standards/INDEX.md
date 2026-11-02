@@ -9,7 +9,7 @@ The single source of engineering rules. Feature work, reviews and "done" claims 
 |---|---|
 | [testing.md](testing.md) | test-first, seams, fakes, naming |
 | [errors-logging.md](errors-logging.md) | error types, messages, CLI exit codes, logging and redaction |
-| [performance.md](performance.md) | the GOAL-7 budget, how it is measured, regression policy |
+| [performance.md](performance.md) | the GOAL-11 budget, how it is measured, regression policy |
 
 ## Code
 
@@ -51,6 +51,6 @@ A release (one capability) is done only when all of these hold. Trimmed for a si
 5. **AI-ready** — actions with schema, LLM-readable description and Risk (ARCH-4); the module's context fragment; Events with a one-sentence summary; at least one eval case.
 6. **Tested** — per [testing.md](testing.md); `cargo xtask ci` green.
 7. **Observable** — enough `tracing` to debug from logs alone, and an entry in `navori doctor`.
-8. **Fast** — `cargo xtask perf` green against the GOAL-7 budget (measured, not assumed).
+8. **Fast** — `cargo xtask perf` green against the GOAL-11 budget (measured, not assumed).
 9. **Documented** — `docs/features/<feature>.md`.
 10. **Dogfooded** — used daily for at least 3 days with no blocking defect (GOAL-8).

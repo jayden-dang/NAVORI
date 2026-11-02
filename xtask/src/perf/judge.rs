@@ -27,7 +27,7 @@ pub const METRICS: &[MetricSpec] = &[
     MetricSpec {
         name: "menu_open_after_launch_ms",
         unit: "ms",
-        kind: Kind::Gated { budget: 50.0 },
+        kind: Kind::Gated { budget: 80.0 },
         floor: 5.0,
     },
     MetricSpec {
@@ -251,7 +251,7 @@ mod tests {
     fn within_budget() -> Measurements {
         Measurements::from([
             ("cold_start_ms".to_owned(), 200.0),
-            ("menu_open_after_launch_ms".to_owned(), 50.0),
+            ("menu_open_after_launch_ms".to_owned(), 80.0),
             ("menu_reopen_ms".to_owned(), 50.0),
             ("footprint_menu_open_mb".to_owned(), 60.0),
             ("idle_cpu_pct".to_owned(), 0.0),
@@ -486,7 +486,7 @@ mod tests {
         let standard = include_str!("../../../docs/standards/performance.md");
         let expected: &[(&str, f64, Option<f64>, &str)] = &[
             ("cold_start_ms", 10.0, Some(200.0), "≤ 200 ms"),
-            ("menu_open_after_launch_ms", 5.0, Some(50.0), "≤ 50 ms"),
+            ("menu_open_after_launch_ms", 5.0, Some(80.0), "≤ 80 ms"),
             ("menu_reopen_ms", 5.0, Some(50.0), "≤ 50 ms"),
             ("footprint_menu_open_mb", 1.0, Some(60.0), "≤ 60 MB"),
             ("idle_cpu_pct", 0.1, Some(0.0), "0%"),

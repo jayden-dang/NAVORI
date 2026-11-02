@@ -41,7 +41,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 ## MILE-1 — Foundation (R0)
 
 **Outcome:** The user installs Navori with one command, it starts at login as a menubar icon, and `navori doctor` reports every check green.
-**Goals:** GOAL-7, GOAL-8
+**Goals:** GOAL-11, GOAL-8
 **Members:**
 - **ROAD-1** core-foundation — After: none — Surfaces: `crates/protocol/`, `crates/redact/`, `crates/config/`, `crates/store/`, `crates/kernel/`, `crates/ipc/`, `crates/ffi/`
 - **ROAD-2** menubar-shell — After: ROAD-1 — Surfaces: `apps/macos/`
@@ -56,7 +56,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 ## MILE-2 — Awake (R1)
 
 **Outcome:** The Mac stays awake while any Claude Code, Codex or Grok session is working and goes back to normal sleep after they stop, with no manual action.
-**Goals:** GOAL-2, GOAL-7
+**Goals:** GOAL-2, GOAL-11
 **Members:**
 - **ROAD-5** perf-gate — After: none — Surfaces: `xtask/`
 - **ROAD-6** platform-and-process-model — After: none — Surfaces: `crates/macos/`, `crates/procs/`

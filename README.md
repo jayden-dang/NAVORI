@@ -15,7 +15,7 @@ cargo xtask signing-setup   # once: stable self-signed identity (keeps Keychain 
 cargo xtask run             # build + launch "Navori Dev.app" (separate data, logs and socket)
 cargo xtask install         # build release → /Applications/Navori.app (old one kept as .previous)
 cargo xtask ci              # fmt, clippy -D warnings, tests, dependency rules, Swift build
-cargo xtask perf            # GOAL-7 budget; --record writes perf-baseline.json when the run passes
+cargo xtask perf            # GOAL-11 budget; --record writes perf-baseline.json when the run passes
 cargo xtask outdated        # compare dependencies with the latest stable crates.io releases
 ```
 

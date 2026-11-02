@@ -51,7 +51,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 ## Third-party stack
 
 - Every third-party crate is declared once in `[workspace.dependencies]`, pinned to the latest stable release, and inherited with `workspace = true`; `cargo xtask outdated` reports drift.
-- Prefer the standard library and crates already in the workspace; a new crate needs a reason it cannot be done with what exists (performance budget, GOAL-7).
+- Prefer the standard library and crates already in the workspace; a new crate needs a reason it cannot be done with what exists (performance budget, GOAL-11).
 - No WebView, Electron or JavaScript runtime dependency of any kind (ARCH-15).
 
 | Area | In use (R0) | Planned |

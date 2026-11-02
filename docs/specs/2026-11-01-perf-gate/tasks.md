@@ -14,7 +14,7 @@ Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
 
-**Goal:** `cargo xtask perf [--record]` measures release code against the GOAL-7 budget and a recorded baseline and gives one pass/fail verdict, without touching the daily app.
+**Goal:** `cargo xtask perf [--record]` measures release code against the GOAL-11 budget and a recorded baseline and gives one pass/fail verdict, without touching the daily app.
 
 **Architecture:** `xtask` gains an identity × flavour split for bundling and a `perf` module (judge, baseline, log-stream reader, perf home, launch guard, counter probe, runner) plus a compiled Swift counter helper. The Swift shell gains a `PerfProbe` that exists only in perf mode (`NAVORI_PERF=1` + `NAVORI_PERF_HOME`) and writes `.notice` lines (subsystem `dev.navori`, category `perf`).
 
@@ -326,7 +326,7 @@ _Requirements: PERF-1.1_
 
 **Depends-on:** Task 10
 
-- [ ] **Step 1: Record** — `cargo xtask perf --record`. On 2026-11-02 at `dab5a48` one `--record` run exited 0 (`menu_open_after_launch_ms` 49.2, `idle_footprint_mb` 18.7) and wrote the file. The file was then removed and not committed, because Step 2 did not hold. While `menu_open_after_launch_ms` is over 50, stop this task and report the miss (optimise first, or amend GOAL-7 through `define-project`); never loosen a budget here.
+- [ ] **Step 1: Record** — `cargo xtask perf --record`. On 2026-11-02 at `dab5a48`, before GOAL-11, one `--record` run exited 0 (`menu_open_after_launch_ms` 49.2, `idle_footprint_mb` 18.7) and wrote the file. The file was then removed and not committed, because Step 2 did not hold under the 50 ms line. GOAL-11 raised that first-open budget to 80 ms. Record again on the revision that contains GOAL-11. A miss against 80 ms stops this task; do not loosen the budget here.
 - [ ] **Step 2: Stability** — three consecutive `cargo xtask perf` runs on the same revision give the same verdict with no regression failure; if one regresses without a code change, report the metric and values and raise Open Question 2 (floors) instead of editing floors. On 2026-11-02 at `dab5a48` the three runs exited 1, 1, 0 with `menu_open_after_launch_ms` 51.8, 51.9, 49.4. No regression line was printed. Floors were not edited.
 - [ ] **Step 3: Commit** — `git commit -m "chore: record the perf baseline"`
 

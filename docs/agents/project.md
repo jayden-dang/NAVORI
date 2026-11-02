@@ -136,7 +136,7 @@ None — not deployed
 Run in order; `cut-release` executes exactly these and does not improvise.
 
 1. `cargo xtask ci` — the full gate.
-2. `cargo xtask perf` — the GOAL-7 budget on release code packaged as the dev identity
+2. `cargo xtask perf` — the GOAL-11 budget on release code packaged as the dev identity
    (`docs/standards/performance.md`). `--record` is not part of a release.
 3. `cargo xtask install` — builds the release bundle, signs it with `Navori Local Signing`,
    runs `codesign --verify --strict --deep`, installs to `/Applications/Navori.app`

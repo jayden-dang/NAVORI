@@ -35,7 +35,7 @@ Rationale and the full system narrative: ../ARCHITECTURE.md.
 - **ARCH-13** Never stop the app on a missing or invalid config; fall back to defaults and report the error.
 - **ARCH-14** Never share data, logs or sockets between the `release` and `dev` profiles.
 
-### Performance (GOAL-7)
+### Performance (GOAL-11)
 - **ARCH-15** Ship no WebView, Electron or JavaScript runtime anywhere in the app.
 - **ARCH-16** While the menu is closed, fire no timer more often than every 30 seconds, and register all periodic work through the Scheduler.
 - **ARCH-17** Create the AI runtime and provider HTTP clients on first use, never at startup.
@@ -54,5 +54,5 @@ None — all invariants live in this file. Split into `docs/architecture/<domain
 | ARCH-6 | `navori-store` / `EventBus` redact on write; tests in `crates/store`, `crates/kernel` |
 | ARCH-10, ARCH-12, ARCH-13, ARCH-14 | tests in `crates/kernel`, `crates/store`, `crates/config`, `crates/ffi` |
 | ARCH-11 | tests in `crates/ipc` |
-| ARCH-15 – ARCH-18 | design review (`inspect-invariants`). `cargo xtask perf` checks the GOAL-7 budgets, not these four |
+| ARCH-15 – ARCH-18 | design review (`inspect-invariants`). `cargo xtask perf` checks the GOAL-11 budgets, not these four |
 | ARCH-1, ARCH-4, ARCH-5, ARCH-7, ARCH-8 | design review (`inspect-invariants`) |
