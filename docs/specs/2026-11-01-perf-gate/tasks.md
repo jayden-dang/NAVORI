@@ -326,8 +326,8 @@ _Requirements: PERF-1.1_
 
 **Depends-on:** Task 10
 
-- [ ] **Step 1: Record** — `cargo xtask perf --record`. On 2026-11-02 at `dab5a48`, before GOAL-11, one `--record` run exited 0 (`menu_open_after_launch_ms` 49.2, `idle_footprint_mb` 18.7) and wrote the file. The file was then removed and not committed, because Step 2 did not hold under the 50 ms line. GOAL-11 raised that first-open budget to 80 ms. Record again on the revision that contains GOAL-11. A miss against 80 ms stops this task; do not loosen the budget here.
-- [ ] **Step 2: Stability** — three consecutive `cargo xtask perf` runs on the same revision give the same verdict with no regression failure; if one regresses without a code change, report the metric and values and raise Open Question 2 (floors) instead of editing floors. On 2026-11-02 at `dab5a48` the three runs exited 1, 1, 0 with `menu_open_after_launch_ms` 51.8, 51.9, 49.4. No regression line was printed. Floors were not edited.
+- [ ] **Step 1: Record** — `cargo xtask perf --record`. On 2026-11-02 at `10ae1cf` the run exited 0 and wrote `perf-baseline.json` (`menu_open_after_launch_ms` 51.1 against budget 80, `peak_footprint_mb` 31.36). The file was removed and not committed, because Step 2 did not hold. A miss against a GOAL-11 budget stops this task; do not loosen a budget here.
+- [ ] **Step 2: Stability** — three consecutive `cargo xtask perf` runs on the same revision give the same verdict with no regression failure; if one regresses without a code change, report the metric and values and raise Open Question 2 (floors) instead of editing floors. On 2026-11-02 at `10ae1cf`, after the record above, the three runs exited 0, 0, 1. First opens were 51.8, 44.1 and 50.6 ms, all inside 80. The failing line was `peak_footprint_mb` 37.58 against threshold 34.50 (runs 1 and 2 were 29.13 and 29.03). No floor was edited.
 - [ ] **Step 3: Commit** — `git commit -m "chore: record the perf baseline"`
 
 _Requirements: PERF-2.1, PERF-6.4_
