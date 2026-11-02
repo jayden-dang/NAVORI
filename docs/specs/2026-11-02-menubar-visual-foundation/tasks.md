@@ -450,10 +450,10 @@ _Requirements: MENU-1.10, MENU-5.1, MENU-5.2, MENU-5.3, MENU-5.4, MENU-5.5, MENU
 
 **Depends-on:** Task 14
 
-- [ ] **Step 1: Implement**: each row and each module and Event row is `.accessibilityElement(children: .ignore)` with a label and value; a row that opens a Submenu has the hint `Opens a submenu`; a row that acts has the button trait. Every state dot sits beside its words. `StatusPanel` reads `accessibilityDisplayShouldReduceMotion` at show and uses `.none` when it is on.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Manual pass**: with VoiceOver on, walk level 0 and the Core Submenu and hear each row as one sentence, including that the Core row opens a Submenu. With Reduce Motion on, the panel appears with no animation. With Reduce Transparency on, every panel of the Cascade is opaque. Record the result in the task report.
-- [ ] **Step 4: Commit** `git commit -m "feat(shell): read the menu well with VoiceOver and Reduce Motion"`
+- [x] **Step 1: Implement**: each row and each module and Event row is `.accessibilityElement(children: .ignore)` with a label and value; a row that opens a Submenu has the hint `Opens a submenu`; a row that acts has the button trait. Every state dot sits beside its words. `StatusPanel` reads `accessibilityDisplayShouldReduceMotion` at show and uses `.none` when it is on.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Manual pass**: with VoiceOver on, walk level 0 and the Core Submenu and hear each row as one sentence, including that the Core row opens a Submenu. With Reduce Motion on, the panel appears with no animation. With Reduce Transparency on, every panel of the Cascade is opaque. Record the result in the task report.
+- [x] **Step 4: Commit** `git commit -m "feat(shell): read the menu well with VoiceOver and Reduce Motion"`
 
 _Requirements: MENU-6.1, MENU-6.2, MENU-6.4, MENU-11.3_
 
