@@ -361,10 +361,10 @@ _Requirements: KCONTRACT-5.4, KCONTRACT-6.1, KCONTRACT-G6, KCONTRACT-G8_
 
 **Depends-on:** Task 11
 
-- [ ] **Step 1: Edit** `docs/standards/performance.md` (line 41) and `docs/architecture/system.md` (line 60) to replace "paused during sleep" with what now holds: a timer parks on uptime, and an overdue timer may fire during dark wake. In `system.md`, set the Scheduler row to Built.
-- [ ] **Step 2: Edit** `docs/architecture/runtime.md` (line 54) for the sweep's pause, `docs/architecture/data.md` (lines 21 and 23) for per-value fallback and the pause, and `docs/codebase/modules.md` (lines 18 and 22) for the new surface.
-- [ ] **Step 3: Edit** the `docs/ARCHITECTURE.md` kernel seed (lines 70–103): delete the Scheduler bullet with its battery wording and the `Config` line, and correct `run(self, ctx)` and `ActionMeta` to the code. Keep `context()`, `tray()` and `ModuleHandle` for MILE-3. Add `system_did_wake` to the FFI surface near line 122.
-- [ ] **Step 4: Commit** `git commit -m "docs: record the scheduler, per-value config and sweep pause"`
+- [x] **Step 1: Edit** `docs/standards/performance.md` (line 41) and `docs/architecture/system.md` (line 60) to replace "paused during sleep" with what now holds: a timer parks on uptime, and an overdue timer may fire during dark wake. In `system.md`, set the Scheduler row to Built.
+- [x] **Step 2: Edit** `docs/architecture/runtime.md` (line 54) for the sweep's pause, `docs/architecture/data.md` (lines 21 and 23) for per-value fallback and the pause, and `docs/codebase/modules.md` (lines 18 and 22) for the new surface.
+- [x] **Step 3: Edit** the `docs/ARCHITECTURE.md` kernel seed (lines 70–103): delete the Scheduler bullet with its battery wording and the `Config` line, and correct `run(self, ctx)` and `ActionMeta` to the code. Keep `context()`, `tray()` and `ModuleHandle` for MILE-3. Add `system_did_wake` to the FFI surface near line 122.
+- [x] **Step 4: Commit** `git commit -m "docs: record the scheduler, per-value config and sweep pause"`
 
 _Requirements: none of its own; documentation for the IDs in Tasks 1–11._
 
