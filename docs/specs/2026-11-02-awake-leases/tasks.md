@@ -229,12 +229,12 @@ _Requirements: AWAKE-5.13, AWAKE-10.1, AWAKE-10.2, AWAKE-10.3, AWAKE-10.4, AWAKE
 
 **Depends-on:** Task 3, Task 4
 
-- [ ] **Step 1: Write failing tests:** `awake_hold_for_an_hour_shows_in_status`, `awake_hold_with_no_flag_is_until_off`, `awake_release_all_ends_the_lease`, `a_bad_duration_is_a_usage_error` (exit 2), `awake_status_with_the_app_down_exits_3`.
+- [x] **Step 1: Write failing tests:** `awake_hold_for_an_hour_shows_in_status`, `awake_hold_with_no_flag_is_until_off`, `awake_release_all_ends_the_lease`, `a_bad_duration_is_a_usage_error` (exit 2), `awake_status_with_the_app_down_exits_3`.
 Run: `cargo nextest run -p navori-cli --test cli` — expect: unrecognized subcommand.
-- [ ] **Step 2: Implement** the subcommands and a small `parse_duration`, with no new dependency. Status prints the Lease count, then one line per Lease, and says when a Lease exists with `system_held` false.
+- [x] **Step 2: Implement** the subcommands and a small `parse_duration`, with no new dependency. Status prints the Lease count, then one line per Lease, and says when a Lease exists with `system_held` false.
 Run: same command — expect: pass.
-- [ ] **Step 3: Run** `cargo xtask check-deps` — expect: pass, with the CLI still on `navori-config`, `navori-ipc`, `navori-protocol`.
-- [ ] **Step 4: Commit** `git commit -m "feat(cli): add navori awake hold, release-all and status"`
+- [x] **Step 3: Run** `cargo xtask check-deps` — expect: pass, with the CLI still on `navori-config`, `navori-ipc`, `navori-protocol`.
+- [x] **Step 4: Commit** `git commit -m "feat(cli): add navori awake hold, release-all and status"`
 
 _Requirements: AWAKE-9.6, AWAKE-12.5, AWAKE-12.6_
 
@@ -254,13 +254,13 @@ _Requirements: AWAKE-9.6, AWAKE-12.5, AWAKE-12.6_
 
 **Depends-on:** Task 3
 
-- [ ] **Step 1: Write failing tests** with `FakeProcesses` and `FakeExitsHandle`: `a_command_lease_holds_until_its_process_exits`, `a_command_lease_has_no_deadline`, `a_gone_process_answers_ok_with_no_lease`, `a_zombie_process_answers_ok_with_no_lease`, `a_process_of_another_user_is_refused`, `a_non_positive_pid_is_invalid`, `kqueue_rejecting_the_watch_answers_failed_with_no_lease`, `two_leases_on_one_process_unwatch_only_at_the_last`, `no_exit_source_is_built_until_a_process_lease_exists`, `a_dead_exit_source_records_a_problem_and_does_not_spin_then_rebuilds_on_the_timer` (through `FakeExitsHandle::close`).
+- [x] **Step 1: Write failing tests** with `FakeProcesses` and `FakeExitsHandle`: `a_command_lease_holds_until_its_process_exits`, `a_command_lease_has_no_deadline`, `a_gone_process_answers_ok_with_no_lease`, `a_zombie_process_answers_ok_with_no_lease`, `a_process_of_another_user_is_refused`, `a_non_positive_pid_is_invalid`, `kqueue_rejecting_the_watch_answers_failed_with_no_lease`, `two_leases_on_one_process_unwatch_only_at_the_last`, `no_exit_source_is_built_until_a_process_lease_exists`, `a_dead_exit_source_records_a_problem_and_does_not_spin_then_rebuilds_on_the_timer` (through `FakeExitsHandle::close`).
 Run: `cargo nextest run -p navori-mod-awake --test command` — expect: no such variant.
-- [ ] **Step 2: Implement.** `watcher_next` is pending while `self.watcher` is `None`. On `None` from `next`, drop the watcher, record the `exits` problem and rebuild on the 60-second timer. Filter `entry` by uid and zombie.
+- [x] **Step 2: Implement.** `watcher_next` is pending while `self.watcher` is `None`. On `None` from `next`, drop the watcher, record the `exits` problem and rebuild on the 60-second timer. Filter `entry` by uid and zombie.
 Run: same command — expect: pass.
-- [ ] **Step 3: Write and run a real-OS test** in `real_os.rs`, `a_real_child_exit_reaches_the_module`: `Platform::mac()`, spawn `sleep 1`, `hold_command`, wait for `leases` to empty. This is the first time real `ProcWatcher` and `KqueueExits` run together; a failure here is a design finding, so stop and report.
+- [x] **Step 3: Write and run a real-OS test** in `real_os.rs`, `a_real_child_exit_reaches_the_module`: `Platform::mac()`, spawn `sleep 1`, `hold_command`, wait for `leases` to empty. This is the first time real `ProcWatcher` and `KqueueExits` run together; a failure here is a design finding, so stop and report.
 Run: `cargo nextest run -p navori-mod-awake --test real_os` — expect: pass.
-- [ ] **Step 4: Commit** `git commit -m "feat(awake): hold a Lease for the life of a process"`
+- [x] **Step 4: Commit** `git commit -m "feat(awake): hold a Lease for the life of a process"`
 
 _Requirements: AWAKE-3.2, AWAKE-3.3, AWAKE-3.4, AWAKE-3.9_
 
@@ -548,13 +548,13 @@ Wave 2.
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Write failing tests:** table over the four statuses: `Off` with no dot; green dot and `On · Claude Code, 1 hour`; orange dot and `Not held`; `Unavailable` with no Submenu.
+- [x] **Step 1: Write failing tests:** table over the four statuses: `Off` with no dot; green dot and `On · Claude Code, 1 hour`; orange dot and `Not held`; `Unavailable` with no Submenu.
 Run `cargo xtask build-core` first, so `apps/macos/Generated` carries `AwakeView`.
 Run: `swift test --package-path apps/macos --filter AwakeRowStateTests` — expect: no such type.
-- [ ] **Step 2: Implement** the state and `CoreStore.awakeStatus`, mapping `snapshot?.awake` only inside `CoreStore`. Add the row directly above `coreRow` in `PanelView`. Add `awake` at the head of `menuTree()`, with `store.hasSnapshot ? children : []` as `core` does, and matching ids. Change the `submenu` closure's `guard id == "core"` (`StatusBarController.swift:19-22`) to a switch returning `EmptyView()` for `awake` until Task 19. Call `panel.cascade.replaceTree()` when the row's `hasSubmenu` flips, beside the one-shot `didReplaceCoreTree`. No new file imports `NavoriCore`. Do not edit `Features/Preview/`.
-- [ ] **Step 3: Amend MENU's spec in place, keeping its IDs,** so its `tasks.md` citations stay live: MENU-1.2's order gains the Awake row, noting `amended by AWAKE-11.1`; MENU-1.4 stops listing the Awake row, noting the same; answer "The Awake row ships" with: the Core row stays. Leave MENU's `Status: Implemented` and its ticked Task 18, which records what was true at delivery.
-- [ ] **Step 4: Verify** `swift test --package-path apps/macos --filter AwakeRowStateTests` — expect: pass. `cargo xtask ci` — expect: pass. `grep -rln 'import NavoriCore' apps/macos --include='*.swift' | grep -v Generated | grep -v Tests` — expect: only `Core/CoreStore.swift` and `NavoriBanner/CoreStartupBanner.swift`. By hand on `cargo xtask run`: level 0 order is banners, Awake, Core, separator, Settings, About, Quit; `DEV` is on the Core row; the Core Submenu still shows modules, now including `awake`, and at most 8 Events. `cargo xtask perf` — expect: `submenu_open_ms` ≤ 16 ms, still opening `core`, and later opens ≤ 50 ms with the extra row.
-- [ ] **Step 5: Commit** `git commit -m "feat(menu): show the Awake row above the Core row"`
+- [x] **Step 2: Implement** the state and `CoreStore.awakeStatus`, mapping `snapshot?.awake` only inside `CoreStore`. Add the row directly above `coreRow` in `PanelView`. Add `awake` at the head of `menuTree()`, with `store.hasSnapshot ? children : []` as `core` does, and matching ids. Change the `submenu` closure's `guard id == "core"` (`StatusBarController.swift:19-22`) to a switch returning `EmptyView()` for `awake` until Task 19. Call `panel.cascade.replaceTree()` when the row's `hasSubmenu` flips, beside the one-shot `didReplaceCoreTree`. No new file imports `NavoriCore`. Do not edit `Features/Preview/`.
+- [x] **Step 3: Amend MENU's spec in place, keeping its IDs,** so its `tasks.md` citations stay live: MENU-1.2's order gains the Awake row, noting `amended by AWAKE-11.1`; MENU-1.4 stops listing the Awake row, noting the same; answer "The Awake row ships" with: the Core row stays. Leave MENU's `Status: Implemented` and its ticked Task 18, which records what was true at delivery.
+- [x] **Step 4: Verify** `swift test --package-path apps/macos --filter AwakeRowStateTests` — expect: pass. `cargo xtask ci` — expect: pass. `grep -rln 'import NavoriCore' apps/macos --include='*.swift' | grep -v Generated | grep -v Tests` — expect: only `Core/CoreStore.swift` and `NavoriBanner/CoreStartupBanner.swift`. By hand on `cargo xtask run`: level 0 order is banners, Awake, Core, separator, Settings, About, Quit; `DEV` is on the Core row; the Core Submenu still shows modules, now including `awake`, and at most 8 Events. `cargo xtask perf` — expect: `submenu_open_ms` ≤ 16 ms, still opening `core`, and later opens ≤ 50 ms with the extra row.
+- [x] **Step 5: Commit** `git commit -m "feat(menu): show the Awake row above the Core row"`
 
 _Requirements: AWAKE-11.1, AWAKE-11.2, AWAKE-11.3, AWAKE-11.4, AWAKE-12.7, AWAKE-12.8, AWAKE-12.9_
 
