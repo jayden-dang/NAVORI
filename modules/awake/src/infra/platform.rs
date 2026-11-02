@@ -176,6 +176,41 @@ impl Platform {
         }
     }
 
+    /// One snapshot for every restored lease. `None` means the list could not be read.
+    pub(crate) async fn fresh_labels(
+        &mut self,
+        commands: &[ProcId],
+        sessions: &[ProcId],
+    ) -> Option<FreshLabels> {
+        if commands.is_empty() && sessions.is_empty() {
+            return Some(FreshLabels {
+                commands: Vec::new(),
+                sessions: Vec::new(),
+            });
+        }
+        let source = match self.ensure_processes() {
+            Ok(source) => source,
+            Err(err) => {
+                tracing::warn!(
+                    %err,
+                    "the process list could not be opened; restored leases keep no label"
+                );
+                return None;
+            }
+        };
+        let commands = commands.to_vec();
+        let sessions = sessions.to_vec();
+        match tokio::task::spawn_blocking(move || label_snapshot(source, &commands, &sessions))
+            .await
+        {
+            Ok(labels) => labels,
+            Err(err) => {
+                tracing::error!(%err, "label snapshot task stopped");
+                None
+            }
+        }
+    }
+
     pub(crate) fn build_watcher(&mut self) -> Result<ProcWatcher, PlatformError> {
         let source = Arc::clone(&self.ensure_processes()?);
         ProcWatcher::new(source, |sink| self.open_exits(sink)).map_err(|err| match err {
@@ -255,6 +290,50 @@ fn started_after(start: StartTime, first_hold: SystemTime) -> bool {
         return false;
     };
     start.0 > hold_us
+}
+
+#[derive(Debug)]
+pub(crate) struct FreshLabels {
+    pub commands: Vec<Option<String>>,
+    pub sessions: Vec<Option<String>>,
+}
+
+fn label_snapshot(
+    source: Arc<dyn ProcessSource>,
+    commands: &[ProcId],
+    sessions: &[ProcId],
+) -> Option<FreshLabels> {
+    let snapshot = match Snapshot::take(source) {
+        Ok(snapshot) => snapshot,
+        Err(err) => {
+            tracing::warn!(
+                %err,
+                "the process list could not be read; restored leases keep no label"
+            );
+            return None;
+        }
+    };
+    Some(FreshLabels {
+        commands: commands
+            .iter()
+            .map(|id| command_label(&snapshot, *id))
+            .collect(),
+        sessions: sessions
+            .iter()
+            .map(|id| location_label(&snapshot, *id))
+            .collect(),
+    })
+}
+
+fn command_label(snapshot: &Snapshot, id: ProcId) -> Option<String> {
+    let process = snapshot.get(id.pid)?;
+    if process.id != id {
+        return None;
+    }
+    let path = process.exe.as_ref().ok()?;
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .filter(|name| !name.is_empty())
 }
 
 fn location_label(snapshot: &Snapshot, process: ProcId) -> Option<String> {

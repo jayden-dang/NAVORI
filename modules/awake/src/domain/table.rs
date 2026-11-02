@@ -237,6 +237,21 @@ impl LeaseTable {
             .map(|lease| lease.process)
     }
 
+    pub(crate) fn session_saved(&self, session_id: &str) -> Option<SessionSaved> {
+        self.sessions
+            .iter()
+            .find(|lease| lease.session_id == session_id)
+            .map(saved_session)
+    }
+
+    pub(crate) fn saved_sessions(&self) -> Vec<SessionSaved> {
+        self.sessions.iter().map(saved_session).collect()
+    }
+
+    pub(crate) fn saved_commands(&self) -> Vec<ProcId> {
+        self.commands.iter().map(|lease| lease.process).collect()
+    }
+
     pub(crate) fn stop_session(&mut self, session_id: &str, now: SystemTime) {
         let Some(lease) = self
             .sessions
@@ -482,9 +497,36 @@ impl LeaseTable {
 
     fn earliest_start(&self) -> Option<SystemTime> {
         let manual = self.manual.as_ref().map(Manual::started);
-        let command = self.commands.iter().map(|lease| lease.started).min();
+        // Epoch is a restored command: its wall-clock start is not stored.
+        let command = self
+            .commands
+            .iter()
+            .map(|lease| lease.started)
+            .filter(|started| *started != UNIX_EPOCH)
+            .min();
         let session = self.sessions.iter().map(|lease| lease.first_hold).min();
         [manual, command, session].into_iter().flatten().min()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SessionSaved {
+    pub session_id: String,
+    pub harness: Harness,
+    pub process: ProcId,
+    pub first_hold: SystemTime,
+    pub deadline: SystemTime,
+    pub stop_mark: Option<SystemTime>,
+}
+
+fn saved_session(lease: &SessionLease) -> SessionSaved {
+    SessionSaved {
+        session_id: lease.session_id.clone(),
+        harness: lease.harness,
+        process: lease.process,
+        first_hold: lease.first_hold,
+        deadline: lease.deadline,
+        stop_mark: lease.stop_mark,
     }
 }
 

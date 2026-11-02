@@ -48,6 +48,9 @@ pub struct Rig {
     pub processes: Arc<FakeProcesses>,
     pub exits: FakeExitsHandle,
     pub clock: FakeClock,
+    source: Arc<dyn ProcessSource>,
+    store: Store,
+    timing: Timing,
 }
 
 impl Rig {
@@ -96,23 +99,47 @@ impl Rig {
     ) -> Self {
         let clock = FakeClock::at(ORIGIN_MS);
         let power = Arc::new(FakePower::new());
+        let store = Store::open_in_memory().unwrap();
         let platform = Platform::new(
             Arc::clone(&power) as Arc<dyn PowerAssertions>,
-            Box::new(move || Ok(Arc::clone(&source))),
+            Box::new({
+                let source = Arc::clone(&source);
+                move || Ok(Arc::clone(&source))
+            }),
             factory,
         );
-        let kernel =
-            Kernel::builder_with_clock(Store::open_in_memory().unwrap(), Arc::new(clock.clone()))
-                .pause_journal_sweep()
-                .register(Awake::new(platform, ASSERTION_NAME, timing))
-                .start();
+        let kernel = Kernel::builder_with_clock(store.clone(), Arc::new(clock.clone()))
+            .pause_journal_sweep()
+            .register(Awake::new(platform, ASSERTION_NAME, timing))
+            .start();
         Self {
             kernel,
             power,
             processes,
             exits,
             clock,
+            source,
+            store,
+            timing,
         }
+    }
+
+    /// Shut the running kernel down and start another on the same store and fakes.
+    pub async fn reopen(&mut self) {
+        self.shutdown().await;
+        let source = Arc::clone(&self.source);
+        let exits = self.exits.clone();
+        let factory = Box::new(move |sink| exits.factory()(sink)) as ExitsFactory;
+        let platform = Platform::new(
+            Arc::clone(&self.power) as Arc<dyn PowerAssertions>,
+            Box::new(move || Ok(Arc::clone(&source))),
+            factory,
+        );
+        self.kernel = Kernel::builder_with_clock(self.store.clone(), Arc::new(self.clock.clone()))
+            .pause_journal_sweep()
+            .register(Awake::new(platform, ASSERTION_NAME, self.timing))
+            .start();
+        self.idle().await;
     }
 
     pub async fn dispatch(&self, action: Value) -> Result<Value, DispatchError> {

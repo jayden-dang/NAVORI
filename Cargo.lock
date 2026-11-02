@@ -743,6 +743,7 @@ dependencies = [
  "navori-macos",
  "navori-procs",
  "navori-store",
+ "rusqlite",
  "schemars",
  "serde",
  "serde_json",

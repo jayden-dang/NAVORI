@@ -12,6 +12,8 @@ anyhow.workspace = true
 navori-kernel.workspace = true
 navori-macos.workspace = true
 navori-procs.workspace = true
+navori-store.workspace = true
+rusqlite.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -20,7 +22,6 @@ tracing.workspace = true
 
 [dev-dependencies]
 navori-macos = { workspace = true, features = ["fake"] }
-navori-store.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 
 [lints]

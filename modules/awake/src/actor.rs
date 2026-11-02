@@ -1,6 +1,8 @@
+use std::collections::BTreeSet;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use navori_kernel::{ActionError, ModuleCtx, Request, Severity, WaitHandle, Wake};
+use navori_macos::StartTime;
 use navori_procs::{Exited, ProcId, ProcWatcher, ProcsError};
 use serde_json::{Value, json};
 
@@ -9,6 +11,7 @@ use crate::domain::{
     self, EndReason, Ended, Held, Lease, LeaseKey, LeaseSource, LeaseTable, Reconciler, Timing,
 };
 use crate::event::{self, LEASE_ENDED, LEASE_STARTED};
+use crate::infra::stored::{self, StoredKind, StoredLease};
 use crate::infra::{ExecutableName, Platform, ProcessClass, Rejected};
 use crate::state::AwakeState;
 
@@ -16,6 +19,8 @@ const MAX_SECONDS: u64 = 7 * 24 * 60 * 60;
 const EXIT_RETRY: Duration = Duration::from_secs(60);
 const EXITS_PROBLEM: &str =
     "Exit watches stopped, so a command lease has no end signal. Navori retries in 60 seconds.";
+const STORE_PROBLEM: &str = "Awake could not save a lease. Navori retries in 60 seconds.";
+const PLATFORM_PROBLEM: &str = "Awake could not watch a process, so a stored lease stays on disk. Navori retries in 60 seconds.";
 
 pub struct Awake {
     platform: Platform,
@@ -24,7 +29,11 @@ pub struct Awake {
     published: AwakeState,
     watcher: Option<ProcWatcher>,
     exits_problem: Option<String>,
+    store_problem: Option<String>,
+    platform_problem: Option<String>,
     retry_at: Option<SystemTime>,
+    restored: bool,
+    dirty: BTreeSet<String>,
 }
 
 impl std::fmt::Debug for Awake {
@@ -47,22 +56,34 @@ impl Awake {
             published: AwakeState::idle(),
             watcher: None,
             exits_problem: None,
+            store_problem: None,
+            platform_problem: None,
             retry_at: None,
+            restored: false,
+            dirty: BTreeSet::new(),
         }
     }
 
     pub(crate) async fn run_loop(&mut self, ctx: &mut ModuleCtx<Self>) -> anyhow::Result<()> {
         let mut wait = ctx.wait_handle();
+        stored::migrate(&ctx.store)?;
+        self.restore_if_needed(ctx, wait.now()).await;
         loop {
             let now = wait.now();
-            self.rebuild_exits_if_due(now);
+            let due = self.take_due_retry(now);
+            if due && self.exits_problem.is_some() {
+                self.rebuild_exits_now(now);
+            }
+            if due && !self.restored {
+                self.restore_if_needed(ctx, now).await;
+            }
             self.turn(ctx, now).await;
             let deadline = self.deadline();
             tokio::select! {
                 biased;
                 exit = watcher_next(&mut self.watcher) => {
                     match exit {
-                        Some(exited) => self.on_process_exit(ctx, exited.id),
+                        Some(exited) => self.on_process_exit(ctx, exited.id, wait.now()),
                         None => self.note_exits_dead(wait.now()),
                     }
                 }
@@ -105,31 +126,20 @@ impl Awake {
                 self.hold_until_off(now);
                 Ok(Some(Started::UntilOff))
             }
-            AwakeAction::HoldCommand { pid } => self.hold_command(now, *pid),
+            AwakeAction::HoldCommand { pid } => self.hold_command(ctx, now, *pid),
             AwakeAction::HoldSession {
                 session_id,
                 pid,
                 ppid,
             } => {
-                self.hold_session(now, session_id.clone(), *pid, *ppid)
+                self.hold_session(ctx, now, session_id.clone(), *pid, *ppid)
                     .await
             }
             AwakeAction::StopSession { session_id } => {
-                self.stop_session(session_id, truncate_us(now))
+                self.stop_session(ctx, session_id, truncate_us(now))
             }
-            AwakeAction::EndSession { session_id } => self.end_session(ctx, session_id),
-            AwakeAction::ReleaseAll => {
-                let ended = self.table.release_all();
-                let ids: Vec<ProcId> = ended
-                    .iter()
-                    .filter_map(|end| process_of(&end.lease))
-                    .collect();
-                for id in ids {
-                    self.unwatch_if_idle(id);
-                }
-                self.emit_ended(ctx, &ended);
-                Ok(None)
-            }
+            AwakeAction::EndSession { session_id } => self.end_session(ctx, session_id, now),
+            AwakeAction::ReleaseAll => self.release_all(ctx, now),
         };
         match started {
             Ok(started) => {
@@ -167,7 +177,12 @@ impl Awake {
         Ok(())
     }
 
-    fn hold_command(&mut self, now: SystemTime, pid: i32) -> Result<Option<Started>, ActionError> {
+    fn hold_command(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        now: SystemTime,
+        pid: i32,
+    ) -> Result<Option<Started>, ActionError> {
         if pid <= 0 {
             return Err(ActionError::Invalid(format!(
                 "pid must be positive, not {pid}"
@@ -199,6 +214,7 @@ impl Awake {
         }
         self.arm(id)?;
         self.table.hold_command(id, truncate_us(now), label.clone());
+        self.save_command(ctx, now, id);
         let key = LeaseKey::Command {
             pid: id.pid,
             start_us: id.start.0,
@@ -212,6 +228,7 @@ impl Awake {
 
     async fn hold_session(
         &mut self,
+        ctx: &ModuleCtx<Self>,
         now: SystemTime,
         session_id: String,
         pid: i32,
@@ -268,6 +285,7 @@ impl Awake {
         if let Some(old) = previous.filter(|old| *old != process) {
             self.unwatch_if_idle(old);
         }
+        self.save_session(ctx, now, &session_id);
         if !created {
             return Ok(None);
         }
@@ -281,6 +299,7 @@ impl Awake {
         &mut self,
         ctx: &ModuleCtx<Self>,
         session_id: &str,
+        now: SystemTime,
     ) -> Result<Option<Started>, ActionError> {
         if !valid_session_id(session_id) {
             return Err(ActionError::Invalid(
@@ -292,6 +311,7 @@ impl Awake {
             if let Some(id) = process_of(&ended.lease) {
                 self.unwatch_if_idle(id);
             }
+            self.forget_ended(ctx, now, std::slice::from_ref(&ended));
             // No locked end sentence is true for EndSession.
             self.emit_ended(ctx, &[ended]);
         }
@@ -300,6 +320,7 @@ impl Awake {
 
     fn stop_session(
         &mut self,
+        ctx: &ModuleCtx<Self>,
         session_id: &str,
         now: SystemTime,
     ) -> Result<Option<Started>, ActionError> {
@@ -310,6 +331,33 @@ impl Awake {
             ));
         }
         self.table.stop_session(session_id, now);
+        self.save_session(ctx, now, session_id);
+        Ok(None)
+    }
+
+    fn release_all(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        now: SystemTime,
+    ) -> Result<Option<Started>, ActionError> {
+        if let Err(err) = stored::clear(&ctx.store) {
+            tracing::warn!(error = %err, "release all could not delete stored leases");
+            self.note_store(now);
+            return Err(ActionError::Failed(
+                "stored leases could not be deleted, so nothing was released".to_owned(),
+            ));
+        }
+        self.dirty.clear();
+        self.store_problem = None;
+        let ended = self.table.release_all();
+        let ids: Vec<ProcId> = ended
+            .iter()
+            .filter_map(|end| process_of(&end.lease))
+            .collect();
+        for id in ids {
+            self.unwatch_if_idle(id);
+        }
+        self.emit_ended(ctx, &ended);
         Ok(None)
     }
 
@@ -341,9 +389,10 @@ impl Awake {
         Ok(())
     }
 
-    fn on_process_exit(&mut self, ctx: &ModuleCtx<Self>, id: ProcId) {
+    fn on_process_exit(&mut self, ctx: &ModuleCtx<Self>, id: ProcId, now: SystemTime) {
         let ended = self.table.on_exit(id);
         self.unwatch_if_idle(id);
+        self.forget_ended(ctx, now, &ended);
         self.emit_ended(ctx, &ended);
     }
 
@@ -357,7 +406,9 @@ impl Awake {
         if self.table.process_ids().is_empty() {
             self.watcher = None;
             self.exits_problem = None;
-            self.retry_at = None;
+            if self.dirty.is_empty() && self.restored && self.platform_problem.is_none() {
+                self.retry_at = None;
+            }
         }
     }
 
@@ -370,17 +421,10 @@ impl Awake {
         }
         tracing::warn!("exit watches stopped; a command lease has no end signal until the retry");
         self.exits_problem = Some(EXITS_PROBLEM.to_owned());
-        self.retry_at = now.checked_add(EXIT_RETRY);
+        self.schedule_retry(now);
     }
 
-    fn rebuild_exits_if_due(&mut self, now: SystemTime) {
-        let Some(due) = self.retry_at else {
-            return;
-        };
-        if now < due {
-            return;
-        }
-        self.retry_at = None;
+    fn rebuild_exits_now(&mut self, now: SystemTime) {
         if self.table.process_ids().is_empty() {
             self.exits_problem = None;
             return;
@@ -390,7 +434,7 @@ impl Awake {
             Err(err) => {
                 tracing::warn!(error = %err, "exit watches could not be rebuilt");
                 self.exits_problem = Some(EXITS_PROBLEM.to_owned());
-                self.retry_at = now.checked_add(EXIT_RETRY);
+                self.schedule_retry(now);
             }
         }
     }
@@ -417,6 +461,7 @@ impl Awake {
                 self.unwatch_if_idle(id);
             }
         }
+        self.forget_ended(ctx, now, &settled.ended);
         self.emit_ended(ctx, &settled.ended);
         for (key, process, first_hold) in settled.to_check {
             let reading = self.platform.read_descendants(process, first_hold).await;
@@ -424,10 +469,12 @@ impl Awake {
                 if let Some(id) = process_of(&ended.lease) {
                     self.unwatch_if_idle(id);
                 }
+                self.forget_ended(ctx, now, std::slice::from_ref(&ended));
                 self.emit_ended(ctx, &[ended]);
             }
         }
         let held = self.reconciler.apply(self.table.wants());
+        self.flush_dirty(ctx, now);
         if let Some(code) = held.release_failed {
             tracing::warn!(code, "releasing a power assertion failed");
         }
@@ -436,7 +483,11 @@ impl Awake {
 
     fn publish(&mut self, ctx: &ModuleCtx<Self>, held: &Held) -> AwakeState {
         let mut state = self.table.snapshot(held.system, held.display);
-        state.problem = self.exits_problem.clone();
+        state.problem = self
+            .store_problem
+            .clone()
+            .or_else(|| self.platform_problem.clone())
+            .or_else(|| self.exits_problem.clone());
         if state != self.published {
             self.published = state.clone();
             let next = state.clone();
@@ -509,6 +560,286 @@ impl Awake {
             }
         }
     }
+
+    fn take_due_retry(&mut self, now: SystemTime) -> bool {
+        match self.retry_at {
+            Some(due) if now >= due => {
+                self.retry_at = None;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn schedule_retry(&mut self, now: SystemTime) {
+        let Some(at) = now.checked_add(EXIT_RETRY) else {
+            return;
+        };
+        self.retry_at = Some(match self.retry_at {
+            Some(existing) => existing.min(at),
+            None => at,
+        });
+    }
+
+    fn note_store(&mut self, now: SystemTime) {
+        self.store_problem = Some(STORE_PROBLEM.to_owned());
+        self.schedule_retry(now);
+    }
+
+    fn note_platform(&mut self, now: SystemTime, err: impl std::fmt::Display) {
+        tracing::warn!(error = %err, "a stored lease could not be watched");
+        self.platform_problem = Some(PLATFORM_PROBLEM.to_owned());
+        self.schedule_retry(now);
+    }
+
+    fn save_session(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime, session_id: &str) {
+        let Some(saved) = self.table.session_saved(session_id) else {
+            return;
+        };
+        self.upsert_row(ctx, now, stored_session(&saved));
+    }
+
+    fn save_command(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime, process: ProcId) {
+        if !self.table.has_command(process) {
+            return;
+        }
+        self.upsert_row(ctx, now, stored_command(process));
+    }
+
+    fn upsert_row(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime, row: StoredLease) {
+        match stored::upsert(&ctx.store, &row) {
+            Ok(()) => self.clear_dirty(&row.key),
+            Err(err) => {
+                tracing::warn!(error = %err, key = %row.key, "lease row was not written");
+                self.dirty.insert(row.key);
+                self.note_store(now);
+            }
+        }
+    }
+
+    fn delete_stored(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime, key: &str) {
+        match stored::delete(&ctx.store, key) {
+            Ok(()) => self.clear_dirty(key),
+            Err(err) => {
+                tracing::warn!(error = %err, key, "lease row was not deleted");
+                self.dirty.insert(key.to_owned());
+                self.note_store(now);
+            }
+        }
+    }
+
+    fn clear_dirty(&mut self, key: &str) {
+        self.dirty.remove(key);
+        if self.dirty.is_empty() {
+            self.store_problem = None;
+        }
+    }
+
+    fn forget_ended(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime, ended: &[Ended]) {
+        for end in ended {
+            if let Some(key) = stored_key(&end.lease) {
+                self.delete_stored(ctx, now, &key);
+            }
+        }
+    }
+
+    fn flush_dirty(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime) {
+        if self.dirty.is_empty() {
+            return;
+        }
+        let keys: Vec<String> = self.dirty.iter().cloned().collect();
+        for key in keys {
+            let result = match self.row_for(&key) {
+                Some(row) => stored::upsert(&ctx.store, &row),
+                None => stored::delete(&ctx.store, &key),
+            };
+            match result {
+                Ok(()) => {
+                    self.dirty.remove(&key);
+                }
+                Err(err) => {
+                    tracing::warn!(error = %err, key = %key, "a stored lease retry failed");
+                }
+            }
+        }
+        if self.dirty.is_empty() {
+            self.store_problem = None;
+        } else {
+            self.note_store(now);
+        }
+    }
+
+    fn row_for(&self, key: &str) -> Option<StoredLease> {
+        self.table
+            .saved_sessions()
+            .into_iter()
+            .map(|saved| stored_session(&saved))
+            .chain(self.table.saved_commands().into_iter().map(stored_command))
+            .find(|row| row.key == key)
+    }
+
+    async fn restore_if_needed(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime) {
+        if self.restored {
+            return;
+        }
+        let rows = match stored::load(&ctx.store) {
+            Ok(rows) => rows,
+            Err(err) => {
+                tracing::warn!(error = %err, "stored leases could not be read");
+                self.note_store(now);
+                return;
+            }
+        };
+        if rows.is_empty() {
+            self.finish_restore();
+            return;
+        }
+        let mut kept = Vec::new();
+        let mut armed = Vec::new();
+        for row in rows {
+            match self.classify_row(ctx, now, &row, &mut armed) {
+                RowFate::Keep(id) => kept.push((row, id)),
+                RowFate::Drop => {}
+                RowFate::Halt => {
+                    self.disarm_unheld(&armed);
+                    return;
+                }
+            }
+        }
+        let command_ids: Vec<ProcId> = kept
+            .iter()
+            .filter(|(row, _)| row.kind == StoredKind::Command)
+            .map(|(_, id)| *id)
+            .collect();
+        let session_ids: Vec<ProcId> = kept
+            .iter()
+            .filter(|(row, _)| row.kind == StoredKind::Session)
+            .map(|(_, id)| *id)
+            .collect();
+        let labels = self.platform.fresh_labels(&command_ids, &session_ids).await;
+        let mut command_at = 0;
+        let mut session_at = 0;
+        for (row, id) in &kept {
+            let label = match row.kind {
+                StoredKind::Command => {
+                    let label = label_at(
+                        labels.as_ref().map(|pair| pair.commands.as_slice()),
+                        command_at,
+                    );
+                    command_at += 1;
+                    label
+                }
+                StoredKind::Session => {
+                    let label = label_at(
+                        labels.as_ref().map(|pair| pair.sessions.as_slice()),
+                        session_at,
+                    );
+                    session_at += 1;
+                    label
+                }
+            };
+            if !self.install_row(row, *id, label) {
+                self.delete_stored(ctx, now, &row.key);
+            }
+        }
+        self.disarm_unheld(&armed);
+        self.finish_restore();
+    }
+
+    fn classify_row(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        now: SystemTime,
+        row: &StoredLease,
+        armed: &mut Vec<ProcId>,
+    ) -> RowFate {
+        let id = ProcId {
+            pid: row.pid,
+            start: StartTime(row.process_start_us),
+        };
+        // Watch before the liveness check so an exit in that gap is still delivered.
+        if !armed.contains(&id) {
+            if let Err(err) = self.arm(id) {
+                self.note_platform(now, err);
+                return RowFate::Halt;
+            }
+            armed.push(id);
+        }
+        match self.platform.classify(row.pid) {
+            Err(err) => {
+                self.note_platform(now, err);
+                RowFate::Halt
+            }
+            Ok(ProcessClass::Live(live)) if live == id => RowFate::Keep(live),
+            Ok(_) => {
+                self.delete_stored(ctx, now, &row.key);
+                RowFate::Drop
+            }
+        }
+    }
+
+    fn install_row(&mut self, row: &StoredLease, id: ProcId, label: Option<String>) -> bool {
+        match row.kind {
+            StoredKind::Command => {
+                self.table.hold_command(id, UNIX_EPOCH, label);
+                true
+            }
+            StoredKind::Session => {
+                let Some(session_id) = row.session_id.clone() else {
+                    return false;
+                };
+                let Some(harness) = row.harness else {
+                    return false;
+                };
+                let Some(first_hold) = row.first_hold else {
+                    return false;
+                };
+                let Some(deadline) = row.deadline else {
+                    return false;
+                };
+                self.table.hold_session(
+                    session_id.clone(),
+                    harness,
+                    id,
+                    first_hold,
+                    deadline,
+                    label,
+                );
+                if let Some(mark) = row.stop_mark {
+                    self.table.stop_session(&session_id, mark);
+                }
+                true
+            }
+        }
+    }
+
+    fn disarm_unheld(&mut self, armed: &[ProcId]) {
+        for id in armed {
+            if self.table.leases_on(*id) > 0 {
+                continue;
+            }
+            if let Some(watcher) = self.watcher.as_mut() {
+                watcher.unwatch(*id);
+            }
+        }
+        if self.table.process_ids().is_empty() {
+            self.watcher = None;
+        }
+    }
+
+    fn finish_restore(&mut self) {
+        self.restored = true;
+        self.platform_problem = None;
+        if self.dirty.is_empty() {
+            self.store_problem = None;
+        }
+    }
+}
+
+enum RowFate {
+    Keep(ProcId),
+    Drop,
+    Halt,
 }
 
 enum Started {
@@ -595,6 +926,54 @@ fn rejected_hold(rejected: Rejected, pid: i32, ppid: i32) -> ActionError {
 
 fn payload(key: &str, kind: &str) -> Value {
     json!({ "key": key, "kind": kind })
+}
+
+fn stored_key(lease: &Lease) -> Option<String> {
+    match lease.source {
+        LeaseSource::Command { .. } | LeaseSource::Session { .. } => Some(lease.key.text()),
+        LeaseSource::Duration { .. } | LeaseSource::UntilOff => None,
+    }
+}
+
+fn stored_session(saved: &domain::SessionSaved) -> StoredLease {
+    StoredLease {
+        key: LeaseKey::Session {
+            session_id: saved.session_id.clone(),
+        }
+        .text(),
+        kind: StoredKind::Session,
+        session_id: Some(saved.session_id.clone()),
+        harness: Some(saved.harness),
+        pid: saved.process.pid,
+        process_start_us: saved.process.start.0,
+        first_hold: Some(saved.first_hold),
+        stop_mark: saved.stop_mark,
+        deadline: Some(saved.deadline),
+    }
+}
+
+fn stored_command(process: ProcId) -> StoredLease {
+    StoredLease {
+        key: LeaseKey::Command {
+            pid: process.pid,
+            start_us: process.start.0,
+        }
+        .text(),
+        kind: StoredKind::Command,
+        session_id: None,
+        harness: None,
+        pid: process.pid,
+        process_start_us: process.start.0,
+        first_hold: None,
+        stop_mark: None,
+        deadline: None,
+    }
+}
+
+fn label_at(labels: Option<&[Option<String>]>, index: usize) -> Option<String> {
+    labels
+        .and_then(|labels| labels.get(index).cloned())
+        .flatten()
 }
 
 fn truncate_us(time: SystemTime) -> SystemTime {
