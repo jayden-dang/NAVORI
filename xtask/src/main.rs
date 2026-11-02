@@ -1009,6 +1009,9 @@ fn ci(root: &Path) -> Result<()> {
     sh(Command::new("swift")
         .args(["build", "--arch", "arm64", "--package-path"])
         .arg(root.join("apps/macos")))?;
+    sh(Command::new("swift")
+        .args(["test", "--arch", "arm64", "--package-path"])
+        .arg(root.join("apps/macos")))?;
     println!("✓ ci passed");
     Ok(())
 }
