@@ -681,3 +681,178 @@ fn calling_shutdown_twice_is_harmless() {
         futures::executor::block_on(core.dispatch("system".into(), "\"ping\"".into())).unwrap_err();
     assert_eq!(err, CoreError::ShutDown);
 }
+
+fn start_profile(home: &tempfile::TempDir, profile: &str) -> (Arc<NavoriCore>, Arc<Recorder>) {
+    let rec = Arc::new(Recorder::default());
+    let mut cfg = config(home);
+    cfg.profile = profile.to_owned();
+    let core = NavoriCore::start(cfg, rec.clone()).unwrap();
+    (core, rec)
+}
+
+fn awake_of(core: &NavoriCore) -> navori_ffi::AwakeView {
+    match core.status().awake {
+        Some(awake) => awake,
+        None => panic!("the snapshot carries awake"),
+    }
+}
+
+fn dispatch_json(core: &NavoriCore, module: &str, action: &str) -> String {
+    futures::executor::block_on(core.dispatch(module.to_owned(), action.to_owned())).unwrap()
+}
+
+#[test]
+fn the_snapshot_carries_awake_after_a_hold() {
+    let home = home();
+    let (core, rec) = start(&home);
+    let idle = awake_of(&core);
+    assert!(idle.leases.is_empty(), "{idle:?}");
+    let before = snapshot_count(&rec);
+    dispatch_json(&core, "awake", r#"{"hold_for":{"seconds":3600}}"#);
+    eventually(|| awake_of(&core).leases.len() == 1 && awake_of(&core).system_held);
+    let awake = awake_of(&core);
+    assert_eq!(awake.leases.len(), 1);
+    let lease = &awake.leases[0];
+    assert_eq!(lease.key, "manual");
+    assert_eq!(lease.kind, "duration");
+    assert_eq!(lease.label.as_deref(), Some("1 hour"));
+    assert_eq!(lease.harness, None);
+    assert_eq!(lease.pid, None);
+    assert!(!lease.stopped);
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+    let ends = lease.ends_at_ms.expect("a duration lease has an end");
+    assert!(
+        (now_ms + 3_590_000..=now_ms + 3_610_000).contains(&ends),
+        "ends_at_ms {ends} is not about an hour from {now_ms}"
+    );
+    assert!(awake.system_held);
+    assert!(!awake.display_held);
+    assert!(awake.problem.is_none(), "{awake:?}");
+    eventually(|| {
+        snapshot_count(&rec) > before
+            && rec
+                .0
+                .lock()
+                .unwrap()
+                .last()
+                .and_then(|shot| shot.awake.as_ref())
+                .is_some_and(|view| view.system_held && view.leases.len() == 1)
+    });
+    let row = core
+        .doctor()
+        .into_iter()
+        .find(|check| check.name == "awake")
+        .unwrap();
+    assert!(row.ok);
+    assert_eq!(row.detail, "1 Lease");
+    core.shutdown();
+}
+
+#[test]
+fn an_idle_core_reports_a_passing_awake_row_and_keeps_the_five_others() {
+    let home = home();
+    let (core, _) = start(&home);
+    eventually(|| core.doctor().iter().all(|check| check.ok));
+    let checks = core.doctor();
+    let names: Vec<_> = checks.iter().map(|check| check.name.as_str()).collect();
+    assert_eq!(
+        names,
+        ["config", "database", "ipc", "modules", "awake", "logs"]
+    );
+    let awake = checks.iter().find(|check| check.name == "awake").unwrap();
+    assert!(awake.ok);
+    assert_eq!(awake.detail, "no problem");
+    core.shutdown();
+}
+
+#[test]
+fn a_stray_awake_table_in_config_raises_no_notice() {
+    let home = home();
+    write_config(&home, "[awake]\nseconds = 1\nname = \"not a setting\"\n");
+    let (core, _) = start(&home);
+    assert!(core.status().config_notice.is_none());
+    let config = config_check(&core);
+    assert!(config.ok, "{}", config.detail);
+    assert!(!config.detail.contains("awake"), "{}", config.detail);
+    let awake = awake_of(&core);
+    assert!(awake.leases.is_empty(), "{awake:?}");
+    assert!(!awake.system_held);
+    core.shutdown();
+}
+
+#[test]
+fn an_idle_core_holds_no_assertion() {
+    let home = home();
+    let (core, _) = start(&home);
+    let awake = awake_of(&core);
+    assert!(!awake.system_held);
+    assert!(!awake.display_held);
+    assert!(awake.leases.is_empty());
+    let answer: serde_json::Value =
+        serde_json::from_str(&dispatch_json(&core, "awake", "\"status\"")).unwrap();
+    assert_eq!(answer["leases"], serde_json::json!([]));
+    assert_eq!(answer["system_held"], false);
+    core.shutdown();
+}
+
+#[test]
+fn the_system_module_still_runs_beside_awake() {
+    let home = home();
+    let (core, _) = start(&home);
+    eventually(|| {
+        let modules = core.status().modules;
+        modules
+            .iter()
+            .any(|module| module.id == "system" && module.state == "running")
+            && modules
+                .iter()
+                .any(|module| module.id == "awake" && module.state == "running")
+    });
+    assert_eq!(dispatch_json(&core, "system", "\"ping\""), "\"pong\"");
+    core.shutdown();
+}
+
+#[test]
+fn a_lease_in_the_dev_profile_is_absent_from_the_release_profile() {
+    let home = home();
+    let (dev, _) = start_profile(&home, "dev");
+    let (release, _) = start_profile(&home, "release");
+    let dev_status = dev.status();
+    let release_status = release.status();
+    assert_ne!(dev_status.socket_path, release_status.socket_path);
+    assert_ne!(dev_status.data_dir, release_status.data_dir);
+    assert_ne!(dev_status.logs_dir, release_status.logs_dir);
+    assert!(
+        std::path::Path::new(&dev_status.data_dir)
+            .join("navori.db")
+            .exists()
+    );
+    assert!(
+        std::path::Path::new(&release_status.data_dir)
+            .join("navori.db")
+            .exists()
+    );
+    assert!(
+        dev_status.logs_dir.ends_with("Navori Dev"),
+        "{}",
+        dev_status.logs_dir
+    );
+    assert!(
+        release_status.logs_dir.ends_with("Navori"),
+        "{}",
+        release_status.logs_dir
+    );
+    dispatch_json(&dev, "awake", r#"{"hold_for":{"seconds":3600}}"#);
+    eventually(|| awake_of(&dev).system_held && awake_of(&dev).leases.len() == 1);
+    let release_awake = awake_of(&release);
+    assert!(
+        release_awake.leases.is_empty(),
+        "release saw the dev lease: {release_awake:?}"
+    );
+    assert!(!release_awake.system_held);
+    dev.shutdown();
+    release.shutdown();
+}

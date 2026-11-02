@@ -12,6 +12,7 @@ use navori_config::{
 };
 use navori_ipc::Handler;
 use navori_kernel::{DispatchError, Kernel, ModuleState};
+use navori_mod_awake::{Awake, AwakeState, LeaseState, Platform, Timing};
 use navori_protocol::{Check, CoreStatus, Envelope, Event, ModuleInfo, Severity, rpc};
 use navori_store::Store;
 use serde_json::{Value, json};
@@ -113,6 +114,8 @@ impl Inner {
         } else {
             check("modules", false, unhealthy.join(", "))
         });
+
+        checks.push(awake_check(awake_view(&self.kernel).as_ref()));
 
         let probe = self.paths.logs_dir.join(".write-probe");
         checks.push(
@@ -234,12 +237,90 @@ pub fn build_kernel(
     store: Store,
     sections: serde_json::Map<String, serde_json::Value>,
     sweep: &JournalSweep,
+    name: &str,
 ) -> Kernel {
     let builder = match sweep {
         JournalSweep::KeepDays(days) => Kernel::builder(store).journal_retention_days(*days),
         JournalSweep::Paused => Kernel::builder(store).pause_journal_sweep(),
     };
-    builder.config_sections(sections).start()
+    builder
+        .config_sections(sections)
+        .register(Awake::new(Platform::mac(), name, Timing::FIXED))
+        .start()
+}
+
+impl From<LeaseState> for crate::LeaseView {
+    fn from(lease: LeaseState) -> Self {
+        let LeaseState {
+            key,
+            kind,
+            harness,
+            label,
+            pid,
+            stopped,
+            ends_at_ms,
+        } = lease;
+        Self {
+            key,
+            kind,
+            harness,
+            label,
+            pid,
+            stopped,
+            ends_at_ms,
+        }
+    }
+}
+
+impl From<AwakeState> for crate::AwakeView {
+    fn from(state: AwakeState) -> Self {
+        let AwakeState {
+            leases,
+            system_held,
+            display_held,
+            since_ms,
+            problem,
+        } = state;
+        Self {
+            leases: leases.into_iter().map(crate::LeaseView::from).collect(),
+            system_held,
+            display_held,
+            since_ms,
+            problem,
+        }
+    }
+}
+
+/// `None` when Awake is not registered or its published state will not deserialize.
+pub fn awake_view(kernel: &Kernel) -> Option<crate::AwakeView> {
+    let value = kernel.state("awake")?;
+    match serde_json::from_value::<AwakeState>(value) {
+        Ok(state) => Some(crate::AwakeView::from(state)),
+        Err(error) => {
+            tracing::warn!(%error, "awake state will not deserialize");
+            None
+        }
+    }
+}
+
+/// One fixed doctor row: passing with `no problem` or the lease count, failing with the problem.
+pub fn awake_check(view: Option<&crate::AwakeView>) -> Check {
+    let Some(view) = view else {
+        return check(
+            "awake",
+            false,
+            "Awake's state could not be read.".to_owned(),
+        );
+    };
+    if let Some(problem) = &view.problem {
+        return check("awake", false, problem.clone());
+    }
+    if view.leases.is_empty() {
+        return check("awake", true, "no problem".to_owned());
+    }
+    let count = view.leases.len();
+    let noun = if count == 1 { "Lease" } else { "Leases" };
+    check("awake", true, format!("{count} {noun}"))
 }
 
 /// JSON-RPC handler for the local socket.
