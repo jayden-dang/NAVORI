@@ -748,12 +748,22 @@ impl Awake {
             self.finish_restore();
             return;
         }
-        let mut kept = Vec::new();
+        let mut installed = Vec::new();
         let mut armed = Vec::new();
         let mut retry = false;
         for row in rows {
             match self.classify_row(ctx, now, &row, &mut armed) {
-                RowFate::Keep(id) => kept.push((row, id)),
+                RowFate::Keep(id) => {
+                    if !self.install_row(&row, id, None) {
+                        self.delete_stored(ctx, now, &row.key);
+                        continue;
+                    }
+                    // Settle and hold this row before the next one is read.
+                    self.turn(ctx, now).await;
+                    if self.installed_row_remains(&row, id) {
+                        installed.push((row, id));
+                    }
+                }
                 RowFate::Drop => {}
                 RowFate::Retry => retry = true,
                 RowFate::Halt => {
@@ -762,12 +772,40 @@ impl Awake {
                 }
             }
         }
-        let command_ids: Vec<ProcId> = kept
+        self.label_installed(&installed).await;
+        self.disarm_unheld(&armed);
+        if retry {
+            return;
+        }
+        self.finish_restore();
+    }
+
+    fn installed_row_remains(&self, row: &StoredLease, id: ProcId) -> bool {
+        match row.kind {
+            StoredKind::Command => self.table.has_command(id),
+            StoredKind::Session => row
+                .session_id
+                .as_deref()
+                .is_some_and(|session_id| self.table.session_process(session_id).is_some()),
+        }
+    }
+
+    /// One snapshot for every row that is still installed after settle.
+    async fn label_installed(&mut self, rows: &[(StoredLease, ProcId)]) {
+        let rows: Vec<(StoredLease, ProcId)> = rows
+            .iter()
+            .filter(|(row, id)| self.installed_row_remains(row, *id))
+            .cloned()
+            .collect();
+        if rows.is_empty() {
+            return;
+        }
+        let command_ids: Vec<ProcId> = rows
             .iter()
             .filter(|(row, _)| row.kind == StoredKind::Command)
             .map(|(_, id)| *id)
             .collect();
-        let session_ids: Vec<ProcId> = kept
+        let session_ids: Vec<ProcId> = rows
             .iter()
             .filter(|(row, _)| row.kind == StoredKind::Session)
             .map(|(_, id)| *id)
@@ -775,7 +813,7 @@ impl Awake {
         let labels = self.platform.fresh_labels(&command_ids, &session_ids).await;
         let mut command_at = 0;
         let mut session_at = 0;
-        for (row, id) in &kept {
+        for (row, id) in &rows {
             let label = match row.kind {
                 StoredKind::Command => {
                     let label = label_at(
@@ -794,15 +832,15 @@ impl Awake {
                     label
                 }
             };
-            if !self.install_row(row, *id, label) {
-                self.delete_stored(ctx, now, &row.key);
+            match row.kind {
+                StoredKind::Command => self.table.set_command_label(*id, label),
+                StoredKind::Session => {
+                    if let Some(session_id) = row.session_id.as_deref() {
+                        self.table.set_session_label(session_id, label);
+                    }
+                }
             }
         }
-        self.disarm_unheld(&armed);
-        if retry {
-            return;
-        }
-        self.finish_restore();
     }
 
     fn classify_row(

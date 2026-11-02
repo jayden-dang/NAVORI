@@ -164,10 +164,50 @@ async fn a_panic_mid_restore_restores_every_row_on_reentry() {
     assert_eq!(row_count(&rig), 2);
     assert_eq!(rig.power.held(), system_only());
 
+    assert_eq!(rig.exits.tokens(COMMAND_PID).len(), 1);
+    assert_eq!(rig.exits.tokens(CLAUDE).len(), 1);
+
     rig.shutdown().await;
     assert!(rig.power.held().is_empty());
+    let releases_after_close = rig.power.releases();
     rig.power.panic_on_hold(1);
     rig.reopen().await;
+
+    // Time stays paused, so the restart sleep has not finished. The command
+    // key sorts first: that row is watched, and the session row is not.
+    for _ in 0..40 {
+        if rig.exits.tokens(COMMAND_PID).len() >= 2 {
+            break;
+        }
+        rig.idle().await;
+    }
+    assert_eq!(
+        rig.exits.tokens(COMMAND_PID).len(),
+        2,
+        "the first stored row is watched before the panic"
+    );
+    assert_eq!(
+        rig.exits.tokens(CLAUDE).len(),
+        1,
+        "the second stored row is not installed yet"
+    );
+    assert!(
+        rig.power.held().is_empty(),
+        "the panicking hold did not keep a guard: {:?}",
+        rig.power.held()
+    );
+    assert_eq!(rig.power.releases(), releases_after_close);
+    let crashed = rig
+        .kernel
+        .modules()
+        .into_iter()
+        .find(|module| module.id == "awake")
+        .unwrap();
+    assert!(
+        matches!(crashed.state, ModuleState::Restarting { .. }),
+        "{crashed:?}"
+    );
+    assert!(crashed.restarts >= 1, "{crashed:?}");
 
     let state = until_held(&rig, |state| {
         lease_count(state) == 2 && state["system_held"] == json!(true)
@@ -176,15 +216,25 @@ async fn a_panic_mid_restore_restores_every_row_on_reentry() {
 
     assert_eq!(row_count(&rig), 2);
     assert_eq!(lease_count(&state), 2);
+    assert_eq!(state["leases"][0]["kind"], "command");
+    assert_eq!(state["leases"][0]["pid"], COMMAND_PID);
+    assert_eq!(state["leases"][1]["kind"], "session");
+    assert_eq!(state["leases"][1]["pid"], CLAUDE);
     assert_eq!(state["display_held"], false);
     assert_eq!(state["problem"], Value::Null);
     assert_eq!(rig.power.held(), system_only());
+    assert_eq!(rig.power.releases(), releases_after_close);
+    assert!(
+        rig.exits.tokens(CLAUDE).len() >= 2,
+        "re-entry watches the session row that the panic skipped"
+    );
     let info = rig
         .kernel
         .modules()
         .into_iter()
         .find(|module| module.id == "awake")
         .unwrap();
+    assert_eq!(info.state, ModuleState::Running);
     assert!(info.restarts >= 1, "{info:?}");
     rig.shutdown().await;
 }

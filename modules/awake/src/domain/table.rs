@@ -211,6 +211,16 @@ impl LeaseTable {
         });
     }
 
+    pub(crate) fn set_command_label(&mut self, process: ProcId, label: Option<String>) {
+        if let Some(lease) = self
+            .commands
+            .iter_mut()
+            .find(|lease| lease.process == process)
+        {
+            lease.label = label;
+        }
+    }
+
     /// One session key. A repeated hold keeps First hold and moves the deadline.
     /// Returns whether this created the lease.
     pub(crate) fn hold_session(
@@ -246,6 +256,16 @@ impl LeaseTable {
             label,
         });
         true
+    }
+
+    pub(crate) fn set_session_label(&mut self, session_id: &str, label: Option<String>) {
+        if let Some(lease) = self
+            .sessions
+            .iter_mut()
+            .find(|lease| lease.session_id == session_id)
+        {
+            lease.label = label;
+        }
     }
 
     pub(crate) fn session_process(&self, session_id: &str) -> Option<ProcId> {
