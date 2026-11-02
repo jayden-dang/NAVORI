@@ -8,6 +8,8 @@ pub enum AwakeAction {
     Status,
     /// Keep this Mac awake for `seconds` of wall-clock time.
     HoldFor { seconds: u64 },
+    /// Keep this Mac awake until it is turned off.
+    HoldUntilOff,
     /// End every lease Navori is holding.
     ReleaseAll,
 }
@@ -16,7 +18,7 @@ impl ModuleAction for AwakeAction {
     fn risk(&self) -> Risk {
         match self {
             Self::Status => Risk::Read,
-            Self::HoldFor { .. } | Self::ReleaseAll => Risk::Write,
+            Self::HoldFor { .. } | Self::HoldUntilOff | Self::ReleaseAll => Risk::Write,
         }
     }
 
@@ -29,7 +31,12 @@ impl ModuleAction for AwakeAction {
             },
             ActionDoc {
                 name: "hold_for",
-                description: "Keep this Mac awake for `seconds` of wall-clock time. A later duration request replaces the current one.",
+                description: "Keep this Mac awake for `seconds` of wall-clock time. A later duration or until-off request replaces the current one.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "hold_until_off",
+                description: "Keep this Mac awake until it is turned off. A later duration request replaces this lease.",
                 risk: Risk::Write,
             },
             ActionDoc {

@@ -70,8 +70,12 @@ impl Awake {
         let now = wait.now();
         let started = match &req.action {
             AwakeAction::Status => Ok(None),
-            AwakeAction::HoldFor { seconds } => {
-                self.hold_for(now, *seconds).map(|()| Some(*seconds))
+            AwakeAction::HoldFor { seconds } => self
+                .hold_for(now, *seconds)
+                .map(|()| Some(Started::Duration(*seconds))),
+            AwakeAction::HoldUntilOff => {
+                self.hold_until_off(now);
+                Ok(Some(Started::UntilOff))
             }
             AwakeAction::ReleaseAll => {
                 let ended = self.table.release_all();
@@ -81,14 +85,20 @@ impl Awake {
         };
         match started {
             Ok(started) => {
-                if let Some(seconds) = started {
-                    self.emit_started(ctx, seconds);
+                if let Some(started) = started {
+                    self.emit_started(ctx, started);
                 }
                 let state = self.turn(ctx, now);
                 req.respond(Ok(state));
             }
             Err(err) => req.respond::<AwakeState>(Err(err)),
         }
+    }
+
+    fn hold_until_off(&mut self, now: SystemTime) {
+        let started = truncate_us(now);
+        // Replacement keeps the assertion; no locked end sentence is true.
+        let _replaced = self.table.hold_until_off(started);
     }
 
     fn hold_for(&mut self, now: SystemTime, seconds: u64) -> Result<(), ActionError> {
@@ -129,12 +139,16 @@ impl Awake {
         state
     }
 
-    fn emit_started(&self, ctx: &ModuleCtx<Self>, seconds: u64) {
+    fn emit_started(&self, ctx: &ModuleCtx<Self>, started: Started) {
+        let (source, kind) = match started {
+            Started::Duration(seconds) => (event::duration_source(seconds), "duration"),
+            Started::UntilOff => (event::until_off_source().to_owned(), "until_off"),
+        };
         ctx.emit(
             LEASE_STARTED,
             Severity::Info,
-            event::started(&event::duration_source(seconds)),
-            payload("manual"),
+            event::started(&source),
+            payload("manual", kind),
         );
     }
 
@@ -146,7 +160,7 @@ impl Awake {
                     LEASE_ENDED,
                     Severity::Info,
                     event::ended_deadline(&duration_source_for(&end.lease)),
-                    payload(end.lease.key.as_str()),
+                    payload(end.lease.key.as_str(), kind_of(&end.lease)),
                 ),
                 EndReason::ReleaseAll if !released => {
                     released = true;
@@ -154,7 +168,7 @@ impl Awake {
                         LEASE_ENDED,
                         Severity::Info,
                         event::ended_release_all(),
-                        payload(end.lease.key.as_str()),
+                        payload(end.lease.key.as_str(), kind_of(&end.lease)),
                     );
                 }
                 EndReason::ReleaseAll | EndReason::Replaced => {}
@@ -163,17 +177,33 @@ impl Awake {
     }
 }
 
-fn duration_source_for(lease: &Lease) -> String {
-    let LeaseSource::Duration { started } = lease.source;
-    let seconds = lease
-        .deadline
-        .and_then(|deadline| deadline.duration_since(started).ok())
-        .map_or(0, |span| span.as_secs());
-    event::duration_source(seconds)
+enum Started {
+    Duration(u64),
+    UntilOff,
 }
 
-fn payload(key: &str) -> Value {
-    json!({ "key": key, "kind": "duration" })
+fn duration_source_for(lease: &Lease) -> String {
+    match lease.source {
+        LeaseSource::Duration { started } => {
+            let seconds = lease
+                .deadline
+                .and_then(|deadline| deadline.duration_since(started).ok())
+                .map_or(0, |span| span.as_secs());
+            event::duration_source(seconds)
+        }
+        LeaseSource::UntilOff => event::until_off_source().to_owned(),
+    }
+}
+
+fn kind_of(lease: &Lease) -> &'static str {
+    match lease.source {
+        LeaseSource::Duration { .. } => "duration",
+        LeaseSource::UntilOff => "until_off",
+    }
+}
+
+fn payload(key: &str, kind: &str) -> Value {
+    json!({ "key": key, "kind": kind })
 }
 
 fn truncate_us(time: SystemTime) -> SystemTime {
