@@ -20,7 +20,11 @@ final class StatusPanel: NSPanel {
     init(content: CascadeContent, onVisibility: @escaping (Bool) -> Void) {
         self.content = content
         self.onVisibility = onVisibility
-        self.cascade = CascadeController(tree: content.tree, activate: content.activate)
+        self.cascade = CascadeController(
+            tree: content.tree,
+            submenu: content.submenu,
+            activate: content.activate
+        )
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: Self.width, height: 420),
             styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
@@ -187,11 +191,15 @@ final class StatusPanel: NSPanel {
         let quit = pad..<(pad + row)
         let about = quit.upperBound..<(quit.upperBound + row)
         let settings = about.upperBound..<(about.upperBound + row)
+        let divider: CGFloat = 1
+        let coreStart = settings.upperBound + divider
+        let core = coreStart..<(coreStart + row)
         let id: String
         switch y {
         case quit: id = "quit"
         case about: id = "about"
         case settings: id = "settings"
+        case core: id = "core"
         default: return
         }
         cascade.click(id)

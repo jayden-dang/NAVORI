@@ -16,7 +16,10 @@ final class StatusBarController: NSObject {
         let content = CascadeContent(
             tree: { [weak self] in self?.menuTree() ?? [] },
             root: AnyView(PanelView(store: self.store)),
-            submenu: { _ in AnyView(EmptyView()) },
+            submenu: { [weak self] id in
+                guard let self, id == "core" else { return AnyView(EmptyView()) }
+                return AnyView(CoreSubmenuView(store: self.store))
+            },
             activate: { [weak self] id in self?.activate(id) }
         )
         return StatusPanel(content: content, onVisibility: { [weak self] visible in
@@ -24,6 +27,7 @@ final class StatusBarController: NSObject {
         })
     }()
     private var didScheduleStatusMark = false
+    private var didReplaceCoreTree = false
 
     init(store: CoreStore, openSettings: @escaping (SettingsTab) -> Void) {
         self.store = store
@@ -39,6 +43,7 @@ final class StatusBarController: NSObject {
         }
         item.behavior = .terminationOnRemoval
         observeHealth()
+        observeSnapshot()
     }
 
     /// Re-renders the icon whenever `store.health` changes.
@@ -115,9 +120,34 @@ final class StatusBarController: NSObject {
         item.menu = nil  // keep left click for the panel
     }
 
+    private func observeSnapshot() {
+        withObservationTracking {
+            _ = store.hasSnapshot
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                self?.onSnapshotChange()
+                self?.observeSnapshot()
+            }
+        }
+    }
+
+    private func onSnapshotChange() {
+        guard store.hasSnapshot, !didReplaceCoreTree else { return }
+        didReplaceCoreTree = true
+        guard panelBuilt, panel.isVisible else { return }
+        panel.cascade.replaceTree()
+    }
+
     private func menuTree() -> [CascadeNode] {
+        let coreChildren: [CascadeNode]
+        if store.hasSnapshot {
+            let modules = store.moduleRows.map { CascadeNode(id: $0.id) }
+            coreChildren = modules.isEmpty ? [CascadeNode(id: "core.modules")] : modules
+        } else {
+            coreChildren = []
+        }
         return [
-            CascadeNode(id: "core", isActionable: true),
+            CascadeNode(id: "core", isActionable: true, children: coreChildren),
             CascadeNode(id: "settings", isActionable: true),
             CascadeNode(id: "about", isActionable: true),
             CascadeNode(id: "quit", isActionable: true),
