@@ -17,8 +17,15 @@ final class StatusBarController: NSObject {
             tree: { [weak self] in self?.menuTree() ?? [] },
             root: AnyView(PanelView(store: self.store)),
             submenu: { [weak self] id in
-                guard let self, id == "core" else { return AnyView(EmptyView()) }
-                return AnyView(CoreSubmenuView(store: self.store))
+                guard let self else { return AnyView(EmptyView()) }
+                switch id {
+                case "core":
+                    return AnyView(CoreSubmenuView(store: self.store))
+                case "awake":
+                    return AnyView(EmptyView())
+                default:
+                    return AnyView(EmptyView())
+                }
             },
             activate: { [weak self] id in self?.activate(id) }
         )
@@ -31,6 +38,7 @@ final class StatusBarController: NSObject {
     #endif
     private var didScheduleStatusMark = false
     private var didReplaceCoreTree = false
+    private var awakeHadSubmenu = false
 
     init(store: CoreStore, openSettings: @escaping (SettingsTab) -> Void) {
         self.store = store
@@ -45,6 +53,7 @@ final class StatusBarController: NSObject {
             button.toolTip = AppEnvironment.displayName
         }
         item.behavior = .terminationOnRemoval
+        awakeHadSubmenu = AwakeRowState(status: store.awakeStatus).hasSubmenu
         observeHealth()
         observeSnapshot()
     }
@@ -156,9 +165,14 @@ final class StatusBarController: NSObject {
     }
 
     private func onSnapshotChange() {
-        guard store.hasSnapshot, !didReplaceCoreTree else { return }
-        didReplaceCoreTree = true
-        guard panelBuilt, panel.isOpen else { return }
+        let hasSubmenu = AwakeRowState(status: store.awakeStatus).hasSubmenu
+        let coreArrived = store.hasSnapshot && !didReplaceCoreTree
+        let submenuFlipped = hasSubmenu != awakeHadSubmenu
+        if coreArrived {
+            didReplaceCoreTree = true
+        }
+        awakeHadSubmenu = hasSubmenu
+        guard panelBuilt, panel.isOpen, coreArrived || submenuFlipped else { return }
         panel.cascade.replaceTree()
     }
 
@@ -170,11 +184,25 @@ final class StatusBarController: NSObject {
         } else {
             coreChildren = []
         }
+        let awakeChildren = store.hasSnapshot && AwakeRowState(status: store.awakeStatus).hasSubmenu
+            ? awakeCommands
+            : []
         return [
+            CascadeNode(id: "awake", isActionable: true, children: awakeChildren),
             CascadeNode(id: "core", isActionable: true, children: coreChildren),
             CascadeNode(id: "settings", isActionable: true),
             CascadeNode(id: "about", isActionable: true),
             CascadeNode(id: "quit", isActionable: true),
+        ]
+    }
+
+    /// Static command ids from the Awake submenu. The view stays empty until that submenu ships.
+    private var awakeCommands: [CascadeNode] {
+        [
+            CascadeNode(id: "awake.hold_hour", isActionable: true),
+            CascadeNode(id: "awake.hold_until_off", isActionable: true),
+            CascadeNode(id: "awake.display", isActionable: true),
+            CascadeNode(id: "awake.release_all", isActionable: true),
         ]
     }
 
