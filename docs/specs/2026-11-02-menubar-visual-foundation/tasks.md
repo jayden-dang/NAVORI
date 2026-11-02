@@ -229,7 +229,7 @@ _Requirements: MENU-5.1, MENU-5.2, MENU-5.3, MENU-5.4, MENU-5.5, MENU-5.6, MENU-
 
 **Interfaces:**
 - Consumes: none
-- Produces: `final class GlassSurfaceView: NSView { init(content: NSView); var tint: NSColor }`; `enum GlassTint { static let standard: NSColor }` (black at 65% in dark appearance, white at 55% in light); `StatusPanel.width == 360`
+- Produces: `final class GlassSurfaceView: NSView { init(content: NSView); var tint: NSColor }`; `enum GlassTint { static let standard: NSColor }` (black at 69% in dark appearance, white at 57% in light); `StatusPanel.width == 360`
 
 **Depends-on:** Task 1, Task 3
 
@@ -564,7 +564,7 @@ _Requirements: MENU-2.3, MENU-G6_
 
 **Interfaces:**
 - Consumes: the Preview's tint slider
-- Produces: final `GlassTint.standard`
+- Produces: final `GlassTint.standard` (black at 69% in dark appearance, white at 57% in light)
 
 **Depends-on:** Task 19
 
