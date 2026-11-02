@@ -115,6 +115,9 @@ impl WaitHandle {
                 return Wake::PanelChanged;
             }
 
+            let pulses = self.inputs.borrow().wake_pulses;
+            let pulse_moved = pulses != self.seen_wake_pulses;
+
             let Some(deadline) = deadline else {
                 if self.inputs.changed().await.is_err() {
                     std::future::pending::<()>().await;
@@ -125,6 +128,11 @@ impl WaitHandle {
             let remaining = deadline
                 .duration_since(self.now())
                 .unwrap_or(Duration::ZERO);
+            self.seen_wake_pulses = pulses;
+            if pulse_moved && remaining.is_zero() {
+                return Wake::Due;
+            }
+
             let park = remaining.max(self.closed_menu_gap());
             tokio::select! {
                 biased;

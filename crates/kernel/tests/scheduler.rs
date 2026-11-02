@@ -36,6 +36,10 @@ impl FakeClock {
         let millis = u64::try_from(by.as_millis()).unwrap();
         self.millis.fetch_add(millis, Ordering::SeqCst);
     }
+
+    fn set(&self, millis: u64) {
+        self.millis.store(millis, Ordering::SeqCst);
+    }
 }
 
 impl WallClock for FakeClock {
@@ -657,6 +661,223 @@ async fn a_panel_change_does_not_count_toward_the_gap() {
         futures::poll!(wait.as_mut()),
         Poll::Pending,
         "panel change moved the 30-second gap"
+    );
+
+    clock.advance(Duration::from_secs(1));
+    tokio::time::advance(Duration::from_secs(1)).await;
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_pulse_after_the_deadline_passed_in_sleep_returns_due() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+    let deadline = wall(ORIGIN_MS + 10_000);
+    let mut wait = std::pin::pin!(handle.wait_until(Some(deadline)));
+
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    clock.advance(Duration::from_secs(10));
+    assert_eq!(
+        futures::poll!(wait.as_mut()),
+        Poll::Pending,
+        "wall time alone returned Due while tokio stood still"
+    );
+
+    kernel.scheduler().wake_pulse();
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_pulse_returns_due_without_waiting_for_the_gap() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+
+    let first = wall(ORIGIN_MS + 1_000);
+    {
+        let mut wait = std::pin::pin!(handle.wait_until(Some(first)));
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+        clock.advance(Duration::from_secs(1));
+        tokio::time::advance(Duration::from_secs(1)).await;
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    }
+
+    clock.advance(Duration::from_secs(10));
+    tokio::time::advance(Duration::from_secs(10)).await;
+
+    let overdue = wall(ORIGIN_MS + 2_000);
+    kernel.scheduler().wake_pulse();
+    let mut wait = std::pin::pin!(handle.wait_until(Some(overdue)));
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_pulse_before_the_deadline_returns_nothing_and_waits_the_remaining_wall_time() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+    let deadline = wall(ORIGIN_MS + 10_000);
+    let mut wait = std::pin::pin!(handle.wait_until(Some(deadline)));
+
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    kernel.scheduler().wake_pulse();
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+
+    clock.advance(Duration::from_secs(9));
+    tokio::time::advance(Duration::from_secs(9)).await;
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+
+    clock.advance(Duration::from_secs(1));
+    tokio::time::advance(Duration::from_secs(1)).await;
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_pulse_with_no_deadline_keeps_waiting() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+    let mut wait = std::pin::pin!(handle.wait_until(None));
+
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    kernel.scheduler().wake_pulse();
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    tokio::time::advance(Duration::from_secs(24 * 60 * 60)).await;
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_pulse_seen_with_no_deadline_answers_the_next_deadline_without_the_gap() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+
+    let first = wall(ORIGIN_MS + 1_000);
+    {
+        let mut wait = std::pin::pin!(handle.wait_until(Some(first)));
+        clock.advance(Duration::from_secs(1));
+        tokio::time::advance(Duration::from_secs(1)).await;
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    }
+
+    clock.advance(Duration::from_secs(10));
+    tokio::time::advance(Duration::from_secs(10)).await;
+
+    {
+        let mut waiting = std::pin::pin!(handle.wait_until(None));
+        assert_eq!(futures::poll!(waiting.as_mut()), Poll::Pending);
+        kernel.scheduler().wake_pulse();
+        assert_eq!(futures::poll!(waiting.as_mut()), Poll::Pending);
+    }
+
+    let overdue = wall(ORIGIN_MS + 2_000);
+    let mut wait = std::pin::pin!(handle.wait_until(Some(overdue)));
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn with_no_pulse_a_deadline_across_sleep_returns_at_a_later_timer_wake() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+    let deadline = wall(ORIGIN_MS + 10_000);
+    let mut wait = std::pin::pin!(handle.wait_until(Some(deadline)));
+
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    clock.advance(Duration::from_secs(10));
+    assert_eq!(
+        futures::poll!(wait.as_mut()),
+        Poll::Pending,
+        "a deadline across sleep was lost or returned before the timer"
+    );
+    tokio::time::advance(Duration::from_secs(10)).await;
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_pulse_with_no_handle_is_recorded_without_error() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    kernel.scheduler().wake_pulse();
+
+    let handle = kernel.scheduler().wait_handle();
+    let rendered = format!("{handle:?}");
+    assert!(
+        rendered.contains("seen_wake_pulses: 1"),
+        "pulse with no handle was not recorded: {rendered}"
+    );
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_wall_clock_moved_back_defers_due_and_moved_forward_brings_it_on() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+    let deadline = wall(ORIGIN_MS + 10_000);
+    let mut wait = std::pin::pin!(handle.wait_until(Some(deadline)));
+
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    clock.set(ORIGIN_MS - 5_000);
+    tokio::time::advance(Duration::from_secs(10)).await;
+    assert_eq!(
+        futures::poll!(wait.as_mut()),
+        Poll::Pending,
+        "a wall clock moved backward still returned Due"
+    );
+
+    clock.set(ORIGIN_MS + 10_000);
+    assert_eq!(
+        futures::poll!(wait.as_mut()),
+        Poll::Pending,
+        "moving the clock forward returned Due before the next check"
+    );
+    tokio::time::advance(Duration::from_secs(15)).await;
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_pulse_does_not_count_toward_the_gap() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+
+    let first = wall(ORIGIN_MS + 1_000);
+    {
+        let mut wait = std::pin::pin!(handle.wait_until(Some(first)));
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+        clock.advance(Duration::from_secs(1));
+        tokio::time::advance(Duration::from_secs(1)).await;
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    }
+
+    clock.advance(Duration::from_secs(10));
+    tokio::time::advance(Duration::from_secs(10)).await;
+
+    let overdue = wall(ORIGIN_MS + 2_000);
+    kernel.scheduler().wake_pulse();
+    {
+        let mut wait = std::pin::pin!(handle.wait_until(Some(overdue)));
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    }
+
+    let mut wait = std::pin::pin!(handle.wait_until(Some(overdue)));
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    clock.advance(Duration::from_secs(19));
+    tokio::time::advance(Duration::from_secs(19)).await;
+    assert_eq!(
+        futures::poll!(wait.as_mut()),
+        Poll::Pending,
+        "pulse moved the 30-second gap"
     );
 
     clock.advance(Duration::from_secs(1));
