@@ -16,11 +16,36 @@ use crate::infra::{ExecutableName, Platform, ProcessClass, Rejected};
 use crate::state::AwakeState;
 
 const MAX_SECONDS: u64 = 7 * 24 * 60 * 60;
-const EXIT_RETRY: Duration = Duration::from_secs(60);
+const RETRY: Duration = Duration::from_secs(60);
+const SYSTEM_PROBLEM: &str = "macOS refused the request. Navori keeps trying.";
+const DISPLAY_PROBLEM: &str = "macOS refused to keep the display on. Navori keeps trying.";
+const RELEASE_PROBLEM: &str = "Releasing a power assertion failed.";
 const EXITS_PROBLEM: &str =
     "Exit watches stopped, so a command lease has no end signal. Navori retries in 60 seconds.";
 const STORE_PROBLEM: &str = "Awake could not save a lease. Navori retries in 60 seconds.";
 const PLATFORM_PROBLEM: &str = "Awake could not watch a process, so a stored lease stays on disk. Navori retries in 60 seconds.";
+
+#[derive(Debug, Default)]
+struct Problems {
+    system: Option<String>,
+    display: Option<String>,
+    release: Option<String>,
+    store: Option<String>,
+    platform: Option<String>,
+    exits: Option<String>,
+}
+
+impl Problems {
+    fn first(&self) -> Option<String> {
+        self.system
+            .clone()
+            .or_else(|| self.display.clone())
+            .or_else(|| self.release.clone())
+            .or_else(|| self.store.clone())
+            .or_else(|| self.platform.clone())
+            .or_else(|| self.exits.clone())
+    }
+}
 
 pub struct Awake {
     platform: Platform,
@@ -28,9 +53,7 @@ pub struct Awake {
     reconciler: Reconciler,
     published: AwakeState,
     watcher: Option<ProcWatcher>,
-    exits_problem: Option<String>,
-    store_problem: Option<String>,
-    platform_problem: Option<String>,
+    problems: Problems,
     retry_at: Option<SystemTime>,
     restored: bool,
     dirty: BTreeSet<String>,
@@ -55,9 +78,7 @@ impl Awake {
             reconciler,
             published: AwakeState::idle(),
             watcher: None,
-            exits_problem: None,
-            store_problem: None,
-            platform_problem: None,
+            problems: Problems::default(),
             retry_at: None,
             restored: false,
             dirty: BTreeSet::new(),
@@ -71,7 +92,7 @@ impl Awake {
         loop {
             let now = wait.now();
             let due = self.take_due_retry(now);
-            if due && self.exits_problem.is_some() {
+            if due && self.problems.exits.is_some() {
                 self.rebuild_exits_now(now);
             }
             if due && !self.restored {
@@ -352,7 +373,7 @@ impl Awake {
             ));
         }
         self.dirty.clear();
-        self.store_problem = None;
+        self.problems.store = None;
         let ended = self.table.release_all();
         let ids: Vec<ProcId> = ended
             .iter()
@@ -409,35 +430,31 @@ impl Awake {
         }
         if self.table.process_ids().is_empty() {
             self.watcher = None;
-            self.exits_problem = None;
-            if self.dirty.is_empty() && self.restored && self.platform_problem.is_none() {
-                self.retry_at = None;
-            }
+            self.problems.exits = None;
         }
     }
 
     fn note_exits_dead(&mut self, now: SystemTime) {
         self.watcher = None;
         if self.table.process_ids().is_empty() {
-            self.exits_problem = None;
-            self.retry_at = None;
+            self.problems.exits = None;
             return;
         }
         tracing::warn!("exit watches stopped; a command lease has no end signal until the retry");
-        self.exits_problem = Some(EXITS_PROBLEM.to_owned());
+        self.problems.exits = Some(EXITS_PROBLEM.to_owned());
         self.schedule_retry(now);
     }
 
     fn rebuild_exits_now(&mut self, now: SystemTime) {
         if self.table.process_ids().is_empty() {
-            self.exits_problem = None;
+            self.problems.exits = None;
             return;
         }
         match self.rebuild_watcher() {
-            Ok(()) => self.exits_problem = None,
+            Ok(()) => self.problems.exits = None,
             Err(err) => {
                 tracing::warn!(error = %err, "exit watches could not be rebuilt");
-                self.exits_problem = Some(EXITS_PROBLEM.to_owned());
+                self.problems.exits = Some(EXITS_PROBLEM.to_owned());
                 self.schedule_retry(now);
             }
         }
@@ -478,20 +495,48 @@ impl Awake {
             }
         }
         let held = self.reconciler.apply(self.table.wants());
+        self.note_assertions(&held);
         self.flush_dirty(ctx, now);
+        self.sync_retry(now, &held);
+        self.publish(ctx, &held)
+    }
+
+    fn note_assertions(&mut self, held: &Held) {
+        let wants = self.table.wants();
+        self.problems.system = (wants.system && !held.system).then(|| SYSTEM_PROBLEM.to_owned());
+        self.problems.display =
+            (wants.display && !held.display).then(|| DISPLAY_PROBLEM.to_owned());
         if let Some(code) = held.release_failed {
             tracing::warn!(code, "releasing a power assertion failed");
+            self.problems.release = Some(RELEASE_PROBLEM.to_owned());
+        } else if held.released {
+            self.problems.release = None;
         }
-        self.publish(ctx, &held)
+    }
+
+    fn sync_retry(&mut self, now: SystemTime, held: &Held) {
+        if !self.needs_retry(held) {
+            self.retry_at = None;
+            return;
+        }
+        if self.retry_at.is_none() {
+            self.schedule_retry(now);
+        }
+    }
+
+    fn needs_retry(&self, held: &Held) -> bool {
+        let wants = self.table.wants();
+        (wants.system && !held.system)
+            || (wants.display && !held.display)
+            || !self.dirty.is_empty()
+            || self.problems.platform.is_some()
+            || self.problems.exits.is_some()
+            || !self.restored
     }
 
     fn publish(&mut self, ctx: &ModuleCtx<Self>, held: &Held) -> AwakeState {
         let mut state = self.table.snapshot(held.system, held.display);
-        state.problem = self
-            .store_problem
-            .clone()
-            .or_else(|| self.platform_problem.clone())
-            .or_else(|| self.exits_problem.clone());
+        state.problem = self.problems.first();
         if state != self.published {
             self.published = state.clone();
             let next = state.clone();
@@ -581,7 +626,7 @@ impl Awake {
     }
 
     fn schedule_retry(&mut self, now: SystemTime) {
-        let Some(at) = now.checked_add(EXIT_RETRY) else {
+        let Some(at) = now.checked_add(RETRY) else {
             return;
         };
         self.retry_at = Some(match self.retry_at {
@@ -591,13 +636,13 @@ impl Awake {
     }
 
     fn note_store(&mut self, now: SystemTime) {
-        self.store_problem = Some(STORE_PROBLEM.to_owned());
+        self.problems.store = Some(STORE_PROBLEM.to_owned());
         self.schedule_retry(now);
     }
 
     fn note_platform(&mut self, now: SystemTime, err: impl std::fmt::Display) {
         tracing::warn!(error = %err, "a stored lease could not be watched");
-        self.platform_problem = Some(PLATFORM_PROBLEM.to_owned());
+        self.problems.platform = Some(PLATFORM_PROBLEM.to_owned());
         self.schedule_retry(now);
     }
 
@@ -640,7 +685,7 @@ impl Awake {
     fn clear_dirty(&mut self, key: &str) {
         self.dirty.remove(key);
         if self.dirty.is_empty() {
-            self.store_problem = None;
+            self.problems.store = None;
         }
     }
 
@@ -672,7 +717,7 @@ impl Awake {
             }
         }
         if self.dirty.is_empty() {
-            self.store_problem = None;
+            self.problems.store = None;
         } else {
             self.note_store(now);
         }
@@ -853,9 +898,9 @@ impl Awake {
 
     fn finish_restore(&mut self) {
         self.restored = true;
-        self.platform_problem = None;
+        self.problems.platform = None;
         if self.dirty.is_empty() {
-            self.store_problem = None;
+            self.problems.store = None;
         }
     }
 }

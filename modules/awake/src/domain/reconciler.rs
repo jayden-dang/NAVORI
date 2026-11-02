@@ -10,6 +10,7 @@ pub struct Held {
     pub display: bool,
     pub refused: Vec<AssertionKind>,
     pub release_failed: Option<i32>,
+    pub released: bool,
 }
 
 pub struct Reconciler {
@@ -42,11 +43,12 @@ impl Reconciler {
     pub fn apply(&mut self, wants: Wants) -> Held {
         let mut refused = Vec::new();
         let mut release_failed = None;
+        let mut released = false;
         if !wants.display {
-            release(&mut self.display, &mut release_failed);
+            released |= release(&mut self.display, &mut release_failed);
         }
         if !wants.system {
-            release(&mut self.system, &mut release_failed);
+            released |= release(&mut self.system, &mut release_failed);
         }
         if wants.system && self.system.is_none() {
             self.hold(AssertionKind::System, &mut refused);
@@ -59,6 +61,7 @@ impl Reconciler {
             display: self.display.is_some(),
             refused,
             release_failed,
+            released,
         }
     }
 
@@ -75,16 +78,20 @@ impl Reconciler {
     }
 }
 
-fn release(guard: &mut Option<AssertionGuard>, failed: &mut Option<i32>) {
+fn release(guard: &mut Option<AssertionGuard>, failed: &mut Option<i32>) -> bool {
     let Some(guard) = guard.take() else {
-        return;
+        return false;
     };
-    if let Err(err) = guard.release() {
-        let code = match err {
-            PowerError::ReleaseFailed { code } | PowerError::Refused { code, .. } => code,
-        };
-        if failed.is_none() {
-            *failed = Some(code);
+    match guard.release() {
+        Ok(()) => true,
+        Err(err) => {
+            let code = match err {
+                PowerError::ReleaseFailed { code } | PowerError::Refused { code, .. } => code,
+            };
+            if failed.is_none() {
+                *failed = Some(code);
+            }
+            false
         }
     }
 }
