@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use navori_kernel::{DispatchError, Envelope, Kernel, WallClock};
 use navori_macos::fake::{FakeExitsHandle, FakePower, FakeProcesses};
 use navori_macos::{PowerAssertions, ProcessSource};
-use navori_mod_awake::{Awake, Platform, Timing};
+use navori_mod_awake::{Awake, ExitsFactory, Platform, Timing};
 use navori_store::Store;
 use serde_json::Value;
 
@@ -52,19 +52,39 @@ pub struct Rig {
 
 impl Rig {
     pub fn new() -> Self {
+        let processes = Arc::new(FakeProcesses::new(501));
+        let source = Arc::clone(&processes) as Arc<dyn ProcessSource>;
+        Self::with_source(processes, source)
+    }
+
+    pub fn with_source(processes: Arc<FakeProcesses>, source: Arc<dyn ProcessSource>) -> Self {
+        let exits = FakeExitsHandle::new();
+        let factory = {
+            let exits = exits.clone();
+            Box::new(move |sink| exits.clone().factory()(sink)) as ExitsFactory
+        };
+        Self::assemble(processes, source, exits, factory)
+    }
+
+    pub fn with_exits_factory(factory: ExitsFactory) -> Self {
+        let processes = Arc::new(FakeProcesses::new(501));
+        let source = Arc::clone(&processes) as Arc<dyn ProcessSource>;
+        Self::assemble(processes, source, FakeExitsHandle::new(), factory)
+    }
+
+    fn assemble(
+        processes: Arc<FakeProcesses>,
+        source: Arc<dyn ProcessSource>,
+        exits: FakeExitsHandle,
+        factory: ExitsFactory,
+    ) -> Self {
         let clock = FakeClock::at(ORIGIN_MS);
         let power = Arc::new(FakePower::new());
-        let processes = Arc::new(FakeProcesses::new(501));
-        let exits = FakeExitsHandle::new();
-        let platform = {
-            let processes = Arc::clone(&processes);
-            let exits = exits.clone();
-            Platform::new(
-                Arc::clone(&power) as Arc<dyn PowerAssertions>,
-                Box::new(move || Ok(Arc::clone(&processes) as Arc<dyn ProcessSource>)),
-                Box::new(move |sink| exits.clone().factory()(sink)),
-            )
-        };
+        let platform = Platform::new(
+            Arc::clone(&power) as Arc<dyn PowerAssertions>,
+            Box::new(move || Ok(Arc::clone(&source))),
+            factory,
+        );
         let kernel =
             Kernel::builder_with_clock(Store::open_in_memory().unwrap(), Arc::new(clock.clone()))
                 .pause_journal_sweep()

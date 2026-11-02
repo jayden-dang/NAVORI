@@ -44,3 +44,7 @@ pub(crate) fn ended_deadline(source: &str) -> String {
 pub(crate) fn ended_release_all() -> String {
     "Stopped keeping this Mac awake: Release all.".to_owned()
 }
+
+pub(crate) fn ended_exited(source: &str) -> String {
+    format!("Stopped keeping this Mac awake: {source} exited.")
+}
