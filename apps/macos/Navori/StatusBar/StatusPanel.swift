@@ -93,7 +93,7 @@ final class StatusPanel: NSPanel {
     }
 
     func show(relativeTo button: NSStatusBarButton, onFirstFrame: (@MainActor () -> Void)? = nil) {
-        cascade.reset()
+        cascade.closeSubmenus()
         guard let buttonWindow = button.window else { return }
         let anchor = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let screen = buttonWindow.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
@@ -168,7 +168,7 @@ final class StatusPanel: NSPanel {
             NSEvent.removeMonitor(monitor)
             outsideClickMonitor = nil
         }
-        cascade.reset()
+        cascade.closeSubmenus()
         onVisibility(false)
         orderOut(nil)
         super.close()

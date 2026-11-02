@@ -41,7 +41,7 @@ struct MenuRowView: View {
                 Spacer(minLength: 8)
                 if let dot = row.dot {
                     Circle()
-                        .fill(dotColor(dot))
+                        .fill(statusDotColor(dot))
                         .frame(width: 7, height: 7)
                 }
                 if let value = row.value {
@@ -107,15 +107,15 @@ struct MenuRowView: View {
         }
         .frame(width: 20, height: 20)
     }
+}
 
-    private func dotColor(_ dot: StatusDot) -> Color {
-        switch dot {
-        case .green: Color(nsColor: .systemGreen)
-        case .yellow: Color(nsColor: .systemYellow)
-        case .orange: Color(nsColor: .systemOrange)
-        case .red: Color(nsColor: .systemRed)
-        case .gray: Color(nsColor: .systemGray)
-        }
+func statusDotColor(_ dot: StatusDot) -> Color {
+    switch dot {
+    case .green: Color(nsColor: .systemGreen)
+    case .yellow: Color(nsColor: .systemYellow)
+    case .orange: Color(nsColor: .systemOrange)
+    case .red: Color(nsColor: .systemRed)
+    case .gray: Color(nsColor: .systemGray)
     }
 }
 

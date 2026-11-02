@@ -98,10 +98,6 @@ final class CascadeController {
         selection = state.selection
     }
 
-    func reset() {
-        closeSubmenus()
-    }
-
     var keyIsInside: Bool {
         guard let key = NSApp.keyWindow else { return false }
         return owns(key)

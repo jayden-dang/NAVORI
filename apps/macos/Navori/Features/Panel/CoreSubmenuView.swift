@@ -30,7 +30,7 @@ private struct ModulesSection: View {
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(dotColor(ModuleDot.color(state: module.state)))
+                            .fill(statusDotColor(ModuleDot.color(state: module.state)))
                             .frame(width: 7, height: 7)
                         Text(module.id)
                             .font(.system(size: 13))
@@ -65,15 +65,6 @@ private struct ModulesSection: View {
         return "\(label(module)), \(detail)"
     }
 
-    private func dotColor(_ dot: StatusDot) -> Color {
-        switch dot {
-        case .green: Color(nsColor: .systemGreen)
-        case .yellow: Color(nsColor: .systemYellow)
-        case .orange: Color(nsColor: .systemOrange)
-        case .red: Color(nsColor: .systemRed)
-        case .gray: Color(nsColor: .systemGray)
-        }
-    }
 }
 
 private struct ActivitySection: View {
@@ -88,6 +79,7 @@ private struct ActivitySection: View {
                     .foregroundStyle(Color(nsColor: .secondaryLabelColor))
             } else {
                 ForEach(Array(events.prefix(8))) { event in
+                    let age = Self.relative(event.tsMs)
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Circle()
                             .fill(Color(nsColor: .secondaryLabelColor))
@@ -97,20 +89,19 @@ private struct ActivitySection: View {
                             .foregroundStyle(Color(nsColor: .labelColor))
                             .lineLimit(2)
                         Spacer(minLength: 4)
-                        Text(Self.relative(event.tsMs))
+                        Text(age)
                             .font(.system(size: 12))
                             .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                     }
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(event.summary)
-                    .accessibilityValue(spoken(event))
+                    .accessibilityValue(spoken(event, age: age))
                 }
             }
         }
     }
 
-    private func spoken(_ event: EventRow) -> String {
-        let age = Self.relative(event.tsMs)
+    private func spoken(_ event: EventRow, age: String) -> String {
         guard event.severity.isEmpty == false else { return age }
         return "\(event.severity), \(age)"
     }
