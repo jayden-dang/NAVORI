@@ -14,7 +14,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 mod perf;
 
 const SIGNING_IDENTITY: &str = "Navori Local Signing";
-const MIN_MACOS: &str = "15.0";
+const MIN_MACOS: &str = "26.0";
 
 #[derive(Debug, Parser)]
 #[command(name = "xtask")]
@@ -1008,6 +1008,9 @@ fn ci(root: &Path) -> Result<()> {
     build_core(root, Profile::Dev.default_flavor())?;
     sh(Command::new("swift")
         .args(["build", "--arch", "arm64", "--package-path"])
+        .arg(root.join("apps/macos")))?;
+    sh(Command::new("swift")
+        .args(["test", "--arch", "arm64", "--package-path"])
         .arg(root.join("apps/macos")))?;
     println!("✓ ci passed");
     Ok(())

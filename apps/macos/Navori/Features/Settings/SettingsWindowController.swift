@@ -4,15 +4,17 @@ import SwiftUI
 @MainActor
 final class SettingsWindowController {
     private let store: CoreStore
+    private let selection = SettingsSelection()
     private var window: NSWindow?
 
     init(store: CoreStore) {
         self.store = store
     }
 
-    func show() {
+    func show(tab: SettingsTab = .general) {
+        selection.tab = tab
         if window == nil {
-            let hosting = NSHostingController(rootView: SettingsView(store: store))
+            let hosting = NSHostingController(rootView: SettingsView(store: store, selection: selection))
             let window = NSWindow(contentViewController: hosting)
             window.title = "\(AppEnvironment.displayName) Settings"
             window.styleMask = [.titled, .closable, .miniaturizable]

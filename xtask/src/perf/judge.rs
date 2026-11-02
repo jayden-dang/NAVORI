@@ -6,7 +6,6 @@ use super::baseline::{Baseline, Machine};
 pub enum Kind {
     Gated { budget: f64 },
     BaselineOnly,
-    Skipped { reason: &'static str },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -93,10 +92,8 @@ pub const METRICS: &[MetricSpec] = &[
     MetricSpec {
         name: "submenu_open_ms",
         unit: "ms",
-        kind: Kind::Skipped {
-            reason: "no submenu until the A5 menu",
-        },
-        floor: 0.0,
+        kind: Kind::Gated { budget: 16.0 },
+        floor: 5.0,
     },
 ];
 
@@ -130,9 +127,6 @@ pub fn judge(m: &Measurements, baseline: Option<&Baseline>, machine: &Machine) -
     let mut passed = true;
     for spec in METRICS {
         match spec.kind {
-            Kind::Skipped { reason } => {
-                lines.push(format!("{} skipped: {reason}", spec.name));
-            }
             Kind::BaselineOnly => match m.get(spec.name) {
                 None => {
                     lines.push(missing_metric(spec.name));
@@ -262,6 +256,7 @@ mod tests {
             ("idle_disk_writes_kb".to_owned(), 64.0),
             ("menu_open_cpu_ms".to_owned(), 5.0),
             ("thread_count".to_owned(), 2.0),
+            ("submenu_open_ms".to_owned(), 16.0),
         ])
     }
 
@@ -337,17 +332,45 @@ mod tests {
     }
 
     #[test]
-    fn skipped_metric_prints_reason_and_does_not_fail() {
+    fn no_metric_reports_itself_as_skipped() {
         let verdict = judge(&within_budget(), None, &machine());
         assert!(
-            verdict
-                .lines
-                .iter()
-                .any(|line| line.contains("skipped: no submenu until the A5 menu")),
+            verdict.lines.iter().all(|line| !line.contains("skipped")),
             "{:?}",
             verdict.lines
         );
         assert!(verdict.passed, "{:?}", verdict.lines);
+    }
+
+    #[test]
+    fn a_submenu_open_over_sixteen_ms_fails_the_run() {
+        let mut measurements = within_budget();
+        measurements.insert("submenu_open_ms".to_owned(), 17.0);
+        let verdict = judge(&measurements, None, &machine());
+        assert!(
+            verdict.lines.iter().any(|line| {
+                line.contains("submenu_open_ms") && line.contains("17") && line.contains("16")
+            }),
+            "{:?}",
+            verdict.lines
+        );
+        assert!(!verdict.passed, "{:?}", verdict.lines);
+    }
+
+    #[test]
+    fn a_missing_submenu_measurement_fails_the_run() {
+        let mut measurements = within_budget();
+        measurements.remove("submenu_open_ms");
+        let verdict = judge(&measurements, None, &machine());
+        assert!(
+            verdict
+                .lines
+                .iter()
+                .any(|line| line.contains("no line for an enabled metric: submenu_open_ms")),
+            "{:?}",
+            verdict.lines
+        );
+        assert!(!verdict.passed, "{:?}", verdict.lines);
     }
 
     #[test]
@@ -420,9 +443,6 @@ mod tests {
         let measured = within_budget();
         let mut metrics = BTreeMap::new();
         for spec in METRICS {
-            if matches!(spec.kind, Kind::Skipped { .. }) {
-                continue;
-            }
             let value = measured[spec.name];
             metrics.insert(spec.name.to_owned(), (value, spec.floor));
         }
@@ -507,12 +527,7 @@ mod tests {
                 "5 ms `menu_open_after_launch_ms`",
             ),
             ("thread_count", 2.0, None, "2 threads `thread_count`"),
-            (
-                "submenu_open_ms",
-                0.0,
-                None,
-                "submenu_open_ms skipped: no submenu until the A5 menu",
-            ),
+            ("submenu_open_ms", 5.0, Some(16.0), "≤ 16 ms"),
         ];
         assert_eq!(METRICS.len(), expected.len());
         for (spec, (name, floor, budget, phrase)) in METRICS.iter().zip(expected) {
@@ -520,7 +535,7 @@ mod tests {
             assert_eq!(spec.floor, *floor);
             match (spec.kind, budget) {
                 (Kind::Gated { budget: actual }, Some(want)) => assert_eq!(actual, *want),
-                (Kind::BaselineOnly, None) | (Kind::Skipped { .. }, None) => {}
+                (Kind::BaselineOnly, None) => {}
                 (kind, want) => panic!("{name} kind {kind:?} budget {want:?}"),
             }
             assert!(
@@ -528,7 +543,6 @@ mod tests {
                 "{name} phrase {phrase:?} missing from the standard"
             );
         }
-        assert!(standard.contains("submenu_open_ms skipped: no submenu until the A5 menu"));
     }
 
     #[test]

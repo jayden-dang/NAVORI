@@ -12,6 +12,7 @@ use serde_json::Value;
 pub enum Mark {
     StatusItemDrawn { ms: f64 },
     MenuOpened { ms: f64, first: bool, modules: u32 },
+    SubmenuOpened { ms: f64 },
 }
 
 #[derive(Debug)]
@@ -45,6 +46,13 @@ fn parse_message(message: &str) -> Option<Mark> {
                 return None;
             }
             Some(Mark::MenuOpened { ms, first, modules })
+        }
+        "submenuOpened" => {
+            let ms = finite_ms(parts.next()?)?;
+            if parts.next().is_some() {
+                return None;
+            }
+            Some(Mark::SubmenuOpened { ms })
         }
         _ => None,
     }
@@ -264,6 +272,18 @@ mod tests {
                 },
             ))
         );
+    }
+
+    #[test]
+    fn a_submenu_mark_parses_its_time() {
+        let line = r#"{"eventMessage":"submenuOpened ms=7.3","processID":9}"#;
+        assert_eq!(parse_line(line), Some((9, Mark::SubmenuOpened { ms: 7.3 })));
+    }
+
+    #[test]
+    fn a_submenu_mark_with_an_extra_field_is_rejected() {
+        let line = r#"{"processID":9,"eventMessage":"submenuOpened ms=1.0 extra=1"}"#;
+        assert_eq!(parse_line(line), None);
     }
 
     #[test]

@@ -13,7 +13,7 @@ Not covered here: the executable commands (`docs/agents/project.md`, release ste
 
 | Environment | Deploy path |
 |---|---|
-| Build (every change) | Rust static library for `navori-ffi` (Apple Silicon, deployment target macOS 15.0) → UniFFI Swift bindings, headers and module map → `NavoriCoreFFI.xcframework` → SwiftPM build of the Shell → assemble the `.app` (app binary, `Helpers/navori`, generated `Info.plist` with the Profile and bundle id) → sign the CLI, then the app, with hardened runtime. |
+| Build (every change) | Rust static library for `navori-ffi` (Apple Silicon, deployment target macOS 26.0) → UniFFI Swift bindings, headers and module map → `NavoriCoreFFI.xcframework` → SwiftPM build of the Shell → assemble the `.app` (app binary, `Helpers/navori`, generated `Info.plist` with the Profile and bundle id) → sign the CLI, then the app, with hardened runtime. |
 | `dev` | `build/dev/Navori Dev.app` (bundle id `dev.navori.app.debug`), rebuilt and relaunched in place by the dev run command; never touches the installed `release` copy or its data. |
 | `release` (now — single user) | The full gate passes → release bundle signed with the stable self-signed identity `Navori Local Signing` → signature verified (`--strict --deep`) → installed to `/Applications/Navori.app` → `navori doctor` smoke check → version tag. Updating is a `git pull` followed by the same path. |
 | `release` (later — open source) | Same pipeline with a Developer ID identity, plus notarization and stapling, a DMG, a Sparkle update feed, and a Homebrew cask / download page so other developers install and update it themselves. Requires choosing a license first. |

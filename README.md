@@ -5,7 +5,7 @@ Swift (AppKit + SwiftUI) shell. Architecture: [docs/ARCHITECTURE.md](docs/ARCHIT
 
 ## Requirements
 
-- macOS 15+ on Apple Silicon, Xcode (Swift 6) command-line tools
+- macOS 26+ on Apple Silicon, Xcode (Swift 6) command-line tools
 - Rust stable (`rust-toolchain.toml` pins the channel and components)
 
 ## Everyday commands

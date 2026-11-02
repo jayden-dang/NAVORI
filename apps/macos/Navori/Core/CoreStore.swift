@@ -1,6 +1,7 @@
 import Foundation
 import NavoriBanner
 import NavoriCore
+import NavoriPanel
 import Observation
 import os
 
@@ -83,6 +84,36 @@ final class CoreStore {
         snapshot?.modules.count(where: { $0.state == "running" }) ?? 0
     }
 
+    var moduleRows: [ModuleRow] {
+        snapshot?.modules.map {
+            ModuleRow(id: $0.id, state: $0.state, detail: $0.detail, restarts: $0.restarts)
+        } ?? []
+    }
+
+    var eventRows: [EventRow] {
+        snapshot?.recentEvents.map {
+            EventRow(id: $0.id, tsMs: $0.tsMs, severity: $0.severity, summary: $0.summary)
+        } ?? []
+    }
+
+    var uncleanExit: String? { snapshot?.lastUncleanExit }
+
+    var configProblem: ConfigProblem? {
+        guard let notice = snapshot?.configNotice else { return nil }
+        return ConfigProblem(title: notice.title, message: notice.message)
+    }
+
+    var hasSnapshot: Bool { snapshot != nil }
+
+    var coreStatus: CoreStatus {
+        switch health {
+        case .starting: CoreStatus(health: .starting)
+        case .ok: CoreStatus(health: .ok)
+        case .degraded: CoreStatus(health: .degraded)
+        case .down: CoreStatus(health: .down)
+        }
+    }
+
     var health: Health {
         if let startupError { return .down(startupError) }
         guard let snapshot else { return .starting }
@@ -106,6 +137,25 @@ final class CoreStore {
         case notRunning
         var errorDescription: String? { "The Navori core is not running." }
     }
+}
+
+struct ModuleRow: Identifiable, Equatable {
+    let id: String
+    let state: String
+    let detail: String?
+    let restarts: UInt32
+}
+
+struct EventRow: Identifiable, Equatable {
+    let id: String
+    let tsMs: Int64
+    let severity: String
+    let summary: String
+}
+
+struct ConfigProblem: Equatable {
+    let title: String
+    let message: String
 }
 
 /// Receives snapshots on a core worker thread and forwards them to the main actor.

@@ -19,7 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusBar = StatusBarController(
             store: store,
-            openSettings: { [weak self] in self?.settings.show() }
+            openSettings: { [weak self] tab in self?.settings.show(tab: tab) }
         )
         if let statusBar {
             PerfProbe.start(statusBar: statusBar, store: store)

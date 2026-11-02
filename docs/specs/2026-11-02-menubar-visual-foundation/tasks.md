@@ -106,10 +106,10 @@ Retrieval (`load-subgraph`, schema 1.1, recipe `fsubr-1.2`, run once on the File
 
 **Depends-on:** none
 
-- [ ] **Step 1: Edit** the pins and the docs. Keep `.swiftLanguageMode(.v5)` on `NavoriCore`. Add row `D9` to the decisions table in `docs/ARCHITECTURE.md`, linking ADR 0006. Edit `docs/product/vision.md:43` through `define-project` update mode: minimum macOS only.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass, which proves UniFFI's target builds under tools 6.2.
-- [ ] **Step 3: Verify** `cargo xtask run`, then `plutil -extract LSMinimumSystemVersion raw "build/dev/Navori Dev.app/Contents/Info.plist"` — expect: `26.0`. `grep -rn "macOS 15\|15\.0" README.md docs/product docs/architecture docs/standards/INDEX.md docs/ops .cargo apps/macos/Package.swift` — expect: no minimum-version hit.
-- [ ] **Step 4: Commit** `git commit -m "build: require macOS 26 for the glass menu"`
+- [x] **Step 1: Edit** the pins and the docs. Keep `.swiftLanguageMode(.v5)` on `NavoriCore`. Add row `D9` to the decisions table in `docs/ARCHITECTURE.md`, linking ADR 0006. Edit `docs/product/vision.md:43` through `define-project` update mode: minimum macOS only.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass, which proves UniFFI's target builds under tools 6.2.
+- [x] **Step 3: Verify** `cargo xtask run`, then `plutil -extract LSMinimumSystemVersion raw "build/dev/Navori Dev.app/Contents/Info.plist"` — expect: `26.0`. `grep -rn "macOS 15\|15\.0" README.md docs/product docs/architecture docs/standards/INDEX.md docs/ops .cargo apps/macos/Package.swift` — expect: no minimum-version hit.
+- [x] **Step 4: Commit** `git commit -m "build: require macOS 26 for the glass menu"`
 
 _Requirements: MENU-10.1, MENU-10.2, MENU-10.3_
 
@@ -128,10 +128,10 @@ _Requirements: MENU-10.1, MENU-10.2, MENU-10.3_
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1: Add** the step to `fn ci`, following the `swift build` call.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass, and its output shows the 3 existing Swift tests running after the Rust steps in today's order.
-- [ ] **Step 3: Prove the failure path** — temporarily flip one `#expect` in `StatusPanelClickPolicyTests.swift`, run `cargo xtask ci` — expect: non-zero exit. Restore it.
-- [ ] **Step 4: Commit** `git commit -m "build(ci): run the Swift tests in the gate"`
+- [x] **Step 1: Add** the step to `fn ci`, following the `swift build` call.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass, and its output shows the 3 existing Swift tests running after the Rust steps in today's order.
+- [x] **Step 3: Prove the failure path** — temporarily flip one `#expect` in `StatusPanelClickPolicyTests.swift`, run `cargo xtask ci` — expect: non-zero exit. Restore it.
+- [x] **Step 4: Commit** `git commit -m "build(ci): run the Swift tests in the gate"`
 
 _Requirements: MENU-9.2, MENU-9.3, MENU-G9_
 
@@ -152,11 +152,11 @@ _Requirements: MENU-9.2, MENU-9.3, MENU-G9_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Write failing tests**, with literal expected frames: with `visible` (0, 0, 1800, 900), parent (1000, 400, 360, 300), row with `maxY` 650 and `size` (360, 200): `a_submenu_opens_to_the_right_of_its_parent_aligned_to_its_row` expects (1364, 450, 360, 200). With `visible` width 1500: `a_submenu_that_would_cross_the_right_edge_opens_on_the_left` expects x 636. `a_submenu_near_the_bottom_shifts_up_to_stay_on_screen` and `a_submenu_taller_than_the_screen_is_limited_to_the_visible_height`. For the diagonal, `a_point_toward_the_submenu_is_inside`, `a_point_moving_away_is_outside`, and `the_triangle_points_left_for_a_flipped_submenu`. For the policy, `a_click_inside_an_open_panel_does_not_dismiss` and `a_click_outside_every_panel_and_the_button_dismisses`; update the two existing tests with `cascadeFrames: []`.
-- [ ] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter NavoriPanelTests` — expect: does not compile, the new names do not exist.
-- [ ] **Step 3: Implement** the Produces list. `NavoriPanel` imports only CoreGraphics and Foundation.
-- [ ] **Step 4: Run** the same command — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(panel): place submenus and find the safe diagonal"`
+- [x] **Step 1: Write failing tests**, with literal expected frames: with `visible` (0, 0, 1800, 900), parent (1000, 400, 360, 300), row with `maxY` 650 and `size` (360, 200): `a_submenu_opens_to_the_right_of_its_parent_aligned_to_its_row` expects (1364, 450, 360, 200). With `visible` width 1500: `a_submenu_that_would_cross_the_right_edge_opens_on_the_left` expects x 636. `a_submenu_near_the_bottom_shifts_up_to_stay_on_screen` and `a_submenu_taller_than_the_screen_is_limited_to_the_visible_height`. For the diagonal, `a_point_toward_the_submenu_is_inside`, `a_point_moving_away_is_outside`, and `the_triangle_points_left_for_a_flipped_submenu`. For the policy, `a_click_inside_an_open_panel_does_not_dismiss` and `a_click_outside_every_panel_and_the_button_dismisses`; update the two existing tests with `cascadeFrames: []`.
+- [x] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter NavoriPanelTests` — expect: does not compile, the new names do not exist.
+- [x] **Step 3: Implement** the Produces list. `NavoriPanel` imports only CoreGraphics and Foundation.
+- [x] **Step 4: Run** the same command — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "feat(panel): place submenus and find the safe diagonal"`
 
 _Requirements: MENU-4.5, MENU-4.6, MENU-9.1, MENU-G3_
 
@@ -185,11 +185,11 @@ public struct CascadeState: Sendable { public init(root: [CascadeNode], maxDepth
 
 **Depends-on:** Task 3
 
-- [ ] **Step 1: Write failing tests** over a tree with `core` (children `core.a`, with children `core.a.x`, with child `core.a.x.y`), `settings`, `quit`: `resting_on_a_row_with_a_submenu_opens_it_when_the_timer_fires`, `a_click_on_a_row_with_a_submenu_opens_it_at_once`, `a_click_on_an_action_row_activates_it`, `moving_inside_the_diagonal_keeps_the_submenu_and_the_selection`, `resting_on_another_row_inside_the_diagonal_switches_when_the_timer_fires`, `leaving_the_diagonal_selects_the_row_and_closes_the_submenu_it_does_not_own`, `every_new_pointer_position_rearms_the_timer`, `the_same_pointer_position_twice_changes_nothing`, `leaving_a_row_clears_its_selection_unless_it_owns_an_open_submenu`, `a_row_at_the_maximum_depth_never_opens`, `a_row_with_no_action_is_never_selected`, `replacing_the_tree_can_add_children`, `replacing_the_tree_closes_a_submenu_whose_children_are_gone`.
-- [ ] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter CascadeStateTests` — expect: does not compile.
-- [ ] **Step 3: Implement** the rules listed under "Cascade logic" in `design.md`.
-- [ ] **Step 4: Run** the same command — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(panel): decide the cascade from pointer events"`
+- [x] **Step 1: Write failing tests** over a tree with `core` (children `core.a`, with children `core.a.x`, with child `core.a.x.y`), `settings`, `quit`: `resting_on_a_row_with_a_submenu_opens_it_when_the_timer_fires`, `a_click_on_a_row_with_a_submenu_opens_it_at_once`, `a_click_on_an_action_row_activates_it`, `moving_inside_the_diagonal_keeps_the_submenu_and_the_selection`, `resting_on_another_row_inside_the_diagonal_switches_when_the_timer_fires`, `leaving_the_diagonal_selects_the_row_and_closes_the_submenu_it_does_not_own`, `every_new_pointer_position_rearms_the_timer`, `the_same_pointer_position_twice_changes_nothing`, `leaving_a_row_clears_its_selection_unless_it_owns_an_open_submenu`, `a_row_at_the_maximum_depth_never_opens`, `a_row_with_no_action_is_never_selected`, `replacing_the_tree_can_add_children`, `replacing_the_tree_closes_a_submenu_whose_children_are_gone`.
+- [x] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter CascadeStateTests` — expect: does not compile.
+- [x] **Step 3: Implement** the rules listed under "Cascade logic" in `design.md`.
+- [x] **Step 4: Run** the same command — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "feat(panel): decide the cascade from pointer events"`
 
 _Requirements: MENU-4.1, MENU-4.2, MENU-4.3, MENU-4.4, MENU-4.8, MENU-9.1_
 
@@ -209,11 +209,11 @@ _Requirements: MENU-4.1, MENU-4.2, MENU-4.3, MENU-4.4, MENU-4.8, MENU-9.1_
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Write failing tests**: `down_and_up_wrap_through_rows_with_an_action`, `down_skips_rows_with_no_action`, `right_opens_the_submenu_and_moves_in`, `left_closes_the_submenu_and_returns_to_its_row`, `return_does_what_a_click_on_the_selection_does`, `escape_closes_the_deepest_panel`, `escape_at_level_zero_closes_everything`, `a_real_pointer_move_after_keys_takes_the_one_selection`, `a_row_moving_under_a_still_pointer_does_not_take_a_keyboard_selection`.
-- [ ] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter CascadeStateTests` — expect: the new tests fail on their assertions.
-- [ ] **Step 3: Implement** the key rules.
-- [ ] **Step 4: Run** the same command — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(panel): decide the cascade from keys"`
+- [x] **Step 1: Write failing tests**: `down_and_up_wrap_through_rows_with_an_action`, `down_skips_rows_with_no_action`, `right_opens_the_submenu_and_moves_in`, `left_closes_the_submenu_and_returns_to_its_row`, `return_does_what_a_click_on_the_selection_does`, `escape_closes_the_deepest_panel`, `escape_at_level_zero_closes_everything`, `a_real_pointer_move_after_keys_takes_the_one_selection`, `a_row_moving_under_a_still_pointer_does_not_take_a_keyboard_selection`.
+- [x] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter CascadeStateTests` — expect: the new tests fail on their assertions.
+- [x] **Step 3: Implement** the key rules.
+- [x] **Step 4: Run** the same command — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "feat(panel): decide the cascade from keys"`
 
 _Requirements: MENU-5.1, MENU-5.2, MENU-5.3, MENU-5.4, MENU-5.5, MENU-5.6, MENU-9.1_
 
@@ -229,15 +229,15 @@ _Requirements: MENU-5.1, MENU-5.2, MENU-5.3, MENU-5.4, MENU-5.5, MENU-5.6, MENU-
 
 **Interfaces:**
 - Consumes: none
-- Produces: `final class GlassSurfaceView: NSView { init(content: NSView); var tint: NSColor }`; `enum GlassTint { static let standard: NSColor }` (black at 65% in dark appearance, white at 55% in light); `StatusPanel.width == 360`
+- Produces: `final class GlassSurfaceView: NSView { init(content: NSView); var tint: NSColor }`; `enum GlassTint { static let standard: NSColor }` (black at 69% in dark appearance, white at 57% in light); `StatusPanel.width == 360`
 
 **Depends-on:** Task 1, Task 3
 
-- [ ] **Step 1: Implement** `GlassSurfaceView`: `NSGlassEffectView` with style `.clear`, corner radius 12 and `tint`, no availability branch and no `NSVisualEffectView` fallback. While Reduce Transparency is on, it shows an opaque `windowBackgroundColor` layer, and it swaps on the notification. Remove `NSVisualEffectView` from `StatusPanel`.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass. `grep -rn "NSVisualEffectView\|#available(macOS" apps/macos/Navori` — expect: no hit.
-- [ ] **Step 3: Check by hand** with `cargo xtask run`: glass over a bright window and over a dark one; Reduce Transparency on and off while open; open under the status item, near the right screen edge, on a second Space and over a full-screen app, with the frontmost app staying active. For the off-screen fallback, launch the binary with `NAVORI_PERF=1 NAVORI_PERF_HOME=<temp dir>`, send `kill -USR1 <pid>`, and see the panel at the top of the main screen.
-- [ ] **Step 4: Run** `cargo xtask perf` — expect: `menu_open_after_launch_ms` ≤ 80 and `menu_reopen_ms` ≤ 50. A failure stops the plan here and goes to the user, because every later task sits on this surface.
-- [ ] **Step 5: Commit** `git commit -m "feat(shell): put the menu on clear glass"`
+- [x] **Step 1: Implement** `GlassSurfaceView`: `NSGlassEffectView` with style `.clear`, corner radius 12 and `tint`, no availability branch and no `NSVisualEffectView` fallback. While Reduce Transparency is on, it shows an opaque `windowBackgroundColor` layer, and it swaps on the notification. Remove `NSVisualEffectView` from `StatusPanel`.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass. `grep -rn "NSVisualEffectView\|#available(macOS" apps/macos/Navori` — expect: no hit.
+- [x] **Step 3: Check by hand** with `cargo xtask run`: glass over a bright window and over a dark one; Reduce Transparency on and off while open; open under the status item, near the right screen edge, on a second Space and over a full-screen app, with the frontmost app staying active. For the off-screen fallback, launch the binary with `NAVORI_PERF=1 NAVORI_PERF_HOME=<temp dir>`, send `kill -USR1 <pid>`, and see the panel at the top of the main screen.
+- [x] **Step 4: Run** `cargo xtask perf` — expect: `menu_open_after_launch_ms` ≤ 80 and `menu_reopen_ms` ≤ 50. A failure stops the plan here and goes to the user, because every later task sits on this surface.
+- [x] **Step 5: Commit** `git commit -m "feat(shell): put the menu on clear glass"`
 
 _Requirements: MENU-1.1, MENU-6.3, MENU-10.4, MENU-G1, MENU-G2, MENU-G14_
 
@@ -256,10 +256,10 @@ _Requirements: MENU-1.1, MENU-6.3, MENU-10.4, MENU-G1, MENU-G2, MENU-G14_
 
 **Depends-on:** Task 6
 
-- [ ] **Step 1: Implement**: `TabView(selection:)` bound to a small `@Observable` that the controller holds; `AppDelegate.applicationShouldHandleReopen` still calls `show()`.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand**: `show(tab: .about)` from a temporary call opens on About; an already-open window switches tab; General, Diagnostics and About keep their content; launching the app again opens Settings.
-- [ ] **Step 4: Commit** `git commit -m "feat(settings): open the window on a chosen tab"`
+- [x] **Step 1: Implement**: `TabView(selection:)` bound to a small `@Observable` that the controller holds; `AppDelegate.applicationShouldHandleReopen` still calls `show()`.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand**: `show(tab: .about)` from a temporary call opens on About; an already-open window switches tab; General, Diagnostics and About keep their content; launching the app again opens Settings.
+- [x] **Step 4: Commit** `git commit -m "feat(settings): open the window on a chosen tab"`
 
 _Requirements: MENU-1.8, MENU-G8_
 
@@ -281,11 +281,11 @@ _Requirements: MENU-1.8, MENU-G8_
 
 **Depends-on:** Task 2, Task 7
 
-- [ ] **Step 1: Write failing tests**: `each_status_has_its_label_dot_and_submenu` (a table: `Starting` no dot and no Submenu, `Running` green with one, `Needs attention` orange with one, `Not running` red and no Submenu), `module_dots_follow_the_module_state` (a table: `running` green, `starting` and `restarting` yellow, `failed` red, `stopped` gray).
-- [ ] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter CoreRowStateTests` — expect: does not compile.
-- [ ] **Step 3: Implement** the Produces lists. `configProblem` holds today's title and `snapshot.configError` as its message. Move `PanelView` to these properties, retype its private `ModulesSection` and `ActivitySection` to `ModuleRow` and `EventRow`, and remove its `import NavoriCore`.
-- [ ] **Step 4: Run** the same command, then `cargo xtask ci` — expect: pass, and the panel looks as it did.
-- [ ] **Step 5: Commit** `git commit -m "feat(shell): name the core state in plain rows"`
+- [x] **Step 1: Write failing tests**: `each_status_has_its_label_dot_and_submenu` (a table: `Starting` no dot and no Submenu, `Running` green with one, `Needs attention` orange with one, `Not running` red and no Submenu), `module_dots_follow_the_module_state` (a table: `running` green, `starting` and `restarting` yellow, `failed` red, `stopped` gray).
+- [x] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter CoreRowStateTests` — expect: does not compile.
+- [x] **Step 3: Implement** the Produces lists. `configProblem` holds today's title and `snapshot.configError` as its message. Move `PanelView` to these properties, retype its private `ModulesSection` and `ActivitySection` to `ModuleRow` and `EventRow`, and remove its `import NavoriCore`.
+- [x] **Step 4: Run** the same command, then `cargo xtask ci` — expect: pass, and the panel looks as it did.
+- [x] **Step 5: Commit** `git commit -m "feat(shell): name the core state in plain rows"`
 
 _Requirements: MENU-3.2, MENU-3.7, MENU-3.10_
 
@@ -309,10 +309,10 @@ StatusPanel(content: CascadeContent, onVisibility: @escaping (Bool) -> Void)
 
 **Depends-on:** Task 4, Task 8
 
-- [ ] **Step 1: Implement**: `StatusBarController` builds `CascadeContent` around today's `PanelView` and binds `onVisibility` to `store.setPanelVisible`. `StatusPanel` no longer holds `store`. Behavior does not change.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand**: the panel opens, closes and shows the same content as before.
-- [ ] **Step 4: Commit** `git commit -m "refactor(shell): let the status panel take its content"`
+- [x] **Step 1: Implement**: `StatusBarController` builds `CascadeContent` around today's `PanelView` and binds `onVisibility` to `store.setPanelVisible`. `StatusPanel` no longer holds `store`. Behavior does not change.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand**: the panel opens, closes and shows the same content as before.
+- [x] **Step 4: Commit** `git commit -m "refactor(shell): let the status panel take its content"`
 
 _Requirements: MENU-G6_
 
@@ -337,12 +337,12 @@ StatusPanel.cascade: CascadeController { get }
 ```
 Row ids: `core`, `settings`, `about`, `quit`.
 
-**Depends-on:** Task 4, Task 8, Task 10
+**Depends-on:** Task 4, Task 8, Task 9
 
-- [ ] **Step 1: Implement** `PanelView` in the order banners, Core row, `Divider`, `Settings…`, `About Navori`, `Quit Navori`, with no header, version, Core section or Activity section. `MenuRowView` draws 14 pt titles, 13 pt values, `labelColor` and `secondaryLabelColor`, and the accent fill at 8 pt corners with white text while selected. The `Button` action is the row's only click report. `CascadeController` runs `CascadeState` and the hover timer; it handles selection and `activate`, and logs and ignores `open` until Task 12.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand** in `cargo xtask run`: layout and type against the brief; a Core row with its state; the `DEV` chip in the dev build. A first click on `Settings…` closes the menu and opens Settings; `About Navori` opens the About tab; `Quit Navori` quits. `.onContinuousHover` selects rows with another app frontmost, or apply the design's fallback. Status icon, dimming, tooltip and the right-click menu are unchanged.
-- [ ] **Step 4: Commit** `git commit -m "feat(shell): show the new level 0 menu"`
+- [x] **Step 1: Implement** `PanelView` in the order banners, Core row, `Divider`, `Settings…`, `About Navori`, `Quit Navori`, with no header, version, Core section or Activity section. `MenuRowView` draws 14 pt titles, 13 pt values, `labelColor` and `secondaryLabelColor`, and the accent fill at 8 pt corners with white text while selected. The `Button` action is the row's only click report. `CascadeController` runs `CascadeState` and the hover timer; it handles selection and `activate`, and logs and ignores `open` until Task 12.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand** in `cargo xtask run`: layout and type against the brief; a Core row with its state; the `DEV` chip in the dev build. A first click on `Settings…` closes the menu and opens Settings; `About Navori` opens the About tab; `Quit Navori` quits. `.onContinuousHover` selects rows with another app frontmost, or apply the design's fallback. Status icon, dimming, tooltip and the right-click menu are unchanged.
+- [x] **Step 4: Commit** `git commit -m "feat(shell): show the new level 0 menu"`
 
 _Requirements: MENU-1.2, MENU-1.3, MENU-1.5, MENU-1.6, MENU-1.7, MENU-1.9, MENU-3.8, MENU-G4, MENU-G7, MENU-G11_
 
@@ -361,10 +361,10 @@ _Requirements: MENU-1.2, MENU-1.3, MENU-1.5, MENU-1.6, MENU-1.7, MENU-1.9, MENU-
 
 **Depends-on:** Task 10
 
-- [ ] **Step 1: Implement** the banners above the Core row, startup first; change the `Banner` message from `.secondary` to `labelColor`, keeping `lineLimit(4)`; add no restart control. Level 0 re-fits when a banner appears.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand**: an invalid `config.toml` shows the config banner with its report; `kill -9` of a dev build then a relaunch shows the unclean-exit banner; a garbage file at `<temp home>/Library/Application Support/Navori Dev/navori.db`, with the binary launched directly under `NAVORI_PERF=1 NAVORI_PERF_HOME=<temp home>`, shows the startup banner with the `startup failed:` text. Each is readable on a bright background and offers no restart button.
-- [ ] **Step 4: Commit** `git commit -m "feat(shell): keep core problems readable on glass"`
+- [x] **Step 1: Implement** the banners above the Core row, startup first; change the `Banner` message from `.secondary` to `labelColor`, keeping `lineLimit(4)`; add no restart control. Level 0 re-fits when a banner appears.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand**: an invalid `config.toml` shows the config banner with its report; `kill -9` of a dev build then a relaunch shows the unclean-exit banner; a garbage file at `<temp home>/Library/Application Support/Navori Dev/navori.db`, with the binary launched directly under `NAVORI_PERF=1 NAVORI_PERF_HOME=<temp home>`, shows the startup banner with the `startup failed:` text. Each is readable on a bright background and offers no restart button.
+- [x] **Step 4: Commit** `git commit -m "feat(shell): keep core problems readable on glass"`
 
 _Requirements: MENU-2.1, MENU-2.2, MENU-2.3, MENU-2.4, MENU-2.5_
 
@@ -384,10 +384,10 @@ _Requirements: MENU-2.1, MENU-2.2, MENU-2.3, MENU-2.4, MENU-2.5_
 
 **Depends-on:** Task 3, Task 5, Task 11
 
-- [ ] **Step 1: Implement** `CascadePanel`, one per depth, ordered out rather than closed. `CascadeController` runs `open` and `close(depth:)`, sends `replaceTree` when the first snapshot arrives, and re-places an open Submenu when level 0 re-fits. `CoreSubmenuView` lists modules with state, restarts and detail, then at most 8 Events with severity icon and narrow relative age, or `Nothing yet.`. Content scrolls and is limited to the height `CascadePlacement` allows.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand**: hover opens the Submenu after the delay and a click opens it at once; with another app frontmost, a first click and hover both reach the Submenu; moving diagonally across other rows keeps it, and resting on another row switches. It flips left at the right screen edge; a short-screen window scrolls it; a new Event appears with it open. With no snapshot, the row has no chevron. Turn VoiceOver on and confirm it reaches the Submenu, which is never key; if it cannot, apply the design's fallback now.
-- [ ] **Step 4: Commit** `git commit -m "feat(shell): read modules and activity in the core submenu"`
+- [x] **Step 1: Implement** `CascadePanel`, one per depth, ordered out rather than closed. `CascadeController` runs `open` and `close(depth:)`, sends `replaceTree` when the first snapshot arrives, and re-places an open Submenu when level 0 re-fits. `CoreSubmenuView` lists modules with state, restarts and detail, then at most 8 Events with severity icon and narrow relative age, or `Nothing yet.`. Content scrolls and is limited to the height `CascadePlacement` allows.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand**: hover opens the Submenu after the delay and a click opens it at once; with another app frontmost, a first click and hover both reach the Submenu; moving diagonally across other rows keeps it, and resting on another row switches. It flips left at the right screen edge; a short-screen window scrolls it; a new Event appears with it open. With no snapshot, the row has no chevron. Turn VoiceOver on and confirm it reaches the Submenu, which is never key; if it cannot, apply the design's fallback now.
+- [x] **Step 4: Commit** `git commit -m "feat(shell): read modules and activity in the core submenu"`
 
 _Requirements: MENU-3.1, MENU-3.3, MENU-3.4, MENU-3.5, MENU-3.6, MENU-3.7, MENU-4.1, MENU-4.2, MENU-4.3, MENU-4.4, MENU-4.5, MENU-4.6, MENU-4.7_
 
@@ -406,10 +406,10 @@ _Requirements: MENU-3.1, MENU-3.3, MENU-3.4, MENU-3.5, MENU-3.6, MENU-3.7, MENU-
 
 **Depends-on:** Task 12
 
-- [ ] **Step 1: Implement** the close order: return if `!isOpen`; `isOpen = false`; `cascade.reset()`; `onVisibility(false)`; `super.close()`. `show` sets `isOpen = true` and calls `onVisibility(true)` once. `toggle` reads `isOpen`, not `isVisible`. The timer closure does nothing when `isOpen` is false. `closeAll` calls `close()`. The outside-click policy gets `cascade.openFrames`.
-- [ ] **Step 2: Temporarily log** each `onVisibility` call in the dev build. Run `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand** that each path logs exactly one `true` then one `false`, with a Submenu open each time: click outside; click the status button; click inside the Submenu (nothing closes); switch app; right-click the status item; `Settings…`; Esc from level 0. A click on the status button does not reopen it. Closing with the hover timer armed opens nothing afterward. Remove the log.
-- [ ] **Step 4: Commit** `git commit -m "fix(shell): close the whole cascade once on every path"`
+- [x] **Step 1: Implement** the close order: return if `!isOpen`; `isOpen = false`; `cascade.reset()`; `onVisibility(false)`; `super.close()`. `show` sets `isOpen = true` and calls `onVisibility(true)` once. `toggle` reads `isOpen`, not `isVisible`. The timer closure does nothing when `isOpen` is false. `closeAll` calls `close()`. The outside-click policy gets `cascade.openFrames`.
+- [x] **Step 2: Temporarily log** each `onVisibility` call in the dev build. Run `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand** that each path logs exactly one `true` then one `false`, with a Submenu open each time: click outside; click the status button; click inside the Submenu (nothing closes); switch app; right-click the status item; `Settings…`; Esc from level 0. A click on the status button does not reopen it. Closing with the hover timer armed opens nothing afterward. Remove the log.
+- [x] **Step 4: Commit** `git commit -m "fix(shell): close the whole cascade once on every path"`
 
 _Requirements: MENU-4.9, MENU-4.10, MENU-4.11, MENU-4.12, MENU-4.13, MENU-4.14, MENU-4.15, MENU-G6_
 
@@ -428,10 +428,10 @@ _Requirements: MENU-4.9, MENU-4.10, MENU-4.11, MENU-4.12, MENU-4.13, MENU-4.14, 
 
 **Depends-on:** Task 5, Task 13
 
-- [ ] **Step 1: Implement**: keyDown for key codes 126, 125, 123, 124, 36, 76 and 53 becomes `cascade.key(...)`; ⌘-chords fall through. While the first responder is an `NSText`, every key but Esc passes through. `cancelOperation` sends `key(.escape)`. `Settings…` and `Quit Navori` carry `⌘,` and `⌘Q`.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand** with the pointer parked outside the menu: ↓ reaches every row and wraps; → opens the Core Submenu; ← returns to the Core row; Return on `Settings…` opens Settings; Esc closes the Submenu, then level 0; `⌘,` and `⌘Q` work. If `.keyboardShortcut` does not answer, apply the design's fallback. Moving the pointer then moves the one selection.
-- [ ] **Step 4: Commit** `git commit -m "feat(shell): drive the menu from the keyboard"`
+- [x] **Step 1: Implement**: keyDown for key codes 126, 125, 123, 124, 36, 76 and 53 becomes `cascade.key(...)`; ⌘-chords fall through. While the first responder is an `NSText`, every key but Esc passes through. `cancelOperation` sends `key(.escape)`. `Settings…` and `Quit Navori` carry `⌘,` and `⌘Q`.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand** with the pointer parked outside the menu: ↓ reaches every row and wraps; → opens the Core Submenu; ← returns to the Core row; Return on `Settings…` opens Settings; Esc closes the Submenu, then level 0; `⌘,` and `⌘Q` work. If `.keyboardShortcut` does not answer, apply the design's fallback. Moving the pointer then moves the one selection.
+- [x] **Step 4: Commit** `git commit -m "feat(shell): drive the menu from the keyboard"`
 
 _Requirements: MENU-1.10, MENU-5.1, MENU-5.2, MENU-5.3, MENU-5.4, MENU-5.5, MENU-5.6_
 
@@ -450,10 +450,10 @@ _Requirements: MENU-1.10, MENU-5.1, MENU-5.2, MENU-5.3, MENU-5.4, MENU-5.5, MENU
 
 **Depends-on:** Task 14
 
-- [ ] **Step 1: Implement**: each row and each module and Event row is `.accessibilityElement(children: .ignore)` with a label and value; a row that opens a Submenu has the hint `Opens a submenu`; a row that acts has the button trait. Every state dot sits beside its words. `StatusPanel` reads `accessibilityDisplayShouldReduceMotion` at show and uses `.none` when it is on.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Manual pass**: with VoiceOver on, walk level 0 and the Core Submenu and hear each row as one sentence, including that the Core row opens a Submenu. With Reduce Motion on, the panel appears with no animation. With Reduce Transparency on, every panel of the Cascade is opaque. Record the result in the task report.
-- [ ] **Step 4: Commit** `git commit -m "feat(shell): read the menu well with VoiceOver and Reduce Motion"`
+- [x] **Step 1: Implement**: each row and each module and Event row is `.accessibilityElement(children: .ignore)` with a label and value; a row that opens a Submenu has the hint `Opens a submenu`; a row that acts has the button trait. Every state dot sits beside its words. `StatusPanel` reads `accessibilityDisplayShouldReduceMotion` at show and uses `.none` when it is on.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Manual pass**: with VoiceOver on, walk level 0 and the Core Submenu and hear each row as one sentence, including that the Core row opens a Submenu. With Reduce Motion on, the panel appears with no animation. With Reduce Transparency on, every panel of the Cascade is opaque. Record the result in the task report.
+- [x] **Step 4: Commit** `git commit -m "feat(shell): read the menu well with VoiceOver and Reduce Motion"`
 
 _Requirements: MENU-6.1, MENU-6.2, MENU-6.4, MENU-11.3_
 
@@ -473,11 +473,11 @@ _Requirements: MENU-6.1, MENU-6.2, MENU-6.4, MENU-11.3_
 
 **Depends-on:** Task 15
 
-- [ ] **Step 1: Implement** the Preview from the brief's Surfaces 1 and 2 in files wrapped whole in `#if DEBUG`: Ask field, Needs you with capsule buttons with no action, Awake, Ports and Pull Requests rows, and a tint slider row showing its value. Awake opens `Agent sessions`, which opens a level 3 row. `onVisibility` does nothing. `activate` does nothing.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand** in `cargo xtask run`: the right-click item opens the Preview; 3 levels open; the slider retints every open panel; typing works in the Ask field; `Navori Dev` logs no dispatched Action.
-- [ ] **Step 4: Verify the compile-out**: `swift build -c release --arch arm64 --package-path apps/macos`, then `BIN=$(swift build -c release --arch arm64 --package-path apps/macos --show-bin-path)`, `test -f "$BIN/Navori"` — expect: exit 0, so the search cannot pass on a missing file. `strings "$BIN/Navori" | grep -c NAVORI-PREVIEW-SAMPLE` — expect: `0`. The same with `-c debug` — expect: at least `1`. The marker is over 15 bytes so Swift stores it as a real string in the binary.
-- [ ] **Step 5: Commit** `git commit -m "feat(shell): add a dev-only preview of the full menu"`
+- [x] **Step 1: Implement** the Preview from the brief's Surfaces 1 and 2 in files wrapped whole in `#if DEBUG`: Ask field, Needs you with capsule buttons with no action, Awake, Ports and Pull Requests rows, and a tint slider row showing its value. Awake opens `Agent sessions`, which opens a level 3 row. `onVisibility` does nothing. `activate` does nothing.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand** in `cargo xtask run`: the right-click item opens the Preview; 3 levels open; the slider retints every open panel; typing works in the Ask field; `Navori Dev` logs no dispatched Action.
+- [x] **Step 4: Verify the compile-out**: `swift build -c release --arch arm64 --package-path apps/macos`, then `BIN=$(swift build -c release --arch arm64 --package-path apps/macos --show-bin-path)`, `test -f "$BIN/Navori"` — expect: exit 0, so the search cannot pass on a missing file. `strings "$BIN/Navori" | grep -c NAVORI-PREVIEW-SAMPLE` — expect: `0`. The same with `-c debug` — expect: at least `1`. The marker is over 15 bytes so Swift stores it as a real string in the binary.
+- [x] **Step 5: Commit** `git commit -m "feat(shell): add a dev-only preview of the full menu"`
 
 _Requirements: MENU-7.1, MENU-7.2, MENU-7.3, MENU-7.4, MENU-7.5, MENU-7.6_
 
@@ -497,13 +497,13 @@ _Requirements: MENU-7.1, MENU-7.2, MENU-7.3, MENU-7.4, MENU-7.5, MENU-7.6_
 
 **Depends-on:** Task 12, Task 13, Task 16
 
-- [ ] **Step 1: Write failing tests** in `logstream.rs`, `judge.rs`, `baseline.rs` and `mod.rs`: `a_submenu_mark_parses_its_time`, `a_submenu_mark_with_an_extra_field_is_rejected`, `a_submenu_open_over_sixteen_ms_fails_the_run`, `a_missing_submenu_measurement_fails_the_run`, `no_metric_reports_itself_as_skipped`, `a_baseline_stores_the_submenu_metric`, `the_submenu_metric_is_the_median_of_each_process_median`. Change the skip assertions at `judge.rs` 346, 511, 514, 531 and `baseline.rs` 226; `baseline.rs` 190 stays as input, and `judge.rs` 296 needs no change. `within_budget()` at `judge.rs` 251 and the `process()` helper at `mod.rs` 593 gain the new value.
-- [ ] **Step 2: Run** `cargo test -p xtask perf` — expect: does not compile, `Mark::SubmenuOpened` does not exist.
-- [ ] **Step 3: Implement** the Produces list. Deleting `Kind::Skipped` touches `judge.rs` 9, 96, 133, 423, 523 and `baseline.rs` 58. `open_submenu` sends `USR2` and awaits the mark with `is_submenu_open`, with no probe sample; phase A runs it 5 times after the reopens, before `peak` is sampled, and `insert_median` takes each process's median. `openCoreSubmenuFresh` reaches the Submenu through `panel.cascade`. `SIGUSR2` is ignored then sourced inside `installSignalHandlers`, as `SIGUSR1` is. With level 0 not open, `openCoreSubmenuFresh` faults and marks nothing.
-- [ ] **Step 4: Update** `docs/standards/performance.md`: the budget row, the skip list line removed, floor 5 ms added, and the method: median across processes of 5 Core Submenu opens each. The test at `judge.rs` 505-531 reads this file, so its assertions and this wording change together.
-- [ ] **Step 5: Run** `cargo test -p xtask perf` — expect: pass. `cargo xtask perf` — expect: `submenu_open_ms` measured at ≤ 16, no line says skipped, `menuOpened` and `statusItemDrawn` still parse, and a clean `SIGTERM` exit. A failure over budget stops and goes to the user.
-- [ ] **Step 6: Verify** that a dev build not in perf mode installs no handler: `kill -USR2 <pid>` ends the process, as `USR1` does.
-- [ ] **Step 7: Commit** `git commit -m "feat(perf): gate how fast the core submenu opens"`
+- [x] **Step 1: Write failing tests** in `logstream.rs`, `judge.rs`, `baseline.rs` and `mod.rs`: `a_submenu_mark_parses_its_time`, `a_submenu_mark_with_an_extra_field_is_rejected`, `a_submenu_open_over_sixteen_ms_fails_the_run`, `a_missing_submenu_measurement_fails_the_run`, `no_metric_reports_itself_as_skipped`, `a_baseline_stores_the_submenu_metric`, `the_submenu_metric_is_the_median_of_each_process_median`. Change the skip assertions at `judge.rs` 346, 511, 514, 531 and `baseline.rs` 226; `baseline.rs` 190 stays as input, and `judge.rs` 296 needs no change. `within_budget()` at `judge.rs` 251 and the `process()` helper at `mod.rs` 593 gain the new value.
+- [x] **Step 2: Run** `cargo test -p xtask perf` — expect: does not compile, `Mark::SubmenuOpened` does not exist.
+- [x] **Step 3: Implement** the Produces list. Deleting `Kind::Skipped` touches `judge.rs` 9, 96, 133, 423, 523 and `baseline.rs` 58. `open_submenu` sends `USR2` and awaits the mark with `is_submenu_open`, with no probe sample; phase A runs it 5 times after the reopens, before `peak` is sampled, and `insert_median` takes each process's median. `openCoreSubmenuFresh` reaches the Submenu through `panel.cascade`. `SIGUSR2` is ignored then sourced inside `installSignalHandlers`, as `SIGUSR1` is. With level 0 not open, `openCoreSubmenuFresh` faults and marks nothing.
+- [x] **Step 4: Update** `docs/standards/performance.md`: the budget row, the skip list line removed, floor 5 ms added, and the method: median across processes of 5 Core Submenu opens each. The test at `judge.rs` 505-531 reads this file, so its assertions and this wording change together.
+- [x] **Step 5: Run** `cargo test -p xtask perf` — expect: pass. `cargo xtask perf` — expect: `submenu_open_ms` measured at ≤ 16, no line says skipped, `menuOpened` and `statusItemDrawn` still parse, and a clean `SIGTERM` exit. A failure over budget stops and goes to the user.
+- [x] **Step 6: Verify** that a dev build not in perf mode installs no handler: `kill -USR2 <pid>` ends the process, as `USR1` does.
+- [x] **Step 7: Commit** `git commit -m "feat(perf): gate how fast the core submenu opens"`
 
 _Requirements: MENU-8.1, MENU-8.2, MENU-8.3, MENU-8.4, MENU-G5, MENU-G10, MENU-G12, MENU-G13_
 
@@ -522,11 +522,11 @@ _Requirements: MENU-8.1, MENU-8.2, MENU-8.3, MENU-8.4, MENU-G5, MENU-G10, MENU-G
 
 **Depends-on:** Task 17
 
-- [ ] **Step 1: Search** for the now-unused `ModulesSection`, `ActivitySection`, the `Self.maxHeight` constant and the `440` limit; delete what has no reader.
-- [ ] **Step 2: Verify the source**: `grep -rnE 'Ask Navori|Needs you|caught up|Pull Requests|"Awake"|"Ports"' apps/macos/Navori` — expect: hits only in `Features/Preview/`. `strings` cannot prove this, because Swift stores strings of 15 bytes or fewer inline.
-- [ ] **Step 3: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 4: Check by hand** in a release bundle, `cargo xtask bundle --profile release`, launched after quitting any running Navori: level 0 shows only the Core row and its three actions, with no `DEV` chip, and the right-click menu has no Preview item.
-- [ ] **Step 5: Commit** `git commit -m "refactor(shell): remove the old panel sections"`
+- [x] **Step 1: Search** for the now-unused `ModulesSection`, `ActivitySection`, the `Self.maxHeight` constant and the `440` limit; delete what has no reader.
+- [x] **Step 2: Verify the source**: `grep -rnE 'Ask Navori|Needs you|caught up|Pull Requests|"Awake"|"Ports"' apps/macos/Navori` — expect: hits only in `Features/Preview/`. `strings` cannot prove this, because Swift stores strings of 15 bytes or fewer inline.
+- [x] **Step 3: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 4: Check by hand** in a release bundle, `cargo xtask bundle --profile release`, launched after quitting any running Navori: level 0 shows only the Core row and its three actions, with no `DEV` chip, and the right-click menu has no Preview item.
+- [x] **Step 5: Commit** `git commit -m "refactor(shell): remove the old panel sections"`
 
 _Requirements: MENU-1.4, MENU-3.9_
 
@@ -545,11 +545,11 @@ _Requirements: MENU-1.4, MENU-3.9_
 
 **Depends-on:** Task 18
 
-- [ ] **Step 1: Precondition** — KCONTRACT is on `main`. If it is not when every other task is done, stop and ask the user (design: KCONTRACT merges first).
-- [ ] **Step 2: Merge** with `git merge main`, not a rebase, because a rebase would replay each commit's conflict. In a conflict in `PanelView.swift`, keep the new layout; `configProblem` in `CoreStore.swift` takes `title` and `message` from `configNotice` with no Shell wording; keep `WakeObserver` in `AppDelegate` and the new `show(tab:)` call.
-- [ ] **Step 3: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 4: Check by hand**: `log_level = 42` shows a banner naming `log_level` and not saying the whole file is on defaults; an unparseable `config.toml` says the whole file is on defaults; a sleep and wake still pulses. `CoreStore.setPanelVisible` is still reached once per open and close.
-- [ ] **Step 5: Commit** the merge, then `git commit -m "feat(shell): show the core's config notice on the new banner"` if any change remains.
+- [x] **Step 1: Precondition** — KCONTRACT is on `main`. If it is not when every other task is done, stop and ask the user (design: KCONTRACT merges first).
+- [x] **Step 2: Merge** with `git merge main`, not a rebase, because a rebase would replay each commit's conflict. In a conflict in `PanelView.swift`, keep the new layout; `configProblem` in `CoreStore.swift` takes `title` and `message` from `configNotice` with no Shell wording; keep `WakeObserver` in `AppDelegate` and the new `show(tab:)` call.
+- [x] **Step 3: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 4: Check by hand**: `log_level = 42` shows a banner naming `log_level` and not saying the whole file is on defaults; an unparseable `config.toml` says the whole file is on defaults; a sleep and wake still pulses. `CoreStore.setPanelVisible` is still reached once per open and close.
+- [x] **Step 5: Commit** the merge, then `git commit -m "feat(shell): show the core's config notice on the new banner"` if any change remains.
 
 _Requirements: MENU-2.3, MENU-G6_
 
@@ -564,13 +564,13 @@ _Requirements: MENU-2.3, MENU-G6_
 
 **Interfaces:**
 - Consumes: the Preview's tint slider
-- Produces: final `GlassTint.standard`
+- Produces: final `GlassTint.standard` (black at 69% in dark appearance, white at 57% in light)
 
 **Depends-on:** Task 19
 
-- [ ] **Step 1: Pick with the user** in the Preview on their real wallpaper. Measure screenshots of the chosen tint: dark appearance on a white background and light appearance on a black one. Expect primary text ≥ 4.5:1 and secondary ≥ 3:1. A tint the user prefers that misses this goes back to them with the numbers; it is not silently raised.
-- [ ] **Step 2: Set** `GlassTint.standard` and record the value in the brief's Amendment 11.
-- [ ] **Step 3: Run** `cargo xtask ci`, then `cargo xtask perf` — expect: every GOAL-11 budget met. Confirm from the idle metrics that the closed menu holds 0% CPU, and by reading `CascadeController` that the only timer is the one-shot hover work item.
-- [ ] **Step 4: Commit** `git commit -m "feat(shell): set the menu's glass tint"`
+- [x] **Step 1: Pick with the user** in the Preview on their real wallpaper. Measure screenshots of the chosen tint: dark appearance on a white background and light appearance on a black one. Expect primary text ≥ 4.5:1 and secondary ≥ 3:1. A tint the user prefers that misses this goes back to them with the numbers; it is not silently raised.
+- [x] **Step 2: Set** `GlassTint.standard` and record the value in the brief's Amendment 11.
+- [x] **Step 3: Run** `cargo xtask ci`, then `cargo xtask perf` — expect: every GOAL-11 budget met. Confirm from the idle metrics that the closed menu holds 0% CPU, and by reading `CascadeController` that the only timer is the one-shot hover work item.
+- [x] **Step 4: Commit** `git commit -m "feat(shell): set the menu's glass tint"`
 
 _Requirements: MENU-11.1, MENU-11.2, MENU-11.4_

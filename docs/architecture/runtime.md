@@ -61,7 +61,7 @@ Not covered here: what each component is for (`system.md`), what is stored where
 | `dev` | `build/dev/Navori Dev.app`, bundle id `dev.navori.app.debug`; data, logs and socket under `Navori Dev` — never shared with `release` (ARCH-14). Launched with `cargo xtask run`; the CLI needs `--profile dev`. |
 | Tests | `cargo test`: in-memory Store, temporary home under `/tmp` (keeps socket paths under the 104-byte limit), real sockets and a real in-process Core; no app bundle, no file logging. |
 
-Both app profiles run only on macOS 15+ on Apple Silicon, signed with the stable self-signed identity, outside the App Sandbox. If a socket path would exceed 103 bytes, the socket moves to a private `/tmp/navori-<uid>/<profile>.sock`.
+Both app profiles run only on macOS 26+ on Apple Silicon, signed with the stable self-signed identity, outside the App Sandbox. If a socket path would exceed 103 bytes, the socket moves to a private `/tmp/navori-<uid>/<profile>.sock`.
 
 ## Not the invariant spine
 

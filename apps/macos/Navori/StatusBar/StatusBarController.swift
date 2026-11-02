@@ -1,21 +1,38 @@
 import AppKit
+import NavoriPanel
 import Observation
 import QuartzCore
+import SwiftUI
 
 /// Owns the menubar item. Left click toggles the panel; right click shows a native menu.
 @MainActor
 final class StatusBarController: NSObject {
     private let store: CoreStore
-    private let openSettings: () -> Void
+    private let openSettings: (SettingsTab) -> Void
     private let item: NSStatusItem
     private var panelBuilt = false
     private lazy var panel: StatusPanel = {
         self.panelBuilt = true
-        return StatusPanel(store: self.store, openSettings: { [weak self] in self?.showSettings() })
+        let content = CascadeContent(
+            tree: { [weak self] in self?.menuTree() ?? [] },
+            root: AnyView(PanelView(store: self.store)),
+            submenu: { [weak self] id in
+                guard let self, id == "core" else { return AnyView(EmptyView()) }
+                return AnyView(CoreSubmenuView(store: self.store))
+            },
+            activate: { [weak self] id in self?.activate(id) }
+        )
+        return StatusPanel(content: content, onVisibility: { [weak self] visible in
+            self?.store.setPanelVisible(visible)
+        })
     }()
+    #if DEBUG
+    private var previewPanel: StatusPanel?
+    #endif
     private var didScheduleStatusMark = false
+    private var didReplaceCoreTree = false
 
-    init(store: CoreStore, openSettings: @escaping () -> Void) {
+    init(store: CoreStore, openSettings: @escaping (SettingsTab) -> Void) {
         self.store = store
         self.openSettings = openSettings
         self.item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -29,6 +46,7 @@ final class StatusBarController: NSObject {
         }
         item.behavior = .terminationOnRemoval
         observeHealth()
+        observeSnapshot()
     }
 
     /// Re-renders the icon whenever `store.health` changes.
@@ -68,13 +86,16 @@ final class StatusBarController: NSObject {
         if isRightClick {
             showMenu()
         } else if let button = item.button {
+            #if DEBUG
+            previewPanel?.close()
+            #endif
             panel.toggle(relativeTo: button)
         }
     }
 
     func openMenuFresh() {
         let builtBefore = panelBuilt
-        if panelBuilt, panel.isVisible {
+        if panelBuilt, panel.isOpen {
             let behavior = panel.animationBehavior
             panel.animationBehavior = .none
             panel.close()
@@ -91,10 +112,28 @@ final class StatusBarController: NSObject {
         }
     }
 
+    func openCoreSubmenuFresh() {
+        guard panelBuilt, panel.isOpen else {
+            PerfProbe.fault("SIGUSR2 open has no level 0")
+            return
+        }
+        panel.cascade.closeSubmenus()
+        guard let trigger = PerfProbe.captureTrigger() else { return }
+        panel.cascade.open("core") {
+            PerfProbe.markSubmenuOpened(since: trigger)
+        }
+    }
+
     private func showMenu() {
         panel.close()
+        #if DEBUG
+        previewPanel?.close()
+        #endif
         let menu = NSMenu()
         menu.addItem(withTitle: "Open \(AppEnvironment.displayName)", action: #selector(openPanel), keyEquivalent: "").target = self
+        #if DEBUG
+        menu.addItem(withTitle: "Open Menu Preview", action: #selector(openPreview), keyEquivalent: "").target = self
+        #endif
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(settingsFromMenu), keyEquivalent: ",").target = self
         menu.addItem(withTitle: "Open Logs Folder", action: #selector(openLogs), keyEquivalent: "").target = self
@@ -105,14 +144,81 @@ final class StatusBarController: NSObject {
         item.menu = nil  // keep left click for the panel
     }
 
-    private func showSettings() {
+    private func observeSnapshot() {
+        withObservationTracking {
+            _ = store.hasSnapshot
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                self?.onSnapshotChange()
+                self?.observeSnapshot()
+            }
+        }
+    }
+
+    private func onSnapshotChange() {
+        guard store.hasSnapshot, !didReplaceCoreTree else { return }
+        didReplaceCoreTree = true
+        guard panelBuilt, panel.isOpen else { return }
+        panel.cascade.replaceTree()
+    }
+
+    private func menuTree() -> [CascadeNode] {
+        let coreChildren: [CascadeNode]
+        if store.hasSnapshot {
+            let modules = store.moduleRows.map { CascadeNode(id: $0.id) }
+            coreChildren = modules.isEmpty ? [CascadeNode(id: "core.modules")] : modules
+        } else {
+            coreChildren = []
+        }
+        return [
+            CascadeNode(id: "core", isActionable: true, children: coreChildren),
+            CascadeNode(id: "settings", isActionable: true),
+            CascadeNode(id: "about", isActionable: true),
+            CascadeNode(id: "quit", isActionable: true),
+        ]
+    }
+
+    private func activate(_ id: String) {
+        switch id {
+        case "settings": showSettings(.general)
+        case "about": showSettings(.about)
+        case "quit": NSApp.terminate(nil)
+        default: break
+        }
+    }
+
+    private func showSettings(_ tab: SettingsTab = .general) {
         panel.close()
-        openSettings()
+        #if DEBUG
+        previewPanel?.close()
+        #endif
+        openSettings(tab)
     }
 
     @objc private func openPanel() {
+        #if DEBUG
+        previewPanel?.close()
+        #endif
         if let button = item.button { panel.show(relativeTo: button) }
     }
+
+    #if DEBUG
+    @objc private func openPreview() {
+        panel.close()
+        if previewPanel == nil {
+            let created = StatusPanel(
+                content: PreviewMenu.content(setTint: { [weak self] tint in
+                    self?.previewPanel?.setTint(tint)
+                }),
+                onVisibility: { _ in }
+            )
+            previewPanel = created
+        }
+        if let button = item.button {
+            previewPanel?.show(relativeTo: button)
+        }
+    }
+    #endif
 
     @objc private func settingsFromMenu() { showSettings() }
 
