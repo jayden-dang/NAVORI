@@ -3,8 +3,8 @@ import AppKit
 enum GlassTint {
     static let standard = NSColor(name: "GlassTint.standard", dynamicProvider: { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor.black.withAlphaComponent(0.70)
-            : NSColor.white.withAlphaComponent(0.60)
+            ? NSColor.black.withAlphaComponent(0.69)
+            : NSColor.white.withAlphaComponent(0.57)
     })
 }
 
