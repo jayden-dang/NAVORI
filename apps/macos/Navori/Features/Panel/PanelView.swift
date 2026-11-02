@@ -24,7 +24,7 @@ struct PanelView: View {
             Divider().padding(.horizontal, 12)
             footer
         }
-        .frame(width: 380)
+        .frame(width: 360)
     }
 
     private var header: some View {

@@ -11,7 +11,7 @@ final class StatusPanel: NSPanel {
     private var outsideClickMonitor: Any?
     private var frameLink: CADisplayLink?
     private var frameCallback: (@MainActor () -> Void)?
-    private static let width: CGFloat = 380
+    private static let width: CGFloat = 360
     private static let maxHeight: CGFloat = 560
 
     init(store: CoreStore, openSettings: @escaping () -> Void) {
@@ -32,24 +32,8 @@ final class StatusPanel: NSPanel {
         hasShadow = true
         animationBehavior = .utilityWindow
 
-        let background = NSVisualEffectView()
-        background.material = .popover
-        background.state = .active
-        background.blendingMode = .behindWindow
-        background.wantsLayer = true
-        background.layer?.cornerRadius = 12
-        background.layer?.masksToBounds = true
-
         let hosting = NSHostingView(rootView: PanelView(store: store, openSettings: openSettings))
-        hosting.translatesAutoresizingMaskIntoConstraints = false
-        background.addSubview(hosting)
-        NSLayoutConstraint.activate([
-            hosting.leadingAnchor.constraint(equalTo: background.leadingAnchor),
-            hosting.trailingAnchor.constraint(equalTo: background.trailingAnchor),
-            hosting.topAnchor.constraint(equalTo: background.topAnchor),
-            hosting.bottomAnchor.constraint(equalTo: background.bottomAnchor),
-        ])
-        contentView = background
+        contentView = GlassSurfaceView(content: hosting)
     }
 
     override var canBecomeKey: Bool { true }
