@@ -7,15 +7,17 @@ import SwiftUI
 /// Closes on Escape, on click outside, and when it loses key status.
 @MainActor
 final class StatusPanel: NSPanel {
-    private let store: CoreStore
+    private let content: CascadeContent
+    private let onVisibility: (Bool) -> Void
     private var outsideClickMonitor: Any?
     private var frameLink: CADisplayLink?
     private var frameCallback: (@MainActor () -> Void)?
     private static let width: CGFloat = 360
     private static let maxHeight: CGFloat = 560
 
-    init(store: CoreStore, openSettings: @escaping (SettingsTab) -> Void) {
-        self.store = store
+    init(content: CascadeContent, onVisibility: @escaping (Bool) -> Void) {
+        self.content = content
+        self.onVisibility = onVisibility
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: Self.width, height: 420),
             styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
@@ -32,7 +34,7 @@ final class StatusPanel: NSPanel {
         hasShadow = true
         animationBehavior = .utilityWindow
 
-        let hosting = NSHostingView(rootView: PanelView(store: store, openSettings: openSettings))
+        let hosting = NSHostingView(rootView: self.content.root)
         contentView = GlassSurfaceView(content: hosting)
     }
 
@@ -65,7 +67,7 @@ final class StatusPanel: NSPanel {
         setFrame(frame, display: true)
 
         frameCallback = onFirstFrame
-        store.setPanelVisible(true)
+        onVisibility(true)
         makeKeyAndOrderFront(nil)
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self, weak button] event in
             // Global monitors report screen coordinates in locationInWindow.
@@ -96,7 +98,7 @@ final class StatusPanel: NSPanel {
             NSEvent.removeMonitor(monitor)
             outsideClickMonitor = nil
         }
-        store.setPanelVisible(false)
+        onVisibility(false)
         super.close()
     }
 

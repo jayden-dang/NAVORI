@@ -1,6 +1,8 @@
 import AppKit
+import NavoriPanel
 import Observation
 import QuartzCore
+import SwiftUI
 
 /// Owns the menubar item. Left click toggles the panel; right click shows a native menu.
 @MainActor
@@ -11,7 +13,28 @@ final class StatusBarController: NSObject {
     private var panelBuilt = false
     private lazy var panel: StatusPanel = {
         self.panelBuilt = true
-        return StatusPanel(store: self.store, openSettings: { [weak self] tab in self?.showSettings(tab) })
+        let content = CascadeContent(
+            tree: {
+                [
+                    CascadeNode(id: "settings", isActionable: true),
+                    CascadeNode(id: "quit", isActionable: true),
+                ]
+            },
+            root: AnyView(PanelView(store: self.store, openSettings: { [weak self] tab in
+                self?.showSettings(tab)
+            })),
+            submenu: { _ in AnyView(EmptyView()) },
+            activate: { [weak self] id in
+                switch id {
+                case "settings": self?.showSettings(.general)
+                case "quit": NSApp.terminate(nil)
+                default: break
+                }
+            }
+        )
+        return StatusPanel(content: content, onVisibility: { [weak self] visible in
+            self?.store.setPanelVisible(visible)
+        })
     }()
     private var didScheduleStatusMark = false
 
