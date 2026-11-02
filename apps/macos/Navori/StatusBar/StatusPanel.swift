@@ -14,7 +14,7 @@ final class StatusPanel: NSPanel {
     private static let width: CGFloat = 360
     private static let maxHeight: CGFloat = 560
 
-    init(store: CoreStore, openSettings: @escaping () -> Void) {
+    init(store: CoreStore, openSettings: @escaping (SettingsTab) -> Void) {
         self.store = store
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: Self.width, height: 420),
