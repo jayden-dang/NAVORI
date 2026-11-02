@@ -522,11 +522,11 @@ _Requirements: MENU-8.1, MENU-8.2, MENU-8.3, MENU-8.4, MENU-G5, MENU-G10, MENU-G
 
 **Depends-on:** Task 17
 
-- [ ] **Step 1: Search** for the now-unused `ModulesSection`, `ActivitySection`, the `Self.maxHeight` constant and the `440` limit; delete what has no reader.
-- [ ] **Step 2: Verify the source**: `grep -rnE 'Ask Navori|Needs you|caught up|Pull Requests|"Awake"|"Ports"' apps/macos/Navori` — expect: hits only in `Features/Preview/`. `strings` cannot prove this, because Swift stores strings of 15 bytes or fewer inline.
-- [ ] **Step 3: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 4: Check by hand** in a release bundle, `cargo xtask bundle --profile release`, launched after quitting any running Navori: level 0 shows only the Core row and its three actions, with no `DEV` chip, and the right-click menu has no Preview item.
-- [ ] **Step 5: Commit** `git commit -m "refactor(shell): remove the old panel sections"`
+- [x] **Step 1: Search** for the now-unused `ModulesSection`, `ActivitySection`, the `Self.maxHeight` constant and the `440` limit; delete what has no reader.
+- [x] **Step 2: Verify the source**: `grep -rnE 'Ask Navori|Needs you|caught up|Pull Requests|"Awake"|"Ports"' apps/macos/Navori` — expect: hits only in `Features/Preview/`. `strings` cannot prove this, because Swift stores strings of 15 bytes or fewer inline.
+- [x] **Step 3: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 4: Check by hand** in a release bundle, `cargo xtask bundle --profile release`, launched after quitting any running Navori: level 0 shows only the Core row and its three actions, with no `DEV` chip, and the right-click menu has no Preview item.
+- [x] **Step 5: Commit** `git commit -m "refactor(shell): remove the old panel sections"`
 
 _Requirements: MENU-1.4, MENU-3.9_
 
