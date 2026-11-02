@@ -1,18 +1,33 @@
 import AppKit
 import NavoriCore
+import Observation
 import SwiftUI
+
+enum SettingsTab: Hashable {
+    case general, diagnostics, about
+}
+
+@MainActor
+@Observable
+final class SettingsSelection {
+    var tab: SettingsTab = .general
+}
 
 struct SettingsView: View {
     let store: CoreStore
+    @Bindable var selection: SettingsSelection
 
     var body: some View {
-        TabView {
+        TabView(selection: $selection.tab) {
             GeneralTab(store: store)
                 .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(SettingsTab.general)
             DiagnosticsTab(store: store)
                 .tabItem { Label("Diagnostics", systemImage: "stethoscope") }
+                .tag(SettingsTab.diagnostics)
             AboutTab(store: store)
                 .tabItem { Label("About", systemImage: "info.circle") }
+                .tag(SettingsTab.about)
         }
         .padding(20)
         .frame(width: 560, height: 420)

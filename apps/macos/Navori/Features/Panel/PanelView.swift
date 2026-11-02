@@ -4,7 +4,7 @@ import SwiftUI
 /// Content of the menubar panel.
 struct PanelView: View {
     let store: CoreStore
-    let openSettings: () -> Void
+    let openSettings: (SettingsTab) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -61,7 +61,7 @@ struct PanelView: View {
 
     private var footer: some View {
         HStack {
-            Button("Settings…", action: openSettings)
+            Button("Settings…") { openSettings(.general) }
                 .keyboardShortcut(",", modifiers: .command)
             Spacer()
             Button("Quit") { NSApp.terminate(nil) }

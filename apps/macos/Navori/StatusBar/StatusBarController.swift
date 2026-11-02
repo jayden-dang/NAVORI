@@ -6,16 +6,16 @@ import QuartzCore
 @MainActor
 final class StatusBarController: NSObject {
     private let store: CoreStore
-    private let openSettings: () -> Void
+    private let openSettings: (SettingsTab) -> Void
     private let item: NSStatusItem
     private var panelBuilt = false
     private lazy var panel: StatusPanel = {
         self.panelBuilt = true
-        return StatusPanel(store: self.store, openSettings: { [weak self] in self?.showSettings() })
+        return StatusPanel(store: self.store, openSettings: { [weak self] tab in self?.showSettings(tab) })
     }()
     private var didScheduleStatusMark = false
 
-    init(store: CoreStore, openSettings: @escaping () -> Void) {
+    init(store: CoreStore, openSettings: @escaping (SettingsTab) -> Void) {
         self.store = store
         self.openSettings = openSettings
         self.item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -105,9 +105,9 @@ final class StatusBarController: NSObject {
         item.menu = nil  // keep left click for the panel
     }
 
-    private func showSettings() {
+    private func showSettings(_ tab: SettingsTab = .general) {
         panel.close()
-        openSettings()
+        openSettings(tab)
     }
 
     @objc private func openPanel() {
