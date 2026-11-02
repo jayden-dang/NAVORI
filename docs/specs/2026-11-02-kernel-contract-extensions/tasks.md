@@ -116,11 +116,11 @@ _Requirements: KCONTRACT-4.1, KCONTRACT-4.2, KCONTRACT-4.3, KCONTRACT-4.4, KCONT
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1: Write failing tests:** `a_closed_menu_holds_timer_wakes_30_seconds_apart` (deadlines 1 s apart: second `Due` not before 30 s after the first, and at 30 s); `an_open_menu_applies_no_gap`; `the_first_timer_wake_is_not_delayed`; `dropping_a_wait_keeps_the_record_of_the_previous_timer_wake`.
-- [ ] **Step 2: Run** `cargo nextest run -p navori-kernel --test scheduler` — expect: the first test fails, `Due` arrives after 1 s.
-- [ ] **Step 3: Implement** loop step 5 with a 30-second constant.
-- [ ] **Step 4: Run** the same command — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(kernel): hold timer wakes 30 seconds apart while the menu is closed"`
+- [x] **Step 1: Write failing tests:** `a_closed_menu_holds_timer_wakes_30_seconds_apart` (deadlines 1 s apart: second `Due` not before 30 s after the first, and at 30 s); `an_open_menu_applies_no_gap`; `the_first_timer_wake_is_not_delayed`; `dropping_a_wait_keeps_the_record_of_the_previous_timer_wake`.
+- [x] **Step 2: Run** `cargo nextest run -p navori-kernel --test scheduler` — expect: the first test fails, `Due` arrives after 1 s.
+- [x] **Step 3: Implement** loop step 5 with a 30-second constant.
+- [x] **Step 4: Run** the same command — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "feat(kernel): hold timer wakes 30 seconds apart while the menu is closed"`
 
 _Requirements: KCONTRACT-4.5, KCONTRACT-4.9, KCONTRACT-4.10, KCONTRACT-4.11_
 
