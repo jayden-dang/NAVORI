@@ -209,11 +209,11 @@ _Requirements: MENU-4.1, MENU-4.2, MENU-4.3, MENU-4.4, MENU-4.8, MENU-9.1_
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Write failing tests**: `down_and_up_wrap_through_rows_with_an_action`, `down_skips_rows_with_no_action`, `right_opens_the_submenu_and_moves_in`, `left_closes_the_submenu_and_returns_to_its_row`, `return_does_what_a_click_on_the_selection_does`, `escape_closes_the_deepest_panel`, `escape_at_level_zero_closes_everything`, `a_real_pointer_move_after_keys_takes_the_one_selection`, `a_row_moving_under_a_still_pointer_does_not_take_a_keyboard_selection`.
-- [ ] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter CascadeStateTests` — expect: the new tests fail on their assertions.
-- [ ] **Step 3: Implement** the key rules.
-- [ ] **Step 4: Run** the same command — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(panel): decide the cascade from keys"`
+- [x] **Step 1: Write failing tests**: `down_and_up_wrap_through_rows_with_an_action`, `down_skips_rows_with_no_action`, `right_opens_the_submenu_and_moves_in`, `left_closes_the_submenu_and_returns_to_its_row`, `return_does_what_a_click_on_the_selection_does`, `escape_closes_the_deepest_panel`, `escape_at_level_zero_closes_everything`, `a_real_pointer_move_after_keys_takes_the_one_selection`, `a_row_moving_under_a_still_pointer_does_not_take_a_keyboard_selection`.
+- [x] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter CascadeStateTests` — expect: the new tests fail on their assertions.
+- [x] **Step 3: Implement** the key rules.
+- [x] **Step 4: Run** the same command — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "feat(panel): decide the cascade from keys"`
 
 _Requirements: MENU-5.1, MENU-5.2, MENU-5.3, MENU-5.4, MENU-5.5, MENU-5.6, MENU-9.1_
 
@@ -256,10 +256,10 @@ _Requirements: MENU-1.1, MENU-6.3, MENU-10.4, MENU-G1, MENU-G2, MENU-G14_
 
 **Depends-on:** Task 6
 
-- [ ] **Step 1: Implement**: `TabView(selection:)` bound to a small `@Observable` that the controller holds; `AppDelegate.applicationShouldHandleReopen` still calls `show()`.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand**: `show(tab: .about)` from a temporary call opens on About; an already-open window switches tab; General, Diagnostics and About keep their content; launching the app again opens Settings.
-- [ ] **Step 4: Commit** `git commit -m "feat(settings): open the window on a chosen tab"`
+- [x] **Step 1: Implement**: `TabView(selection:)` bound to a small `@Observable` that the controller holds; `AppDelegate.applicationShouldHandleReopen` still calls `show()`.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand**: `show(tab: .about)` from a temporary call opens on About; an already-open window switches tab; General, Diagnostics and About keep their content; launching the app again opens Settings.
+- [x] **Step 4: Commit** `git commit -m "feat(settings): open the window on a chosen tab"`
 
 _Requirements: MENU-1.8, MENU-G8_
 
