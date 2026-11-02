@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use common::{ASSERTION_NAME, ORIGIN_MS, Rig};
 use navori_kernel::{ActionError, DispatchError, Severity};
-use navori_macos::AssertionKind;
 use navori_macos::fake::FakeProcess;
+use navori_macos::{AssertionKind, ReadError};
 use serde_json::{Value, json};
 
 const CLAUDE: i32 = 100;
@@ -24,6 +24,8 @@ const GRACE: Duration = Duration::from_secs(120);
 const CAP: Duration = Duration::from_secs(2 * 60 * 60);
 const TTL: Duration = Duration::from_secs(8 * 60 * 60);
 const RETRY: Duration = Duration::from_secs(60);
+const PLATFORM_PROBLEM: &str = "Awake could not watch a process, so a stored lease stays on disk. Navori retries in 60 seconds.";
+const STORE_PROBLEM: &str = "Awake could not save a lease. Navori retries in 60 seconds.";
 const ARGV_MARK: &str = "--secret-argv";
 const CWD_MARK: &str = "secret-cwd-marker";
 const ENV_MARK: &str = "SECRET_ENV_MARKER";
@@ -403,6 +405,101 @@ async fn a_zombie_deletes_its_row() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_process_read_failure_during_restore_keeps_the_row_and_retries() {
+    let mut rig = Rig::new();
+    command_process(&rig);
+    rig.dispatch(hold_command(COMMAND_PID)).await.unwrap();
+    assert_eq!(
+        rows(&rig).len(),
+        1,
+        "the command lease is stored before close"
+    );
+    assert_eq!(rig.exits.tokens(COMMAND_PID).len(), 1);
+
+    rig.shutdown().await;
+    rig.processes.fail_entry(COMMAND_PID, ReadError::Denied);
+    rig.reopen().await;
+
+    let state = awake_state(&rig);
+    assert_eq!(rows(&rig).len(), 1, "a failed process read keeps the row");
+    assert_eq!(
+        rows(&rig)[0].process_start_us,
+        i64::try_from(COMMAND_START).unwrap()
+    );
+    assert_eq!(lease_count(&state), 0, "an unread process is not held yet");
+    assert_eq!(state["system_held"], false);
+    assert_eq!(state["problem"], json!(PLATFORM_PROBLEM));
+    assert!(rig.power.held().is_empty());
+    assert!(ended(&rig).is_empty(), "a failed read is not an end");
+    assert!(
+        rig.exits.watched().is_empty(),
+        "the failed read leaves no watch"
+    );
+    assert_eq!(rig.exits.tokens(COMMAND_PID).len(), 2);
+
+    rig.advance(RETRY - Duration::from_secs(1)).await;
+    rig.idle().await;
+    assert_eq!(rows(&rig).len(), 1);
+    assert_eq!(awake_state(&rig)["problem"], json!(PLATFORM_PROBLEM));
+    assert_eq!(
+        rig.exits.tokens(COMMAND_PID).len(),
+        2,
+        "the retry waits the full minute"
+    );
+
+    rig.advance(Duration::from_secs(1)).await;
+    for _ in 0..50 {
+        if rig.exits.tokens(COMMAND_PID).len() >= 3 {
+            break;
+        }
+        rig.idle().await;
+    }
+    let retried = awake_state(&rig);
+    assert_eq!(
+        rig.exits.tokens(COMMAND_PID).len(),
+        3,
+        "the minute timer reads the process again"
+    );
+    assert_eq!(rows(&rig).len(), 1, "the retry still keeps the row");
+    assert_eq!(lease_count(&retried), 0);
+    assert_eq!(retried["system_held"], false);
+    assert_eq!(retried["problem"], json!(PLATFORM_PROBLEM));
+    assert!(rig.power.held().is_empty());
+    assert!(ended(&rig).is_empty());
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn another_users_process_with_the_stored_start_is_restored() {
+    let mut rig = Rig::new();
+    command_process(&rig);
+    rig.dispatch(hold_command(COMMAND_PID)).await.unwrap();
+    assert_eq!(
+        rows(&rig).len(),
+        1,
+        "the command lease is stored before close"
+    );
+
+    rig.shutdown().await;
+    rig.processes.replace(COMMAND_PID, COMMAND_START, 502);
+    rig.reopen().await;
+
+    let state = awake_state(&rig);
+    assert_eq!(
+        rows(&rig).len(),
+        1,
+        "another user with the stored start is not gone"
+    );
+    assert_eq!(lease_count(&state), 1);
+    assert_eq!(state["system_held"], true);
+    assert_eq!(state["leases"][0]["pid"], COMMAND_PID);
+    assert_eq!(state["problem"], Value::Null);
+    assert_held_system(&rig);
+    assert!(ended(&rig).is_empty());
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
 async fn an_expired_session_ends_on_reopen() {
     let mut rig = Rig::new();
     open_session(&rig).await;
@@ -554,6 +651,39 @@ async fn a_failed_release_all_delete_changes_nothing_and_answers_failed() {
     assert_eq!(lease_count(&state), 1);
     assert_eq!(state["leases"][0]["key"], format!("session:{SESSION}"));
     assert_eq!(state["system_held"], true);
+    assert_held_system(&rig);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_failed_release_all_delete_does_not_leave_a_stuck_store_problem() {
+    let rig = Rig::new();
+    open_session(&rig).await;
+    assert_eq!(rows(&rig).len(), 1);
+    drop_leases(&rig);
+
+    let error = rig.dispatch(json!("release_all")).await.unwrap_err();
+    assert!(
+        matches!(error, DispatchError::Action(ActionError::Failed(_))),
+        "{error}"
+    );
+
+    let state = rig.dispatch(json!("status")).await.unwrap();
+    assert_eq!(lease_count(&state), 1);
+    assert_eq!(state["leases"][0]["key"], format!("session:{SESSION}"));
+    assert_eq!(state["system_held"], true);
+    assert!(
+        state["problem"].is_null(),
+        "release all must not publish {STORE_PROBLEM}, got {}",
+        state["problem"]
+    );
+    assert_held_system(&rig);
+
+    rig.advance(RETRY).await;
+    let later = rig.dispatch(json!("status")).await.unwrap();
+    assert_eq!(later["problem"], Value::Null);
+    assert_eq!(lease_count(&later), 1);
+    assert_eq!(later["system_held"], true);
     assert_held_system(&rig);
     rig.shutdown().await;
 }

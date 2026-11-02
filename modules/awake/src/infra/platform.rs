@@ -3,7 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use navori_macos::{
     ExitSink, ExitSource, KqueueExits, MacPower, MacProcesses, PlatformError, PowerAssertions,
-    ProcessSource, ReadError, StartTime,
+    ProcEntry, ProcessSource, ReadError, StartTime,
 };
 use navori_procs::{
     Branch, Harness, HarnessLookup, Location, ProcId, ProcWatcher, ProcsError, Snapshot,
@@ -20,9 +20,12 @@ pub type ExitsFactory =
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProcessClass {
     Live(ProcId),
-    /// Gone, a zombie, or a record that could not be read.
+    /// Gone, or a zombie.
     Finished,
-    OtherUser,
+    /// This user's uid does not own the process. The id is still the start time we read.
+    OtherUser(ProcId),
+    /// `entry` failed and the pid may still be the stored process.
+    Unreadable,
 }
 
 /// Basename of the executable, when the process is still there.
@@ -109,7 +112,7 @@ impl Platform {
     pub fn identify(&mut self, pid: i32) -> Result<Option<ProcId>, PlatformError> {
         Ok(match self.classify(pid)? {
             ProcessClass::Live(id) => Some(id),
-            ProcessClass::Finished | ProcessClass::OtherUser => None,
+            ProcessClass::Finished | ProcessClass::OtherUser(_) | ProcessClass::Unreadable => None,
         })
     }
 
@@ -118,14 +121,10 @@ impl Platform {
         let uid = source.current_uid();
         let class = match source.entry(pid) {
             Ok(entry) if entry.zombie => ProcessClass::Finished,
-            Ok(entry) if entry.ruid != uid => ProcessClass::OtherUser,
-            Ok(entry) => ProcessClass::Live(ProcId {
-                pid: entry.pid,
-                start: entry.start,
-            }),
-            Err(ReadError::Gone | ReadError::Denied | ReadError::Malformed) => {
-                ProcessClass::Finished
-            }
+            Ok(entry) if entry.ruid != uid => ProcessClass::OtherUser(proc_id(&entry)),
+            Ok(entry) => ProcessClass::Live(proc_id(&entry)),
+            Err(ReadError::Gone) => ProcessClass::Finished,
+            Err(ReadError::Denied | ReadError::Malformed) => ProcessClass::Unreadable,
         };
         Ok(class)
     }
@@ -229,6 +228,13 @@ impl Platform {
         let open = (self.processes)()?;
         self.open = Some(Arc::clone(&open));
         Ok(open)
+    }
+}
+
+fn proc_id(entry: &ProcEntry) -> ProcId {
+    ProcId {
+        pid: entry.pid,
+        start: entry.start,
     }
 }
 

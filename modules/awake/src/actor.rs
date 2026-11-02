@@ -139,7 +139,7 @@ impl Awake {
                 self.stop_session(ctx, session_id, truncate_us(now))
             }
             AwakeAction::EndSession { session_id } => self.end_session(ctx, session_id, now),
-            AwakeAction::ReleaseAll => self.release_all(ctx, now),
+            AwakeAction::ReleaseAll => self.release_all(ctx),
         };
         match started {
             Ok(started) => {
@@ -190,12 +190,12 @@ impl Awake {
         }
         let id = match self.platform.classify(pid).map_err(platform_failed)? {
             ProcessClass::Live(id) => id,
-            ProcessClass::OtherUser => {
+            ProcessClass::OtherUser(_) => {
                 return Err(ActionError::Invalid(format!(
                     "pid {pid} belongs to another user"
                 )));
             }
-            ProcessClass::Finished => return Ok(None),
+            ProcessClass::Finished | ProcessClass::Unreadable => return Ok(None),
         };
         let label = match self
             .platform
@@ -335,14 +335,10 @@ impl Awake {
         Ok(None)
     }
 
-    fn release_all(
-        &mut self,
-        ctx: &ModuleCtx<Self>,
-        now: SystemTime,
-    ) -> Result<Option<Started>, ActionError> {
+    fn release_all(&mut self, ctx: &ModuleCtx<Self>) -> Result<Option<Started>, ActionError> {
         if let Err(err) = stored::clear(&ctx.store) {
             tracing::warn!(error = %err, "release all could not delete stored leases");
-            self.note_store(now);
+            // No dirty key, so a store problem here would never be retried.
             return Err(ActionError::Failed(
                 "stored leases could not be deleted, so nothing was released".to_owned(),
             ));
@@ -770,7 +766,13 @@ impl Awake {
                 self.note_platform(now, err);
                 RowFate::Halt
             }
-            Ok(ProcessClass::Live(live)) if live == id => RowFate::Keep(live),
+            Ok(ProcessClass::Unreadable) => {
+                self.note_platform(now, "reading the process failed");
+                RowFate::Halt
+            }
+            Ok(ProcessClass::Live(live) | ProcessClass::OtherUser(live)) if live == id => {
+                RowFate::Keep(live)
+            }
             Ok(_) => {
                 self.delete_stored(ctx, now, &row.key);
                 RowFate::Drop
