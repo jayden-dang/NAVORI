@@ -18,6 +18,8 @@ pub enum AwakeAction {
         pid: i32,
         ppid: i32,
     },
+    /// Mark the harness session `session_id` as stopped.
+    StopSession { session_id: String },
     /// End the session lease for `session_id`.
     EndSession { session_id: String },
     /// End every lease Navori is holding.
@@ -32,6 +34,7 @@ impl ModuleAction for AwakeAction {
             | Self::HoldUntilOff
             | Self::HoldCommand { .. }
             | Self::HoldSession { .. }
+            | Self::StopSession { .. }
             | Self::EndSession { .. }
             | Self::ReleaseAll => Risk::Write,
         }
@@ -62,6 +65,11 @@ impl ModuleAction for AwakeAction {
             ActionDoc {
                 name: "hold_session",
                 description: "Keep this Mac awake for one harness session. The harness is resolved from `pid`, then `ppid`. A repeated hold keeps one lease, moves the deadline, and keeps the first hold.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "stop_session",
+                description: "Mark a harness session as stopped. The lease stays through grace while a new descendant is running, and it ends at the cap.",
                 risk: Risk::Write,
             },
             ActionDoc {

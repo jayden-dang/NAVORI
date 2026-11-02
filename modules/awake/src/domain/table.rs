@@ -52,6 +52,7 @@ pub enum LeaseSource {
         harness: Harness,
         process: ProcId,
         first_hold: SystemTime,
+        stop_mark: Option<SystemTime>,
     },
 }
 
@@ -67,9 +68,18 @@ pub struct Lease {
 pub enum EndReason {
     Deadline,
     ProcessExited,
+    GraceClean,
+    Cap,
     EndSession,
     ReleaseAll,
     Replaced,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reading {
+    NoNewDescendant,
+    NewDescendant,
+    Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -130,6 +140,8 @@ struct SessionLease {
     process: ProcId,
     first_hold: SystemTime,
     deadline: SystemTime,
+    stop_mark: Option<SystemTime>,
+    next_check: Option<SystemTime>,
     label: Option<String>,
 }
 
@@ -201,6 +213,8 @@ impl LeaseTable {
             existing.process = process;
             existing.deadline = deadline;
             existing.label = label;
+            existing.stop_mark = None;
+            existing.next_check = None;
             return false;
         }
         self.sessions.push(SessionLease {
@@ -209,6 +223,8 @@ impl LeaseTable {
             process,
             first_hold,
             deadline,
+            stop_mark: None,
+            next_check: None,
             label,
         });
         true
@@ -219,6 +235,59 @@ impl LeaseTable {
             .iter()
             .find(|lease| lease.session_id == session_id)
             .map(|lease| lease.process)
+    }
+
+    pub(crate) fn stop_session(&mut self, session_id: &str, now: SystemTime) {
+        let Some(lease) = self
+            .sessions
+            .iter_mut()
+            .find(|lease| lease.session_id == session_id)
+        else {
+            return;
+        };
+        if lease.stop_mark.is_some() {
+            return;
+        }
+        lease.stop_mark = Some(now);
+        lease.next_check = now.checked_add(self.timing.grace);
+    }
+
+    pub(crate) fn resolve_check(
+        &mut self,
+        key: &LeaseKey,
+        reading: Reading,
+        now: SystemTime,
+    ) -> Option<Ended> {
+        let LeaseKey::Session { session_id } = key else {
+            return None;
+        };
+        let index = self
+            .sessions
+            .iter()
+            .position(|lease| &lease.session_id == session_id)?;
+        let cap = self.timing.cap;
+        let recheck = self.timing.recheck;
+        let mark = self.sessions[index].stop_mark?;
+        if cap_reached(mark, cap, now) {
+            let lease = self.sessions.remove(index);
+            return Some(Ended {
+                lease: session_as_lease(&lease),
+                reason: EndReason::Cap,
+            });
+        }
+        match reading {
+            Reading::NoNewDescendant => {
+                let lease = self.sessions.remove(index);
+                Some(Ended {
+                    lease: session_as_lease(&lease),
+                    reason: EndReason::GraceClean,
+                })
+            }
+            Reading::NewDescendant | Reading::Unknown => {
+                self.sessions[index].next_check = now.checked_add(recheck);
+                None
+            }
+        }
     }
 
     pub(crate) fn end_session(&mut self, session_id: &str) -> Option<Ended> {
@@ -337,21 +406,39 @@ impl LeaseTable {
             });
         }
         let mut kept = Vec::new();
+        let mut to_check = Vec::new();
+        let cap = self.timing.cap;
         for lease in self.sessions.drain(..) {
+            if lease
+                .stop_mark
+                .is_some_and(|mark| cap_reached(mark, cap, now))
+            {
+                ended.push(Ended {
+                    lease: session_as_lease(&lease),
+                    reason: EndReason::Cap,
+                });
+                continue;
+            }
             if now >= lease.deadline {
                 ended.push(Ended {
                     lease: session_as_lease(&lease),
                     reason: EndReason::Deadline,
                 });
-            } else {
-                kept.push(lease);
+                continue;
             }
+            if lease.stop_mark.is_some() && lease.next_check.is_some_and(|check| now >= check) {
+                to_check.push((
+                    LeaseKey::Session {
+                        session_id: lease.session_id.clone(),
+                    },
+                    lease.process,
+                    lease.first_hold,
+                ));
+            }
+            kept.push(lease);
         }
         self.sessions = kept;
-        Settled {
-            ended,
-            to_check: Vec::new(),
-        }
+        Settled { ended, to_check }
     }
 
     pub fn wants(&self) -> Wants {
@@ -362,14 +449,15 @@ impl LeaseTable {
     }
 
     pub(crate) fn next_deadline(&self) -> Option<SystemTime> {
-        let manual = self.manual.as_ref().and_then(Manual::deadline);
-        let session = self.sessions.iter().map(|lease| lease.deadline).min();
-        match (manual, session) {
-            (Some(manual), Some(session)) => Some(manual.min(session)),
-            (Some(manual), None) => Some(manual),
-            (None, Some(session)) => Some(session),
-            (None, None) => None,
+        let mut wake = self.manual.as_ref().and_then(Manual::deadline);
+        for lease in &self.sessions {
+            wake = earlier(wake, Some(lease.deadline));
+            if let Some(mark) = lease.stop_mark {
+                wake = earlier(wake, cap_at(mark, self.timing.cap));
+            }
+            wake = earlier(wake, lease.next_check);
         }
+        wake
     }
 
     pub(crate) fn snapshot(&self, system_held: bool, display_held: bool) -> AwakeState {
@@ -471,8 +559,24 @@ fn session_state(lease: &SessionLease) -> LeaseState {
         harness: Some(harness_name(lease.harness).to_owned()),
         label: lease.label.clone(),
         pid: Some(lease.process.pid),
-        stopped: false,
+        stopped: lease.stop_mark.is_some(),
         ends_at_ms: Some(wall_ms(lease.deadline)),
+    }
+}
+
+fn cap_at(mark: SystemTime, cap: Duration) -> Option<SystemTime> {
+    mark.checked_add(cap)
+}
+
+fn cap_reached(mark: SystemTime, cap: Duration, now: SystemTime) -> bool {
+    cap_at(mark, cap).is_some_and(|at| now >= at)
+}
+
+fn earlier(current: Option<SystemTime>, next: Option<SystemTime>) -> Option<SystemTime> {
+    match (current, next) {
+        (Some(current), Some(next)) => Some(current.min(next)),
+        (current, None) => current,
+        (None, next) => next,
     }
 }
 
@@ -486,6 +590,7 @@ fn session_as_lease(lease: &SessionLease) -> Lease {
             harness: lease.harness,
             process: lease.process,
             first_hold: lease.first_hold,
+            stop_mark: lease.stop_mark,
         },
         deadline: Some(lease.deadline),
         label: lease.label.clone(),

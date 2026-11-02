@@ -56,7 +56,7 @@ impl Awake {
         loop {
             let now = wait.now();
             self.rebuild_exits_if_due(now);
-            self.turn(ctx, now);
+            self.turn(ctx, now).await;
             let deadline = self.deadline();
             tokio::select! {
                 biased;
@@ -114,6 +114,9 @@ impl Awake {
                 self.hold_session(now, session_id.clone(), *pid, *ppid)
                     .await
             }
+            AwakeAction::StopSession { session_id } => {
+                self.stop_session(session_id, truncate_us(now))
+            }
             AwakeAction::EndSession { session_id } => self.end_session(ctx, session_id),
             AwakeAction::ReleaseAll => {
                 let ended = self.table.release_all();
@@ -133,7 +136,7 @@ impl Awake {
                 if let Some(started) = started {
                     self.emit_started(ctx, started);
                 }
-                let state = self.turn(ctx, now);
+                let state = self.turn(ctx, now).await;
                 req.respond(Ok(state));
             }
             Err(err) => req.respond::<AwakeState>(Err(err)),
@@ -295,6 +298,21 @@ impl Awake {
         Ok(None)
     }
 
+    fn stop_session(
+        &mut self,
+        session_id: &str,
+        now: SystemTime,
+    ) -> Result<Option<Started>, ActionError> {
+        if !valid_session_id(session_id) {
+            return Err(ActionError::Invalid(
+                "session_id must be 1 to 128 bytes of letters, digits, '.', '_', ':', or '-'"
+                    .to_owned(),
+            ));
+        }
+        self.table.stop_session(session_id, now);
+        Ok(None)
+    }
+
     fn arm(&mut self, id: ProcId) -> Result<(), ActionError> {
         if self.table.leases_on(id) > 0 {
             return Ok(());
@@ -392,7 +410,7 @@ impl Awake {
         Ok(())
     }
 
-    fn turn(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime) -> AwakeState {
+    async fn turn(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime) -> AwakeState {
         let settled = self.table.settle(now);
         for end in &settled.ended {
             if let Some(id) = process_of(&end.lease) {
@@ -400,6 +418,15 @@ impl Awake {
             }
         }
         self.emit_ended(ctx, &settled.ended);
+        for (key, process, first_hold) in settled.to_check {
+            let reading = self.platform.read_descendants(process, first_hold).await;
+            if let Some(ended) = self.table.resolve_check(&key, reading, now) {
+                if let Some(id) = process_of(&ended.lease) {
+                    self.unwatch_if_idle(id);
+                }
+                self.emit_ended(ctx, &[ended]);
+            }
+        }
         let held = self.reconciler.apply(self.table.wants());
         if let Some(code) = held.release_failed {
             tracing::warn!(code, "releasing a power assertion failed");
@@ -455,6 +482,18 @@ impl Awake {
                     LEASE_ENDED,
                     Severity::Info,
                     event::ended_exited(&source_text(&end.lease)),
+                    payload(&end.lease.key.text(), kind_of(&end.lease)),
+                ),
+                EndReason::GraceClean => ctx.emit(
+                    LEASE_ENDED,
+                    Severity::Info,
+                    event::ended_grace(&source_text(&end.lease)),
+                    payload(&end.lease.key.text(), kind_of(&end.lease)),
+                ),
+                EndReason::Cap => ctx.emit(
+                    LEASE_ENDED,
+                    Severity::Warn,
+                    event::ended_cap(&source_text(&end.lease)),
                     payload(&end.lease.key.text(), kind_of(&end.lease)),
                 ),
                 EndReason::ReleaseAll if !released => {

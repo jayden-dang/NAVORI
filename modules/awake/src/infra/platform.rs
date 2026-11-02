@@ -1,13 +1,16 @@
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use navori_macos::{
     ExitSink, ExitSource, KqueueExits, MacPower, MacProcesses, PlatformError, PowerAssertions,
-    ProcessSource, ReadError,
+    ProcessSource, ReadError, StartTime,
 };
 use navori_procs::{
     Branch, Harness, HarnessLookup, Location, ProcId, ProcWatcher, ProcsError, Snapshot,
     harness_of, resolve_location,
 };
+
+use crate::domain::Reading;
 
 pub type ProcessFactory = Box<dyn FnMut() -> Result<Arc<dyn ProcessSource>, PlatformError> + Send>;
 pub type ExitsFactory =
@@ -143,6 +146,36 @@ impl Platform {
         Ok(name)
     }
 
+    /// One snapshot of descendants. Start time decides busy; CPU time is not read.
+    pub(crate) async fn read_descendants(
+        &mut self,
+        process: ProcId,
+        first_hold: SystemTime,
+    ) -> Reading {
+        let source = match self.ensure_processes() {
+            Ok(source) => source,
+            Err(err) => {
+                tracing::warn!(
+                    %err,
+                    "the process list could not be opened; the session stays until the cap"
+                );
+                return Reading::Unknown;
+            }
+        };
+        match tokio::task::spawn_blocking(move || classify_descendants(source, process, first_hold))
+            .await
+        {
+            Ok(reading) => reading,
+            Err(err) => {
+                tracing::error!(
+                    %err,
+                    "descendant snapshot task stopped; the session stays until the cap"
+                );
+                Reading::Unknown
+            }
+        }
+    }
+
     pub(crate) fn build_watcher(&mut self) -> Result<ProcWatcher, PlatformError> {
         let source = Arc::clone(&self.ensure_processes()?);
         ProcWatcher::new(source, |sink| self.open_exits(sink)).map_err(|err| match err {
@@ -186,6 +219,42 @@ fn resolve_open(
         },
     };
     Ok((harness, process, location_label(&snapshot, process)))
+}
+
+fn classify_descendants(
+    source: Arc<dyn ProcessSource>,
+    process: ProcId,
+    first_hold: SystemTime,
+) -> Reading {
+    let snapshot = match Snapshot::take(source) {
+        Ok(snapshot) => snapshot,
+        Err(err) => {
+            tracing::warn!(
+                %err,
+                "the process list could not be read; the session stays until the cap"
+            );
+            return Reading::Unknown;
+        }
+    };
+    let busy = snapshot
+        .descendants(process)
+        .iter()
+        .any(|descendant| started_after(descendant.id.start, first_hold));
+    if busy {
+        Reading::NewDescendant
+    } else {
+        Reading::NoNewDescendant
+    }
+}
+
+fn started_after(start: StartTime, first_hold: SystemTime) -> bool {
+    let Ok(since) = first_hold.duration_since(UNIX_EPOCH) else {
+        return false;
+    };
+    let Ok(hold_us) = u64::try_from(since.as_micros()) else {
+        return false;
+    };
+    start.0 > hold_us
 }
 
 fn location_label(snapshot: &Snapshot, process: ProcId) -> Option<String> {

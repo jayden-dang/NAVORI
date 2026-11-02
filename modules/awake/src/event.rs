@@ -48,3 +48,12 @@ pub(crate) fn ended_release_all() -> String {
 pub(crate) fn ended_exited(source: &str) -> String {
     format!("Stopped keeping this Mac awake: {source} exited.")
 }
+
+pub(crate) fn ended_grace(source: &str) -> String {
+    format!("Stopped keeping this Mac awake: {source} stopped.")
+}
+
+pub(crate) fn ended_cap(source: &str) -> String {
+    // The sentence is fixed copy. A shorter test cap still says "2 hours".
+    format!("Stopped keeping this Mac awake: {source} was still busy 2 hours after it stopped.")
+}

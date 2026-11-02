@@ -52,9 +52,18 @@ pub struct Rig {
 
 impl Rig {
     pub fn new() -> Self {
+        Self::with_timing(Timing::FIXED)
+    }
+
+    pub fn with_timing(timing: Timing) -> Self {
         let processes = Arc::new(FakeProcesses::new(501));
         let source = Arc::clone(&processes) as Arc<dyn ProcessSource>;
-        Self::with_source(processes, source)
+        let exits = FakeExitsHandle::new();
+        let factory = {
+            let exits = exits.clone();
+            Box::new(move |sink| exits.clone().factory()(sink)) as ExitsFactory
+        };
+        Self::assemble(processes, source, exits, factory, timing)
     }
 
     pub fn with_source(processes: Arc<FakeProcesses>, source: Arc<dyn ProcessSource>) -> Self {
@@ -63,13 +72,19 @@ impl Rig {
             let exits = exits.clone();
             Box::new(move |sink| exits.clone().factory()(sink)) as ExitsFactory
         };
-        Self::assemble(processes, source, exits, factory)
+        Self::assemble(processes, source, exits, factory, Timing::FIXED)
     }
 
     pub fn with_exits_factory(factory: ExitsFactory) -> Self {
         let processes = Arc::new(FakeProcesses::new(501));
         let source = Arc::clone(&processes) as Arc<dyn ProcessSource>;
-        Self::assemble(processes, source, FakeExitsHandle::new(), factory)
+        Self::assemble(
+            processes,
+            source,
+            FakeExitsHandle::new(),
+            factory,
+            Timing::FIXED,
+        )
     }
 
     fn assemble(
@@ -77,6 +92,7 @@ impl Rig {
         source: Arc<dyn ProcessSource>,
         exits: FakeExitsHandle,
         factory: ExitsFactory,
+        timing: Timing,
     ) -> Self {
         let clock = FakeClock::at(ORIGIN_MS);
         let power = Arc::new(FakePower::new());
@@ -88,7 +104,7 @@ impl Rig {
         let kernel =
             Kernel::builder_with_clock(Store::open_in_memory().unwrap(), Arc::new(clock.clone()))
                 .pause_journal_sweep()
-                .register(Awake::new(platform, ASSERTION_NAME, Timing::FIXED))
+                .register(Awake::new(platform, ASSERTION_NAME, timing))
                 .start();
         Self {
             kernel,
