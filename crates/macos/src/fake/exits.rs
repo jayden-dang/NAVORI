@@ -94,6 +94,11 @@ impl FakeExitsHandle {
             .cloned()
             .unwrap_or_default()
     }
+
+    /// Drop the sink so a waiting watcher observes shutdown.
+    pub fn close(&self) {
+        lock(&self.state).sink = None;
+    }
 }
 
 impl Default for FakeExitsHandle {
