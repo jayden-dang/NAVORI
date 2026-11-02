@@ -346,6 +346,18 @@ fn every_catalog_name_decodes_as_an_action() {
     }
 }
 
+#[test]
+fn hold_until_off_says_a_later_until_off_replaces_the_manual_lease() {
+    let doc = AwakeAction::catalog()
+        .into_iter()
+        .find(|doc| doc.name == "hold_until_off")
+        .unwrap();
+    assert_eq!(
+        doc.description,
+        "Keep this Mac awake until it is turned off. A later duration or until-off request replaces this lease."
+    );
+}
+
 #[tokio::test(start_paused = true)]
 async fn status_is_read_and_the_others_are_write() {
     let rig = Rig::new();

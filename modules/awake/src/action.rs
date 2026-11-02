@@ -57,7 +57,7 @@ impl ModuleAction for AwakeAction {
             },
             ActionDoc {
                 name: "hold_until_off",
-                description: "Keep this Mac awake until it is turned off. A later duration request replaces this lease.",
+                description: "Keep this Mac awake until it is turned off. A later duration or until-off request replaces this lease.",
                 risk: Risk::Write,
             },
             ActionDoc {
