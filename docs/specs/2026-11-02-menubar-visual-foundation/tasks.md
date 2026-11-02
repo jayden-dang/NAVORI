@@ -428,10 +428,10 @@ _Requirements: MENU-4.9, MENU-4.10, MENU-4.11, MENU-4.12, MENU-4.13, MENU-4.14, 
 
 **Depends-on:** Task 5, Task 13
 
-- [ ] **Step 1: Implement**: keyDown for key codes 126, 125, 123, 124, 36, 76 and 53 becomes `cascade.key(...)`; ⌘-chords fall through. While the first responder is an `NSText`, every key but Esc passes through. `cancelOperation` sends `key(.escape)`. `Settings…` and `Quit Navori` carry `⌘,` and `⌘Q`.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand** with the pointer parked outside the menu: ↓ reaches every row and wraps; → opens the Core Submenu; ← returns to the Core row; Return on `Settings…` opens Settings; Esc closes the Submenu, then level 0; `⌘,` and `⌘Q` work. If `.keyboardShortcut` does not answer, apply the design's fallback. Moving the pointer then moves the one selection.
-- [ ] **Step 4: Commit** `git commit -m "feat(shell): drive the menu from the keyboard"`
+- [x] **Step 1: Implement**: keyDown for key codes 126, 125, 123, 124, 36, 76 and 53 becomes `cascade.key(...)`; ⌘-chords fall through. While the first responder is an `NSText`, every key but Esc passes through. `cancelOperation` sends `key(.escape)`. `Settings…` and `Quit Navori` carry `⌘,` and `⌘Q`.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand** with the pointer parked outside the menu: ↓ reaches every row and wraps; → opens the Core Submenu; ← returns to the Core row; Return on `Settings…` opens Settings; Esc closes the Submenu, then level 0; `⌘,` and `⌘Q` work. If `.keyboardShortcut` does not answer, apply the design's fallback. Moving the pointer then moves the one selection.
+- [x] **Step 4: Commit** `git commit -m "feat(shell): drive the menu from the keyboard"`
 
 _Requirements: MENU-1.10, MENU-5.1, MENU-5.2, MENU-5.3, MENU-5.4, MENU-5.5, MENU-5.6_
 
