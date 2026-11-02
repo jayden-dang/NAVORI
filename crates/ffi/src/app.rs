@@ -11,7 +11,7 @@ use navori_config::{
     Config, ConfigLoad, ConfigReport, JournalSweep, Paths, Profile, WholeFileReason,
 };
 use navori_ipc::Handler;
-use navori_kernel::{DispatchError, Kernel, ModuleState};
+use navori_kernel::{DispatchError, Kernel, Module, ModuleState};
 use navori_mod_awake::{Awake, AwakeState, LeaseState, Platform, Timing};
 use navori_protocol::{Check, CoreStatus, Envelope, Event, ModuleInfo, Severity, rpc};
 use navori_store::Store;
@@ -291,16 +291,34 @@ impl From<AwakeState> for crate::AwakeView {
     }
 }
 
+const STOPPED_PROBLEM: &str = "The Awake module stopped.";
+
 /// `None` when Awake is not registered or its published state will not deserialize.
 pub fn awake_view(kernel: &Kernel) -> Option<crate::AwakeView> {
     let value = kernel.state("awake")?;
-    match serde_json::from_value::<AwakeState>(value) {
-        Ok(state) => Some(crate::AwakeView::from(state)),
+    let mut view = match serde_json::from_value::<AwakeState>(value) {
+        Ok(state) => crate::AwakeView::from(state),
         Err(error) => {
             tracing::warn!(%error, "awake state will not deserialize");
-            None
+            return None;
         }
+    };
+    if awake_is_down(kernel) {
+        view.system_held = false;
+        view.display_held = false;
+        view.problem = Some(STOPPED_PROBLEM.to_owned());
     }
+    Some(view)
+}
+
+fn awake_is_down(kernel: &Kernel) -> bool {
+    kernel.modules().into_iter().any(|module| {
+        module.id == Awake::ID
+            && matches!(
+                module.state,
+                ModuleState::Failed { .. } | ModuleState::Stopped
+            )
+    })
 }
 
 /// One fixed doctor row: passing with `no problem` or the lease count, failing with the problem.

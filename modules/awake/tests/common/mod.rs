@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use navori_kernel::{DispatchError, Envelope, Kernel, WallClock};
+use navori_kernel::{DispatchError, Envelope, Kernel, RestartPolicy, WallClock};
 use navori_macos::fake::{FakeExitsHandle, FakePower, FakeProcesses};
 use navori_macos::{PowerAssertions, ProcessSource};
 use navori_mod_awake::{Awake, ExitsFactory, Platform, Timing};
@@ -51,6 +51,7 @@ pub struct Rig {
     source: Arc<dyn ProcessSource>,
     store: Store,
     timing: Timing,
+    policy: RestartPolicy,
 }
 
 impl Rig {
@@ -66,7 +67,25 @@ impl Rig {
             let exits = exits.clone();
             Box::new(move |sink| exits.clone().factory()(sink)) as ExitsFactory
         };
-        Self::assemble(processes, source, exits, factory, timing)
+        Self::assemble(
+            processes,
+            source,
+            exits,
+            factory,
+            timing,
+            RestartPolicy::default(),
+        )
+    }
+
+    pub fn with_policy(policy: RestartPolicy) -> Self {
+        let processes = Arc::new(FakeProcesses::new(501));
+        let source = Arc::clone(&processes) as Arc<dyn ProcessSource>;
+        let exits = FakeExitsHandle::new();
+        let factory = {
+            let exits = exits.clone();
+            Box::new(move |sink| exits.clone().factory()(sink)) as ExitsFactory
+        };
+        Self::assemble(processes, source, exits, factory, Timing::FIXED, policy)
     }
 
     pub fn with_source(processes: Arc<FakeProcesses>, source: Arc<dyn ProcessSource>) -> Self {
@@ -75,7 +94,14 @@ impl Rig {
             let exits = exits.clone();
             Box::new(move |sink| exits.clone().factory()(sink)) as ExitsFactory
         };
-        Self::assemble(processes, source, exits, factory, Timing::FIXED)
+        Self::assemble(
+            processes,
+            source,
+            exits,
+            factory,
+            Timing::FIXED,
+            RestartPolicy::default(),
+        )
     }
 
     pub fn with_exits_factory(factory: ExitsFactory) -> Self {
@@ -87,6 +113,7 @@ impl Rig {
             FakeExitsHandle::new(),
             factory,
             Timing::FIXED,
+            RestartPolicy::default(),
         )
     }
 
@@ -96,6 +123,7 @@ impl Rig {
         exits: FakeExitsHandle,
         factory: ExitsFactory,
         timing: Timing,
+        policy: RestartPolicy,
     ) -> Self {
         let clock = FakeClock::at(ORIGIN_MS);
         let power = Arc::new(FakePower::new());
@@ -110,6 +138,7 @@ impl Rig {
         );
         let kernel = Kernel::builder_with_clock(store.clone(), Arc::new(clock.clone()))
             .pause_journal_sweep()
+            .restart_policy(policy)
             .register(Awake::new(platform, ASSERTION_NAME, timing))
             .start();
         Self {
@@ -121,6 +150,7 @@ impl Rig {
             source,
             store,
             timing,
+            policy,
         }
     }
 
@@ -137,6 +167,7 @@ impl Rig {
         );
         self.kernel = Kernel::builder_with_clock(self.store.clone(), Arc::new(self.clock.clone()))
             .pause_journal_sweep()
+            .restart_policy(self.policy)
             .register(Awake::new(platform, ASSERTION_NAME, self.timing))
             .start();
         self.idle().await;
