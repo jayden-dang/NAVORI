@@ -309,10 +309,10 @@ StatusPanel(content: CascadeContent, onVisibility: @escaping (Bool) -> Void)
 
 **Depends-on:** Task 4, Task 8
 
-- [ ] **Step 1: Implement**: `StatusBarController` builds `CascadeContent` around today's `PanelView` and binds `onVisibility` to `store.setPanelVisible`. `StatusPanel` no longer holds `store`. Behavior does not change.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand**: the panel opens, closes and shows the same content as before.
-- [ ] **Step 4: Commit** `git commit -m "refactor(shell): let the status panel take its content"`
+- [x] **Step 1: Implement**: `StatusBarController` builds `CascadeContent` around today's `PanelView` and binds `onVisibility` to `store.setPanelVisible`. `StatusPanel` no longer holds `store`. Behavior does not change.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand**: the panel opens, closes and shows the same content as before.
+- [x] **Step 4: Commit** `git commit -m "refactor(shell): let the status panel take its content"`
 
 _Requirements: MENU-G6_
 
