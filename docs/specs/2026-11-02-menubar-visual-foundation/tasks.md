@@ -337,7 +337,7 @@ StatusPanel.cascade: CascadeController { get }
 ```
 Row ids: `core`, `settings`, `about`, `quit`.
 
-**Depends-on:** Task 4, Task 8, Task 10
+**Depends-on:** Task 4, Task 8, Task 9
 
 - [ ] **Step 1: Implement** `PanelView` in the order banners, Core row, `Divider`, `Settings…`, `About Navori`, `Quit Navori`, with no header, version, Core section or Activity section. `MenuRowView` draws 14 pt titles, 13 pt values, `labelColor` and `secondaryLabelColor`, and the accent fill at 8 pt corners with white text while selected. The `Button` action is the row's only click report. `CascadeController` runs `CascadeState` and the hover timer; it handles selection and `activate`, and logs and ignores `open` until Task 12.
 - [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
