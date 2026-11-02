@@ -40,7 +40,7 @@ Later, when open-sourced, other developers may install it themselves for their o
 
 ## Scope boundaries
 
-- **In scope now:** releases R1–R6 (Awake, AI Assistant, Ports, GitHub, Proactive, MCP) on macOS 15+ / Apple Silicon for one user; R0 Foundation has shipped.
+- **In scope now:** releases R1–R6 (Awake, AI Assistant, Ports, GitHub, Proactive, MCP) on macOS 26+ / Apple Silicon for one user; R0 Foundation has shipped.
 - **Deferred:**
   - Open source: choose a license (the workspace is `UNLICENSED` today), Developer ID signing + notarization, a Homebrew cask, a download page, auto-update.
   - "Life" utility modules beyond the developer workflow (calendar, notes, clipboard…) — each must pass a check against this vision before it is planned.

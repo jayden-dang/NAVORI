@@ -18,7 +18,7 @@ The single source of engineering rules. Feature work, reviews and "done" claims 
 - **Dependencies:** declared once in `[workspace.dependencies]`, pinned to the latest stable release; check drift with `cargo xtask outdated`. Prefer the standard library and existing workspace crates over new dependencies.
 - **Swift:** the app target builds in Swift 6 language mode; the UniFFI-generated `NavoriCore` target stays in Swift 5 mode until UniFFI's async code is fully `Sendable` (uniffi-rs #2448). Only `CoreStore` touches the bindings (ARCH-2).
 - **UI:** follows `docs/design/2026-11-01-menubar-ui-brief.md` — monochrome SF Symbols, semantic color only as a 7 pt status dot, status never by color alone, Reduce Motion / Reduce Transparency honored. Never write `*/` in a Rust doc comment exported through UniFFI (it is copied into a Swift block comment).
-- **Deployment target:** `MACOSX_DEPLOYMENT_TARGET` (`.cargo/config.toml`), `LSMinimumSystemVersion` and `Package.swift` platforms must all say macOS 15.0.
+- **Deployment target:** `MACOSX_DEPLOYMENT_TARGET` (`.cargo/config.toml`), `LSMinimumSystemVersion` and `Package.swift` platforms must all say macOS 26.0.
 
 ## Gates
 

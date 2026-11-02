@@ -1,11 +1,11 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 // The Swift shell of Navori. Build through `cargo xtask bundle` / `cargo xtask run`, which first
 // generates `Generated/` (Rust core as an XCFramework + UniFFI Swift bindings).
 import PackageDescription
 
 let package = Package(
     name: "Navori",
-    platforms: [.macOS(.v15)],
+    platforms: [.macOS(.v26)],
     products: [
         .executable(name: "Navori", targets: ["Navori"]),
     ],

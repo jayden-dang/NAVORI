@@ -14,7 +14,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 mod perf;
 
 const SIGNING_IDENTITY: &str = "Navori Local Signing";
-const MIN_MACOS: &str = "15.0";
+const MIN_MACOS: &str = "26.0";
 
 #[derive(Debug, Parser)]
 #[command(name = "xtask")]

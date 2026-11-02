@@ -4,4 +4,4 @@ xtask = "run --quiet --package xtask --"
 [env]
 # Must match LSMinimumSystemVersion / Package.swift platforms, or the linker warns and
 # the app may use APIs missing on older macOS.
-MACOSX_DEPLOYMENT_TARGET = "15.0"
+MACOSX_DEPLOYMENT_TARGET = "26.0"

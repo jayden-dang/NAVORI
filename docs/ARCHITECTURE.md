@@ -62,6 +62,7 @@ Hard-to-reverse decisions live as ADRs in `docs/adr/`; the rest are recorded whe
 | D6 | **Running with the lid closed**: not supported | Non-goals in `docs/product/vision.md` |
 | D7 | **AI observation scope**: everything except secrets | [ADR 0003](adr/0003-ai-sees-everything-except-secrets.md) |
 | D8 | **App signing**: self-signed identity, no paid Apple Developer account yet | [ADR 0004](adr/0004-self-signed-code-signing.md) |
+| D9 | **Menubar menu**: hand-built cascade on NSPanel with NSGlassEffectView (macOS 26), not NSMenu | [ADR 0006](adr/0006-menubar-menu-on-nspanel.md) |
 
 ## Design seeds (pending feature specs)
 
