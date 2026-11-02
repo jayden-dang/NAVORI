@@ -7,7 +7,7 @@
 > for tracking.
 
 Feature code: PERF
-Status: In-progress
+Status: Implemented
 Date: 2026-11-01
 Execution-mode: continuous
 Max-concurrency: auto
@@ -329,6 +329,8 @@ _Requirements: PERF-1.1_
 - [ ] **Step 1: Record** — `cargo xtask perf --record`. On 2026-11-02 at `10ae1cf` the run exited 0 and wrote `perf-baseline.json` (`menu_open_after_launch_ms` 51.1 against budget 80, `peak_footprint_mb` 31.36). The file was removed and not committed, because Step 2 did not hold. A miss against a GOAL-11 budget stops this task; do not loosen a budget here.
 - [ ] **Step 2: Stability** — three consecutive `cargo xtask perf` runs on the same revision give the same verdict with no regression failure; if one regresses without a code change, report the metric and values and raise Open Question 2 (floors) instead of editing floors. On 2026-11-02 at `10ae1cf`, after the record above, the three runs exited 0, 0, 1. First opens were 51.8, 44.1 and 50.6 ms, all inside 80. The failing line was `peak_footprint_mb` 37.58 against threshold 34.50 (runs 1 and 2 were 29.13 and 29.03). No floor was edited.
 - [ ] **Step 3: Commit** — `git commit -m "chore: record the perf baseline"`
+
+Author stamp 2026-11-02: Status is Implemented. These three steps stay open. `perf-baseline.json` was not committed.
 
 _Requirements: PERF-2.1, PERF-6.4_
 
