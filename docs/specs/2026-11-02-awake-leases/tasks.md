@@ -426,11 +426,11 @@ _Requirements: AWAKE-8.1, AWAKE-8.2, AWAKE-8.3, AWAKE-8.4, AWAKE-8.5, AWAKE-8.6,
 
 **Depends-on:** Task 12
 
-- [ ] **Step 1: Write failing tests:** `a_panic_keeps_the_leases_and_the_held_assertion`, `a_panic_between_a_table_change_and_reconcile_is_repaired_on_reentry` (one Lease held, `panic_on_hold(1)`, Display on, the dispatch answers `Unavailable`, then assert both held after restart), `a_panic_mid_restore_restores_every_row_on_reentry`, `permanent_failure_releases_every_assertion` (a fast `RestartPolicy` through `KernelBuilder::restart_policy`). In `crates/ffi/tests/awake.rs`: `a_failed_module_is_never_reported_as_holding`, `the_awake_row_fails_when_the_module_failed`.
+- [x] **Step 1: Write failing tests:** `a_panic_keeps_the_leases_and_the_held_assertion`, `a_panic_between_a_table_change_and_reconcile_is_repaired_on_reentry` (one Lease held, `panic_on_hold(1)`, Display on, the dispatch answers `Unavailable`, then assert both held after restart), `a_panic_mid_restore_restores_every_row_on_reentry`, `permanent_failure_releases_every_assertion` (a fast `RestartPolicy` through `KernelBuilder::restart_policy`). In `crates/ffi/tests/awake.rs`: `a_failed_module_is_never_reported_as_holding`, `the_awake_row_fails_when_the_module_failed`.
 Run: `cargo nextest run -p navori-mod-awake --test restart` and `cargo nextest run -p navori-ffi --test awake` — expect: fail on the assertions.
-- [ ] **Step 2: Implement.** Every `run` entry: migrate, restore unless restored, settle, reconcile, flush dirty rows, publish.
+- [x] **Step 2: Implement.** Every `run` entry: migrate, restore unless restored, settle, reconcile, flush dirty rows, publish.
 Run: same commands — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(awake): repair after a restart and never claim a hold after failing"`
+- [x] **Step 3: Commit** `git commit -m "feat(awake): repair after a restart and never claim a hold after failing"`
 
 _Requirements: AWAKE-8.9, AWAKE-13.8, AWAKE-13.9_
 
