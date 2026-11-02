@@ -671,6 +671,8 @@ dependencies = [
  "navori-config",
  "navori-ipc",
  "navori-kernel",
+ "navori-macos",
+ "navori-mod-awake",
  "navori-protocol",
  "navori-redact",
  "navori-store",

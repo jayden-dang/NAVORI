@@ -25,7 +25,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::app::{Inner, IpcBridge};
 
-pub use app::config_notice;
+pub use app::{awake_check, awake_view, config_notice};
 
 uniffi::setup_scaffolding!();
 
@@ -86,6 +86,26 @@ pub struct CheckView {
 }
 
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct LeaseView {
+    pub key: String,
+    pub kind: String,
+    pub harness: Option<String>,
+    pub label: Option<String>,
+    pub pid: Option<i32>,
+    pub stopped: bool,
+    pub ends_at_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct AwakeView {
+    pub leases: Vec<LeaseView>,
+    pub system_held: bool,
+    pub display_held: bool,
+    pub since_ms: Option<i64>,
+    pub problem: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct CoreSnapshot {
     pub version: String,
     pub profile: String,
@@ -102,6 +122,8 @@ pub struct CoreSnapshot {
     pub modules: Vec<ModuleView>,
     /// Newest first.
     pub recent_events: Vec<EventView>,
+    /// Awake's published state. Absent when that state will not deserialize.
+    pub awake: Option<AwakeView>,
 }
 
 #[derive(Debug, Clone, PartialEq, thiserror::Error, uniffi::Error)]
@@ -183,8 +205,14 @@ impl NavoriCore {
 
         let store =
             Store::open(&paths.db_file, &paths.backups_dir).map_err(|e| startup("database", e))?;
-        let kernel = handle
-            .block_on(async { app::build_kernel(store.clone(), loaded.sections, &loaded.sweep) });
+        let kernel = handle.block_on(async {
+            app::build_kernel(
+                store.clone(),
+                loaded.sections,
+                &loaded.sweep,
+                assertion_name(profile),
+            )
+        });
         let config_notice = app::config_notice(
             &loaded.report,
             &loaded.sweep,
@@ -389,6 +417,14 @@ fn snapshot(inner: &Inner) -> CoreSnapshot {
                 summary: e.summary,
             })
             .collect(),
+        awake: app::awake_view(&inner.kernel),
+    }
+}
+
+fn assertion_name(profile: Profile) -> &'static str {
+    match profile {
+        Profile::Release => "Navori: keeping this Mac awake",
+        Profile::Dev => "Navori Dev: keeping this Mac awake",
     }
 }
 
