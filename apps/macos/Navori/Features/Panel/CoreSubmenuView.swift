@@ -49,12 +49,20 @@ private struct ModulesSection: View {
                             .padding(.leading, 15)
                     }
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(module.id)
+                .accessibilityValue(spoken(module))
             }
         }
     }
 
     private func label(_ module: ModuleRow) -> String {
         module.restarts > 0 ? "\(module.state) · \(module.restarts) restarts" : module.state
+    }
+
+    private func spoken(_ module: ModuleRow) -> String {
+        guard let detail = module.detail, !detail.isEmpty else { return label(module) }
+        return "\(label(module)), \(detail)"
     }
 
     private func dotColor(_ dot: StatusDot) -> Color {
@@ -94,6 +102,9 @@ private struct ActivitySection: View {
                             .font(.system(size: 12))
                             .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(event.summary)
+                    .accessibilityValue(Self.relative(event.tsMs))
                 }
             }
         }

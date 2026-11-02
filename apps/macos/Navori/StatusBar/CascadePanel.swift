@@ -1,4 +1,5 @@
 import AppKit
+import NavoriPanel
 import QuartzCore
 import SwiftUI
 
@@ -53,7 +54,45 @@ final class CascadePanel: NSPanel {
 
     required init?(coder: NSCoder) { nil }
 
-    override var canBecomeKey: Bool { false }
+    override var canBecomeKey: Bool { NSWorkspace.shared.isVoiceOverEnabled }
+
+    var onResignKey: (() -> Void)?
+    var onKey: ((CascadeKey) -> Void)?
+
+    override func resignKey() {
+        super.resignKey()
+        DispatchQueue.main.async { [weak self] in
+            self?.onResignKey?()
+        }
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown, routeKey(event) {
+            return
+        }
+        super.sendEvent(event)
+    }
+
+    /// Same routing as `StatusPanel`: arrows, Return and Esc, and never VO or ⌘ chords.
+    private func routeKey(_ event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.command)
+            || event.modifierFlags.contains(.control)
+            || event.modifierFlags.contains(.option) {
+            return false
+        }
+        let key: CascadeKey
+        switch event.keyCode {
+        case 126: key = .up
+        case 125: key = .down
+        case 123: key = .left
+        case 124: key = .right
+        case 36, 76: key = .return
+        case 53: key = .escape
+        default: return false
+        }
+        onKey?(key)
+        return true
+    }
 
     func setRootView(_ view: AnyView) {
         hosting.rootView = view
@@ -82,6 +121,8 @@ final class CascadePanel: NSPanel {
         frameLink?.invalidate()
         frameLink = nil
         frameCallback = nil
+        onResignKey = nil
+        onKey = nil
         orderOut(nil)
     }
 

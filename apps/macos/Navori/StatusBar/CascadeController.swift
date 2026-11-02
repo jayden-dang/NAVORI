@@ -96,6 +96,16 @@ final class CascadeController {
         closeSubmenus()
     }
 
+    var keyIsInside: Bool {
+        guard let key = NSApp.keyWindow else { return false }
+        return owns(key)
+    }
+
+    func handleResignKey() {
+        if keyIsInside { return }
+        panel?.close()
+    }
+
     var openFrames: [CGRect] {
         var frames: [CGRect] = []
         if let panel, panel.isOpen {
@@ -135,6 +145,12 @@ final class CascadeController {
         let depth = (state.openPath.firstIndex(of: row) ?? 0) + 1
         let child = panels[depth] ?? CascadePanel()
         panels[depth] = child
+        child.onResignKey = { [weak self] in
+            self?.handleResignKey()
+        }
+        child.onKey = { [weak self] key in
+            self?.key(key)
+        }
         child.setRootView(AnyView(submenu(row).environment(self)))
         child.onFittingSizeChange = { [weak self] in
             self?.schedulePlace(row)
@@ -183,6 +199,11 @@ final class CascadeController {
             size: child.idealSize,
             visible: visible
         )
+    }
+
+    private func owns(_ window: NSWindow) -> Bool {
+        if window === panel { return true }
+        return panels.values.contains { $0 === window }
     }
 
     private func hideFrom(depth: Int) {

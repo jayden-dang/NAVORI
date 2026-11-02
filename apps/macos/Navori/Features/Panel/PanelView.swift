@@ -116,5 +116,8 @@ struct Banner: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background((style == .error ? Color.red : Color.orange).opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(message)
     }
 }

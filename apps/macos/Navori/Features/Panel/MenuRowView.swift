@@ -88,6 +88,11 @@ struct MenuRowView: View {
         } action: { frame in
             cascade.setRowFrame(row.id, frame)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(row.title)
+        .accessibilityValue(row.value ?? "")
+        .accessibilityHint(row.opensSubmenu ? "Opens a submenu" : "")
+        .accessibilityAddTraits(.isButton)
     }
 
     @ViewBuilder

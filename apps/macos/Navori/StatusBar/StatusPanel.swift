@@ -16,6 +16,8 @@ final class StatusPanel: NSPanel {
     private var refitPending = false
     /// Exact-once flag. `super.close()` can re-enter through `resignKey`.
     private(set) var isOpen = false
+    /// Extra click can resign key (async close) then fire `toggle` and reopen.
+    private var closedAt: CFTimeInterval = 0
     private static let width: CGFloat = 360
     private static let maxHeight: CGFloat = 560
 
@@ -56,7 +58,13 @@ final class StatusPanel: NSPanel {
     override var canBecomeKey: Bool { true }
 
     func toggle(relativeTo button: NSStatusBarButton) {
-        isOpen ? close() : show(relativeTo: button)
+        if isOpen {
+            close()
+        } else if CACurrentMediaTime() - closedAt < 0.25 {
+            return
+        } else {
+            show(relativeTo: button)
+        }
     }
 
     func show(relativeTo button: NSStatusBarButton, onFirstFrame: (@MainActor () -> Void)? = nil) {
@@ -82,6 +90,9 @@ final class StatusPanel: NSPanel {
         }
         setFrame(frame, display: true)
         scheduleRefit()
+        animationBehavior = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            ? .none
+            : .utilityWindow
 
         frameCallback = onFirstFrame
         let opening = !isOpen
@@ -118,6 +129,7 @@ final class StatusPanel: NSPanel {
     override func close() {
         guard isOpen else { return }
         isOpen = false
+        closedAt = CACurrentMediaTime()
         frameLink?.invalidate()
         frameLink = nil
         frameCallback = nil
@@ -127,12 +139,21 @@ final class StatusPanel: NSPanel {
         }
         cascade.reset()
         onVisibility(false)
+        orderOut(nil)
         super.close()
     }
 
     override func resignKey() {
         super.resignKey()
-        close()
+        if NSWorkspace.shared.isVoiceOverEnabled {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.isOpen else { return }
+                if self.cascade.keyIsInside { return }
+                self.close()
+            }
+        } else {
+            close()
+        }
     }
 
     private func fittedHeight() -> CGFloat {
@@ -198,7 +219,10 @@ final class StatusPanel: NSPanel {
 
     /// Hosting view is first responder and would eat arrows, Return, and Esc.
     private func routeKey(_ event: NSEvent) -> Bool {
-        if event.modifierFlags.contains(.command) {
+        // ⌘-chords and VoiceOver (Control-Option / Caps Lock) must reach the system.
+        if event.modifierFlags.contains(.command)
+            || event.modifierFlags.contains(.control)
+            || event.modifierFlags.contains(.option) {
             return false
         }
         guard let key = Self.cascadeKey(event.keyCode) else { return false }
