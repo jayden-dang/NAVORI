@@ -384,10 +384,10 @@ _Requirements: MENU-2.1, MENU-2.2, MENU-2.3, MENU-2.4, MENU-2.5_
 
 **Depends-on:** Task 3, Task 5, Task 11
 
-- [ ] **Step 1: Implement** `CascadePanel`, one per depth, ordered out rather than closed. `CascadeController` runs `open` and `close(depth:)`, sends `replaceTree` when the first snapshot arrives, and re-places an open Submenu when level 0 re-fits. `CoreSubmenuView` lists modules with state, restarts and detail, then at most 8 Events with severity icon and narrow relative age, or `Nothing yet.`. Content scrolls and is limited to the height `CascadePlacement` allows.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand**: hover opens the Submenu after the delay and a click opens it at once; with another app frontmost, a first click and hover both reach the Submenu; moving diagonally across other rows keeps it, and resting on another row switches. It flips left at the right screen edge; a short-screen window scrolls it; a new Event appears with it open. With no snapshot, the row has no chevron. Turn VoiceOver on and confirm it reaches the Submenu, which is never key; if it cannot, apply the design's fallback now.
-- [ ] **Step 4: Commit** `git commit -m "feat(shell): read modules and activity in the core submenu"`
+- [x] **Step 1: Implement** `CascadePanel`, one per depth, ordered out rather than closed. `CascadeController` runs `open` and `close(depth:)`, sends `replaceTree` when the first snapshot arrives, and re-places an open Submenu when level 0 re-fits. `CoreSubmenuView` lists modules with state, restarts and detail, then at most 8 Events with severity icon and narrow relative age, or `Nothing yet.`. Content scrolls and is limited to the height `CascadePlacement` allows.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand**: hover opens the Submenu after the delay and a click opens it at once; with another app frontmost, a first click and hover both reach the Submenu; moving diagonally across other rows keeps it, and resting on another row switches. It flips left at the right screen edge; a short-screen window scrolls it; a new Event appears with it open. With no snapshot, the row has no chevron. Turn VoiceOver on and confirm it reaches the Submenu, which is never key; if it cannot, apply the design's fallback now.
+- [x] **Step 4: Commit** `git commit -m "feat(shell): read modules and activity in the core submenu"`
 
 _Requirements: MENU-3.1, MENU-3.3, MENU-3.4, MENU-3.5, MENU-3.6, MENU-3.7, MENU-4.1, MENU-4.2, MENU-4.3, MENU-4.4, MENU-4.5, MENU-4.6, MENU-4.7_
 
