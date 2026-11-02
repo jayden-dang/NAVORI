@@ -1,10 +1,14 @@
 //! `navori` — command-line client for the running Navori app.
 //!
 //! Exit codes: 0 success · 1 command failed · 2 usage error · 3 app not running.
+//! `awake run` returns the wrapped command's code instead (126, 127, 128+N as env(1)).
 
+use std::ffi::OsString;
 use std::os::unix::fs::MetadataExt;
+use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
-use std::process::ExitCode;
+use std::process::{ExitCode, Stdio};
+use std::time::Duration;
 
 use clap::{Parser, Subcommand};
 use navori_config::{Paths, Profile};
@@ -76,6 +80,12 @@ enum AwakeCommand {
         #[arg(long)]
         json: bool,
     },
+    /// Run a command and keep this Mac awake while it runs.
+    Run {
+        /// The command and its arguments.
+        #[arg(last = true, required = true)]
+        command: Vec<OsString>,
+    },
 }
 
 enum Failure {
@@ -94,7 +104,7 @@ impl From<IpcError> for Failure {
 }
 
 fn main() -> ExitCode {
-    let cli = Cli::parse();
+    let Cli { profile, command } = Cli::parse();
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -105,20 +115,25 @@ fn main() -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    match runtime.block_on(run(cli)) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(Failure::Usage(m)) => {
-            eprintln!("navori: {m}");
-            ExitCode::from(2)
-        }
-        Err(Failure::NotRunning(m)) => {
-            eprintln!("navori: {m}");
-            ExitCode::from(3)
-        }
-        Err(Failure::Failed(m)) => {
-            eprintln!("navori: {m}");
-            ExitCode::from(1)
-        }
+    match command {
+        Command::Awake {
+            command: AwakeCommand::Run { command },
+        } => runtime.block_on(awake_run(&profile, command)),
+        command => match runtime.block_on(run(Cli { profile, command })) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(Failure::Usage(m)) => {
+                eprintln!("navori: {m}");
+                ExitCode::from(2)
+            }
+            Err(Failure::NotRunning(m)) => {
+                eprintln!("navori: {m}");
+                ExitCode::from(3)
+            }
+            Err(Failure::Failed(m)) => {
+                eprintln!("navori: {m}");
+                ExitCode::from(1)
+            }
+        },
     }
 }
 
@@ -223,6 +238,7 @@ async fn run(cli: Cli) -> Result<(), Failure> {
                     print_awake_status(&v);
                 }
             }
+            AwakeCommand::Run { .. } => unreachable!("handled before connect"),
         },
         Command::Doctor { .. } => unreachable!("handled above"),
     }
@@ -237,6 +253,84 @@ async fn dispatch_awake(client: &mut Client, action: Value) -> Result<Value, Fai
         )
         .await
         .map_err(Into::into)
+}
+
+async fn awake_run(profile: &str, argv: Vec<OsString>) -> ExitCode {
+    let Some((program, args)) = argv.split_first() else {
+        eprintln!("navori: missing command");
+        return ExitCode::from(2);
+    };
+    let mut child = match std::process::Command::new(program)
+        .args(args)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(err) => {
+            eprintln!("navori: {}: {err}", program.to_string_lossy());
+            let code = if err.kind() == std::io::ErrorKind::NotFound {
+                127
+            } else {
+                126
+            };
+            return ExitCode::from(code);
+        }
+    };
+
+    let pid = i32::try_from(child.id()).unwrap_or(i32::MAX);
+    ask_for_command_lease(profile, pid).await;
+
+    match child.wait() {
+        Ok(status) => command_exit_code(status),
+        Err(err) => {
+            eprintln!("navori: {err}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+async fn ask_for_command_lease(profile: &str, pid: i32) {
+    let socket = match socket_path(profile) {
+        Ok(path) => path,
+        Err(e) => {
+            eprintln!("navori: no Lease held: {}", failure_reason(&e));
+            return;
+        }
+    };
+    let hold = async {
+        let mut client = Client::connect(&socket).await.map_err(Failure::from)?;
+        dispatch_awake(&mut client, json!({ "hold_command": { "pid": pid } })).await
+    };
+    match tokio::time::timeout(Duration::from_secs(5), hold).await {
+        Ok(Ok(_)) => {}
+        Ok(Err(Failure::NotRunning(_))) => {
+            eprintln!("navori: no Lease held because Navori is not running");
+        }
+        Ok(Err(e)) => {
+            eprintln!("navori: no Lease held: {}", failure_reason(&e));
+        }
+        Err(_) => {
+            eprintln!("navori: no Lease held: timed out");
+        }
+    }
+}
+
+fn failure_reason(failure: &Failure) -> &str {
+    match failure {
+        Failure::Usage(m) | Failure::NotRunning(m) | Failure::Failed(m) => m,
+    }
+}
+
+fn command_exit_code(status: std::process::ExitStatus) -> ExitCode {
+    if let Some(code) = status.code() {
+        ExitCode::from(code as u8)
+    } else if let Some(sig) = status.signal() {
+        ExitCode::from(128u8.saturating_add(sig as u8))
+    } else {
+        ExitCode::from(1)
+    }
 }
 
 fn awake_hold_action(duration: Option<&str>) -> Result<Value, Failure> {
