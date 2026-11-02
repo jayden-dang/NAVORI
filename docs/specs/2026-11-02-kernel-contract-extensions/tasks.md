@@ -13,6 +13,7 @@ Execution-mode: continuous
 Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
+Delivered-by: 78e30b9039e2863f33a7be9d0742c931e64aae40
 
 **Goal:** Give the Kernel a per-Module config and a deadline wait handle that ROAD-8 can use without editing `crates/kernel`, keep a bad config value to itself, and pause the Journal sweep when retention cannot be trusted.
 

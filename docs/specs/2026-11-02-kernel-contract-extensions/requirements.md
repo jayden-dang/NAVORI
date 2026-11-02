@@ -1,7 +1,7 @@
 # Requirements: Kernel contract extensions
 
 Feature code: KCONTRACT
-Status: In-progress
+Status: Implemented
 Date: 2026-11-02
 
 <!--
