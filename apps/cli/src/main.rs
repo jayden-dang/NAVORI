@@ -54,6 +54,28 @@ enum Command {
         /// The action as JSON: `"name"` or `{"name": {...}}`.
         action: String,
     },
+    /// Keep this Mac awake.
+    Awake {
+        #[command(subcommand)]
+        command: AwakeCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum AwakeCommand {
+    /// Keep this Mac awake for a duration, or until turned off.
+    Hold {
+        /// How long to hold, as Ns, Nm or Nh. Omit to hold until turned off.
+        #[arg(long = "for", value_name = "DURATION")]
+        duration: Option<String>,
+    },
+    /// End every lease Navori is holding.
+    ReleaseAll,
+    /// Show the leases that are keeping this Mac awake.
+    Status {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 enum Failure {
@@ -123,6 +145,13 @@ async fn run(cli: Cli) -> Result<(), Failure> {
     {
         return Err(Failure::Usage(format!("action is not valid JSON: {e}")));
     }
+    // A bad --for is usage (exit 2) even when the app is down.
+    if let Command::Awake {
+        command: AwakeCommand::Hold { duration },
+    } = &cli.command
+    {
+        let _ = awake_hold_action(duration.as_deref())?;
+    }
 
     let mut client = Client::connect(&socket).await?;
     match cli.command {
@@ -178,9 +207,64 @@ async fn run(cli: Cli) -> Result<(), Failure> {
                 .await?;
             println!("{v}");
         }
+        Command::Awake { command } => match command {
+            AwakeCommand::Hold { duration } => {
+                let action = awake_hold_action(duration.as_deref())?;
+                dispatch_awake(&mut client, action).await?;
+            }
+            AwakeCommand::ReleaseAll => {
+                dispatch_awake(&mut client, json!("release_all")).await?;
+            }
+            AwakeCommand::Status { json } => {
+                let v = dispatch_awake(&mut client, json!("status")).await?;
+                if json {
+                    print_json(&v);
+                } else {
+                    print_awake_status(&v);
+                }
+            }
+        },
         Command::Doctor { .. } => unreachable!("handled above"),
     }
     Ok(())
+}
+
+async fn dispatch_awake(client: &mut Client, action: Value) -> Result<Value, Failure> {
+    client
+        .call(
+            method::DISPATCH,
+            json!({ "module": "awake", "action": action }),
+        )
+        .await
+        .map_err(Into::into)
+}
+
+fn awake_hold_action(duration: Option<&str>) -> Result<Value, Failure> {
+    match duration {
+        Some(raw) => Ok(json!({ "hold_for": { "seconds": parse_duration(raw)? } })),
+        None => Ok(json!("hold_until_off")),
+    }
+}
+
+fn parse_duration(raw: &str) -> Result<u64, Failure> {
+    let split = raw.find(|c: char| !c.is_ascii_digit()).unwrap_or(raw.len());
+    let (digits, unit) = raw.split_at(split);
+    let n: u64 = digits.parse().map_err(|_| duration_usage(raw))?;
+    if n == 0 || unit.len() != 1 {
+        return Err(duration_usage(raw));
+    }
+    match unit {
+        "s" => Ok(n),
+        "m" => n.checked_mul(60).ok_or_else(|| duration_usage(raw)),
+        "h" => n.checked_mul(3_600).ok_or_else(|| duration_usage(raw)),
+        _ => Err(duration_usage(raw)),
+    }
+}
+
+fn duration_usage(raw: &str) -> Failure {
+    Failure::Usage(format!(
+        "duration {raw:?} is not Ns, Nm or Nh (for example 90s, 30m, 1h)"
+    ))
 }
 
 async fn doctor(socket: &std::path::Path, json: bool) -> Result<(), Failure> {
@@ -237,6 +321,27 @@ fn print_json(v: &Value) {
     match serde_json::to_string_pretty(v) {
         Ok(s) => println!("{s}"),
         Err(_) => println!("{v}"),
+    }
+}
+
+fn print_awake_status(v: &Value) {
+    let leases = v["leases"].as_array();
+    let count = leases.map(Vec::len).unwrap_or(0);
+    let noun = if count == 1 { "Lease" } else { "Leases" };
+    println!("{count} {noun}");
+    if let Some(leases) = leases {
+        for lease in leases {
+            let line = lease["label"]
+                .as_str()
+                .filter(|label| !label.is_empty())
+                .or_else(|| lease["kind"].as_str())
+                .unwrap_or("lease");
+            println!("  {line}");
+        }
+    }
+    let system_held = v["system_held"].as_bool().unwrap_or(false);
+    if count > 0 && !system_held {
+        println!("not held");
     }
 }
 
