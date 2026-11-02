@@ -326,8 +326,30 @@ _Requirements: PERF-1.1_
 
 **Depends-on:** Task 10
 
-- [ ] **Step 1: Record** — `cargo xtask perf --record`. While any gated metric is over budget (expected today: `idle_footprint_mb` ≈ 42 MiB > 30) the file is not written. Then stop this task and report the miss to the user (optimise first, or amend GOAL-7 through `define-project`); never loosen a budget here.
-- [ ] **Step 2: Stability** — three consecutive `cargo xtask perf` runs on the same revision give the same verdict with no regression failure; if one regresses without a code change, report the metric and values and raise Open Question 2 (floors) instead of editing floors.
+- [ ] **Step 1: Record** — `cargo xtask perf --record`. On 2026-11-02 at `dab5a48` one `--record` run exited 0 (`menu_open_after_launch_ms` 49.2, `idle_footprint_mb` 18.7) and wrote the file. The file was then removed and not committed, because Step 2 did not hold. While `menu_open_after_launch_ms` is over 50, stop this task and report the miss (optimise first, or amend GOAL-7 through `define-project`); never loosen a budget here.
+- [ ] **Step 2: Stability** — three consecutive `cargo xtask perf` runs on the same revision give the same verdict with no regression failure; if one regresses without a code change, report the metric and values and raise Open Question 2 (floors) instead of editing floors. On 2026-11-02 at `dab5a48` the three runs exited 1, 1, 0 with `menu_open_after_launch_ms` 51.8, 51.9, 49.4. No regression line was printed. Floors were not edited.
 - [ ] **Step 3: Commit** — `git commit -m "chore: record the perf baseline"`
 
 _Requirements: PERF-2.1, PERF-6.4_
+
+---
+
+### Task 13: Keep the build line first on stdout
+
+**Files:**
+- Modify: `xtask/src/main.rs` (`tool_stdout`, `sh`)
+- Test: `xtask` unit test `tool_stdout_is_piped_so_report_stdout_stays_clean`
+
+**Reuse:** rung 2 — changes the existing `sh` helper
+
+**Interfaces:**
+- Consumes: child tool stdout from `cargo` / `swift` / `xcodebuild` during `cargo xtask perf`
+- Produces: report stdout whose first line is `build <seconds>s`, with tool progress on stderr; `phase A` and `phase B` lines unchanged
+
+**Depends-on:** Task 10
+
+- [x] **Step 1: Failing test, then pipe** — `tool_stdout()` returns a pipe; `sh` copies that pipe to stderr. `cargo test -p xtask tool_stdout_is_piped_so_report_stdout_stays_clean` passes (1 passed, 2026-11-01).
+- [x] **Step 2: Full run** — `cargo xtask perf` stdout begins with `build <n.nnn>s` and still ends with `phase A <n.nnn>s` and `phase B <n.nnn>s`. Observed on 2026-11-02: record run `build 9.500s` / `phase A 10.748s` / `phase B 70.262s`, and three later runs the same shape. Tool progress stayed on stderr.
+- [x] **Step 3: Commit** — `f8ee2c8` `fix(xtask): keep perf report stdout free of tool progress`
+
+_Requirements: PERF-1.11, PERF-1.12_

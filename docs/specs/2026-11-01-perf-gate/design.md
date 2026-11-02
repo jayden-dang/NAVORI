@@ -17,6 +17,8 @@ Neighbors (catalog `docs/specs/catalog/app.md`, OWNS coverage 0 of 5 cards — n
 
 Known before the first run: the installed release app idles at **42 MB** phys_footprint with 6 threads, above the 30 MB `idle_footprint_mb` budget. The gate will report that miss; fixing it is out of scope (requirements, Out of Scope).
 
+Measured on this Mac (`Mac17,9`, macOS 27.0.1) at `dab5a48` on 2026-11-02: `idle_footprint_mb` was about 19 MB, inside the 30 MB budget. The gated miss is `menu_open_after_launch_ms`, which landed at 49.2, 51.8, 51.9 and 49.4 across four runs. One `--record` run exited 0 and wrote `perf-baseline.json`; the file was not committed because the next three runs did not share a verdict (exit 1, 1, 0). No run printed a regression line. The 50 ms budget was not changed.
+
 ## Decisions
 
 1. **Split `Profile` into identity and flavour.** `Profile` keeps identity (name, bundle id, app name, icon, `NavoriProfile`); a new `Flavor { Debug, Release }` carries cargo/Swift build config. Existing commands pass `profile.default_flavor()`, so their output is unchanged; perf builds `(Profile::Dev, Flavor::Release)` into `build/perf/`.
@@ -138,4 +140,4 @@ Locality: `docs/standards/testing.md:24` — xtask's pure perf logic is now unit
 
 ## Coverage check
 
-Every requirement ID appears in a `Satisfies:` line: PERF-1.1–1.12, 2.1–2.6, 3.1–3.5, 4.1–4.6, 5.1–5.6, 6.1–6.5. PERF-1.3 and PERF-1.6 appear in two sections by necessity (the runner collects, the helper reads, the judge reports). PERF-1.11 is also covered by the `tool_stdout` unit seam. PERF-6.4 (three consecutive passes) is verified by the e2e seam, not owned by one module. No ID is deliberately unmapped.
+Every requirement ID appears in a `Satisfies:` line: PERF-1.1–1.12, 2.1–2.6, 3.1–3.5, 4.1–4.6, 5.1–5.6, 6.1–6.5. PERF-1.3 and PERF-1.6 appear in two sections by necessity (the runner collects, the helper reads, the judge reports). PERF-1.11 is also covered by the `tool_stdout` unit seam. PERF-6.4 (three consecutive runs, same verdict, no regression failure) is verified by the e2e seam, not owned by one module. No ID is deliberately unmapped.

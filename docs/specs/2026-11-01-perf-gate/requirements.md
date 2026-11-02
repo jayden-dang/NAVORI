@@ -113,4 +113,4 @@ Files this change touches, with what each must keep doing:
 ## Open Questions
 
 - Whether a callback after `show()` lines up with the menu's first frame on screen, and whether a SIGUSR1-opened panel stays open in the inactive app — owner: design-solution (calibration spike: compare against a one-shot display-link frame reference, ≤ 5 ms apart) — 2026-11-01 — forbid-guess.
-- Floors in PERF-2.5 are estimates — owner: the author, after the first 3 runs (PERF-6.4) — 2026-11-01 — forbid-guess.
+- Floors in PERF-2.5 are estimates — owner: the author, after the first 3 runs (PERF-6.4) — 2026-11-01 — forbid-guess. On 2026-11-02 the three runs at `dab5a48` did not agree (exits 1, 1, 0) because `menu_open_after_launch_ms` sat on both sides of 50 (51.8, 51.9, 49.4). That was the absolute budget, not a regression past a floor, so the floors were left as written.
