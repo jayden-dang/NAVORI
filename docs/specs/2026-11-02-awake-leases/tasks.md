@@ -450,12 +450,12 @@ _Requirements: AWAKE-8.9, AWAKE-13.8, AWAKE-13.9_
 
 **Depends-on:** Task 13
 
-- [ ] **Step 1: Write failing tests:** `every_action_has_a_description_a_schema_and_a_risk`, `every_catalog_name_decodes_as_an_action` (checks each name against a sample payload, since nothing ties them today), `status_is_read_and_the_others_are_write`, `no_action_is_destructive`, `a_started_lease_emits_one_sentence` and `an_ended_lease_emits_one_sentence` (table: deadline, process exit, grace, Cap, Release all, literal strings from `design.md`), `no_event_names_a_project_or_a_branch`.
+- [x] **Step 1: Write failing tests:** `every_action_has_a_description_a_schema_and_a_risk`, `every_catalog_name_decodes_as_an_action` (checks each name against a sample payload, since nothing ties them today), `status_is_read_and_the_others_are_write`, `no_action_is_destructive`, `a_started_lease_emits_one_sentence` and `an_ended_lease_emits_one_sentence` (table: deadline, process exit, grace, Cap, Release all, literal strings from `design.md`), `no_event_names_a_project_or_a_branch`.
 Run: `cargo nextest run -p navori-mod-awake --test actions` — expect: fail on the assertions.
-- [ ] **Step 2: Implement.**
+- [x] **Step 2: Implement.**
 Run: same command — expect: pass.
-- [ ] **Step 3: Verify** `cargo xtask check-deps` — expect: pass. `grep -rn 'unsafe' modules/awake/src` — expect: no match. `git diff main -- crates/ffi apps/cli | grep -n '^+.*unsafe'` — expect: no match.
-- [ ] **Step 4: Commit** `git commit -m "feat(awake): describe its Actions and record its Events"`
+- [x] **Step 3: Verify** `cargo xtask check-deps` — expect: pass. `grep -rn 'unsafe' modules/awake/src` — expect: no match. `git diff main -- crates/ffi apps/cli | grep -n '^+.*unsafe'` — expect: no match.
+- [x] **Step 4: Commit** `git commit -m "feat(awake): describe its Actions and record its Events"`
 
 _Requirements: AWAKE-9.1, AWAKE-9.2, AWAKE-9.3, AWAKE-9.4, AWAKE-9.5, AWAKE-13.7, AWAKE-13.11_
 
