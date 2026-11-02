@@ -185,11 +185,11 @@ public struct CascadeState: Sendable { public init(root: [CascadeNode], maxDepth
 
 **Depends-on:** Task 3
 
-- [ ] **Step 1: Write failing tests** over a tree with `core` (children `core.a`, with children `core.a.x`, with child `core.a.x.y`), `settings`, `quit`: `resting_on_a_row_with_a_submenu_opens_it_when_the_timer_fires`, `a_click_on_a_row_with_a_submenu_opens_it_at_once`, `a_click_on_an_action_row_activates_it`, `moving_inside_the_diagonal_keeps_the_submenu_and_the_selection`, `resting_on_another_row_inside_the_diagonal_switches_when_the_timer_fires`, `leaving_the_diagonal_selects_the_row_and_closes_the_submenu_it_does_not_own`, `every_new_pointer_position_rearms_the_timer`, `the_same_pointer_position_twice_changes_nothing`, `leaving_a_row_clears_its_selection_unless_it_owns_an_open_submenu`, `a_row_at_the_maximum_depth_never_opens`, `a_row_with_no_action_is_never_selected`, `replacing_the_tree_can_add_children`, `replacing_the_tree_closes_a_submenu_whose_children_are_gone`.
-- [ ] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter CascadeStateTests` — expect: does not compile.
-- [ ] **Step 3: Implement** the rules listed under "Cascade logic" in `design.md`.
-- [ ] **Step 4: Run** the same command — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(panel): decide the cascade from pointer events"`
+- [x] **Step 1: Write failing tests** over a tree with `core` (children `core.a`, with children `core.a.x`, with child `core.a.x.y`), `settings`, `quit`: `resting_on_a_row_with_a_submenu_opens_it_when_the_timer_fires`, `a_click_on_a_row_with_a_submenu_opens_it_at_once`, `a_click_on_an_action_row_activates_it`, `moving_inside_the_diagonal_keeps_the_submenu_and_the_selection`, `resting_on_another_row_inside_the_diagonal_switches_when_the_timer_fires`, `leaving_the_diagonal_selects_the_row_and_closes_the_submenu_it_does_not_own`, `every_new_pointer_position_rearms_the_timer`, `the_same_pointer_position_twice_changes_nothing`, `leaving_a_row_clears_its_selection_unless_it_owns_an_open_submenu`, `a_row_at_the_maximum_depth_never_opens`, `a_row_with_no_action_is_never_selected`, `replacing_the_tree_can_add_children`, `replacing_the_tree_closes_a_submenu_whose_children_are_gone`.
+- [x] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter CascadeStateTests` — expect: does not compile.
+- [x] **Step 3: Implement** the rules listed under "Cascade logic" in `design.md`.
+- [x] **Step 4: Run** the same command — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "feat(panel): decide the cascade from pointer events"`
 
 _Requirements: MENU-4.1, MENU-4.2, MENU-4.3, MENU-4.4, MENU-4.8, MENU-9.1_
 
@@ -233,11 +233,11 @@ _Requirements: MENU-5.1, MENU-5.2, MENU-5.3, MENU-5.4, MENU-5.5, MENU-5.6, MENU-
 
 **Depends-on:** Task 1, Task 3
 
-- [ ] **Step 1: Implement** `GlassSurfaceView`: `NSGlassEffectView` with style `.clear`, corner radius 12 and `tint`, no availability branch and no `NSVisualEffectView` fallback. While Reduce Transparency is on, it shows an opaque `windowBackgroundColor` layer, and it swaps on the notification. Remove `NSVisualEffectView` from `StatusPanel`.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass. `grep -rn "NSVisualEffectView\|#available(macOS" apps/macos/Navori` — expect: no hit.
-- [ ] **Step 3: Check by hand** with `cargo xtask run`: glass over a bright window and over a dark one; Reduce Transparency on and off while open; open under the status item, near the right screen edge, on a second Space and over a full-screen app, with the frontmost app staying active. For the off-screen fallback, launch the binary with `NAVORI_PERF=1 NAVORI_PERF_HOME=<temp dir>`, send `kill -USR1 <pid>`, and see the panel at the top of the main screen.
-- [ ] **Step 4: Run** `cargo xtask perf` — expect: `menu_open_after_launch_ms` ≤ 80 and `menu_reopen_ms` ≤ 50. A failure stops the plan here and goes to the user, because every later task sits on this surface.
-- [ ] **Step 5: Commit** `git commit -m "feat(shell): put the menu on clear glass"`
+- [x] **Step 1: Implement** `GlassSurfaceView`: `NSGlassEffectView` with style `.clear`, corner radius 12 and `tint`, no availability branch and no `NSVisualEffectView` fallback. While Reduce Transparency is on, it shows an opaque `windowBackgroundColor` layer, and it swaps on the notification. Remove `NSVisualEffectView` from `StatusPanel`.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass. `grep -rn "NSVisualEffectView\|#available(macOS" apps/macos/Navori` — expect: no hit.
+- [x] **Step 3: Check by hand** with `cargo xtask run`: glass over a bright window and over a dark one; Reduce Transparency on and off while open; open under the status item, near the right screen edge, on a second Space and over a full-screen app, with the frontmost app staying active. For the off-screen fallback, launch the binary with `NAVORI_PERF=1 NAVORI_PERF_HOME=<temp dir>`, send `kill -USR1 <pid>`, and see the panel at the top of the main screen.
+- [x] **Step 4: Run** `cargo xtask perf` — expect: `menu_open_after_launch_ms` ≤ 80 and `menu_reopen_ms` ≤ 50. A failure stops the plan here and goes to the user, because every later task sits on this surface.
+- [x] **Step 5: Commit** `git commit -m "feat(shell): put the menu on clear glass"`
 
 _Requirements: MENU-1.1, MENU-6.3, MENU-10.4, MENU-G1, MENU-G2, MENU-G14_
 
