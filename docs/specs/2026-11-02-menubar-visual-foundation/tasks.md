@@ -13,6 +13,7 @@ Execution-mode: continuous
 Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
+Delivered-by: 030774d0453a7f172922dde87e275c24719867b8
 
 **Goal:** Rebuild the menubar menu on glass so that it shows only real Core state, runs a tested hand-built Cascade through a real Core Submenu, and gives later features a kit to build on.
 
