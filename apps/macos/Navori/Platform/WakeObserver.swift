@@ -2,7 +2,7 @@ import AppKit
 
 @MainActor
 final class WakeObserver {
-    private var token: NSObjectProtocol?
+    private let token: NSObjectProtocol
 
     init(onWake: @escaping @MainActor () -> Void) {
         token = NSWorkspace.shared.notificationCenter.addObserver(
@@ -17,8 +17,6 @@ final class WakeObserver {
     }
 
     isolated deinit {
-        if let token {
-            NSWorkspace.shared.notificationCenter.removeObserver(token)
-        }
+        NSWorkspace.shared.notificationCenter.removeObserver(token)
     }
 }

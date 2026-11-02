@@ -232,7 +232,6 @@ fn bad_keys(report: &ConfigReport, module_issues: &[&str]) -> Vec<String> {
 
 pub fn build_kernel(
     store: Store,
-    _config: &Config,
     sections: serde_json::Map<String, serde_json::Value>,
     sweep: &JournalSweep,
 ) -> Kernel {
