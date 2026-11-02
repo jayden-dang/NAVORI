@@ -339,10 +339,10 @@ Row ids: `core`, `settings`, `about`, `quit`.
 
 **Depends-on:** Task 4, Task 8, Task 9
 
-- [ ] **Step 1: Implement** `PanelView` in the order banners, Core row, `Divider`, `Settings…`, `About Navori`, `Quit Navori`, with no header, version, Core section or Activity section. `MenuRowView` draws 14 pt titles, 13 pt values, `labelColor` and `secondaryLabelColor`, and the accent fill at 8 pt corners with white text while selected. The `Button` action is the row's only click report. `CascadeController` runs `CascadeState` and the hover timer; it handles selection and `activate`, and logs and ignores `open` until Task 12.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand** in `cargo xtask run`: layout and type against the brief; a Core row with its state; the `DEV` chip in the dev build. A first click on `Settings…` closes the menu and opens Settings; `About Navori` opens the About tab; `Quit Navori` quits. `.onContinuousHover` selects rows with another app frontmost, or apply the design's fallback. Status icon, dimming, tooltip and the right-click menu are unchanged.
-- [ ] **Step 4: Commit** `git commit -m "feat(shell): show the new level 0 menu"`
+- [x] **Step 1: Implement** `PanelView` in the order banners, Core row, `Divider`, `Settings…`, `About Navori`, `Quit Navori`, with no header, version, Core section or Activity section. `MenuRowView` draws 14 pt titles, 13 pt values, `labelColor` and `secondaryLabelColor`, and the accent fill at 8 pt corners with white text while selected. The `Button` action is the row's only click report. `CascadeController` runs `CascadeState` and the hover timer; it handles selection and `activate`, and logs and ignores `open` until Task 12.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand** in `cargo xtask run`: layout and type against the brief; a Core row with its state; the `DEV` chip in the dev build. A first click on `Settings…` closes the menu and opens Settings; `About Navori` opens the About tab; `Quit Navori` quits. `.onContinuousHover` selects rows with another app frontmost, or apply the design's fallback. Status icon, dimming, tooltip and the right-click menu are unchanged.
+- [x] **Step 4: Commit** `git commit -m "feat(shell): show the new level 0 menu"`
 
 _Requirements: MENU-1.2, MENU-1.3, MENU-1.5, MENU-1.6, MENU-1.7, MENU-1.9, MENU-3.8, MENU-G4, MENU-G7, MENU-G11_
 
