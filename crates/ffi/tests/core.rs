@@ -1,12 +1,17 @@
 //! NavoriCore driven from Rust exactly as Swift drives it: plain threads, no ambient runtime.
 #![allow(clippy::unwrap_used)]
 
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use navori_ffi::{CoreConfig, CoreError, CoreSnapshot, NavoriCore, SnapshotListener};
-use navori_protocol::CoreStatus;
+use navori_config::{ConfigReport, JournalSweep, Paths, Profile, WholeFileReason};
+use navori_ffi::{
+    CheckView, ConfigNotice, CoreConfig, CoreError, CoreSnapshot, NavoriCore, SnapshotListener,
+};
 use navori_protocol::rpc::method;
+use navori_protocol::{CoreStatus, Event, Severity};
+use navori_store::Store;
 
 #[derive(Default)]
 struct Recorder(Mutex<Vec<CoreSnapshot>>);
@@ -33,6 +38,12 @@ fn config(home: &tempfile::TempDir) -> CoreConfig {
         app_version: "0.1.0-test".into(),
         log_to_file: false,
     }
+}
+
+fn write_config(home: &tempfile::TempDir, body: &str) {
+    let data = home.path().join("Library/Application Support/Navori Dev");
+    std::fs::create_dir_all(&data).unwrap();
+    std::fs::write(data.join("config.toml"), body).unwrap();
 }
 
 fn start(home: &tempfile::TempDir) -> (Arc<NavoriCore>, Arc<Recorder>) {
@@ -68,7 +79,7 @@ fn starting_creates_the_profile_layout_and_reports_status() {
     );
     assert!(std::path::Path::new(&s.data_dir).join("navori.db").exists());
     assert!(std::path::Path::new(&s.socket_path).exists());
-    assert!(s.config_error.is_none());
+    assert!(s.config_notice.is_none());
     assert!(s.last_unclean_exit.is_none());
     eventually(|| {
         core.status()
@@ -159,16 +170,184 @@ fn the_ipc_socket_serves_core_status() {
 #[test]
 fn an_invalid_config_falls_back_to_defaults_and_is_reported() {
     let home = home();
+    write_config(&home, "log_level = 42\n");
+    let (core, _) = start(&home);
+    let notice = core
+        .status()
+        .config_notice
+        .expect("config notice must be surfaced");
+    assert!(notice.title.contains("config.toml"), "{}", notice.title);
+    assert!(notice.message.contains("log_level"), "{}", notice.message);
+    core.shutdown();
+}
+
+#[test]
+fn a_bad_value_is_named_and_does_not_claim_the_whole_file() {
+    let home = home();
+    write_config(&home, "log_level = \"loud\"\n");
+    let (core, _) = start(&home);
+    let notice = core.status().config_notice.expect("bad value is a notice");
+    assert_eq!(
+        notice,
+        ConfigNotice {
+            title: "config.toml has bad values".into(),
+            message: "log_level use their defaults. Fix them and reopen Navori.".into(),
+        }
+    );
+    core.shutdown();
+}
+
+#[test]
+fn a_bad_module_section_is_named() {
+    let file = Path::new("/tmp/nv/config.toml");
+    let alone = navori_ffi::config_notice(
+        &ConfigReport::Clean,
+        &JournalSweep::KeepDays(30),
+        &["awake"],
+        file,
+    )
+    .expect("a module section on its default is a notice");
+    assert_eq!(
+        alone,
+        ConfigNotice {
+            title: "config.toml has bad values".into(),
+            message: "awake use their defaults. Fix them and reopen Navori.".into(),
+        }
+    );
+
+    let both = navori_ffi::config_notice(
+        &ConfigReport::BadValues(vec!["log_level".into()]),
+        &JournalSweep::KeepDays(30),
+        &["awake"],
+        file,
+    )
+    .expect("a value and a module section are both named");
+    assert_eq!(
+        both.message,
+        "log_level, awake use their defaults. Fix them and reopen Navori."
+    );
+    assert!(!both.title.contains("is on defaults"));
+    assert!(!both.message.contains("is on defaults"));
+}
+
+#[test]
+fn invalid_toml_says_the_whole_file_is_on_defaults_and_names_it() {
+    let file = Path::new("/tmp/nv/config.toml");
+    let no_position = navori_ffi::config_notice(
+        &ConfigReport::WholeFile(WholeFileReason::NotToml { position: None }),
+        &JournalSweep::Paused,
+        &[],
+        file,
+    )
+    .expect("invalid toml is a notice");
+    assert_eq!(
+        no_position,
+        ConfigNotice {
+            title: "config.toml is on defaults".into(),
+            message: "Not valid TOML. Journal cleanup is paused until the file is fixed and Navori is reopened.".into(),
+        }
+    );
+
+    let positioned = navori_ffi::config_notice(
+        &ConfigReport::WholeFile(WholeFileReason::NotToml {
+            position: Some((3, 7)),
+        }),
+        &JournalSweep::Paused,
+        &[],
+        file,
+    )
+    .expect("a toml position is a notice");
+    assert_eq!(
+        positioned.message,
+        "Not valid TOML at line 3, column 7. Journal cleanup is paused until the file is fixed and Navori is reopened."
+    );
+    assert_eq!(positioned.title, "config.toml is on defaults");
+
+    let home = home();
+    write_config(&home, "log_level = \n");
+    let (core, _) = start(&home);
+    let notice = core
+        .status()
+        .config_notice
+        .expect("broken toml is a notice");
+    assert_eq!(notice.title, "config.toml is on defaults");
+    assert!(
+        notice
+            .message
+            .starts_with("Not valid TOML at line 1, column "),
+        "{}",
+        notice.message
+    );
+    assert!(notice.message.ends_with('.'), "{}", notice.message);
+    assert!(!notice.message.contains("log_level"), "{}", notice.message);
+    assert!(
+        notice
+            .message
+            .contains("Journal cleanup is paused until the file is fixed and Navori is reopened."),
+        "{}",
+        notice.message
+    );
+    core.shutdown();
+}
+
+#[test]
+fn an_unreadable_file_says_it_cannot_be_read() {
+    let home = home();
     let data = home.path().join("Library/Application Support/Navori Dev");
     std::fs::create_dir_all(&data).unwrap();
-    std::fs::write(data.join("config.toml"), "log_level = 42\n").unwrap();
+    std::fs::create_dir(data.join("config.toml")).unwrap();
     let (core, _) = start(&home);
-    let err = core
+    let notice = core
         .status()
-        .config_error
-        .expect("config error must be surfaced");
-    assert!(err.contains("config.toml"), "{err}");
+        .config_notice
+        .expect("unreadable file is a notice");
+    assert_eq!(
+        notice,
+        ConfigNotice {
+            title: "config.toml is on defaults".into(),
+            message: "It cannot be read. Journal cleanup is paused until the file is fixed and Navori is reopened.".into(),
+        }
+    );
     core.shutdown();
+}
+
+#[test]
+fn doctor_fails_the_config_check_on_a_bad_value() {
+    let home = home();
+    write_config(&home, "log_level = \"loud\"\n");
+    let (core, _) = start(&home);
+    let check = config_check(&core);
+    assert!(!check.ok);
+    assert_eq!(
+        check.detail,
+        "config.toml has bad values. log_level use their defaults. Fix them and reopen Navori."
+    );
+    core.shutdown();
+}
+
+#[test]
+fn a_bad_value_does_not_stop_the_core() {
+    let home = home();
+    write_config(&home, "log_level = \"loud\"\n");
+    let (core, _) = start(&home);
+    assert!(core.status().config_notice.is_some());
+    let out =
+        futures::executor::block_on(core.dispatch("system".into(), "\"ping\"".into())).unwrap();
+    assert_eq!(out, "\"pong\"");
+    eventually(|| {
+        core.status()
+            .modules
+            .iter()
+            .any(|m| m.id == "system" && m.state == "running")
+    });
+    core.shutdown();
+}
+
+fn config_check(core: &NavoriCore) -> CheckView {
+    core.doctor()
+        .into_iter()
+        .find(|check| check.name == "config")
+        .unwrap()
 }
 
 #[test]
@@ -247,4 +426,258 @@ fn doctor_reports_a_healthy_core() {
     }
     eventually(|| core.doctor().iter().all(|c| c.ok));
     core.shutdown();
+}
+
+const PAUSE_SENTENCE: &str =
+    "Journal cleanup is paused until the file is fixed and Navori is reopened.";
+
+fn seed_event_from_forty_days_ago(home: &tempfile::TempDir) {
+    let uid = std::os::unix::fs::MetadataExt::uid(&std::fs::metadata(home.path()).unwrap());
+    let paths = Paths::new(Profile::Dev, home.path(), uid);
+    let store = Store::open(&paths.db_file, &paths.backups_dir).unwrap();
+    let day_ms: i64 = 24 * 60 * 60 * 1000;
+    let now_ms = i64::try_from(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+    )
+    .unwrap();
+    store
+        .journal_append(&Event {
+            id: "old".into(),
+            ts_ms: now_ms - 40 * day_ms,
+            module: "test".into(),
+            kind: "seed".into(),
+            severity: Severity::Info,
+            summary: "old".into(),
+            payload: serde_json::json!(null),
+        })
+        .unwrap();
+}
+
+fn journal_has_old_event(core: &NavoriCore) -> bool {
+    core.status()
+        .recent_events
+        .iter()
+        .any(|event| event.id == "old")
+}
+
+fn old_event_is_deleted_within_one_second(core: &NavoriCore) {
+    let deadline = Instant::now() + Duration::from_secs(1);
+    while Instant::now() < deadline {
+        if !journal_has_old_event(core) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    panic!("the 40-day event was still in the journal");
+}
+
+fn old_event_stays_for_one_second(core: &NavoriCore) {
+    let deadline = Instant::now() + Duration::from_secs(1);
+    while Instant::now() < deadline {
+        assert!(journal_has_old_event(core), "the 40-day event was deleted");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn pause_is_reported(core: &NavoriCore) {
+    let notice = core.status().config_notice.unwrap();
+    assert!(
+        notice.message.contains(PAUSE_SENTENCE),
+        "{}",
+        notice.message
+    );
+    let check = config_check(core);
+    assert!(
+        check.detail.contains("Journal cleanup is paused"),
+        "{}",
+        check.detail
+    );
+}
+
+#[test]
+fn absent_retention_deletes_events_older_than_30_days() {
+    let bodies: [Option<&str>; 3] = [
+        None,
+        Some("log_level = \"info\"\n"),
+        Some("[journal]\n# retention_days = 365\n"),
+    ];
+    for body in bodies {
+        let home = home();
+        if let Some(body) = body {
+            write_config(&home, body);
+        }
+        seed_event_from_forty_days_ago(&home);
+        let (core, _) = start(&home);
+        old_event_is_deleted_within_one_second(&core);
+        core.shutdown();
+    }
+}
+
+#[test]
+fn a_broken_retention_or_file_keeps_old_events_and_says_the_sweep_is_paused() {
+    let bodies = [
+        "[journal]\nretention_days = 0\n",
+        "[journal]\nretention_days = \"365\"\n",
+        "journal = 3\n",
+        "log_level = \n",
+    ];
+    for body in bodies {
+        let home = home();
+        write_config(&home, body);
+        seed_event_from_forty_days_ago(&home);
+        let (core, _) = start(&home);
+        old_event_stays_for_one_second(&core);
+        pause_is_reported(&core);
+        core.shutdown();
+    }
+}
+
+#[test]
+fn a_valid_retention_keeps_what_it_says() {
+    let home = home();
+    write_config(&home, "[journal]\nretention_days = 90\n");
+    seed_event_from_forty_days_ago(&home);
+    let (core, _) = start(&home);
+    old_event_stays_for_one_second(&core);
+    core.shutdown();
+}
+
+#[test]
+fn a_bad_log_level_alone_does_not_pause_the_sweep() {
+    let home = home();
+    write_config(&home, "log_level = \"loud\"\n");
+    seed_event_from_forty_days_ago(&home);
+    let (core, _) = start(&home);
+    old_event_is_deleted_within_one_second(&core);
+    let notice = core
+        .status()
+        .config_notice
+        .expect("bad log level is a notice");
+    assert!(
+        !notice.message.contains(PAUSE_SENTENCE),
+        "{}",
+        notice.message
+    );
+    core.shutdown();
+}
+
+#[test]
+fn a_paused_sweep_leaves_other_modules_running() {
+    let home = home();
+    write_config(&home, "[journal]\nretention_days = 0\n");
+    let (core, _) = start(&home);
+    eventually(|| {
+        core.doctor()
+            .into_iter()
+            .any(|check| check.name == "modules" && check.ok)
+    });
+    let out =
+        futures::executor::block_on(core.dispatch("system".into(), "\"ping\"".into())).unwrap();
+    assert_eq!(out, "\"pong\"");
+    core.shutdown();
+}
+
+#[test]
+fn fixing_the_file_keeps_the_pause_until_the_next_start() {
+    let home = home();
+    write_config(&home, "[journal]\nretention_days = 0\n");
+    seed_event_from_forty_days_ago(&home);
+    let (core, _) = start(&home);
+    pause_is_reported(&core);
+    old_event_stays_for_one_second(&core);
+    write_config(&home, "[journal]\nretention_days = 30\n");
+    pause_is_reported(&core);
+    core.shutdown();
+
+    let (core, _) = start(&home);
+    assert!(core.status().config_notice.is_none());
+    old_event_is_deleted_within_one_second(&core);
+    core.shutdown();
+}
+
+fn snapshot_count(rec: &Recorder) -> usize {
+    rec.0.lock().unwrap().len()
+}
+
+fn wait_until_snapshots_are_quiet(rec: &Recorder) {
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let mut last = snapshot_count(rec);
+    let mut quiet_since = Instant::now();
+    while Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(20));
+        let count = snapshot_count(rec);
+        if count != last {
+            last = count;
+            quiet_since = Instant::now();
+            continue;
+        }
+        if quiet_since.elapsed() > Duration::from_millis(250) {
+            return;
+        }
+    }
+    panic!("snapshots did not stay quiet for over 250 ms");
+}
+
+fn ms_until_prune_snapshot(core: &NavoriCore, rec: &Recorder) -> u128 {
+    let before = snapshot_count(rec);
+    let started = Instant::now();
+    futures::executor::block_on(core.dispatch(
+        "system".into(),
+        r#"{"prune_journal":{"older_than_days":1}}"#.into(),
+    ))
+    .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while Instant::now() < deadline {
+        if snapshot_count(rec) > before {
+            return started.elapsed().as_millis();
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    panic!("prune_journal produced no snapshot");
+}
+
+#[test]
+fn snapshot_pushes_coalesce_at_33ms_with_the_panel_open_and_250ms_closed() {
+    let home = home();
+    let (core, rec) = start(&home);
+    wait_until_snapshots_are_quiet(&rec);
+    let closed = ms_until_prune_snapshot(&core, &rec);
+    assert!(
+        closed >= 240,
+        "a closed panel delivered the snapshot in {closed} ms"
+    );
+
+    wait_until_snapshots_are_quiet(&rec);
+    core.set_panel_visible(true);
+    let open = ms_until_prune_snapshot(&core, &rec);
+    assert!(
+        open < 200,
+        "an open panel delivered the snapshot in {open} ms"
+    );
+    core.shutdown();
+}
+
+#[test]
+fn a_system_wake_with_a_running_core_is_harmless() {
+    let home = home();
+    let (core, _) = start(&home);
+    core.system_did_wake();
+    let out =
+        futures::executor::block_on(core.dispatch("system".into(), "\"ping\"".into())).unwrap();
+    assert_eq!(out, "\"pong\"");
+    core.shutdown();
+}
+
+#[test]
+fn calling_shutdown_twice_is_harmless() {
+    let home = home();
+    let (core, _) = start(&home);
+    core.shutdown();
+    core.shutdown();
+    let err =
+        futures::executor::block_on(core.dispatch("system".into(), "\"ping\"".into())).unwrap_err();
+    assert_eq!(err, CoreError::ShutDown);
 }

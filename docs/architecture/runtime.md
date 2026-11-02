@@ -28,7 +28,7 @@ Not covered here: what each component is for (`system.md`), what is stored where
 
 **Start** (`NavoriCore::start`, called from `applicationDidFinishLaunching`):
 1. Resolve the Profile and paths; create the data and logs directories.
-2. Load `config.toml` — an invalid file falls back to defaults and is reported (ARCH-13); start file logging.
+2. Load `config.toml` — a missing file means defaults; a bad value falls back alone and the rest of the file is kept; a bad `journal` value, or a file that cannot be read or is not TOML, pauses the journal sweep and is reported (ARCH-13). Start is never aborted by the file; start file logging.
 3. Build the tokio runtime; open the Store (applying migrations, with a backup before upgrading existing data).
 4. Start the Kernel and its modules.
 5. Bind the IPC socket — it doubles as the single-instance lock: a live socket for the same Profile aborts start-up with "Navori (<profile>) is already running".
@@ -51,7 +51,7 @@ Not covered here: what each component is for (`system.md`), what is stored where
 | Runtime shutdown timeout | 1 s | `crates/ffi/src/lib.rs` |
 | Snapshot coalescing | 33 ms menu open · 250 ms menu closed | `crates/ffi/src/app.rs` |
 | IPC request line limit | 1 MiB (responses up to 16 MiB) | `crates/ipc/src/lib.rs` |
-| Journal retention sweep | at start, then every 6 h (retention from config, default 30 days) | `crates/kernel/src/system.rs` |
+| Journal retention sweep | Runs on the wait handle. A paused sweep arms no timer. Otherwise it runs at start, then 6 hours after the last sweep. Retention comes from config, default 30 days. A broken journal or a whole-file fallback pauses it until the next start. | `crates/kernel/src/system.rs` |
 
 ## Environments
 

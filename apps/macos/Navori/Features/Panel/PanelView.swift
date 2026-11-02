@@ -54,8 +54,8 @@ struct PanelView: View {
         if let unclean = store.snapshot?.lastUncleanExit {
             Banner(style: .warning, title: "Navori quit unexpectedly last time", message: unclean)
         }
-        if let configError = store.snapshot?.configError {
-            Banner(style: .warning, title: "config.toml is invalid — using defaults", message: configError)
+        if let notice = store.snapshot?.configNotice {
+            Banner(style: .warning, title: notice.title, message: notice.message)
         }
     }
 

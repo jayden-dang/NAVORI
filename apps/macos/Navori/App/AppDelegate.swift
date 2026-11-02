@@ -5,6 +5,7 @@ import os
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let store = CoreStore()
     private var statusBar: StatusBarController?
+    private var wakeObserver: WakeObserver?
     private lazy var settings = SettingsWindowController(store: store)
     private let log = Logger(subsystem: "dev.navori", category: "app")
 
@@ -12,6 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         log.info("launching \(AppEnvironment.displayName, privacy: .public) \(AppEnvironment.version, privacy: .public)")
         if !AppEnvironment.perfFlagWithoutHome {
             store.start()
+            wakeObserver = WakeObserver { [weak self] in
+                self?.store.systemDidWake()
+            }
         }
         statusBar = StatusBarController(
             store: store,
@@ -23,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        wakeObserver = nil
         store.stop()
     }
 
