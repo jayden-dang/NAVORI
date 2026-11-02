@@ -268,6 +268,203 @@ struct CascadeStateTests {
         #expect(state.openPath == [])
     }
 
+    @Test func down_and_up_wrap_through_rows_with_an_action() {
+        var state = CascadeState(root: Self.tree)
+        #expect(state.handle(.key(.down)).isEmpty)
+        #expect(state.selection == "core")
+        #expect(state.openPath == [])
+        #expect(state.handle(.key(.down)).isEmpty)
+        #expect(state.selection == "settings")
+        #expect(state.handle(.key(.down)).isEmpty)
+        #expect(state.selection == "quit")
+        #expect(state.handle(.key(.down)).isEmpty)
+        #expect(state.selection == "core")
+        #expect(state.handle(.key(.up)).isEmpty)
+        #expect(state.selection == "quit")
+        #expect(state.handle(.key(.up)).isEmpty)
+        #expect(state.selection == "settings")
+        #expect(state.handle(.key(.up)).isEmpty)
+        #expect(state.selection == "core")
+        #expect(state.handle(.key(.up)).isEmpty)
+        #expect(state.selection == "quit")
+
+        var nested = CascadeState(
+            root: [
+                CascadeNode(
+                    id: "core",
+                    children: [
+                        CascadeNode(id: "core.a", isActionable: true),
+                        CascadeNode(id: "core.b", isActionable: true),
+                    ]
+                ),
+                CascadeNode(id: "settings", isActionable: true),
+            ]
+        )
+        _ = nested.handle(.click(row: "core"))
+        #expect(nested.selection == "core")
+        #expect(nested.openPath == ["core"])
+        #expect(nested.handle(.key(.down)).isEmpty)
+        #expect(nested.selection == "core.a")
+        #expect(nested.openPath == ["core"])
+        #expect(nested.handle(.key(.down)).isEmpty)
+        #expect(nested.selection == "core.b")
+        #expect(nested.handle(.key(.down)).isEmpty)
+        #expect(nested.selection == "core.a")
+        #expect(nested.handle(.key(.up)).isEmpty)
+        #expect(nested.selection == "core.b")
+    }
+
+    @Test func down_skips_rows_with_no_action() {
+        let tree: [CascadeNode] = [
+            CascadeNode(
+                id: "core",
+                children: [CascadeNode(id: "core.a", isActionable: true)]
+            ),
+            CascadeNode(id: "heading"),
+            CascadeNode(id: "settings", isActionable: true),
+            CascadeNode(id: "quit", isActionable: true),
+        ]
+        var state = CascadeState(root: tree)
+        _ = state.handle(.key(.down))
+        #expect(state.selection == "core")
+        _ = state.handle(.key(.down))
+        #expect(state.selection == "settings")
+        _ = state.handle(.key(.down))
+        #expect(state.selection == "quit")
+        _ = state.handle(.key(.down))
+        #expect(state.selection == "core")
+        _ = state.handle(.key(.up))
+        #expect(state.selection == "quit")
+        _ = state.handle(.key(.up))
+        #expect(state.selection == "settings")
+        _ = state.handle(.key(.up))
+        #expect(state.selection == "core")
+    }
+
+    @Test func right_opens_the_submenu_and_moves_in() {
+        var state = CascadeState(root: Self.tree)
+        _ = state.handle(.key(.down))
+        #expect(state.selection == "core")
+        let opened = state.handle(.key(.right))
+        #expect(opened == [.open(row: "core")])
+        #expect(state.openPath == ["core"])
+        #expect(state.selection == "core.a")
+
+        var alreadyOpen = CascadeState(root: Self.tree)
+        _ = alreadyOpen.handle(.click(row: "core"))
+        #expect(alreadyOpen.selection == "core")
+        #expect(alreadyOpen.openPath == ["core"])
+        let moved = alreadyOpen.handle(.key(.right))
+        #expect(moved.isEmpty)
+        #expect(alreadyOpen.openPath == ["core"])
+        #expect(alreadyOpen.selection == "core.a")
+    }
+
+    @Test func left_closes_the_submenu_and_returns_to_its_row() {
+        var state = CascadeState(root: Self.tree)
+        _ = state.handle(.key(.down))
+        _ = state.handle(.key(.right))
+        #expect(state.selection == "core.a")
+        #expect(state.openPath == ["core"])
+        let closed = state.handle(.key(.left))
+        #expect(closed == [.close(depth: 1)])
+        #expect(state.openPath == [])
+        #expect(state.selection == "core")
+        let atRoot = state.handle(.key(.left))
+        #expect(atRoot.isEmpty)
+        #expect(state.openPath == [])
+        #expect(state.selection == "core")
+
+        _ = state.handle(.key(.right))
+        _ = state.handle(.key(.right))
+        #expect(state.openPath == ["core", "core.a"])
+        #expect(state.selection == "core.a.x")
+        let inner = state.handle(.key(.left))
+        #expect(inner == [.close(depth: 2)])
+        #expect(state.openPath == ["core"])
+        #expect(state.selection == "core.a")
+    }
+
+    @Test func return_does_what_a_click_on_the_selection_does() {
+        var viaKey = CascadeState(root: Self.tree)
+        _ = viaKey.handle(.key(.down))
+        #expect(viaKey.selection == "core")
+        let keyOpen = viaKey.handle(.key(.return))
+        var viaClick = CascadeState(root: Self.tree)
+        let clickOpen = viaClick.handle(.click(row: "core"))
+        #expect(keyOpen == clickOpen)
+        #expect(keyOpen == [.open(row: "core")])
+        #expect(viaKey.openPath == viaClick.openPath)
+        #expect(viaKey.selection == viaClick.selection)
+
+        var viaKeyQuit = CascadeState(root: Self.tree)
+        _ = viaKeyQuit.handle(.key(.down))
+        _ = viaKeyQuit.handle(.key(.down))
+        _ = viaKeyQuit.handle(.key(.down))
+        #expect(viaKeyQuit.selection == "quit")
+        let keyActivate = viaKeyQuit.handle(.key(.return))
+        var viaClickQuit = CascadeState(root: Self.tree)
+        let clickActivate = viaClickQuit.handle(.click(row: "quit"))
+        #expect(keyActivate == clickActivate)
+        #expect(keyActivate == [.activate(row: "quit")])
+        #expect(viaKeyQuit.openPath == [])
+        #expect(viaKeyQuit.selection == "quit")
+    }
+
+    @Test func escape_closes_the_deepest_panel() {
+        var state = CascadeState(root: Self.tree)
+        _ = state.handle(.click(row: "core"))
+        _ = state.handle(.click(row: "core.a"))
+        #expect(state.openPath == ["core", "core.a"])
+        #expect(state.selection == "core.a")
+        let first = state.handle(.key(.escape))
+        #expect(first == [.close(depth: 2)])
+        #expect(state.openPath == ["core"])
+        #expect(state.selection == "core.a")
+        let second = state.handle(.key(.escape))
+        #expect(second == [.close(depth: 1)])
+        #expect(state.openPath == [])
+        #expect(state.selection == "core")
+    }
+
+    @Test func escape_at_level_zero_closes_everything() {
+        var state = CascadeState(root: Self.tree)
+        _ = state.handle(.key(.down))
+        #expect(state.selection == "core")
+        #expect(state.openPath == [])
+        let effects = state.handle(.key(.escape))
+        #expect(effects == [.closeAll])
+        #expect(state.openPath == [])
+    }
+
+    @Test func a_real_pointer_move_after_keys_takes_the_one_selection() {
+        var state = CascadeState(root: Self.tree)
+        let parked = CGPoint(x: 10, y: 10)
+        _ = state.handle(.pointerOn(row: "core", at: parked, submenu: nil))
+        #expect(state.selection == "core")
+        _ = state.handle(.key(.down))
+        #expect(state.selection == "settings")
+        let moved = state.handle(
+            .pointerOn(row: "quit", at: CGPoint(x: 40, y: 40), submenu: nil)
+        )
+        #expect(moved == [.armHoverTimer])
+        #expect(state.selection == "quit")
+        #expect(state.openPath == [])
+    }
+
+    @Test func a_row_moving_under_a_still_pointer_does_not_take_a_keyboard_selection() {
+        var state = CascadeState(root: Self.tree)
+        let still = CGPoint(x: 10, y: 10)
+        _ = state.handle(.pointerOn(row: "core", at: still, submenu: nil))
+        #expect(state.selection == "core")
+        _ = state.handle(.key(.down))
+        #expect(state.selection == "settings")
+        let stolen = state.handle(.pointerOn(row: "quit", at: still, submenu: nil))
+        #expect(stolen.isEmpty)
+        #expect(state.selection == "settings")
+        #expect(state.openPath == [])
+    }
+
     private static let submenu = CGRect(x: 400, y: 100, width: 200, height: 200)
 
     private static let tree: [CascadeNode] = [

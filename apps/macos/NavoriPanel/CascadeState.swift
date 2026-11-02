@@ -59,8 +59,8 @@ public struct CascadeState: Sendable {
             return handleClick(row)
         case .hoverTimerFired:
             return handleHoverTimerFired()
-        case .key:
-            return []
+        case let .key(key):
+            return handleKey(key)
         case let .replaceTree(tree):
             return handleReplaceTree(tree)
         }
@@ -116,6 +116,57 @@ public struct CascadeState: Sendable {
         return apply(pendingRow, shouldOpen: true)
     }
 
+    private mutating func handleKey(_ key: CascadeKey) -> [CascadeEffect] {
+        switch key {
+        case .down:
+            return moveSelection(delta: 1)
+        case .up:
+            return moveSelection(delta: -1)
+        case .right:
+            return handleKeyRight()
+        case .left:
+            return handleKeyLeft()
+        case .return:
+            guard let selection else { return [] }
+            return handleClick(selection)
+        case .escape:
+            guard openPath.isEmpty == false else { return [.closeAll] }
+            return handleKeyLeft()
+        }
+    }
+
+    private mutating func moveSelection(delta: Int) -> [CascadeEffect] {
+        let rows = actionableIds(in: deepestPanel())
+        guard rows.isEmpty == false else { return [] }
+        let current: Int
+        if let selection, let index = rows.firstIndex(of: selection) {
+            current = index
+        } else {
+            current = delta > 0 ? -1 : rows.count
+        }
+        let next = ((current + delta) % rows.count + rows.count) % rows.count
+        selection = rows[next]
+        return []
+    }
+
+    private mutating func handleKeyRight() -> [CascadeEffect] {
+        guard let selection, let node = node(id: selection), mayOpen(node) else {
+            return []
+        }
+        let effects = apply(selection, shouldOpen: true)
+        if let first = actionableIds(in: node.children).first {
+            self.selection = first
+        }
+        return effects
+    }
+
+    private mutating func handleKeyLeft() -> [CascadeEffect] {
+        guard let owner = openPath.last else { return [] }
+        openPath.removeLast()
+        selection = owner
+        return [.close(depth: openPath.count + 1)]
+    }
+
     private mutating func handleReplaceTree(_ tree: [CascadeNode]) -> [CascadeEffect] {
         root = tree
         let keep = validOpenPrefix()
@@ -157,6 +208,19 @@ public struct CascadeState: Sendable {
 
     private func isActionable(_ node: CascadeNode) -> Bool {
         node.isActionable || node.children.isEmpty == false
+    }
+
+    private func actionableIds(in nodes: [CascadeNode]) -> [String] {
+        nodes.filter { isActionable($0) }.map(\.id)
+    }
+
+    private func deepestPanel() -> [CascadeNode] {
+        var rows = root
+        for id in openPath {
+            guard let node = rows.first(where: { $0.id == id }) else { return rows }
+            rows = node.children
+        }
+        return rows
     }
 
     private func mayOpen(_ node: CascadeNode) -> Bool {
