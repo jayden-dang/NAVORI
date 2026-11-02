@@ -155,12 +155,12 @@ _Requirements: AWAKE-12.12_
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1: Write failing tests** on paused tokio time with `FakePower`: `a_one_hour_lease_holds_one_system_assertion_with_the_given_name`, `two_duration_requests_keep_one_lease_and_restart_the_hour`, `the_lease_ends_at_its_deadline_and_releases_the_assertion`, `with_the_menu_closed_a_lease_ends_within_30_seconds_of_its_deadline`, `sleeping_past_the_deadline_ends_the_lease_on_wake` (a wall-clock jump plus `Scheduler` wake pulse), `sleep_time_is_subtracted_from_the_duration` (a jump before the deadline leaves the absolute deadline unchanged), `a_zero_or_over_7_day_duration_is_invalid`, `status_answers_the_state`.
+- [x] **Step 1: Write failing tests** on paused tokio time with `FakePower`: `a_one_hour_lease_holds_one_system_assertion_with_the_given_name`, `two_duration_requests_keep_one_lease_and_restart_the_hour`, `the_lease_ends_at_its_deadline_and_releases_the_assertion`, `with_the_menu_closed_a_lease_ends_within_30_seconds_of_its_deadline`, `sleeping_past_the_deadline_ends_the_lease_on_wake` (a wall-clock jump plus `Scheduler` wake pulse), `sleep_time_is_subtracted_from_the_duration` (a jump before the deadline leaves the absolute deadline unchanged), `a_zero_or_over_7_day_duration_is_invalid`, `status_answers_the_state`.
 Run: `cargo nextest run -p navori-mod-awake --test duration` — expect: crate does not exist.
-- [ ] **Step 2: Implement** the crate. `actor.rs` computes `let deadline = self.deadline();` before `select!`, ignores `Wake::PanelChanged`, runs `settle(now)`, then `apply`, at the top of every loop turn, and calls `update_state` only when `AwakeState` changed. `Reconciler::apply` computes from its guard fields each call, and uses explicit `release()`. Add `"modules/awake"` to workspace `members` and `navori-mod-awake` to `[workspace.dependencies]`.
+- [x] **Step 2: Implement** the crate. `actor.rs` computes `let deadline = self.deadline();` before `select!`, ignores `Wake::PanelChanged`, runs `settle(now)`, then `apply`, at the top of every loop turn, and calls `update_state` only when `AwakeState` changed. `Reconciler::apply` computes from its guard fields each call, and uses explicit `release()`. Add `"modules/awake"` to workspace `members` and `navori-mod-awake` to `[workspace.dependencies]`.
 Run: `cargo nextest run -p navori-mod-awake --test duration` — expect: pass.
-- [ ] **Step 3: Run** `cargo xtask check-deps` — expect: pass with no `xtask` edit.
-- [ ] **Step 4: Commit** `git commit -m "feat(awake): keep the Mac awake for a fixed time"`
+- [x] **Step 3: Run** `cargo xtask check-deps` — expect: pass with no `xtask` edit.
+- [x] **Step 4: Commit** `git commit -m "feat(awake): keep the Mac awake for a fixed time"`
 
 _Requirements: AWAKE-1.1, AWAKE-1.2, AWAKE-1.3, AWAKE-1.4, AWAKE-1.5, AWAKE-1.6, AWAKE-1.7_
 
