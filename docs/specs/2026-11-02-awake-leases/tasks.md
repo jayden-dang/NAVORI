@@ -130,11 +130,11 @@ Retrieval (`load-subgraph`, schema 1.1, recipe `fsubr-1.2`, run on the File Stru
 
 **Depends-on:** none
 
-- [ ] **Step 1: Write failing tests:** `refuse_still_refuses_every_kind`, `a_refused_kind_leaves_the_other_kind_held`, `allow_lifts_a_refusal`, `a_failing_release_returns_its_code_and_still_counts_the_release`, `panic_on_hold_panics_that_many_times_then_holds`, `list_calls_counts_each_list`, `fail_list_makes_a_snapshot_fail`, `close_makes_the_watcher_return_none`.
+- [x] **Step 1: Write failing tests:** `refuse_still_refuses_every_kind`, `a_refused_kind_leaves_the_other_kind_held`, `allow_lifts_a_refusal`, `a_failing_release_returns_its_code_and_still_counts_the_release`, `panic_on_hold_panics_that_many_times_then_holds`, `list_calls_counts_each_list`, `fail_list_makes_a_snapshot_fail`, `close_makes_the_watcher_return_none`.
 Run: `cargo nextest run -p navori-macos --test fakes` — expect: no such method.
-- [ ] **Step 2: Implement.** `refuse` keeps its meaning. A release closure returns `PowerError::ReleaseFailed { code }` while `fail_release` is set.
+- [x] **Step 2: Implement.** `refuse` keeps its meaning. A release closure returns `PowerError::ReleaseFailed { code }` while `fail_release` is set.
 Run: `cargo nextest run -p navori-macos` — expect: pass, including `crates/macos/tests/power.rs` unedited.
-- [ ] **Step 3: Commit** `git commit -m "test(macos): let the fakes refuse one kind, recover, and fail a release"`
+- [x] **Step 3: Commit** `git commit -m "test(macos): let the fakes refuse one kind, recover, and fail a release"`
 
 _Requirements: AWAKE-12.12_
 
