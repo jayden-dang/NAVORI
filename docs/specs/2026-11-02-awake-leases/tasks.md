@@ -180,11 +180,11 @@ _Requirements: AWAKE-1.1, AWAKE-1.2, AWAKE-1.3, AWAKE-1.4, AWAKE-1.5, AWAKE-1.6,
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Write failing tests:** `an_until_off_lease_has_no_deadline_and_holds_past_any_hour`, `until_off_replaces_a_duration_lease`, `a_duration_request_replaces_an_until_off_lease`, `release_all_ends_every_lease_and_releases_the_assertion`, `the_action_catalog_has_no_pause_and_no_sleep_action` (reads `AwakeAction::catalog()` names), `release_all_is_the_only_catalog_action_for_ending_manual_leases` (the `display` Action joins that list in Task 11).
+- [x] **Step 1: Write failing tests:** `an_until_off_lease_has_no_deadline_and_holds_past_any_hour`, `until_off_replaces_a_duration_lease`, `a_duration_request_replaces_an_until_off_lease`, `release_all_ends_every_lease_and_releases_the_assertion`, `the_action_catalog_has_no_pause_and_no_sleep_action` (reads `AwakeAction::catalog()` names), `release_all_is_the_only_catalog_action_for_ending_manual_leases` (the `display` Action joins that list in Task 11).
 Run: `cargo nextest run -p navori-mod-awake --test manual` — expect: no such variant.
-- [ ] **Step 2: Implement.**
+- [x] **Step 2: Implement.**
 Run: same command — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(awake): hold until turned off and release everything"`
+- [x] **Step 3: Commit** `git commit -m "feat(awake): hold until turned off and release everything"`
 
 _Requirements: AWAKE-2.1, AWAKE-2.2, AWAKE-2.5, AWAKE-2.6, AWAKE-2.7_
 
@@ -204,12 +204,12 @@ _Requirements: AWAKE-2.1, AWAKE-2.2, AWAKE-2.5, AWAKE-2.6, AWAKE-2.7_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Write failing tests** in `crates/ffi/tests/core.rs`: `the_snapshot_carries_awake_after_a_hold`, `an_idle_core_reports_a_passing_awake_row_and_keeps_the_five_others`, `a_stray_awake_table_in_config_raises_no_notice`, `an_idle_core_holds_no_assertion` (the snapshot's `system_held` is false and status answers no Leases), `the_system_module_still_runs_beside_awake`, `a_lease_in_the_dev_profile_is_absent_from_the_release_profile` (two cores on one home, each with its own socket and database).
+- [x] **Step 1: Write failing tests** in `crates/ffi/tests/core.rs`: `the_snapshot_carries_awake_after_a_hold`, `an_idle_core_reports_a_passing_awake_row_and_keeps_the_five_others`, `a_stray_awake_table_in_config_raises_no_notice`, `an_idle_core_holds_no_assertion` (the snapshot's `system_held` is false and status answers no Leases), `the_system_module_still_runs_beside_awake`, `a_lease_in_the_dev_profile_is_absent_from_the_release_profile` (two cores on one home, each with its own socket and database).
 Run: `cargo nextest run -p navori-ffi --test core` — expect: no field `awake`.
-- [ ] **Step 2: Implement.** `navori-macos` goes under `[dev-dependencies]` with `fake`; `Platform::mac()` lives in the Module. `From<AwakeState> for AwakeView` destructures with no `..`. `awake_view` deserializes `Kernel::state("awake")` and returns `None` when that fails. Name the assertion `Navori: keeping this Mac awake` or `Navori Dev: keeping this Mac awake` by Profile. Add the `awake` row after `modules`.
+- [x] **Step 2: Implement.** `navori-macos` goes under `[dev-dependencies]` with `fake`; `Platform::mac()` lives in the Module. `From<AwakeState> for AwakeView` destructures with no `..`. `awake_view` deserializes `Kernel::state("awake")` and returns `None` when that fails. Name the assertion `Navori: keeping this Mac awake` or `Navori Dev: keeping this Mac awake` by Profile. Add the `awake` row after `modules`.
 Run: `cargo nextest run -p navori-ffi` and `cargo nextest run -p navori-cli` — expect: pass, with no other test edited.
-- [ ] **Step 3: Verify** `cargo tree -p navori-mod-awake | grep -c uniffi` — expect: `0`. `crates/kernel/tests/kernel.rs` still passes unedited, which guards restart with backoff.
-- [ ] **Step 4: Commit** `git commit -m "feat(ffi): register Awake and carry its record on the snapshot"`
+- [x] **Step 3: Verify** `cargo tree -p navori-mod-awake | grep -c uniffi` — expect: `0`. `crates/kernel/tests/kernel.rs` still passes unedited, which guards restart with backoff.
+- [x] **Step 4: Commit** `git commit -m "feat(ffi): register Awake and carry its record on the snapshot"`
 
 _Requirements: AWAKE-5.13, AWAKE-10.1, AWAKE-10.2, AWAKE-10.3, AWAKE-10.4, AWAKE-10.6, AWAKE-12.1, AWAKE-12.2, AWAKE-12.3, AWAKE-12.4, AWAKE-12.10, AWAKE-12.11_
 
