@@ -7,8 +7,12 @@ public enum StatusPanelClickPolicy {
     /// them here races mouse-up and re-opens the panel.
     public static func shouldDismissPanel(
         clickScreenPoint: CGPoint,
-        statusButtonScreenFrame: CGRect
+        statusButtonScreenFrame: CGRect,
+        cascadeFrames: [CGRect]
     ) -> Bool {
-        !statusButtonScreenFrame.contains(clickScreenPoint)
+        if statusButtonScreenFrame.contains(clickScreenPoint) {
+            return false
+        }
+        return !cascadeFrames.contains { $0.contains(clickScreenPoint) }
     }
 }

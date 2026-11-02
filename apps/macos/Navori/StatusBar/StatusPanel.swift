@@ -92,7 +92,8 @@ final class StatusPanel: NSPanel {
                     let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
                     guard StatusPanelClickPolicy.shouldDismissPanel(
                         clickScreenPoint: clickPoint,
-                        statusButtonScreenFrame: buttonFrame
+                        statusButtonScreenFrame: buttonFrame,
+                        cascadeFrames: []
                     ) else { return }
                 }
                 self.close()
