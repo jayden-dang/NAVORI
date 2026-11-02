@@ -152,11 +152,11 @@ _Requirements: MENU-9.2, MENU-9.3, MENU-G9_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Write failing tests**, with literal expected frames: with `visible` (0, 0, 1800, 900), parent (1000, 400, 360, 300), row with `maxY` 650 and `size` (360, 200): `a_submenu_opens_to_the_right_of_its_parent_aligned_to_its_row` expects (1364, 450, 360, 200). With `visible` width 1500: `a_submenu_that_would_cross_the_right_edge_opens_on_the_left` expects x 636. `a_submenu_near_the_bottom_shifts_up_to_stay_on_screen` and `a_submenu_taller_than_the_screen_is_limited_to_the_visible_height`. For the diagonal, `a_point_toward_the_submenu_is_inside`, `a_point_moving_away_is_outside`, and `the_triangle_points_left_for_a_flipped_submenu`. For the policy, `a_click_inside_an_open_panel_does_not_dismiss` and `a_click_outside_every_panel_and_the_button_dismisses`; update the two existing tests with `cascadeFrames: []`.
-- [ ] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter NavoriPanelTests` — expect: does not compile, the new names do not exist.
-- [ ] **Step 3: Implement** the Produces list. `NavoriPanel` imports only CoreGraphics and Foundation.
-- [ ] **Step 4: Run** the same command — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(panel): place submenus and find the safe diagonal"`
+- [x] **Step 1: Write failing tests**, with literal expected frames: with `visible` (0, 0, 1800, 900), parent (1000, 400, 360, 300), row with `maxY` 650 and `size` (360, 200): `a_submenu_opens_to_the_right_of_its_parent_aligned_to_its_row` expects (1364, 450, 360, 200). With `visible` width 1500: `a_submenu_that_would_cross_the_right_edge_opens_on_the_left` expects x 636. `a_submenu_near_the_bottom_shifts_up_to_stay_on_screen` and `a_submenu_taller_than_the_screen_is_limited_to_the_visible_height`. For the diagonal, `a_point_toward_the_submenu_is_inside`, `a_point_moving_away_is_outside`, and `the_triangle_points_left_for_a_flipped_submenu`. For the policy, `a_click_inside_an_open_panel_does_not_dismiss` and `a_click_outside_every_panel_and_the_button_dismisses`; update the two existing tests with `cascadeFrames: []`.
+- [x] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter NavoriPanelTests` — expect: does not compile, the new names do not exist.
+- [x] **Step 3: Implement** the Produces list. `NavoriPanel` imports only CoreGraphics and Foundation.
+- [x] **Step 4: Run** the same command — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "feat(panel): place submenus and find the safe diagonal"`
 
 _Requirements: MENU-4.5, MENU-4.6, MENU-9.1, MENU-G3_
 
