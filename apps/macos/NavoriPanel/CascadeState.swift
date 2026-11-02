@@ -117,22 +117,31 @@ public struct CascadeState: Sendable {
     }
 
     private mutating func handleKey(_ key: CascadeKey) -> [CascadeEffect] {
+        var effects: [CascadeEffect] = []
+        if pendingRow != nil {
+            pendingRow = nil
+            effects.append(.cancelHoverTimer)
+        }
         switch key {
         case .down:
-            return moveSelection(delta: 1)
+            effects.append(contentsOf: moveSelection(delta: 1))
         case .up:
-            return moveSelection(delta: -1)
+            effects.append(contentsOf: moveSelection(delta: -1))
         case .right:
-            return handleKeyRight()
+            effects.append(contentsOf: handleKeyRight())
         case .left:
-            return handleKeyLeft()
+            effects.append(contentsOf: handleKeyLeft())
         case .return:
-            guard let selection else { return [] }
-            return handleClick(selection)
+            guard let selection else { return effects }
+            effects.append(contentsOf: handleClick(selection))
         case .escape:
-            guard openPath.isEmpty == false else { return [.closeAll] }
-            return handleKeyLeft()
+            if openPath.isEmpty {
+                effects.append(.closeAll)
+            } else {
+                effects.append(contentsOf: handleKeyLeft())
+            }
         }
+        return effects
     }
 
     private mutating func moveSelection(delta: Int) -> [CascadeEffect] {

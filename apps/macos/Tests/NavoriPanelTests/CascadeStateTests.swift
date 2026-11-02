@@ -465,6 +465,23 @@ struct CascadeStateTests {
         #expect(state.openPath == [])
     }
 
+    @Test func a_key_cancels_the_pending_hover() {
+        var state = CascadeState(root: Self.tree)
+        _ = state.handle(
+            .pointerOn(row: "core", at: CGPoint(x: 10, y: 10), submenu: nil)
+        )
+        #expect(state.selection == "core")
+        #expect(state.openPath == [])
+        let keyed = state.handle(.key(.down))
+        #expect(keyed == [.cancelHoverTimer])
+        #expect(state.selection == "settings")
+        #expect(state.openPath == [])
+        let timed = state.handle(.hoverTimerFired)
+        #expect(timed.isEmpty)
+        #expect(state.selection == "settings")
+        #expect(state.openPath == [])
+    }
+
     private static let submenu = CGRect(x: 400, y: 100, width: 200, height: 200)
 
     private static let tree: [CascadeNode] = [
