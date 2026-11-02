@@ -16,7 +16,7 @@ use tokio_util::sync::CancellationToken;
 use crate::bus::{EventBus, now_ms};
 use crate::module::{ActionError, Module, ModuleAction, ModuleConfig, ModuleCtx, Reply, Request};
 use crate::scheduler::{Scheduler, SystemClock, WallClock};
-use crate::system::System;
+use crate::system::{SweepPolicy, System};
 
 const INBOX_CAPACITY: usize = 256;
 /// A module that ran this long before crashing gets its restart budget back.
@@ -90,7 +90,7 @@ pub struct KernelBuilder {
     launchers: Vec<Launcher>,
     policy: RestartPolicy,
     dispatch_timeout: Duration,
-    retention_days: Arc<std::sync::atomic::AtomicU32>,
+    sweep_policy: Arc<Mutex<SweepPolicy>>,
     sections: serde_json::Map<String, Value>,
 }
 
@@ -111,8 +111,13 @@ impl KernelBuilder {
 
     /// Days of journal history the built-in `system` module keeps (minimum 1).
     pub fn journal_retention_days(self, days: u32) -> Self {
-        self.retention_days
-            .store(days.max(1), std::sync::atomic::Ordering::Relaxed);
+        *lock(&self.sweep_policy) = SweepPolicy::KeepDays(days.max(1));
+        self
+    }
+
+    /// Leave the built-in journal sweep paused for this process.
+    pub fn pause_journal_sweep(self) -> Self {
+        *lock(&self.sweep_policy) = SweepPolicy::Paused;
         self
     }
 
@@ -175,6 +180,7 @@ impl KernelBuilder {
         self.launchers
             .push(Box::new(move |policy, sections, issues| {
                 let config = module_config::<M>(sections, issues);
+                let _ = state_tx.send(module.initial_state());
                 let ctx = ModuleCtx::<M> {
                     inbox: inbox_rx,
                     state: state_tx,
@@ -275,7 +281,7 @@ impl Kernel {
             launchers: Vec::new(),
             policy: RestartPolicy::default(),
             dispatch_timeout: Duration::from_secs(30),
-            retention_days: system.retention_days.clone(),
+            sweep_policy: Arc::clone(&system.sweep_policy),
             sections: serde_json::Map::new(),
         }
         .register(system)

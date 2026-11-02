@@ -2,12 +2,12 @@
 #![allow(clippy::unwrap_used)] // helpers outside #[test] fns
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::time::{Duration, SystemTime};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use navori_kernel::{
-    ActionDoc, ActionError, DispatchError, Envelope, Kernel, Module, ModuleAction, ModuleConfig,
-    ModuleCtx, ModuleState, NoConfig, RestartPolicy, Risk, Severity, Wake,
+    ActionDoc, ActionError, DispatchError, Envelope, Event, Kernel, Module, ModuleAction,
+    ModuleConfig, ModuleCtx, ModuleState, NoConfig, RestartPolicy, Risk, Severity, Wake, WallClock,
 };
 use navori_store::Store;
 use serde::{Deserialize, Serialize};
@@ -866,5 +866,258 @@ async fn a_restart_keeps_the_module_fields_state_and_queued_requests() {
         kernel.state("keeper"),
         Some(json!({ "marker": 42, "runs": 2, "value": 6 }))
     );
+    kernel.shutdown().await;
+}
+
+const DAY: Duration = Duration::from_secs(24 * 60 * 60);
+const SIX_HOURS: Duration = Duration::from_secs(6 * 60 * 60);
+const ORIGIN_MS: u64 = 1_700_000_000_000;
+
+#[derive(Clone, Debug)]
+struct FakeClock {
+    millis: Arc<AtomicU64>,
+}
+
+impl FakeClock {
+    fn at(millis: u64) -> Self {
+        Self {
+            millis: Arc::new(AtomicU64::new(millis)),
+        }
+    }
+
+    fn advance(&self, by: Duration) {
+        let millis = u64::try_from(by.as_millis()).unwrap();
+        self.millis.fetch_add(millis, Ordering::SeqCst);
+    }
+}
+
+impl WallClock for FakeClock {
+    fn now(&self) -> SystemTime {
+        UNIX_EPOCH + Duration::from_millis(self.millis.load(Ordering::SeqCst))
+    }
+}
+
+fn seed_event(store: &Store, id: &str, age: Duration) {
+    let now_ms = i64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+    )
+    .unwrap();
+    let age_ms = i64::try_from(age.as_millis()).unwrap();
+    store
+        .journal_append(&Event {
+            id: id.into(),
+            ts_ms: now_ms - age_ms,
+            module: "test".into(),
+            kind: "seed".into(),
+            severity: Severity::Info,
+            summary: id.into(),
+            payload: json!(null),
+        })
+        .unwrap();
+}
+
+fn event_ids(kernel: &Kernel) -> Vec<String> {
+    kernel
+        .recent_events(50)
+        .unwrap()
+        .into_iter()
+        .map(|event| event.id)
+        .collect()
+}
+
+fn has_event(kernel: &Kernel, id: &str) -> bool {
+    event_ids(kernel).iter().any(|event| event == id)
+}
+
+fn sweep_has_run(kernel: &Kernel) -> bool {
+    kernel
+        .state("system")
+        .and_then(|state| state.get("last_prune_removed").cloned())
+        .is_some_and(|removed| !removed.is_null())
+}
+
+async fn drive_until(mut ready: impl FnMut() -> bool) {
+    for _ in 0..100 {
+        if ready() {
+            return;
+        }
+        tokio::task::yield_now().await;
+    }
+    panic!("condition not reached");
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_paused_sweep_deletes_nothing_at_start_or_after_six_hours() {
+    let store = Store::open_in_memory().unwrap();
+    seed_event(&store, "old", DAY * 40);
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = Kernel::builder_with_clock(store, Arc::new(clock.clone()))
+        .pause_journal_sweep()
+        .start();
+    for _ in 0..20 {
+        tokio::task::yield_now().await;
+    }
+    assert!(has_event(&kernel, "old"), "{:?}", event_ids(&kernel));
+
+    clock.advance(SIX_HOURS + Duration::from_secs(1));
+    tokio::time::advance(SIX_HOURS + Duration::from_secs(1)).await;
+    for _ in 0..20 {
+        tokio::task::yield_now().await;
+    }
+    assert!(has_event(&kernel, "old"), "{:?}", event_ids(&kernel));
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
+async fn a_paused_sweep_is_reported_in_state_as_soon_as_start_returns() {
+    let kernel = Kernel::builder(Store::open_in_memory().unwrap())
+        .pause_journal_sweep()
+        .start();
+    assert_eq!(
+        kernel.state("system"),
+        Some(json!({
+            "last_prune_removed": null,
+            "sweep_paused": true
+        }))
+    );
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
+async fn an_unset_builder_sweeps_at_30_days() {
+    let store = Store::open_in_memory().unwrap();
+    seed_event(&store, "old", DAY * 31);
+    seed_event(&store, "kept", DAY * 29);
+    let kernel = Kernel::builder(store).start();
+    for _ in 0..200 {
+        if !has_event(&kernel, "old") {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    let ids = event_ids(&kernel);
+    assert!(!ids.contains(&"old".to_owned()), "{ids:?}");
+    assert!(ids.contains(&"kept".to_owned()), "{ids:?}");
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
+async fn a_retention_below_one_is_raised_to_one() {
+    let store = Store::open_in_memory().unwrap();
+    seed_event(&store, "stale", DAY * 2);
+    seed_event(&store, "fresh", Duration::from_secs(12 * 60 * 60));
+    let kernel = Kernel::builder(store).journal_retention_days(0).start();
+    for _ in 0..200 {
+        if !has_event(&kernel, "stale") {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    let ids = event_ids(&kernel);
+    assert!(!ids.contains(&"stale".to_owned()), "{ids:?}");
+    assert!(ids.contains(&"fresh".to_owned()), "{ids:?}");
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_later_sweep_runs_six_hours_after_the_last() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel =
+        Kernel::builder_with_clock(Store::open_in_memory().unwrap(), Arc::new(clock.clone()))
+            .start();
+    drive_until(|| sweep_has_run(&kernel)).await;
+    seed_event(kernel.store(), "later", DAY * 40);
+
+    clock.advance(SIX_HOURS - Duration::from_secs(1));
+    tokio::time::advance(SIX_HOURS - Duration::from_secs(1)).await;
+    assert!(has_event(&kernel, "later"), "{:?}", event_ids(&kernel));
+
+    clock.advance(Duration::from_secs(1));
+    tokio::time::advance(Duration::from_secs(1)).await;
+    drive_until(|| !has_event(&kernel, "later")).await;
+    assert!(!has_event(&kernel, "later"), "{:?}", event_ids(&kernel));
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn one_long_sleep_gives_one_catch_up_sweep() {
+    let store = Store::open_in_memory().unwrap();
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = Kernel::builder_with_clock(store.clone(), Arc::new(clock.clone())).start();
+    drive_until(|| sweep_has_run(&kernel)).await;
+    seed_event(&store, "first", DAY * 40);
+
+    clock.advance(DAY * 3);
+    kernel.scheduler().wake_pulse();
+    drive_until(|| !has_event(&kernel, "first")).await;
+    assert!(!has_event(&kernel, "first"), "{:?}", event_ids(&kernel));
+
+    seed_event(&store, "second", DAY * 40);
+    assert!(has_event(&kernel, "second"), "{:?}", event_ids(&kernel));
+
+    clock.advance(SIX_HOURS - Duration::from_secs(1));
+    kernel.scheduler().wake_pulse();
+    for _ in 0..20 {
+        tokio::task::yield_now().await;
+    }
+    assert!(has_event(&kernel, "second"), "{:?}", event_ids(&kernel));
+
+    clock.advance(Duration::from_secs(1));
+    kernel.scheduler().wake_pulse();
+    drive_until(|| !has_event(&kernel, "second")).await;
+    assert!(!has_event(&kernel, "second"), "{:?}", event_ids(&kernel));
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
+async fn prune_journal_with_a_day_count_still_deletes_while_paused() {
+    let store = Store::open_in_memory().unwrap();
+    seed_event(&store, "old", DAY * 40);
+    seed_event(&store, "recent", DAY);
+    let kernel = Kernel::builder(store).pause_journal_sweep().start();
+    for _ in 0..40 {
+        assert!(has_event(&kernel, "old"), "{:?}", event_ids(&kernel));
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    let removed = kernel
+        .dispatch(Envelope {
+            module: "system".into(),
+            action: json!({ "prune_journal": { "older_than_days": 3 } }),
+        })
+        .await
+        .unwrap();
+    assert_eq!(removed, json!(1));
+    let ids = event_ids(&kernel);
+    assert!(!ids.contains(&"old".to_owned()), "{ids:?}");
+    assert!(ids.contains(&"recent".to_owned()), "{ids:?}");
+    kernel.shutdown().await;
+}
+
+#[tokio::test]
+async fn a_failed_sweep_keeps_the_module_running() {
+    let store = Store::open_in_memory().unwrap();
+    store.with_conn(|conn| {
+        conn.execute_batch("DROP TABLE events").unwrap();
+    });
+    let kernel = Kernel::builder(store).start();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let out = kernel
+        .dispatch(Envelope {
+            module: "system".into(),
+            action: json!("ping"),
+        })
+        .await
+        .unwrap();
+    assert_eq!(out, json!("pong"));
+    let system = kernel
+        .modules()
+        .into_iter()
+        .find(|module| module.id == "system")
+        .unwrap();
+    assert_eq!(system.restarts, 0);
+    assert_eq!(system.state, ModuleState::Running);
     kernel.shutdown().await;
 }

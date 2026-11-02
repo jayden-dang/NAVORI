@@ -1,13 +1,13 @@
 //! Built-in `system` module: liveness and journal retention.
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use navori_protocol::Risk;
 use serde::{Deserialize, Serialize};
 
 use crate::module::{ActionDoc, ActionError, Module, ModuleAction, ModuleCtx, NoConfig};
+use crate::scheduler::Wake;
 
 const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 const RETENTION_SWEEP: Duration = Duration::from_secs(6 * 60 * 60);
@@ -48,24 +48,38 @@ impl ModuleAction for SystemAction {
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct SystemState {
     pub last_prune_removed: Option<usize>,
+    pub sweep_paused: bool,
 }
 
-/// Journal retention is applied at start and then every few hours.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SweepPolicy {
+    KeepDays(u32),
+    Paused,
+}
+
+/// Journal retention runs at start and every six hours, unless the sweep is paused.
 #[derive(Debug, Clone)]
 pub struct System {
     /// Shared with the kernel builder so it can be configured after registration.
-    pub(crate) retention_days: Arc<AtomicU32>,
+    pub(crate) sweep_policy: Arc<Mutex<SweepPolicy>>,
 }
 
 impl Default for System {
     fn default() -> Self {
         Self {
-            retention_days: Arc::new(AtomicU32::new(30)),
+            sweep_policy: Arc::new(Mutex::new(SweepPolicy::KeepDays(30))),
         }
     }
 }
 
 impl System {
+    fn current_policy(&self) -> SweepPolicy {
+        *self
+            .sweep_policy
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+
     fn prune(ctx: &ModuleCtx<Self>, days: u32) -> Result<usize, ActionError> {
         let cutoff = crate::bus::now_ms() - i64::from(days) * DAY_MS;
         let removed = ctx
@@ -84,12 +98,18 @@ impl Module for System {
     type State = SystemState;
 
     fn initial_state(&self) -> SystemState {
-        SystemState::default()
+        SystemState {
+            last_prune_removed: None,
+            sweep_paused: self.current_policy() == SweepPolicy::Paused,
+        }
     }
 
     async fn run(&mut self, ctx: &mut ModuleCtx<Self>) -> anyhow::Result<()> {
-        let mut sweep = tokio::time::interval(RETENTION_SWEEP);
-        sweep.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        let mut wait = ctx.wait_handle();
+        let mut next_sweep = match self.current_policy() {
+            SweepPolicy::KeepDays(_) => Some(wait.now()),
+            SweepPolicy::Paused => None,
+        };
         loop {
             tokio::select! {
                 req = ctx.recv() => {
@@ -102,9 +122,15 @@ impl Module for System {
                         }
                     }
                 }
-                _ = sweep.tick() => {
-                    if let Err(e) = Self::prune(ctx, self.retention_days.load(Ordering::Relaxed)) {
-                        tracing::warn!(error = %e, "journal retention sweep failed");
+                wake = wait.wait_until(next_sweep) => {
+                    let Wake::Due = wake else {
+                        continue;
+                    };
+                    if let SweepPolicy::KeepDays(days) = self.current_policy() {
+                        if let Err(e) = Self::prune(ctx, days) {
+                            tracing::warn!(error = %e, "journal retention sweep failed");
+                        }
+                        next_sweep = Some(wait.now() + RETENTION_SWEEP);
                     }
                 }
             }
