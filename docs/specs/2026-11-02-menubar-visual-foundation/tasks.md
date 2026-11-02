@@ -361,10 +361,10 @@ _Requirements: MENU-1.2, MENU-1.3, MENU-1.5, MENU-1.6, MENU-1.7, MENU-1.9, MENU-
 
 **Depends-on:** Task 10
 
-- [ ] **Step 1: Implement** the banners above the Core row, startup first; change the `Banner` message from `.secondary` to `labelColor`, keeping `lineLimit(4)`; add no restart control. Level 0 re-fits when a banner appears.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand**: an invalid `config.toml` shows the config banner with its report; `kill -9` of a dev build then a relaunch shows the unclean-exit banner; a garbage file at `<temp home>/Library/Application Support/Navori Dev/navori.db`, with the binary launched directly under `NAVORI_PERF=1 NAVORI_PERF_HOME=<temp home>`, shows the startup banner with the `startup failed:` text. Each is readable on a bright background and offers no restart button.
-- [ ] **Step 4: Commit** `git commit -m "feat(shell): keep core problems readable on glass"`
+- [x] **Step 1: Implement** the banners above the Core row, startup first; change the `Banner` message from `.secondary` to `labelColor`, keeping `lineLimit(4)`; add no restart control. Level 0 re-fits when a banner appears.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 3: Check by hand**: an invalid `config.toml` shows the config banner with its report; `kill -9` of a dev build then a relaunch shows the unclean-exit banner; a garbage file at `<temp home>/Library/Application Support/Navori Dev/navori.db`, with the binary launched directly under `NAVORI_PERF=1 NAVORI_PERF_HOME=<temp home>`, shows the startup banner with the `startup failed:` text. Each is readable on a bright background and offers no restart button.
+- [x] **Step 4: Commit** `git commit -m "feat(shell): keep core problems readable on glass"`
 
 _Requirements: MENU-2.1, MENU-2.2, MENU-2.3, MENU-2.4, MENU-2.5_
 
