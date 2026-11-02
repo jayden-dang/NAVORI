@@ -470,6 +470,99 @@ async fn a_process_read_failure_during_restore_keeps_the_row_and_retries() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_failed_read_of_one_row_still_restores_the_other_lease() {
+    let mut rig = Rig::new();
+    open_session(&rig).await;
+    rig.advance(FIVE_SECONDS).await;
+    rig.dispatch(stop_session(SESSION)).await.unwrap();
+    command_process(&rig);
+    rig.dispatch(hold_command(COMMAND_PID)).await.unwrap();
+    assert_eq!(rows(&rig).len(), 2, "both leases are stored before close");
+    assert_eq!(rig.exits.tokens(COMMAND_PID).len(), 1);
+
+    rig.shutdown().await;
+    rig.processes.fail_entry(COMMAND_PID, ReadError::Denied);
+    rig.reopen().await;
+
+    let state = awake_state(&rig);
+    let stored = rows(&rig);
+    assert_eq!(stored.len(), 2, "the unreadable command stays stored");
+    assert!(
+        stored.iter().any(|row| row.kind == "command"),
+        "the command row is still in the table"
+    );
+    assert_eq!(
+        stored
+            .iter()
+            .find(|row| row.kind == "session")
+            .and_then(|row| row.stop_mark_us),
+        Some(STOP_MARK_US),
+        "the session row keeps its stop mark"
+    );
+    assert_eq!(lease_count(&state), 1, "the readable session is held");
+    assert_eq!(state["leases"][0]["key"], format!("session:{SESSION}"));
+    assert_eq!(state["leases"][0]["pid"], CLAUDE);
+    assert_eq!(state["leases"][0]["stopped"], true);
+    assert_eq!(state["system_held"], true);
+    assert_eq!(state["problem"], json!(PLATFORM_PROBLEM));
+    assert_held_system(&rig);
+    assert!(
+        rig.exits.watched().contains(&CLAUDE),
+        "the live session stays watched"
+    );
+    assert!(
+        !rig.exits.watched().contains(&COMMAND_PID),
+        "the failed read leaves that row unwatched"
+    );
+    assert!(ended(&rig).is_empty(), "a failed read is not an end");
+
+    rig.advance(RETRY - Duration::from_secs(1)).await;
+    rig.idle().await;
+    assert_eq!(
+        rig.exits.tokens(COMMAND_PID).len(),
+        2,
+        "the retry waits the full minute"
+    );
+    assert_eq!(lease_count(&awake_state(&rig)), 1);
+    assert_eq!(awake_state(&rig)["leases"][0]["stopped"], true);
+
+    rig.advance(Duration::from_secs(1)).await;
+    for _ in 0..50 {
+        if rig.exits.tokens(COMMAND_PID).len() >= 3 {
+            break;
+        }
+        rig.idle().await;
+    }
+    let retried = awake_state(&rig);
+    assert_eq!(
+        rig.exits.tokens(COMMAND_PID).len(),
+        3,
+        "the minute timer reads the unreadable row again"
+    );
+    assert_eq!(
+        rows(&rig).len(),
+        2,
+        "the retry still keeps the unreadable row"
+    );
+    assert_eq!(lease_count(&retried), 1, "the session stays held");
+    assert_eq!(retried["leases"][0]["key"], format!("session:{SESSION}"));
+    assert_eq!(
+        retried["leases"][0]["stopped"], true,
+        "the retry must not clear the stored stop mark"
+    );
+    assert_eq!(retried["system_held"], true);
+    assert_eq!(retried["problem"], json!(PLATFORM_PROBLEM));
+    assert_held_system(&rig);
+    assert!(
+        rig.exits.watched().contains(&CLAUDE),
+        "the session watch survives the retry"
+    );
+    assert!(!rig.exits.watched().contains(&COMMAND_PID));
+    assert!(ended(&rig).is_empty());
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
 async fn another_users_process_with_the_stored_start_is_restored() {
     let mut rig = Rig::new();
     command_process(&rig);

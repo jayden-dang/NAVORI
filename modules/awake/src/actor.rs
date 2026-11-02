@@ -692,10 +692,12 @@ impl Awake {
         }
         let mut kept = Vec::new();
         let mut armed = Vec::new();
+        let mut retry = false;
         for row in rows {
             match self.classify_row(ctx, now, &row, &mut armed) {
                 RowFate::Keep(id) => kept.push((row, id)),
                 RowFate::Drop => {}
+                RowFate::Retry => retry = true,
                 RowFate::Halt => {
                     self.disarm_unheld(&armed);
                     return;
@@ -739,6 +741,9 @@ impl Awake {
             }
         }
         self.disarm_unheld(&armed);
+        if retry {
+            return;
+        }
         self.finish_restore();
     }
 
@@ -768,7 +773,7 @@ impl Awake {
             }
             Ok(ProcessClass::Unreadable) => {
                 self.note_platform(now, "reading the process failed");
-                RowFate::Halt
+                RowFate::Retry
             }
             Ok(ProcessClass::Live(live) | ProcessClass::OtherUser(live)) if live == id => {
                 RowFate::Keep(live)
@@ -790,6 +795,10 @@ impl Awake {
                 let Some(session_id) = row.session_id.clone() else {
                     return false;
                 };
+                // A repeat hold clears the stop mark and the next check.
+                if self.table.session_process(&session_id).is_some() {
+                    return true;
+                }
                 let Some(harness) = row.harness else {
                     return false;
                 };
@@ -841,6 +850,8 @@ impl Awake {
 enum RowFate {
     Keep(ProcId),
     Drop,
+    /// This row stays stored. Other rows in the pass are still finished.
+    Retry,
     Halt,
 }
 
