@@ -13,6 +13,7 @@ final class StatusPanel: NSPanel {
     private var outsideClickMonitor: Any?
     private var frameLink: CADisplayLink?
     private var frameCallback: (@MainActor () -> Void)?
+    private var refitPending = false
     private static let width: CGFloat = 360
     private static let maxHeight: CGFloat = 560
 
@@ -39,6 +40,10 @@ final class StatusPanel: NSPanel {
         animationBehavior = .utilityWindow
 
         let hosting = MenuHostingView(rootView: self.content.root.environment(self.cascade))
+        hosting.sizingOptions = [.intrinsicContentSize]
+        hosting.onFittingSizeChange = { [weak self] in
+            self?.scheduleRefit()
+        }
         contentView = GlassSurfaceView(content: hosting)
     }
 
@@ -51,8 +56,8 @@ final class StatusPanel: NSPanel {
     func show(relativeTo button: NSStatusBarButton, onFirstFrame: (@MainActor () -> Void)? = nil) {
         cascade.reset()
         guard let buttonWindow = button.window else { return }
-        let fitting = contentView?.fittingSize.height ?? 420
-        let height = min(max(fitting, 1), Self.maxHeight)
+        contentView?.layoutSubtreeIfNeeded()
+        let height = fittedHeight()
         let anchor = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let screen = buttonWindow.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
 
@@ -70,6 +75,7 @@ final class StatusPanel: NSPanel {
             frame = NSRect(x: fx, y: visible.maxY - height - 6, width: Self.width, height: height)
         }
         setFrame(frame, display: true)
+        scheduleRefit()
 
         frameCallback = onFirstFrame
         onVisibility(true)
@@ -111,6 +117,31 @@ final class StatusPanel: NSPanel {
     override func resignKey() {
         super.resignKey()
         close()
+    }
+
+    private func fittedHeight() -> CGFloat {
+        let fitting = contentView?.fittingSize.height ?? 420
+        return min(max(fitting, 1), Self.maxHeight)
+    }
+
+    private func scheduleRefit() {
+        guard !refitPending else { return }
+        refitPending = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.refitPending = false
+            self.refitKeepingTop()
+        }
+    }
+
+    private func refitKeepingTop() {
+        guard isVisible else { return }
+        let height = fittedHeight()
+        guard abs(height - frame.height) > 0.5 else { return }
+        var next = frame
+        next.origin.y = frame.maxY - height
+        next.size.height = height
+        setFrame(next, display: true)
     }
 
     private func armFrameLink() {
@@ -168,9 +199,21 @@ final class StatusPanel: NSPanel {
 }
 
 private final class MenuHostingView<Content: View>: NSHostingView<Content> {
+    var onFittingSizeChange: (() -> Void)?
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         super.hitTest(point) ?? self
+    }
+
+    override func layout() {
+        super.layout()
+        onFittingSizeChange?()
+    }
+
+    override func invalidateIntrinsicContentSize() {
+        super.invalidateIntrinsicContentSize()
+        onFittingSizeChange?()
     }
 }

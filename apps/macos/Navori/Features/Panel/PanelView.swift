@@ -1,3 +1,4 @@
+import AppKit
 import NavoriPanel
 import SwiftUI
 
@@ -16,7 +17,8 @@ struct PanelView: View {
             MenuRowView(row: quitRow, cascade: cascade)
         }
         .padding(5)
-        .frame(width: 360)
+        .frame(width: 360, alignment: .topLeading)
+        .fixedSize(horizontal: true, vertical: true)
     }
 
     @ViewBuilder
@@ -184,7 +186,7 @@ struct Banner: View {
                 .foregroundStyle(style == .error ? .red : .orange)
             Text(message)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color(nsColor: .labelColor))
                 .lineLimit(4)
                 .textSelection(.enabled)
         }
