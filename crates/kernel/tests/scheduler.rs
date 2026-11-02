@@ -368,3 +368,118 @@ async fn wait_handles_add_no_runtime_task() {
     assert_eq!(handles.len(), 10);
     kernel.shutdown().await;
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_closed_menu_holds_timer_wakes_30_seconds_apart() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+
+    let first = wall(ORIGIN_MS + 1_000);
+    {
+        let mut wait = std::pin::pin!(handle.wait_until(Some(first)));
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+        clock.advance(Duration::from_secs(1));
+        tokio::time::advance(Duration::from_secs(1)).await;
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    }
+
+    let second = wall(ORIGIN_MS + 2_000);
+    let mut wait = std::pin::pin!(handle.wait_until(Some(second)));
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    clock.advance(Duration::from_secs(1));
+    tokio::time::advance(Duration::from_secs(1)).await;
+    assert_eq!(
+        futures::poll!(wait.as_mut()),
+        Poll::Pending,
+        "second Due arrived 1s after the first"
+    );
+
+    clock.advance(Duration::from_secs(28));
+    tokio::time::advance(Duration::from_secs(28)).await;
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+
+    clock.advance(Duration::from_secs(1));
+    tokio::time::advance(Duration::from_secs(1)).await;
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_open_menu_applies_no_gap() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+
+    let first = wall(ORIGIN_MS + 1_000);
+    {
+        let mut wait = std::pin::pin!(handle.wait_until(Some(first)));
+        clock.advance(Duration::from_secs(1));
+        tokio::time::advance(Duration::from_secs(1)).await;
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    }
+
+    kernel.scheduler().set_panel_visible(true);
+    let second = wall(ORIGIN_MS + 2_000);
+    let mut wait = std::pin::pin!(handle.wait_until(Some(second)));
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    clock.advance(Duration::from_secs(1));
+    tokio::time::advance(Duration::from_secs(1)).await;
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_first_timer_wake_is_not_delayed() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+    let deadline = wall(ORIGIN_MS + 1_000);
+    let mut wait = std::pin::pin!(handle.wait_until(Some(deadline)));
+
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    clock.advance(Duration::from_secs(1));
+    tokio::time::advance(Duration::from_secs(1)).await;
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn dropping_a_wait_keeps_the_record_of_the_previous_timer_wake() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+
+    let first = wall(ORIGIN_MS + 1_000);
+    {
+        let mut wait = std::pin::pin!(handle.wait_until(Some(first)));
+        clock.advance(Duration::from_secs(1));
+        tokio::time::advance(Duration::from_secs(1)).await;
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    }
+
+    let second = wall(ORIGIN_MS + 2_000);
+    {
+        let mut dropped = std::pin::pin!(handle.wait_until(Some(second)));
+        assert_eq!(futures::poll!(dropped.as_mut()), Poll::Pending);
+    }
+
+    let mut wait = std::pin::pin!(handle.wait_until(Some(second)));
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    clock.advance(Duration::from_secs(1));
+    tokio::time::advance(Duration::from_secs(1)).await;
+    assert_eq!(
+        futures::poll!(wait.as_mut()),
+        Poll::Pending,
+        "second Due arrived 1s after the first"
+    );
+
+    clock.advance(Duration::from_secs(28));
+    tokio::time::advance(Duration::from_secs(28)).await;
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+
+    clock.advance(Duration::from_secs(1));
+    tokio::time::advance(Duration::from_secs(1)).await;
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    kernel.shutdown().await;
+}

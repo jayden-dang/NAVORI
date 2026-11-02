@@ -88,6 +88,8 @@ impl Scheduler {
     }
 }
 
+const CLOSED_MENU_TIMER_GAP: Duration = Duration::from_secs(30);
+
 pub struct WaitHandle {
     scheduler: Scheduler,
     inputs: watch::Receiver<Inputs>,
@@ -119,6 +121,7 @@ impl WaitHandle {
             let remaining = deadline
                 .duration_since(self.now())
                 .unwrap_or(Duration::ZERO);
+            let park = remaining.max(self.closed_menu_gap());
             tokio::select! {
                 biased;
                 changed = self.inputs.changed() => {
@@ -126,7 +129,7 @@ impl WaitHandle {
                         std::future::pending::<()>().await;
                     }
                 }
-                () = tokio::time::sleep(remaining) => {
+                () = tokio::time::sleep(park) => {
                     if self.now() >= deadline {
                         self.last_timer_wake = Some(tokio::time::Instant::now());
                         return Wake::Due;
@@ -134,6 +137,16 @@ impl WaitHandle {
                 }
             }
         }
+    }
+
+    fn closed_menu_gap(&self) -> Duration {
+        if self.panel_visible() {
+            return Duration::ZERO;
+        }
+        let Some(last) = self.last_timer_wake else {
+            return Duration::ZERO;
+        };
+        CLOSED_MENU_TIMER_GAP.saturating_sub(last.elapsed())
     }
 
     pub fn panel_visible(&self) -> bool {
