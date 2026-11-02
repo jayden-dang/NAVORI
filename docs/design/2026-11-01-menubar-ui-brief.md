@@ -5,7 +5,7 @@
 
 ## Decision
 
-**Direction A — "Menu" (NSMenu + cascading submenus), variant A5.** A was chosen over B (Triage tabs) and C (per-project Cockpit), then refined over 4 review rounds.
+**Direction A — "Menu" (cascading submenus), variant A5.** A was chosen over B (Triage tabs) and C (per-project Cockpit), then refined over 4 review rounds. The menu is drawn on an `NSPanel`, not an `NSMenu` (Amendment 10).
 
 The user's words (verbatim, in order; the Vietnamese quotes are kept as-is, with an English translation appended):
 - "Tôi muốn đi theo hướng của A — nhưng A chưa đủ tốt, chưa đủ clean và modern" (EN: "I want to go with direction A — but A isn't good enough yet, not clean and modern enough")
@@ -17,7 +17,7 @@ The user's words (verbatim, in order; the Vietnamese quotes are kept as-is, with
 
 ## Grounding
 
-- **Token source of record:** macOS system semantics — `labelColor`, `secondaryLabelColor`, `tertiaryLabelColor`, `separatorColor`, `controlAccentColor` / `selectedContentBackgroundColor`, `systemGreen/Red/Orange/Blue`; system menu material. The repo has no `docs/standards/design-tokens.md` yet; no custom tokens are proposed.
+- **Token source of record:** macOS system semantics — `labelColor`, `secondaryLabelColor`, `tertiaryLabelColor`, `separatorColor`, `controlAccentColor` / `selectedContentBackgroundColor`, `systemGreen/Red/Orange/Blue`; glass surface per Amendment 11. The repo has no `docs/standards/design-tokens.md` yet; no custom tokens are proposed.
 - **Existing kit** (`apps/macos/Navori`): `Banner`, `SectionTitle`, status dot (`Circle().fill`), borderless buttons. Ladder used below: `rung 1 — <native control>` = built-in AppKit/SwiftUI; `rung 2 — <kit piece>` = an existing Navori component; `new (rung 7)` = a new component, with the reason given.
 
 ## Job (the working screen)
@@ -28,7 +28,7 @@ The user's words (verbatim, in order; the Vietnamese quotes are kept as-is, with
 
 ## Signature
 
-**Every detail is one hover away** — the level-0 menu contains only *Ask → Needs you (inbox) → 3 one-line feature rows*; everything else lives in real macOS submenus that flip left near the screen edge, at most 3 levels deep.
+**Every detail is one hover away** — the level-0 menu contains only *Ask → Needs you (inbox) → 3 one-line feature rows*; everything else lives in submenus that flip left near the screen edge, at most 3 levels deep.
 
 ---
 
@@ -45,15 +45,16 @@ The user's words (verbatim, in order; the Vietnamese quotes are kept as-is, with
   5. Separator → `Settings… ⌘,` · `About Navori` · `Quit Navori ⌘Q`.
   - No account, API quota, or "updated" row at level 0.
 - **Components:**
-  - Menu + submenu cascade: `rung 1 — NSMenu / NSMenuItem.submenu` (needs a spike, see Open questions).
-  - Custom row: `new (rung 7) — MenuRowView` (SwiftUI in `NSMenuItem.view`): 20pt lead, title, end value, chevron, up to 2 secondary lines, inline action area. Reason: a standard NSMenuItem has no secondary line / inline buttons.
-  - Ask field: `rung 1 — NSSearchField` in an item view.
+  - Menu + submenu cascade: `new (rung 7) — panel cascade` on `StatusPanel` (`NSPanel`). Reason: Amendment 10.
+  - Glass surface: `rung 1 — NSGlassEffectView` (Amendment 11).
+  - Custom row: `new (rung 7) — MenuRowView` (SwiftUI): 20pt lead, title, end value, chevron, up to 2 secondary lines, inline action area.
+  - Ask field: `rung 1 — SwiftUI TextField` in a rounded fill.
   - Inbox row: `new (rung 7) — InboxRowView` (see Surface 2).
   - Status dot: `rung 2 — status dot`.
   - Icons: `rung 1 — SF Symbols` (monochrome rendering): `sparkle`, `cup.and.saucer`, `point.3.connected.trianglepath.dotted`, `arrow.triangle.pull`, `gearshape`, `bell`, `square`.
 - **States:** default · hover/selected (accent background with 8pt corners, white text + icon) · empty inbox (`✓ You're all caught up`, the menu gets shorter) · core not running (`rung 2 — Banner` error style in the inbox position: "Navori core isn't running" + `Restart`) · GitHub offline (`Pull Requests  offline · 5 min ago`) · Awake off (`Off`, no dot).
 - **Type & color:** SF Pro 14pt title/item, 13pt right-aligned value (`secondaryLabelColor`), 12pt secondary line. SF Mono 11.5pt for port numbers, `#PR`, pid. Monochrome icons in `secondaryLabelColor` (white when selected). Semantic color is **only** the 7pt dot (`systemGreen` on/pass, `systemRed` fail, `systemOrange` conflict, `systemBlue` review/decision). No color tiles, gradients, or multicolor icons.
-- **A11y:** NSMenu-style keyboard navigation (↑↓, → opens a submenu, ← closes, Return, Esc); VoiceOver reads "title, secondary line, time" as one; state is never conveyed by color alone (always text: "2 failing", "On"); respects Reduce Transparency (opaque material) and Reduce Motion; inline button hit area ≥ 24pt tall.
+- **A11y:** NSMenu-style keyboard navigation, built by the panel cascade (↑↓, → opens a submenu, ← closes, Return, Esc); VoiceOver reads "title, secondary line, time" as one; state is never conveyed by color alone (always text: "2 failing", "On"); respects Reduce Transparency (opaque material) and Reduce Motion; inline button hit area ≥ 24pt tall.
 
 ## Surface 2 — Needs you (inbox) — on level 0 and in the `Show all` submenu
 
@@ -111,8 +112,30 @@ The inbox is **the shared decision place between the user and Navori AI** — it
 7. Drop the caption row "Navori · N need you · time" — the menu opens with the Ask field.
 8. **Needs you = the decision inbox between the user and the AI** (Decision / To-do / Update), containing no PRs.
 9. The brief is provisional: each feature updates its own surface when it ships; constraints 1–8 stay unless re-reviewed.
+10. **The menu is an `NSPanel`, not an `NSMenu`** (user, 2026-11-02, replacing "NSMenu" in constraint 1). The cascade, edge flip, keyboard navigation and VoiceOver are built in the Shell. See the spike evidence below.
+11. **The surface is `NSGlassEffectView` with style `.clear` and a tint** (user, 2026-11-02). Starting tint: black at 65% in dark appearance, white at 55% in light. Text on glass uses `labelColor` and `secondaryLabelColor`; `tertiaryLabelColor` does not reach 3:1 at these tints. Reduce Transparency falls back to an opaque surface. Requires macOS 26 or later.
+12. **Until a feature's data exists, level 0 shows only real Core state** (user, 2026-11-02): banners, a `Core` row, then `Settings…`, `About Navori`, `Quit Navori`. The `Core` row is not in the layout above; its submenu holds module states and recent activity, so the cascade runs on real data before Awake. Whether it stays is decided when the Awake row ships. Ask, Needs you and the feature rows appear only in a dev-only preview until their features ship.
+
+## Spike evidence (2026-11-02)
+
+A throwaway AppKit app, driven with real input events on `Mac17,9`, macOS 27.0.1, with no Rust core. The numbers compare the options; they are not the GOAL-11 result.
+
+| Measure | Budget | `NSMenu` | `NSPanel` + glass |
+|---|---|---|---|
+| Typing in Ask, inline buttons | — | works | works |
+| Footprint with the menu open | ≤ 60 MB | 131 MB for about 1.2 s, then 33–35 MB; 26 MB with no text field | 28 MB |
+| Footprint after closing | ≤ 30 MB idle | 32 MB | 28 MB |
+| First open, median | ≤ 80 ms | 94–100 ms | 68–95 ms, noisy |
+| Later opens, median | ≤ 50 ms | 27–32 ms, one sample 54 ms | 8–12 ms |
+| Submenu open, first frame | ≤ 16 ms | 10–11 ms | 12–14 ms, simple child panel |
+
+- `NSStatusItem.button.performClick` blocks the main queue while the `NSMenu` is open (0 of 60 ticks); a real click does not (60 of 60).
+- The cause of the 131 MB peak was not found.
+- Plain `.clear` glass with no tint leaves dark-appearance text unreadable on a white background. Estimated contrast on that background (label colors taken as 85% and 55% white): 65% tint gives 4.9:1 primary and 3.1:1 secondary; 75% gives 6.8:1 and 3.9:1; 85% gives 9.5:1 and 5.0:1. Light-appearance figures on a dark background were sampled over blurred text, so treat them as rough.
+- Not tested: Reduce Transparency, VoiceOver, the real app with the Rust core, and a full panel cascade.
+
+Tint comparison: [`2026-11-02-clear-glass-tints.png`](2026-11-02-clear-glass-tints.png).
 
 ## Open questions for `design-solution`
 
-- **Real NSMenu or a custom-drawn NSPanel cascade?** NSMenu gives native behavior for free (keyboard, material, submenu flipping) but input fields (Ask, Add a to-do) and inline buttons inside `NSMenuItem.view` need a spike to confirm focus/tracking. R0 currently uses an `NSPanel` — this decision may replace `StatusPanel`.
 - Inbox data (Decision/To-do/Update) needs a new module in the kernel (proposed `navori-mod-inbox`, receiving Decisions from the AI runtime via `ActionSpec` + `Risk`).
