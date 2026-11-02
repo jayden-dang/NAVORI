@@ -336,13 +336,13 @@ _Requirements: KCONTRACT-3.2, KCONTRACT-3.3, KCONTRACT-3.5, KCONTRACT-3.6, KCONT
 
 **Depends-on:** Task 1, Task 10
 
-- [ ] **Step 1: Write failing tests:** `snapshot_pushes_coalesce_at_33ms_with_the_panel_open_and_250ms_closed`: wait for quiet first (over 250 ms with no snapshot, because startup also bumps the revision), then change state through `prune_journal`; the listener sees it under 200 ms open and not before 240 ms closed. `a_system_wake_with_a_running_core_is_harmless` (a smoke test: the pulse's effect is proven in Task 4, and the Shell's half is manual); `calling_shutdown_twice_is_harmless`.
-- [ ] **Step 2: Run** `cargo nextest run -p navori-ffi --test core` — expect: does not compile, `system_did_wake` does not exist.
-- [ ] **Step 3: Implement** the Rust side, deleting `Inner.panel_visible`.
-- [ ] **Step 4: Implement** the Swift side. `AppDelegate` creates `WakeObserver` after `store.start()`, calling `store.systemDidWake()`, and drops it in `applicationWillTerminate`. `git diff --stat` shows `StatusPanel.swift` unchanged, so the panel path still goes through `CoreStore.setPanelVisible`.
-- [ ] **Step 5: Run** `cargo xtask ci` — expect: `✓ ci passed`.
-- [ ] **Step 6: Manual Shell check:** `cargo xtask run`, sleep the Mac and wake it, then confirm one wake log line in `navori.*.log` under `~/Library/Logs/Navori Dev` at the time `pmset -g log` shows the full `Wake`. Compare any `DarkWake` entries: this is evidence for the dark-wake open question, not a pass or fail. Record this in the task report.
-- [ ] **Step 7: Commit** `git commit -m "feat(macos): send panel visibility and wake pulses to the scheduler"`
+- [x] **Step 1: Write failing tests:** `snapshot_pushes_coalesce_at_33ms_with_the_panel_open_and_250ms_closed`: wait for quiet first (over 250 ms with no snapshot, because startup also bumps the revision), then change state through `prune_journal`; the listener sees it under 200 ms open and not before 240 ms closed. `a_system_wake_with_a_running_core_is_harmless` (a smoke test: the pulse's effect is proven in Task 4, and the Shell's half is manual); `calling_shutdown_twice_is_harmless`.
+- [x] **Step 2: Run** `cargo nextest run -p navori-ffi --test core` — expect: does not compile, `system_did_wake` does not exist.
+- [x] **Step 3: Implement** the Rust side, deleting `Inner.panel_visible`.
+- [x] **Step 4: Implement** the Swift side. `AppDelegate` creates `WakeObserver` after `store.start()`, calling `store.systemDidWake()`, and drops it in `applicationWillTerminate`. `git diff --stat` shows `StatusPanel.swift` unchanged, so the panel path still goes through `CoreStore.setPanelVisible`.
+- [x] **Step 5: Run** `cargo xtask ci` — expect: `✓ ci passed`.
+- [x] **Step 6: Manual Shell check:** `cargo xtask run`, sleep the Mac and wake it, then confirm one wake log line in `navori.*.log` under `~/Library/Logs/Navori Dev` at the time `pmset -g log` shows the full `Wake`. Compare any `DarkWake` entries: this is evidence for the dark-wake open question, not a pass or fail. Record this in the task report.
+- [x] **Step 7: Commit** `git commit -m "feat(macos): send panel visibility and wake pulses to the scheduler"`
 
 _Requirements: KCONTRACT-5.4, KCONTRACT-6.1, KCONTRACT-G6, KCONTRACT-G8_
 
