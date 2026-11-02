@@ -209,11 +209,11 @@ _Requirements: KCONTRACT-7.3_
 
 **Depends-on:** Task 5, because it edits the probe Modules in `crates/kernel/tests/scheduler.rs`
 
-- [ ] **Step 1: Write failing tests** with a test Module in `crates/kernel/tests/kernel.rs` using config and a wait handle through the public API only: `a_module_outside_the_kernel_uses_config_and_a_wait_handle`; `a_module_reads_its_config_section`; `an_absent_section_gives_the_default`; `an_undecodable_section_gives_that_module_alone_the_default_and_is_listed` (one test Module stays configured); `a_section_failing_the_check_gives_the_default_and_is_listed`; `a_restarted_module_sees_the_same_config`; `a_module_with_no_config_ignores_a_section_with_its_id` (`config_issues` is empty for a `system` section holding `3`); `config_sections_may_be_set_after_register`; `a_restart_keeps_the_module_fields_state_and_queued_requests` (nothing asserts this today).
-- [ ] **Step 2: Run** `cargo nextest run -p navori-kernel --test kernel` — expect: does not compile, `ModuleConfig` does not exist.
-- [ ] **Step 3: Implement** the Produces list. `Counter`, `System` and the probe Modules in `crates/kernel/tests/scheduler.rs` gain `type Config = NoConfig;`. Decode errors are dropped, not logged.
-- [ ] **Step 4: Run** `cargo nextest run -p navori-kernel` — expect: pass, with no existing assertion changed, including `shutdown_stops_every_module`, `dispatch_routes_an_envelope_to_the_module_and_returns_its_answer`, `state_changes_bump_the_revision` and `a_module_that_keeps_crashing_is_marked_failed_and_unavailable`.
-- [ ] **Step 5: Commit** `git commit -m "feat(kernel): give each module its own config section"`
+- [x] **Step 1: Write failing tests** with a test Module in `crates/kernel/tests/kernel.rs` using config and a wait handle through the public API only: `a_module_outside_the_kernel_uses_config_and_a_wait_handle`; `a_module_reads_its_config_section`; `an_absent_section_gives_the_default`; `an_undecodable_section_gives_that_module_alone_the_default_and_is_listed` (one test Module stays configured); `a_section_failing_the_check_gives_the_default_and_is_listed`; `a_restarted_module_sees_the_same_config`; `a_module_with_no_config_ignores_a_section_with_its_id` (`config_issues` is empty for a `system` section holding `3`); `config_sections_may_be_set_after_register`; `a_restart_keeps_the_module_fields_state_and_queued_requests` (nothing asserts this today).
+- [x] **Step 2: Run** `cargo nextest run -p navori-kernel --test kernel` — expect: does not compile, `ModuleConfig` does not exist.
+- [x] **Step 3: Implement** the Produces list. `Counter`, `System` and the probe Modules in `crates/kernel/tests/scheduler.rs` gain `type Config = NoConfig;`. Decode errors are dropped, not logged.
+- [x] **Step 4: Run** `cargo nextest run -p navori-kernel` — expect: pass, with no existing assertion changed, including `shutdown_stops_every_module`, `dispatch_routes_an_envelope_to_the_module_and_returns_its_answer`, `state_changes_bump_the_revision` and `a_module_that_keeps_crashing_is_marked_failed_and_unavailable`.
+- [x] **Step 5: Commit** `git commit -m "feat(kernel): give each module its own config section"`
 
 _Requirements: KCONTRACT-1.1, KCONTRACT-1.2, KCONTRACT-1.3, KCONTRACT-1.4, KCONTRACT-1.5, KCONTRACT-1.6, KCONTRACT-G1, KCONTRACT-G2, KCONTRACT-G3, KCONTRACT-G9_
 
