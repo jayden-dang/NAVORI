@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use futures::FutureExt;
 use futures::future::BoxFuture;
-use navori_config::{Config, Paths, Profile};
+use navori_config::{Config, ConfigReport, Paths, Profile};
 use navori_ipc::Handler;
 use navori_kernel::{DispatchError, Kernel, ModuleState};
 use navori_protocol::{Check, CoreStatus, Envelope, Event, ModuleInfo, Severity, rpc};
@@ -154,9 +154,19 @@ pub fn state_detail(info: &ModuleInfo) -> Option<String> {
 
 /// Loads config; an invalid file falls back to defaults and is reported, never fatal.
 pub fn load_config(paths: &Paths) -> (Config, Option<String>) {
-    match Config::load(&paths.config_file) {
-        Ok(cfg) => (cfg, None),
-        Err(e) => (Config::default(), Some(e.to_string())),
+    let loaded = Config::load(&paths.config_file);
+    let detail = report_text(&paths.config_file, &loaded.report);
+    (loaded.config, detail)
+}
+
+fn report_text(path: &std::path::Path, report: &ConfigReport) -> Option<String> {
+    let file = path.display();
+    match report {
+        ConfigReport::Clean => None,
+        ConfigReport::BadValues(keys) => {
+            Some(format!("invalid config {file}: {}", keys.join(", ")))
+        }
+        ConfigReport::WholeFile(_) => Some(format!("invalid config {file}")),
     }
 }
 

@@ -164,8 +164,8 @@ impl NavoriCore {
         {
             eprintln!("navori: {e}");
         }
-        if let Some(e) = &config_error {
-            tracing::warn!(error = %e, "invalid config; using defaults");
+        if let Some(detail) = &config_error {
+            tracing::warn!(detail = %detail, "invalid config; using defaults");
         }
 
         let runtime = tokio::runtime::Builder::new_multi_thread()
