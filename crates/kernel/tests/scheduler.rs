@@ -20,6 +20,20 @@ fn wall(millis: u64) -> SystemTime {
     UNIX_EPOCH + Duration::from_millis(millis)
 }
 
+/// Marsaglia xorshift64. The seed is never zero, so the sequence does not collapse.
+fn xorshift64(state: &mut u64) -> u64 {
+    let mut x = *state;
+    x ^= x << 13;
+    x ^= x >> 7;
+    x ^= x << 17;
+    *state = x;
+    x
+}
+
+fn roll(state: &mut u64, bound: u64) -> u64 {
+    xorshift64(state) % bound
+}
+
 #[derive(Clone, Debug)]
 struct FakeClock {
     millis: Arc<AtomicU64>,
@@ -35,6 +49,15 @@ impl FakeClock {
     fn advance(&self, by: Duration) {
         let millis = u64::try_from(by.as_millis()).unwrap();
         self.millis.fetch_add(millis, Ordering::SeqCst);
+    }
+
+    fn retreat(&self, by: Duration) {
+        let millis = u64::try_from(by.as_millis()).unwrap();
+        self.millis
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+                Some(current.saturating_sub(millis))
+            })
+            .unwrap();
     }
 
     fn set(&self, millis: u64) {
@@ -884,4 +907,53 @@ async fn a_pulse_does_not_count_toward_the_gap() {
     tokio::time::advance(Duration::from_secs(1)).await;
     assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
     kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn due_is_never_returned_before_the_deadline_by_the_wall_clock() {
+    let mut rng = 0x9E37_79B9_7F4A_7C15_u64;
+    for run in 0..1_000 {
+        let clock = FakeClock::at(ORIGIN_MS);
+        let kernel = kernel_with(&clock);
+        let mut handle = kernel.scheduler().wait_handle();
+        let mut deadline = wall(ORIGIN_MS + roll(&mut rng, 120_001));
+        let mut left = 8 + usize::try_from(roll(&mut rng, 17)).unwrap();
+        while left > 0 {
+            let mut wait = std::pin::pin!(handle.wait_until(Some(deadline)));
+            loop {
+                if left == 0 {
+                    break;
+                }
+                match roll(&mut rng, 5) {
+                    0 => {
+                        tokio::time::advance(Duration::from_millis(roll(&mut rng, 180_001))).await;
+                    }
+                    1 => clock.advance(Duration::from_millis(roll(&mut rng, 180_001))),
+                    2 => clock.retreat(Duration::from_millis(roll(&mut rng, 180_001))),
+                    3 => kernel.scheduler().wake_pulse(),
+                    _ => {
+                        let visible = kernel.scheduler().panel_visible();
+                        kernel.scheduler().set_panel_visible(!visible);
+                    }
+                }
+                left -= 1;
+                match futures::poll!(wait.as_mut()) {
+                    Poll::Ready(Wake::Due) => {
+                        let now = clock.now();
+                        assert!(
+                            now >= deadline,
+                            "run {run} returned Due at {now:?} before {deadline:?}"
+                        );
+                        if left > 0 {
+                            deadline = clock.now() + Duration::from_millis(roll(&mut rng, 60_001));
+                        }
+                        break;
+                    }
+                    Poll::Ready(Wake::PanelChanged) => break,
+                    Poll::Pending => {}
+                }
+            }
+        }
+        kernel.shutdown().await;
+    }
 }
