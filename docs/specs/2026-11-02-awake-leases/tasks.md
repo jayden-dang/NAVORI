@@ -329,11 +329,11 @@ _Requirements: AWAKE-4.1, AWAKE-4.2, AWAKE-4.3, AWAKE-4.4, AWAKE-4.5, AWAKE-4.6,
 
 **Depends-on:** Task 8
 
-- [ ] **Step 1: Write failing tests:** `only_old_descendants_end_the_lease_after_grace`, `a_child_started_at_the_first_hold_is_not_busy`, `a_new_descendant_keeps_the_lease_and_it_is_read_again_60_seconds_on`, `the_lease_ends_at_the_next_read_after_the_new_descendant_exits`, `the_cap_ends_the_lease_with_a_new_descendant_alive`, `the_cap_event_states_the_reason`, `a_repeated_stop_keeps_the_stop_mark`, `a_stop_for_an_unknown_session_changes_nothing`, `a_hold_during_grace_clears_the_stop_mark_and_the_lease_stays`, `a_stop_hold_stop_sequence_counts_the_cap_from_the_second_stop`, `a_snapshot_that_cannot_be_taken_keeps_the_lease_until_the_cap` (through `FakeProcesses::fail_list`), `no_cpu_time_is_read` (asserts `FakeProcesses::reads` holds no `cpu`), `tests_can_pass_shorter_timing`, `the_fixed_timing_is_120_60_7200_and_28800_seconds`.
+- [x] **Step 1: Write failing tests:** `only_old_descendants_end_the_lease_after_grace`, `a_child_started_at_the_first_hold_is_not_busy`, `a_new_descendant_keeps_the_lease_and_it_is_read_again_60_seconds_on`, `the_lease_ends_at_the_next_read_after_the_new_descendant_exits`, `the_cap_ends_the_lease_with_a_new_descendant_alive`, `the_cap_event_states_the_reason`, `a_repeated_stop_keeps_the_stop_mark`, `a_stop_for_an_unknown_session_changes_nothing`, `a_hold_during_grace_clears_the_stop_mark_and_the_lease_stays`, `a_stop_hold_stop_sequence_counts_the_cap_from_the_second_stop`, `a_snapshot_that_cannot_be_taken_keeps_the_lease_until_the_cap` (through `FakeProcesses::fail_list`), `no_cpu_time_is_read` (asserts `FakeProcesses::reads` holds no `cpu`), `tests_can_pass_shorter_timing`, `the_fixed_timing_is_120_60_7200_and_28800_seconds`.
 Run: `cargo nextest run -p navori-mod-awake --test stop` — expect: no such variant.
-- [ ] **Step 2: Implement.** A `Timing` shorter than 30 seconds is floored by the closed-menu gap, so tests of it call `kernel.scheduler().set_panel_visible(true)`.
+- [x] **Step 2: Implement.** A `Timing` shorter than 30 seconds is floored by the closed-menu gap, so tests of it call `kernel.scheduler().set_panel_visible(true)`.
 Run: same command — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(awake): release a stopped session unless new work remains"`
+- [x] **Step 3: Commit** `git commit -m "feat(awake): release a stopped session unless new work remains"`
 
 _Requirements: AWAKE-5.1, AWAKE-5.2, AWAKE-5.3, AWAKE-5.4, AWAKE-5.5, AWAKE-5.6, AWAKE-5.7, AWAKE-5.8, AWAKE-5.9, AWAKE-5.10, AWAKE-5.11, AWAKE-5.12, AWAKE-5.14_
 
