@@ -46,7 +46,7 @@ Paths are shown for `release`; `dev` uses `Navori Dev` in place of `Navori`. Not
 - A module reads and writes only its own Owner's tables and KV namespace; it learns about other modules' data through Events and Actions, never by querying their tables (ARCH-3).
 - Journal ids are ULIDs (time-sortable); re-inserting the same id replaces the row, so replays are idempotent.
 - SQLite runs with `synchronous = NORMAL`, `foreign_keys = ON` and a 5 s busy timeout; all access goes through one connection guarded by the Store.
-- A missing config file means defaults; an invalid one means defaults plus a reported error (ARCH-13). Unknown keys are ignored so older builds can read newer configs.
+- A missing file means defaults; a bad value falls back alone and the rest of the file is kept; a bad `journal` value, or a file that cannot be read or is not TOML, pauses the journal sweep and is reported (ARCH-13). Unknown keys stay ignored so older builds can read newer configs.
 - `release` and `dev` never read each other's files (ARCH-14).
 
 ## Not the invariant spine

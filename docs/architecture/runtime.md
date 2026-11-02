@@ -28,7 +28,7 @@ Not covered here: what each component is for (`system.md`), what is stored where
 
 **Start** (`NavoriCore::start`, called from `applicationDidFinishLaunching`):
 1. Resolve the Profile and paths; create the data and logs directories.
-2. Load `config.toml` — an invalid file falls back to defaults and is reported (ARCH-13); start file logging.
+2. Load `config.toml` — a missing file means defaults; a bad value falls back alone and the rest of the file is kept; a bad `journal` value, or a file that cannot be read or is not TOML, pauses the journal sweep and is reported (ARCH-13). Start is never aborted by the file; start file logging.
 3. Build the tokio runtime; open the Store (applying migrations, with a backup before upgrading existing data).
 4. Start the Kernel and its modules.
 5. Bind the IPC socket — it doubles as the single-instance lock: a live socket for the same Profile aborts start-up with "Navori (<profile>) is already running".

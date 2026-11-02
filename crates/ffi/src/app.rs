@@ -157,7 +157,7 @@ pub fn state_detail(info: &ModuleInfo) -> Option<String> {
     }
 }
 
-/// Loads config; an invalid file falls back to defaults and is reported, never fatal.
+/// The load is infallible: a bad value falls back alone, and a bad journal or a whole-file fallback pauses the sweep.
 pub fn load_config(paths: &Paths) -> ConfigLoad {
     Config::load(&paths.config_file)
 }

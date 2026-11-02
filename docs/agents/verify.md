@@ -113,8 +113,9 @@ Index:
      note the newest `core.started` id.
   2. Quit (Teardown), then `cargo xtask run` and wait for Doctor.
   3. `"$CLI" --profile dev events --limit 5 --json > .skills/verify/<run>/after.json`.
-- **Gotchas:** `events` prints newest first. Retention (default 30 days, `config.toml`)
-  prunes older events — do not assert on anything older than that.
+- **Gotchas:** `events` prints newest first. The sweep prunes at the configured retention
+  (default 30 days) unless it is paused, and a paused sweep deletes nothing until the
+  next start on a fixed file — do not assert on anything older than that retention.
 - **Persist check:** after relaunch, the `core.started` id from step 1 is still present,
   with a `core.stopped` after it and a new `core.started` on top.
 
