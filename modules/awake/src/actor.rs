@@ -126,6 +126,7 @@ impl Awake {
                 self.hold_until_off(now);
                 Ok(Some(Started::UntilOff))
             }
+            AwakeAction::Display { on } => Ok(self.display(*on, now)),
             AwakeAction::HoldCommand { pid } => self.hold_command(ctx, now, *pid),
             AwakeAction::HoldSession {
                 session_id,
@@ -157,6 +158,13 @@ impl Awake {
         let started = truncate_us(now);
         // Replacement keeps the assertion; no locked end sentence is true.
         let _replaced = self.table.hold_until_off(started);
+    }
+
+    fn display(&mut self, on: bool, now: SystemTime) -> Option<Started> {
+        let started = truncate_us(now);
+        self.table
+            .set_display(on, started)
+            .then_some(Started::Display)
     }
 
     fn hold_for(&mut self, now: SystemTime, seconds: u64) -> Result<(), ActionError> {
@@ -503,6 +511,11 @@ impl Awake {
                 "manual".to_owned(),
                 event::until_off_source().to_owned(),
                 "until_off",
+            ),
+            Started::Display => (
+                "display".to_owned(),
+                event::display_source().to_owned(),
+                "display",
             ),
             Started::Command { key, name } => (key, name, "command"),
             Started::Session { key, name } => (key, name, "session"),
@@ -858,6 +871,7 @@ enum RowFate {
 enum Started {
     Duration(u64),
     UntilOff,
+    Display,
     Command { key: String, name: String },
     Session { key: String, name: String },
 }
@@ -896,6 +910,7 @@ fn source_text(lease: &Lease) -> String {
             event::duration_source(seconds)
         }
         LeaseSource::UntilOff => event::until_off_source().to_owned(),
+        LeaseSource::Display => event::display_source().to_owned(),
         LeaseSource::Command { .. } => lease.label.clone().unwrap_or_else(|| "command".to_owned()),
         LeaseSource::Session { harness, .. } => domain::harness_name(*harness).to_owned(),
     }
@@ -905,6 +920,7 @@ fn kind_of(lease: &Lease) -> &'static str {
     match lease.source {
         LeaseSource::Duration { .. } => "duration",
         LeaseSource::UntilOff => "until_off",
+        LeaseSource::Display => "display",
         LeaseSource::Command { .. } => "command",
         LeaseSource::Session { .. } => "session",
     }
@@ -913,7 +929,7 @@ fn kind_of(lease: &Lease) -> &'static str {
 fn process_of(lease: &Lease) -> Option<ProcId> {
     match lease.source {
         LeaseSource::Command { process } | LeaseSource::Session { process, .. } => Some(process),
-        LeaseSource::Duration { .. } | LeaseSource::UntilOff => None,
+        LeaseSource::Duration { .. } | LeaseSource::UntilOff | LeaseSource::Display => None,
     }
 }
 
@@ -944,7 +960,7 @@ fn payload(key: &str, kind: &str) -> Value {
 fn stored_key(lease: &Lease) -> Option<String> {
     match lease.source {
         LeaseSource::Command { .. } | LeaseSource::Session { .. } => Some(lease.key.text()),
-        LeaseSource::Duration { .. } | LeaseSource::UntilOff => None,
+        LeaseSource::Duration { .. } | LeaseSource::UntilOff | LeaseSource::Display => None,
     }
 }
 

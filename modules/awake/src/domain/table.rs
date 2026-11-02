@@ -24,6 +24,7 @@ impl Timing {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LeaseKey {
     Manual,
+    Display,
     Command { pid: i32, start_us: u64 },
     Session { session_id: String },
 }
@@ -32,6 +33,7 @@ impl LeaseKey {
     pub fn text(&self) -> String {
         match self {
             Self::Manual => "manual".to_owned(),
+            Self::Display => "display".to_owned(),
             Self::Command { pid, start_us } => format!("command:{pid}:{start_us}"),
             Self::Session { session_id } => format!("session:{session_id}"),
         }
@@ -44,6 +46,7 @@ pub enum LeaseSource {
         started: SystemTime,
     },
     UntilOff,
+    Display,
     Command {
         process: ProcId,
     },
@@ -149,6 +152,7 @@ struct SessionLease {
 pub struct LeaseTable {
     timing: Timing,
     manual: Option<Manual>,
+    display: Option<SystemTime>,
     commands: Vec<CommandLease>,
     sessions: Vec<SessionLease>,
 }
@@ -158,6 +162,7 @@ impl LeaseTable {
         Self {
             timing,
             manual: None,
+            display: None,
             commands: Vec::new(),
             sessions: Vec::new(),
         }
@@ -173,6 +178,19 @@ impl LeaseTable {
 
     pub(crate) fn hold_until_off(&mut self, started: SystemTime) -> Option<Ended> {
         self.replace_manual(Manual::UntilOff { started })
+    }
+
+    /// Separate from a duration or until-off lease. Returns whether this call created it.
+    pub(crate) fn set_display(&mut self, on: bool, started: SystemTime) -> bool {
+        if on {
+            if self.display.is_some() {
+                return false;
+            }
+            self.display = Some(started);
+            return true;
+        }
+        self.display = None;
+        false
     }
 
     /// One command key per process. A later session lease may share the process
@@ -396,6 +414,10 @@ impl LeaseTable {
                 reason: EndReason::ReleaseAll,
             })
             .collect();
+        ended.extend(self.display.take().map(|_| Ended {
+            lease: display_as_lease(),
+            reason: EndReason::ReleaseAll,
+        }));
         ended.extend(self.commands.drain(..).map(|lease| Ended {
             lease: command_as_lease(&lease),
             reason: EndReason::ReleaseAll,
@@ -458,8 +480,11 @@ impl LeaseTable {
 
     pub fn wants(&self) -> Wants {
         Wants {
-            system: self.manual.is_some() || !self.commands.is_empty() || !self.sessions.is_empty(),
-            display: false,
+            system: self.manual.is_some()
+                || self.display.is_some()
+                || !self.commands.is_empty()
+                || !self.sessions.is_empty(),
+            display: self.display.is_some(),
         }
     }
 
@@ -480,6 +505,9 @@ impl LeaseTable {
         if let Some(lease) = &self.manual {
             leases.push(manual_state(lease));
         }
+        if self.display.is_some() {
+            leases.push(display_state());
+        }
         for lease in &self.commands {
             leases.push(command_state(lease));
         }
@@ -497,6 +525,7 @@ impl LeaseTable {
 
     fn earliest_start(&self) -> Option<SystemTime> {
         let manual = self.manual.as_ref().map(Manual::started);
+        let display = self.display;
         // Epoch is a restored command: its wall-clock start is not stored.
         let command = self
             .commands
@@ -505,7 +534,10 @@ impl LeaseTable {
             .filter(|started| *started != UNIX_EPOCH)
             .min();
         let session = self.sessions.iter().map(|lease| lease.first_hold).min();
-        [manual, command, session].into_iter().flatten().min()
+        [manual, display, command, session]
+            .into_iter()
+            .flatten()
+            .min()
     }
 }
 
@@ -568,6 +600,18 @@ fn manual_state(lease: &Manual) -> LeaseState {
             stopped: false,
             ends_at_ms: None,
         },
+    }
+}
+
+fn display_state() -> LeaseState {
+    LeaseState {
+        key: LeaseKey::Display.text(),
+        kind: "display".to_owned(),
+        harness: None,
+        label: Some("Display".to_owned()),
+        pid: None,
+        stopped: false,
+        ends_at_ms: None,
     }
 }
 
@@ -636,6 +680,15 @@ fn session_as_lease(lease: &SessionLease) -> Lease {
         },
         deadline: Some(lease.deadline),
         label: lease.label.clone(),
+    }
+}
+
+fn display_as_lease() -> Lease {
+    Lease {
+        key: LeaseKey::Display,
+        source: LeaseSource::Display,
+        deadline: None,
+        label: Some("Display".to_owned()),
     }
 }
 

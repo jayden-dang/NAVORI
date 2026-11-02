@@ -13,6 +13,10 @@ pub(crate) fn until_off_source() -> &'static str {
     "until off"
 }
 
+pub(crate) fn display_source() -> &'static str {
+    "display"
+}
+
 pub(crate) fn duration_source(seconds: u64) -> String {
     if seconds == HOUR {
         return "1 hour".to_owned();

@@ -259,5 +259,5 @@ fn release_all_is_the_only_catalog_action_for_ending_manual_leases() {
         .into_iter()
         .filter(|name| !not_ending_manual.contains(name))
         .collect();
-    assert_eq!(ending, vec!["release_all"]);
+    assert_eq!(ending, vec!["display", "release_all"]);
 }

@@ -10,6 +10,8 @@ pub enum AwakeAction {
     HoldFor { seconds: u64 },
     /// Keep this Mac awake until it is turned off.
     HoldUntilOff,
+    /// Keep the display on with its own lease, or end that lease.
+    Display { on: bool },
     /// Keep this Mac awake while process `pid` is still running.
     HoldCommand { pid: i32 },
     /// Keep this Mac awake for the harness session `session_id`.
@@ -32,6 +34,7 @@ impl ModuleAction for AwakeAction {
             Self::Status => Risk::Read,
             Self::HoldFor { .. }
             | Self::HoldUntilOff
+            | Self::Display { .. }
             | Self::HoldCommand { .. }
             | Self::HoldSession { .. }
             | Self::StopSession { .. }
@@ -55,6 +58,11 @@ impl ModuleAction for AwakeAction {
             ActionDoc {
                 name: "hold_until_off",
                 description: "Keep this Mac awake until it is turned off. A later duration request replaces this lease.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "display",
+                description: "Keep the display on with its own lease. Sending `on: false` ends that lease. It does not end a duration or until-off lease, and it is not stored.",
                 risk: Risk::Write,
             },
             ActionDoc {
