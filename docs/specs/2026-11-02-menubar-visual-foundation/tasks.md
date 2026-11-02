@@ -128,10 +128,10 @@ _Requirements: MENU-10.1, MENU-10.2, MENU-10.3_
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1: Add** the step to `fn ci`, following the `swift build` call.
-- [ ] **Step 2: Run** `cargo xtask ci` — expect: pass, and its output shows the 3 existing Swift tests running after the Rust steps in today's order.
-- [ ] **Step 3: Prove the failure path** — temporarily flip one `#expect` in `StatusPanelClickPolicyTests.swift`, run `cargo xtask ci` — expect: non-zero exit. Restore it.
-- [ ] **Step 4: Commit** `git commit -m "build(ci): run the Swift tests in the gate"`
+- [x] **Step 1: Add** the step to `fn ci`, following the `swift build` call.
+- [x] **Step 2: Run** `cargo xtask ci` — expect: pass, and its output shows the 3 existing Swift tests running after the Rust steps in today's order.
+- [x] **Step 3: Prove the failure path** — temporarily flip one `#expect` in `StatusPanelClickPolicyTests.swift`, run `cargo xtask ci` — expect: non-zero exit. Restore it.
+- [x] **Step 4: Commit** `git commit -m "build(ci): run the Swift tests in the gate"`
 
 _Requirements: MENU-9.2, MENU-9.3, MENU-G9_
 
