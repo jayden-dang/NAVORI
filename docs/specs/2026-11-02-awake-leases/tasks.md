@@ -280,12 +280,12 @@ _Requirements: AWAKE-3.2, AWAKE-3.3, AWAKE-3.4, AWAKE-3.9_
 
 **Depends-on:** Task 5, Task 6
 
-- [ ] **Step 1: Write failing tests:** `awake_run_holds_while_the_command_runs` (checks `status` from a second call while `sleep` runs), `awake_run_exits_with_the_commands_code` (table: 0, 3, 7), `awake_run_with_the_app_down_still_runs_and_warns_once_on_stderr` (asserts a marker file, exit code and exactly one stderr line `navori: no Lease held because Navori is not running`), `awake_run_with_a_missing_command_exits_127`, `awake_run_on_a_non_executable_file_exits_126`, `awake_run_exits_128_plus_the_signal`, `awake_run_with_the_app_down_creates_no_socket`. That the CLI never opens the app is also checked in Step 3.
+- [x] **Step 1: Write failing tests:** `awake_run_holds_while_the_command_runs` (checks `status` from a second call while `sleep` runs), `awake_run_exits_with_the_commands_code` (table: 0, 3, 7), `awake_run_with_the_app_down_still_runs_and_warns_once_on_stderr` (asserts a marker file, exit code and exactly one stderr line `navori: no Lease held because Navori is not running`), `awake_run_with_a_missing_command_exits_127`, `awake_run_on_a_non_executable_file_exits_126`, `awake_run_exits_128_plus_the_signal`, `awake_run_with_the_app_down_creates_no_socket`. That the CLI never opens the app is also checked in Step 3.
 Run: `cargo nextest run -p navori-cli --test cli` — expect: unrecognized subcommand.
-- [ ] **Step 2: Implement.** Spawn with inherited stdio, connect, dispatch under a 5-second timeout, wait. Arguments are `Vec<OsString>` with `#[arg(last = true, required = true)]`. Install no signal handler. Any other dispatch failure writes `navori: no Lease held: <reason>`.
+- [x] **Step 2: Implement.** Spawn with inherited stdio, connect, dispatch under a 5-second timeout, wait. Arguments are `Vec<OsString>` with `#[arg(last = true, required = true)]`. Install no signal handler. Any other dispatch failure writes `navori: no Lease held: <reason>`.
 Run: same command — expect: pass.
-- [ ] **Step 3: Verify** `grep -n '"open"\|NSWorkspace\|launchctl' apps/cli/src/main.rs` — expect: no match.
-- [ ] **Step 4: Commit** `git commit -m "feat(cli): add navori awake run"`
+- [x] **Step 3: Verify** `grep -n '"open"\|NSWorkspace\|launchctl' apps/cli/src/main.rs` — expect: no match.
+- [x] **Step 4: Commit** `git commit -m "feat(cli): add navori awake run"`
 
 _Requirements: AWAKE-3.1, AWAKE-3.5, AWAKE-3.6, AWAKE-3.7, AWAKE-3.8_
 
@@ -305,11 +305,11 @@ _Requirements: AWAKE-3.1, AWAKE-3.5, AWAKE-3.6, AWAKE-3.7, AWAKE-3.8_
 
 **Depends-on:** Task 6
 
-- [ ] **Step 1: Write failing tests**, with a chain `claude(100) -> sh(101) -> navori(102)`, as in `crates/procs/tests/harness_of.rs:36-39`: `a_session_lease_watches_the_harness_not_the_hook`, `a_dead_hook_pid_falls_back_to_its_parent`, `a_hold_from_a_process_outside_a_harness_is_invalid_with_no_lease`, `a_hold_with_both_pids_gone_is_invalid_with_no_lease`, `a_repeated_hold_keeps_one_lease_moves_the_deadline_and_keeps_the_first_hold`, `end_session_ends_it_by_session_id_with_no_process_read` (asserts `list_calls` is unchanged), `the_harness_exiting_ends_the_lease`, `the_session_ttl_ends_the_lease_8_hours_after_the_latest_hold`, `a_session_id_outside_the_allowed_characters_is_invalid` (table: empty, 129 bytes, a space, a slash), `a_hold_answers_without_waiting_for_grace`.
+- [x] **Step 1: Write failing tests**, with a chain `claude(100) -> sh(101) -> navori(102)`, as in `crates/procs/tests/harness_of.rs:36-39`: `a_session_lease_watches_the_harness_not_the_hook`, `a_dead_hook_pid_falls_back_to_its_parent`, `a_hold_from_a_process_outside_a_harness_is_invalid_with_no_lease`, `a_hold_with_both_pids_gone_is_invalid_with_no_lease`, `a_repeated_hold_keeps_one_lease_moves_the_deadline_and_keeps_the_first_hold`, `end_session_ends_it_by_session_id_with_no_process_read` (asserts `list_calls` is unchanged), `the_harness_exiting_ends_the_lease`, `the_session_ttl_ends_the_lease_8_hours_after_the_latest_hold`, `a_session_id_outside_the_allowed_characters_is_invalid` (table: empty, 129 bytes, a space, a slash), `a_hold_answers_without_waiting_for_grace`.
 Run: `cargo nextest run -p navori-mod-awake --test session` — expect: no such variant.
-- [ ] **Step 2: Implement.** Stamp First hold from `wait.now()` on the Action's arrival, truncated to microseconds, before `spawn_blocking`. Try `pid`, then `ppid`.
+- [x] **Step 2: Implement.** Stamp First hold from `wait.now()` on the Action's arrival, truncated to microseconds, before `spawn_blocking`. Try `pid`, then `ppid`.
 Run: same command — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(awake): hold and end a Lease for one session"`
+- [x] **Step 3: Commit** `git commit -m "feat(awake): hold and end a Lease for one session"`
 
 _Requirements: AWAKE-4.1, AWAKE-4.2, AWAKE-4.3, AWAKE-4.4, AWAKE-4.5, AWAKE-4.6, AWAKE-4.7, AWAKE-4.8, AWAKE-4.9, AWAKE-4.10, AWAKE-13.5_
 
