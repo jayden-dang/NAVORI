@@ -129,6 +129,10 @@ fn measure_phase_a(
         *slot = reopen.ms;
         menu_open_cpu_ms.push(reopen.cpu_ms);
     }
+    let mut submenu_opens = [0.0; 5];
+    for slot in &mut submenu_opens {
+        *slot = open_submenu(&launched, log)?;
+    }
     let peak = sample_pid(probe, pid)?;
     finish_measured(&mut launched)?;
     Ok(PhaseAProcess {
@@ -138,6 +142,7 @@ fn measure_phase_a(
         modules: first.modules,
         menu_reopen_ms,
         menu_open_cpu_ms,
+        submenu_open_ms: median(&submenu_opens).context("submenu_open_ms has no samples")?,
         peak_bytes: peak.peak,
     })
 }
@@ -187,10 +192,12 @@ fn measurements(
         .map(|run| run.footprint_menu_open_mb)
         .collect();
     let mut reopen = Vec::with_capacity(phase_a.len());
+    let mut submenu = Vec::with_capacity(phase_a.len());
     let mut cpu = Vec::new();
     for run in phase_a {
         reopen
             .push(median(run.menu_reopen_ms.as_slice()).context("menu_reopen_ms has no samples")?);
+        submenu.push(run.submenu_open_ms);
         cpu.extend(run.menu_open_cpu_ms.iter().copied());
     }
     let mut ranked: Vec<&PhaseAProcess> = phase_a.iter().collect();
@@ -238,6 +245,7 @@ fn measurements(
     insert_median(&mut out, "cold_start_ms", &cold_start)?;
     insert_median(&mut out, "menu_open_after_launch_ms", &menu_open)?;
     insert_median(&mut out, "menu_reopen_ms", &reopen)?;
+    insert_median(&mut out, "submenu_open_ms", &submenu)?;
     insert_median(&mut out, "footprint_menu_open_mb", &footprint)?;
     insert_median(&mut out, "menu_open_cpu_ms", &cpu)?;
     insert_median(&mut out, "idle_cpu_pct", &idle_cpu)?;
@@ -264,6 +272,7 @@ struct PhaseAProcess {
     modules: u32,
     menu_reopen_ms: [f64; 5],
     menu_open_cpu_ms: Vec<f64>,
+    submenu_open_ms: f64,
     peak_bytes: u64,
 }
 
@@ -296,6 +305,16 @@ fn spawn_perf(home: &PerfHome, exe: &Path, perf_home: &Path) -> Result<Launched>
     )?;
     home.record_pid(launched.pid)?;
     Ok(launched)
+}
+
+fn open_submenu(launched: &Launched, log: &mut LogStream) -> Result<f64> {
+    let pid = launched.pid;
+    launched.signal("USR2")?;
+    let mark = await_mark(log, pid, is_submenu_open, "submenuOpened")?;
+    let Mark::SubmenuOpened { ms } = mark else {
+        bail!("pid {pid} submenuOpened returned a different mark");
+    };
+    Ok(ms)
 }
 
 fn open_menu(
@@ -404,6 +423,10 @@ fn is_first_open(mark: &Mark) -> bool {
 
 fn is_reopen(mark: &Mark) -> bool {
     matches!(mark, Mark::MenuOpened { first: false, .. })
+}
+
+fn is_submenu_open(mark: &Mark) -> bool {
+    matches!(mark, Mark::SubmenuOpened { .. })
 }
 
 fn session_marker(perf_home: &Path) -> PathBuf {
@@ -590,7 +613,7 @@ mod tests {
     };
     use crate::perf::launch::Launched;
 
-    fn process(reopen: [f64; 5]) -> PhaseAProcess {
+    fn process(reopen: [f64; 5], submenu_open_ms: f64) -> PhaseAProcess {
         PhaseAProcess {
             cold_start_ms: 40.0,
             menu_open_after_launch_ms: 20.0,
@@ -599,6 +622,7 @@ mod tests {
             menu_reopen_ms: reopen,
             menu_open_cpu_ms: vec![1.0, 3.0],
             peak_bytes: 3 * 1_048_576,
+            submenu_open_ms,
         }
     }
 
@@ -618,8 +642,8 @@ mod tests {
     #[test]
     fn reopen_median_is_the_median_of_per_process_medians() {
         let phase_a = [
-            process([0.0, 0.0, 0.0, 100.0, 100.0]),
-            process([10.0, 10.0, 10.0, 10.0, 10.0]),
+            process([0.0, 0.0, 0.0, 100.0, 100.0], 4.0),
+            process([10.0, 10.0, 10.0, 10.0, 10.0], 12.0),
         ];
         let measured = measurements(&phase_a, &phase_b(), 12.5).unwrap();
         assert_eq!(measured["menu_reopen_ms"], 5.0);
@@ -629,6 +653,16 @@ mod tests {
         assert_eq!(measured["peak_footprint_mb"], 3.0);
         assert_eq!(measured["app_size_mb"], 12.5);
         assert_eq!(measured["modules_running"], 3.0);
+    }
+
+    #[test]
+    fn the_submenu_metric_is_the_median_of_each_process_median() {
+        let phase_a = [
+            process([0.0, 0.0, 0.0, 100.0, 100.0], 4.0),
+            process([10.0, 10.0, 10.0, 10.0, 10.0], 12.0),
+        ];
+        let measured = measurements(&phase_a, &phase_b(), 12.5).unwrap();
+        assert_eq!(measured["submenu_open_ms"], 8.0);
     }
 
     #[test]

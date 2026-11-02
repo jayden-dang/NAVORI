@@ -112,6 +112,18 @@ final class StatusBarController: NSObject {
         }
     }
 
+    func openCoreSubmenuFresh() {
+        guard panelBuilt, panel.isOpen else {
+            PerfProbe.fault("SIGUSR2 open has no level 0")
+            return
+        }
+        panel.cascade.closeSubmenus()
+        guard let trigger = PerfProbe.captureTrigger() else { return }
+        panel.cascade.open("core") {
+            PerfProbe.markSubmenuOpened(since: trigger)
+        }
+    }
+
     private func showMenu() {
         panel.close()
         #if DEBUG

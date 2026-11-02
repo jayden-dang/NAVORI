@@ -6,7 +6,7 @@ use std::process::Command;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Map, Value, json};
 
-use super::judge::{Kind, METRICS, Measurements, Verdict};
+use super::judge::{METRICS, Measurements, Verdict};
 
 #[derive(Debug)]
 pub struct Machine {
@@ -55,9 +55,6 @@ impl Baseline {
     ) -> Baseline {
         let mut metrics = BTreeMap::new();
         for spec in METRICS {
-            if matches!(spec.kind, Kind::Skipped { .. }) {
-                continue;
-            }
             if let Some(&value) = measurements.get(spec.name) {
                 metrics.insert(spec.name.to_owned(), (value, spec.floor));
             }
@@ -223,7 +220,14 @@ mod tests {
             serde_json::json!(5.0)
         );
         assert!(raw["metrics"].get("modules_running").is_none());
-        assert!(raw["metrics"].get("submenu_open_ms").is_none());
+        assert_eq!(
+            raw["metrics"]["submenu_open_ms"]["median"],
+            serde_json::json!(9.0)
+        );
+        assert_eq!(
+            raw["metrics"]["submenu_open_ms"]["floor"],
+            serde_json::json!(5.0)
+        );
 
         let loaded = Baseline::load(&path).unwrap().expect("loaded baseline");
         assert_eq!(loaded.machine.model, "Mac14,6");
@@ -237,6 +241,21 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+    }
+
+    #[test]
+    fn a_baseline_stores_the_submenu_metric() {
+        let measurements = Measurements::from([("submenu_open_ms".to_owned(), 9.0)]);
+        let baseline = Baseline::from_run(
+            &measurements,
+            Machine {
+                model: "Mac14,6".to_owned(),
+                macos: "15.6.1".to_owned(),
+            },
+            "abc123".to_owned(),
+            "2026-11-01".to_owned(),
+        );
+        assert_eq!(baseline.metrics.get("submenu_open_ms"), Some(&(9.0, 5.0)));
     }
 
     #[test]
