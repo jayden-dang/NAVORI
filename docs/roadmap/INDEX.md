@@ -1,7 +1,7 @@
 # Roadmap: Navori
 
 Status: Approved
-Date: 2026-11-01
+Date: 2026-11-02
 
 <!--
 The program layer: milestone INTENT, above any single feature and below the product
@@ -37,6 +37,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 | MILE-5 | GitHub (R4) | The user sees pull requests needing review, failing checks and conflicts counted in the menubar, and opens, approves or merges them from the submenu. | MILE-3 | Planned |
 | MILE-6 | Proactive (R5) | Navori AI tells the user on its own, within a daily budget and quiet hours, when CI fails, a review arrives, an Agent session finishes or a port conflicts. | MILE-4, MILE-5 | Planned |
 | MILE-7 | MCP (R6) | Claude Code, Codex and Grok call Navori's tools over MCP under the same approval policy, and Navori AI uses tools from external MCP servers. | MILE-3 | Planned |
+| MILE-8 | Auto Review | When someone directly requests the user's review on a pull request in a repository the user enabled, that pull request gets a started comment, then findings and an approval or a change request by a fixed severity rule with no action from the user, and a re-request on new commits reviews it again. | MILE-5, MILE-6 | Planned |
 
 ## MILE-1 — Foundation (R0)
 
@@ -141,6 +142,22 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Deferred:** None
 **Blockers:** None
 
+## MILE-8 — Auto Review
+
+**Outcome:** When someone directly requests the user's review on a pull request in a repository the user enabled, that pull request gets a started comment, then findings and an approval or a change request by a fixed severity rule with no action from the user, and a re-request on new commits reviews it again.
+**Goals:** GOAL-4, GOAL-11
+**Members:**
+- **ROAD-29** auto-review-standing-approval — After: none — Surfaces: `docs/adr/`, `docs/product/vision.md`, `docs/architecture/INDEX.md`
+- **ROAD-30** agent-dispatch-runner — After: ROAD-9, ROAD-29 — Surfaces: proposed `modules/dispatch/`, `integrations/`
+- **ROAD-31** review-trigger-and-repo-switch — After: ROAD-20, ROAD-22, ROAD-30 — Surfaces: `modules/github/`, proposed `modules/dispatch/`, `apps/macos/Navori/Features/Settings/`
+- **ROAD-32** review-verdict-posting — After: ROAD-21, ROAD-31 — Surfaces: `modules/github/`, proposed `modules/dispatch/`
+- **ROAD-33** re-review-on-request — After: ROAD-32 — Surfaces: `modules/github/`, proposed `modules/dispatch/`
+**Depends-on:** MILE-5, MILE-6
+**Commitment:** Planned
+**Closed:** None
+**Deferred:** None
+**Blockers:** ROAD-30 to ROAD-33 wait on ROAD-29: approving without a human conflicts with GOAL-1, ARCH-5 and the vision's non-goal on `Destructive` actions, and needs a decision of record.
+
 ## Goal dispositions
 
-None — every live `GOAL-N` in `docs/product/vision.md` (GOAL-1 … GOAL-10) is cited by a milestone.
+None — every live `GOAL-N` in `docs/product/vision.md` (GOAL-1 … GOAL-11, except the superseded GOAL-7) is cited by a milestone.
