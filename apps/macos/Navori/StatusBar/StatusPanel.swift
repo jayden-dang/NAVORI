@@ -184,17 +184,41 @@ final class StatusPanel: NSPanel {
     }
 
     override func cancelOperation(_ sender: Any?) {
-        close()
+        cascade.key(.escape)
     }
 
     override func sendEvent(_ event: NSEvent) {
-        if event.type == .keyDown, event.keyCode == 53 {
-            close()
+        if event.type == .keyDown, routeKey(event) {
             return
         }
         super.sendEvent(event)
         guard event.type == .leftMouseUp else { return }
         activateRow(at: event.locationInWindow)
+    }
+
+    /// Hosting view is first responder and would eat arrows, Return, and Esc.
+    private func routeKey(_ event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.command) {
+            return false
+        }
+        guard let key = Self.cascadeKey(event.keyCode) else { return false }
+        if firstResponder is NSText, key != .escape {
+            return false
+        }
+        cascade.key(key)
+        return true
+    }
+
+    private static func cascadeKey(_ keyCode: UInt16) -> CascadeKey? {
+        switch keyCode {
+        case 126: return .up
+        case 125: return .down
+        case 123: return .left
+        case 124: return .right
+        case 36, 76: return .return
+        case 53: return .escape
+        default: return nil
+        }
     }
 
     /// SwiftUI Button does not see first mouse-up in this non-activating panel.
