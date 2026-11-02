@@ -156,16 +156,14 @@ impl Awake {
                 "pid must be positive, not {pid}"
             )));
         }
-        let id = match self.platform.identify(pid).map_err(platform_failed)? {
-            Some(id) => id,
-            None => {
-                return match self.platform.classify(pid).map_err(platform_failed)? {
-                    ProcessClass::OtherUser => Err(ActionError::Invalid(format!(
-                        "pid {pid} belongs to another user"
-                    ))),
-                    ProcessClass::Finished | ProcessClass::Live(_) => Ok(None),
-                };
+        let id = match self.platform.classify(pid).map_err(platform_failed)? {
+            ProcessClass::Live(id) => id,
+            ProcessClass::OtherUser => {
+                return Err(ActionError::Invalid(format!(
+                    "pid {pid} belongs to another user"
+                )));
             }
+            ProcessClass::Finished => return Ok(None),
         };
         let label = match self
             .platform
@@ -179,6 +177,9 @@ impl Awake {
             }
             ExecutableName::Known(name) => name,
         };
+        if self.table.leases_on(id) > 0 {
+            return Ok(None);
+        }
         self.arm(id)?;
         self.table.hold_command(id, truncate_us(now), label.clone());
         let key = LeaseKey::Command {
@@ -197,7 +198,10 @@ impl Awake {
             return Ok(());
         }
         if self.watcher.is_none() {
-            let watcher = self.platform.build_watcher().map_err(platform_failed)?;
+            let watcher = self
+                .platform
+                .build_watcher()
+                .map_err(|source| watch_failed(ProcsError::Platform { source }))?;
             self.watcher = Some(watcher);
         }
         let result = {

@@ -138,14 +138,17 @@ impl LeaseTable {
         self.replace_manual(Manual::UntilOff { started })
     }
 
-    /// A repeated hold of the same process is another lease. One process can
-    /// carry more than one, and they share a single exit watch.
+    /// One command key per process. A later session lease may share the process
+    /// under a different key; that is not a second command row.
     pub(crate) fn hold_command(
         &mut self,
         process: ProcId,
         started: SystemTime,
         label: Option<String>,
     ) {
+        if self.commands.iter().any(|lease| lease.process == process) {
+            return;
+        }
         self.commands.push(CommandLease {
             process,
             started,

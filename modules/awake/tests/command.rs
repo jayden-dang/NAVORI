@@ -1,11 +1,14 @@
 mod common;
 
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use common::{ASSERTION_NAME, ORIGIN_MS, Rig};
 use navori_kernel::{ActionError, DispatchError, Severity};
-use navori_macos::fake::FakeProcess;
-use navori_macos::{AssertionKind, WatchError};
+use navori_macos::fake::{FakeProcess, FakeProcesses};
+use navori_macos::{AssertionKind, PlatformError, ProcEntry, ProcessSource, ReadError, WatchError};
 use serde_json::{Value, json};
 
 const START_US: u64 = 5_000;
@@ -187,6 +190,73 @@ async fn a_zombie_process_answers_ok_with_no_lease() {
     rig.shutdown().await;
 }
 
+struct FirstRuid {
+    inner: Arc<FakeProcesses>,
+    flipped: AtomicBool,
+    ruid: u32,
+}
+
+impl ProcessSource for FirstRuid {
+    fn current_uid(&self) -> u32 {
+        self.inner.current_uid()
+    }
+
+    fn list(&self) -> Result<Vec<ProcEntry>, PlatformError> {
+        self.inner.list()
+    }
+
+    fn entry(&self, pid: i32) -> Result<ProcEntry, ReadError> {
+        let mut entry = self.inner.entry(pid)?;
+        if !self.flipped.swap(true, Ordering::SeqCst) {
+            entry.ruid = self.ruid;
+        }
+        Ok(entry)
+    }
+
+    fn exe(&self, pid: i32) -> Result<PathBuf, ReadError> {
+        self.inner.exe(pid)
+    }
+
+    fn argv(&self, pid: i32) -> Result<Vec<String>, ReadError> {
+        self.inner.argv(pid)
+    }
+
+    fn cwd(&self, pid: i32) -> Result<PathBuf, ReadError> {
+        self.inner.cwd(pid)
+    }
+
+    fn cpu_time(&self, pid: i32) -> Result<Duration, ReadError> {
+        self.inner.cpu_time(pid)
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_pid_is_classified_once() {
+    let processes = Arc::new(FakeProcesses::new(501));
+    processes.add(command(PID));
+    let source = Arc::new(FirstRuid {
+        inner: Arc::clone(&processes),
+        flipped: AtomicBool::new(false),
+        ruid: 502,
+    });
+    let rig = Rig::with_source(processes, source);
+    let err = rig.dispatch(hold_command(PID)).await.unwrap_err();
+    assert!(
+        matches!(
+            err,
+            DispatchError::Action(ActionError::Invalid(ref message))
+                if message == "pid 42 belongs to another user"
+        ),
+        "{err:?}"
+    );
+    let state = rig.kernel.state("awake").unwrap();
+    assert_eq!(lease_count(&state), 0);
+    assert_eq!(state["system_held"], false);
+    assert!(rig.power.held().is_empty());
+    assert!(rig.exits.watched().is_empty());
+    rig.shutdown().await;
+}
+
 #[tokio::test(start_paused = true)]
 async fn a_process_of_another_user_is_refused() {
     let rig = Rig::new();
@@ -233,6 +303,33 @@ async fn a_non_positive_pid_is_invalid() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_failed_exit_source_build_answers_failed_with_no_lease() {
+    let rig = Rig::with_exits_factory(Box::new(|_| {
+        Err(PlatformError::Kqueue {
+            op: "kqueue",
+            errno: 1,
+        })
+    }));
+    rig.processes.add(command(PID));
+    let err = rig.dispatch(hold_command(PID)).await.unwrap_err();
+    assert!(
+        matches!(
+            err,
+            DispatchError::Action(ActionError::Failed(ref message))
+                if message == "exit watches could not be started (kqueue kqueue failed with errno 1; the exit watch was not changed); no command lease was held"
+        ),
+        "{err:?}"
+    );
+    let state = rig.kernel.state("awake").unwrap();
+    assert_eq!(lease_count(&state), 0);
+    assert_eq!(state["system_held"], false);
+    assert_eq!(state["problem"], Value::Null);
+    assert!(rig.power.held().is_empty());
+    assert!(rig.exits.watched().is_empty());
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
 async fn kqueue_rejecting_the_watch_answers_failed_with_no_lease() {
     let rig = Rig::new();
     rig.processes.add(command(PID));
@@ -265,17 +362,8 @@ async fn two_leases_on_one_process_unwatch_only_at_the_last() {
     rig.advance(Duration::from_secs(1)).await;
     let state = rig.dispatch(hold_command(PID)).await.unwrap();
 
-    assert_eq!(lease_count(&state), 2);
-    assert_eq!(state["leases"][0]["pid"], PID);
-    assert_eq!(state["leases"][1]["pid"], PID);
-    assert_eq!(
-        state["leases"][0]["key"],
-        format!("command:{PID}:{START_US}")
-    );
-    assert_eq!(
-        state["leases"][1]["key"],
-        format!("command:{PID}:{START_US}")
-    );
+    assert_eq!(lease_count(&state), 1);
+    assert_eq!(state["leases"], json!([command_row(PID)]));
     assert_eq!(state["since_ms"], ORIGIN_MS as i64);
     assert_eq!(rig.exits.watched(), vec![PID]);
     assert_eq!(rig.exits.tokens(PID).len(), 1);
@@ -289,7 +377,7 @@ async fn two_leases_on_one_process_unwatch_only_at_the_last() {
         .into_iter()
         .filter(|event| event.kind == "awake.lease_started")
         .count();
-    assert_eq!(started, 2);
+    assert_eq!(started, 1);
     let ended_early = rig
         .kernel
         .recent_events(10)
@@ -299,10 +387,11 @@ async fn two_leases_on_one_process_unwatch_only_at_the_last() {
         .count();
     assert_eq!(ended_early, 0);
 
-    let done = rig.dispatch(json!("release_all")).await.unwrap();
-    assert_eq!(lease_count(&done), 0);
+    rig.exits.fire(PID);
+    let done = until(&rig, |state| lease_count(state) == 0).await;
     assert_eq!(done["system_held"], false);
-    assert!(rig.exits.watched().is_empty());
+    assert_eq!(done["since_ms"], Value::Null);
+    assert!(rig.power.held().is_empty());
     assert_eq!(rig.power.releases(), 1);
     let ended: Vec<_> = rig
         .kernel
@@ -314,7 +403,7 @@ async fn two_leases_on_one_process_unwatch_only_at_the_last() {
     assert_eq!(ended.len(), 1);
     assert_eq!(
         ended[0].summary,
-        "Stopped keeping this Mac awake: Release all."
+        "Stopped keeping this Mac awake: sleep exited."
     );
     rig.shutdown().await;
 }
