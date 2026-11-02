@@ -281,11 +281,11 @@ _Requirements: MENU-1.8, MENU-G8_
 
 **Depends-on:** Task 2, Task 7
 
-- [ ] **Step 1: Write failing tests**: `each_status_has_its_label_dot_and_submenu` (a table: `Starting` no dot and no Submenu, `Running` green with one, `Needs attention` orange with one, `Not running` red and no Submenu), `module_dots_follow_the_module_state` (a table: `running` green, `starting` and `restarting` yellow, `failed` red, `stopped` gray).
-- [ ] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter CoreRowStateTests` — expect: does not compile.
-- [ ] **Step 3: Implement** the Produces lists. `configProblem` holds today's title and `snapshot.configError` as its message. Move `PanelView` to these properties, retype its private `ModulesSection` and `ActivitySection` to `ModuleRow` and `EventRow`, and remove its `import NavoriCore`.
-- [ ] **Step 4: Run** the same command, then `cargo xtask ci` — expect: pass, and the panel looks as it did.
-- [ ] **Step 5: Commit** `git commit -m "feat(shell): name the core state in plain rows"`
+- [x] **Step 1: Write failing tests**: `each_status_has_its_label_dot_and_submenu` (a table: `Starting` no dot and no Submenu, `Running` green with one, `Needs attention` orange with one, `Not running` red and no Submenu), `module_dots_follow_the_module_state` (a table: `running` green, `starting` and `restarting` yellow, `failed` red, `stopped` gray).
+- [x] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter CoreRowStateTests` — expect: does not compile.
+- [x] **Step 3: Implement** the Produces lists. `configProblem` holds today's title and `snapshot.configError` as its message. Move `PanelView` to these properties, retype its private `ModulesSection` and `ActivitySection` to `ModuleRow` and `EventRow`, and remove its `import NavoriCore`.
+- [x] **Step 4: Run** the same command, then `cargo xtask ci` — expect: pass, and the panel looks as it did.
+- [x] **Step 5: Commit** `git commit -m "feat(shell): name the core state in plain rows"`
 
 _Requirements: MENU-3.2, MENU-3.7, MENU-3.10_
 
