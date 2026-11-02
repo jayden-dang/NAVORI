@@ -57,7 +57,7 @@ Status: **Built** = in the tree at R0 · **Built (Rn)** = in the tree since that
 | Protocol | Built | Wire types shared by every layer (Envelope, ActionSpec, Event, status, RPC frames). | `crates/protocol` |
 | `navori` CLI | Built | `status`, `doctor`, `events`, `actions`, `dispatch`; later `hook`, `awake`, `ask`, `mcp`. | `apps/cli` |
 | xtask | Built | Build core + bindings, bundle, sign, install, CI gate, dependency rules. | `xtask` |
-| Scheduler | Planned (R1) | Periodic work for all modules: fast while the menu is open, slow in the background, paused during sleep (ARCH-16). | `crates/kernel` |
+| Scheduler | Built | Periodic work for all modules: fast while the menu is open, slow in the background, a timer parks on uptime, and an overdue timer may fire during dark wake (ARCH-16). | `crates/kernel` |
 | Platform FFI | Built (R1) | Safe traits `ProcessSource`, `ExitSource` and `PowerAssertions` (`MacProcesses`, `KqueueExits`, `MacPower`). The only hand-written `unsafe` (ARCH-9). | `crates/macos` |
 | Process model | Built (R1) | Snapshot, project/worktree location, Harness table, child activity and process-exit watcher. No `unsafe`. Uses `ProcessSource` and `ExitSource`. | `crates/procs` |
 | Secrets | Planned (R2) | Keychain storage for tokens and API keys (ARCH-8). | `crates/secrets` |

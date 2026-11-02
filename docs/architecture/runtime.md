@@ -51,7 +51,7 @@ Not covered here: what each component is for (`system.md`), what is stored where
 | Runtime shutdown timeout | 1 s | `crates/ffi/src/lib.rs` |
 | Snapshot coalescing | 33 ms menu open · 250 ms menu closed | `crates/ffi/src/app.rs` |
 | IPC request line limit | 1 MiB (responses up to 16 MiB) | `crates/ipc/src/lib.rs` |
-| Journal retention sweep | at start, then every 6 h (retention from config, default 30 days) | `crates/kernel/src/system.rs` |
+| Journal retention sweep | Runs on the wait handle. A paused sweep arms no timer. Otherwise it runs at start, then 6 hours after the last sweep. Retention comes from config, default 30 days. A broken journal or a whole-file fallback pauses it until the next start. | `crates/kernel/src/system.rs` |
 
 ## Environments
 
