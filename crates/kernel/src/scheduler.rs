@@ -111,6 +111,10 @@ impl fmt::Debug for WaitHandle {
 impl WaitHandle {
     pub async fn wait_until(&mut self, deadline: Option<SystemTime>) -> Wake {
         loop {
+            if self.panel_changed() {
+                return Wake::PanelChanged;
+            }
+
             let Some(deadline) = deadline else {
                 if self.inputs.changed().await.is_err() {
                     std::future::pending::<()>().await;
@@ -137,6 +141,15 @@ impl WaitHandle {
                 }
             }
         }
+    }
+
+    fn panel_changed(&mut self) -> bool {
+        let current = self.inputs.borrow().panel_changes;
+        if current == self.seen_panel_changes {
+            return false;
+        }
+        self.seen_panel_changes = current;
+        true
     }
 
     fn closed_menu_gap(&self) -> Duration {

@@ -421,6 +421,13 @@ async fn an_open_menu_applies_no_gap() {
 
     kernel.scheduler().set_panel_visible(true);
     let second = wall(ORIGIN_MS + 2_000);
+    {
+        let mut opened = std::pin::pin!(handle.wait_until(Some(second)));
+        assert_eq!(
+            futures::poll!(opened.as_mut()),
+            Poll::Ready(Wake::PanelChanged)
+        );
+    }
     let mut wait = std::pin::pin!(handle.wait_until(Some(second)));
     assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
     clock.advance(Duration::from_secs(1));
@@ -477,6 +484,180 @@ async fn dropping_a_wait_keeps_the_record_of_the_previous_timer_wake() {
     clock.advance(Duration::from_secs(28));
     tokio::time::advance(Duration::from_secs(28)).await;
     assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+
+    clock.advance(Duration::from_secs(1));
+    tokio::time::advance(Duration::from_secs(1)).await;
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_panel_change_ends_a_wait_with_a_deadline() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+    let deadline = wall(ORIGIN_MS + 10_000);
+    let mut wait = std::pin::pin!(handle.wait_until(Some(deadline)));
+
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    kernel.scheduler().set_panel_visible(true);
+    assert_eq!(
+        futures::poll!(wait.as_mut()),
+        Poll::Ready(Wake::PanelChanged)
+    );
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_panel_change_ends_a_wait_with_no_deadline() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+    let mut wait = std::pin::pin!(handle.wait_until(None));
+
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    kernel.scheduler().set_panel_visible(true);
+    assert_eq!(
+        futures::poll!(wait.as_mut()),
+        Poll::Ready(Wake::PanelChanged)
+    );
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_handle_reports_whether_the_panel_is_visible() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let handle = kernel.scheduler().wait_handle();
+
+    assert!(!handle.panel_visible());
+    kernel.scheduler().set_panel_visible(true);
+    assert!(handle.panel_visible());
+    kernel.scheduler().set_panel_visible(false);
+    assert!(!handle.panel_visible());
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_panel_change_between_waits_is_not_lost() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+    let deadline = wall(ORIGIN_MS + 60_000);
+    {
+        let mut wait = std::pin::pin!(handle.wait_until(Some(deadline)));
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    }
+
+    kernel.scheduler().set_panel_visible(true);
+    let mut wait = std::pin::pin!(handle.wait_until(Some(deadline)));
+    assert_eq!(
+        futures::poll!(wait.as_mut()),
+        Poll::Ready(Wake::PanelChanged)
+    );
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn two_quick_panel_flips_still_end_the_wait() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+    let deadline = wall(ORIGIN_MS + 60_000);
+    {
+        let mut wait = std::pin::pin!(handle.wait_until(Some(deadline)));
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+        kernel.scheduler().set_panel_visible(true);
+        kernel.scheduler().set_panel_visible(false);
+        assert_eq!(
+            futures::poll!(wait.as_mut()),
+            Poll::Ready(Wake::PanelChanged)
+        );
+    }
+    assert!(!handle.panel_visible());
+
+    let mut again = std::pin::pin!(handle.wait_until(Some(deadline)));
+    assert_eq!(futures::poll!(again.as_mut()), Poll::Pending);
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn setting_the_same_visibility_changes_nothing() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+    let deadline = wall(ORIGIN_MS + 10_000);
+    {
+        let mut wait = std::pin::pin!(handle.wait_until(Some(deadline)));
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+        kernel.scheduler().set_panel_visible(false);
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+    }
+
+    kernel.scheduler().set_panel_visible(true);
+    let mut opened = kernel.scheduler().wait_handle();
+    {
+        let mut seen = std::pin::pin!(opened.wait_until(Some(deadline)));
+        assert_eq!(futures::poll!(seen.as_mut()), Poll::Pending);
+    }
+    let mut again = std::pin::pin!(opened.wait_until(Some(deadline)));
+    assert_eq!(futures::poll!(again.as_mut()), Poll::Pending);
+    kernel.scheduler().set_panel_visible(true);
+    assert_eq!(futures::poll!(again.as_mut()), Poll::Pending);
+
+    clock.advance(Duration::from_secs(10));
+    tokio::time::advance(Duration::from_secs(10)).await;
+    assert_eq!(futures::poll!(again.as_mut()), Poll::Ready(Wake::Due));
+    kernel.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_panel_change_does_not_count_toward_the_gap() {
+    let clock = FakeClock::at(ORIGIN_MS);
+    let kernel = kernel_with(&clock);
+    let mut handle = kernel.scheduler().wait_handle();
+
+    let first = wall(ORIGIN_MS + 1_000);
+    {
+        let mut wait = std::pin::pin!(handle.wait_until(Some(first)));
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+        clock.advance(Duration::from_secs(1));
+        tokio::time::advance(Duration::from_secs(1)).await;
+        assert_eq!(futures::poll!(wait.as_mut()), Poll::Ready(Wake::Due));
+    }
+
+    clock.advance(Duration::from_secs(10));
+    tokio::time::advance(Duration::from_secs(10)).await;
+
+    let during = wall(ORIGIN_MS + 60_000);
+    kernel.scheduler().set_panel_visible(true);
+    {
+        let mut wait = std::pin::pin!(handle.wait_until(Some(during)));
+        assert_eq!(
+            futures::poll!(wait.as_mut()),
+            Poll::Ready(Wake::PanelChanged)
+        );
+    }
+    kernel.scheduler().set_panel_visible(false);
+    {
+        let mut wait = std::pin::pin!(handle.wait_until(Some(during)));
+        assert_eq!(
+            futures::poll!(wait.as_mut()),
+            Poll::Ready(Wake::PanelChanged)
+        );
+    }
+
+    let next = wall(ORIGIN_MS + 2_000);
+    let mut wait = std::pin::pin!(handle.wait_until(Some(next)));
+    assert_eq!(futures::poll!(wait.as_mut()), Poll::Pending);
+
+    clock.advance(Duration::from_secs(19));
+    tokio::time::advance(Duration::from_secs(19)).await;
+    assert_eq!(
+        futures::poll!(wait.as_mut()),
+        Poll::Pending,
+        "panel change moved the 30-second gap"
+    );
 
     clock.advance(Duration::from_secs(1));
     tokio::time::advance(Duration::from_secs(1)).await;
