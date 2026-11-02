@@ -9,6 +9,7 @@
 mod bus;
 mod module;
 mod runtime;
+mod scheduler;
 mod system;
 
 pub use bus::EventBus;
@@ -17,4 +18,5 @@ pub use navori_protocol::{
     ActionSpec, CoreStatus, Envelope, Event, ModuleInfo, ModuleState, Risk, Severity,
 };
 pub use runtime::{DispatchError, Kernel, KernelBuilder, RestartPolicy};
+pub use scheduler::{Scheduler, SystemClock, WaitHandle, Wake, WallClock};
 pub use system::{System, SystemAction, SystemState};

@@ -14,6 +14,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::bus::{EventBus, now_ms};
 use crate::module::{ActionError, Module, ModuleAction, ModuleCtx, Reply, Request};
+use crate::scheduler::{Scheduler, SystemClock, WallClock};
 use crate::system::System;
 
 const INBOX_CAPACITY: usize = 256;
@@ -72,6 +73,7 @@ struct Plumbing {
     bus: EventBus,
     revision: Arc<watch::Sender<u64>>,
     shutdown: CancellationToken,
+    scheduler: Scheduler,
 }
 
 pub struct KernelBuilder {
@@ -161,6 +163,7 @@ impl KernelBuilder {
             bus: self.plumbing.bus.clone(),
             store: self.plumbing.store.clone(),
             shutdown: self.plumbing.shutdown.clone(),
+            scheduler: self.plumbing.scheduler.clone(),
         };
         let sup_info = info.clone();
         let plumbing = self.plumbing.clone();
@@ -215,12 +218,17 @@ impl std::fmt::Debug for Kernel {
 impl Kernel {
     /// A builder with the built-in `system` module already registered.
     pub fn builder(store: Store) -> KernelBuilder {
+        Self::builder_with_clock(store, Arc::new(SystemClock))
+    }
+
+    pub fn builder_with_clock(store: Store, clock: Arc<dyn WallClock>) -> KernelBuilder {
         let (revision, _) = watch::channel(0);
         let plumbing = Plumbing {
             bus: EventBus::new(store.clone()),
             store,
             revision: Arc::new(revision),
             shutdown: CancellationToken::new(),
+            scheduler: Scheduler::new(clock),
         };
         let system = System::default();
         KernelBuilder {
@@ -232,6 +240,10 @@ impl Kernel {
             retention_days: system.retention_days.clone(),
         }
         .register(system)
+    }
+
+    pub fn scheduler(&self) -> &Scheduler {
+        &self.plumbing.scheduler
     }
 
     pub fn actions(&self) -> Vec<ActionSpec> {

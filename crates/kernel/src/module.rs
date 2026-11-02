@@ -12,6 +12,7 @@ use tokio::sync::{mpsc, oneshot, watch};
 use tokio_util::sync::CancellationToken;
 
 use crate::bus::EventBus;
+use crate::scheduler::{Scheduler, WaitHandle};
 
 /// Documentation for one variant of a module's action enum.
 #[derive(Debug, Clone, Copy)]
@@ -89,6 +90,7 @@ pub struct ModuleCtx<M: Module> {
     pub bus: EventBus,
     pub store: Store,
     pub shutdown: CancellationToken,
+    pub(crate) scheduler: Scheduler,
 }
 
 impl<M: Module> std::fmt::Debug for ModuleCtx<M> {
@@ -121,5 +123,9 @@ impl<M: Module> ModuleCtx<M> {
     pub fn emit(&self, kind: &str, severity: Severity, summary: impl Into<String>, payload: Value) {
         self.bus
             .emit(M::ID, kind, severity, summary.into(), payload);
+    }
+
+    pub fn wait_handle(&self) -> WaitHandle {
+        self.scheduler.wait_handle()
     }
 }
