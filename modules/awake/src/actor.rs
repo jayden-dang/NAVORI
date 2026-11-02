@@ -4,13 +4,12 @@ use navori_kernel::{ActionError, ModuleCtx, Request, Severity, WaitHandle, Wake}
 use serde_json::{Value, json};
 
 use crate::action::AwakeAction;
-use crate::domain::{EndReason, Ended, Held, LeaseTable, Reconciler, Timing};
+use crate::domain::{EndReason, Ended, Held, Lease, LeaseSource, LeaseTable, Reconciler, Timing};
 use crate::event::{self, LEASE_ENDED, LEASE_STARTED};
 use crate::infra::Platform;
 use crate::state::AwakeState;
 
 const MAX_SECONDS: u64 = 7 * 24 * 60 * 60;
-const DURATION_SOURCE: &str = "1 hour";
 
 pub struct Awake {
     platform: Platform,
@@ -70,18 +69,20 @@ impl Awake {
     fn on_request(&mut self, ctx: &ModuleCtx<Self>, wait: &WaitHandle, req: Request<AwakeAction>) {
         let now = wait.now();
         let started = match &req.action {
-            AwakeAction::Status => Ok(false),
-            AwakeAction::HoldFor { seconds } => self.hold_for(now, *seconds),
+            AwakeAction::Status => Ok(None),
+            AwakeAction::HoldFor { seconds } => {
+                self.hold_for(now, *seconds).map(|()| Some(*seconds))
+            }
             AwakeAction::ReleaseAll => {
                 let ended = self.table.release_all();
                 self.emit_ended(ctx, &ended);
-                Ok(false)
+                Ok(None)
             }
         };
         match started {
             Ok(started) => {
-                if started {
-                    self.emit_started(ctx);
+                if let Some(seconds) = started {
+                    self.emit_started(ctx, seconds);
                 }
                 let state = self.turn(ctx, now);
                 req.respond(Ok(state));
@@ -90,7 +91,7 @@ impl Awake {
         }
     }
 
-    fn hold_for(&mut self, now: SystemTime, seconds: u64) -> Result<bool, ActionError> {
+    fn hold_for(&mut self, now: SystemTime, seconds: u64) -> Result<(), ActionError> {
         if seconds == 0 || seconds > MAX_SECONDS {
             return Err(ActionError::Invalid(format!(
                 "duration must be from 1 second through 7 days, not {seconds} seconds"
@@ -103,8 +104,9 @@ impl Awake {
             )));
         };
         let deadline = truncate_us(deadline);
-        self.table.hold_for(started, deadline);
-        Ok(true)
+        // Replacement keeps the assertion; no locked end sentence is true.
+        let _replaced = self.table.hold_for(started, deadline);
+        Ok(())
     }
 
     fn turn(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime) -> AwakeState {
@@ -127,11 +129,11 @@ impl Awake {
         state
     }
 
-    fn emit_started(&self, ctx: &ModuleCtx<Self>) {
+    fn emit_started(&self, ctx: &ModuleCtx<Self>, seconds: u64) {
         ctx.emit(
             LEASE_STARTED,
             Severity::Info,
-            event::started(DURATION_SOURCE),
+            event::started(&event::duration_source(seconds)),
             payload("manual"),
         );
     }
@@ -143,7 +145,7 @@ impl Awake {
                 EndReason::Deadline => ctx.emit(
                     LEASE_ENDED,
                     Severity::Info,
-                    event::ended_deadline(DURATION_SOURCE),
+                    event::ended_deadline(&duration_source_for(&end.lease)),
                     payload(end.lease.key.as_str()),
                 ),
                 EndReason::ReleaseAll if !released => {
@@ -159,6 +161,15 @@ impl Awake {
             }
         }
     }
+}
+
+fn duration_source_for(lease: &Lease) -> String {
+    let LeaseSource::Duration { started } = lease.source;
+    let seconds = lease
+        .deadline
+        .and_then(|deadline| deadline.duration_since(started).ok())
+        .map_or(0, |span| span.as_secs());
+    event::duration_source(seconds)
 }
 
 fn payload(key: &str) -> Value {

@@ -62,6 +62,33 @@ async fn a_one_hour_lease_holds_one_system_assertion_with_the_given_name() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_ten_second_hold_starts_as_ten_seconds_not_one_hour() {
+    let rig = Rig::new();
+    rig.dispatch(hold(10)).await.unwrap();
+
+    let events = rig.kernel.recent_events(10).unwrap();
+    let started: Vec<_> = events
+        .iter()
+        .filter(|event| event.kind == "awake.lease_started")
+        .collect();
+    assert_eq!(started.len(), 1);
+    assert_eq!(started[0].module, "awake");
+    assert_eq!(started[0].severity, Severity::Info);
+    assert!(
+        !started[0].summary.contains("1 hour"),
+        "{}",
+        started[0].summary
+    );
+    assert!(
+        started[0].summary.contains("10 seconds"),
+        "{}",
+        started[0].summary
+    );
+    assert_eq!(started[0].summary, "Keeping this Mac awake: 10 seconds.");
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
 async fn two_duration_requests_keep_one_lease_and_restart_the_hour() {
     let rig = Rig::new();
     let first = rig.dispatch(hold(3600)).await.unwrap();
@@ -89,6 +116,29 @@ async fn two_duration_requests_keep_one_lease_and_restart_the_hour() {
         vec![(AssertionKind::System, ASSERTION_NAME.to_owned())]
     );
     assert_eq!(rig.power.releases(), 0);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn replacing_a_duration_lease_emits_another_start_and_no_end() {
+    let rig = Rig::new();
+    rig.dispatch(hold(3600)).await.unwrap();
+    rig.advance(Duration::from_secs(10 * 60)).await;
+    rig.dispatch(hold(3600)).await.unwrap();
+
+    let events = rig.kernel.recent_events(10).unwrap();
+    let started: Vec<_> = events
+        .iter()
+        .filter(|event| event.kind == "awake.lease_started")
+        .collect();
+    let ended: Vec<_> = events
+        .iter()
+        .filter(|event| event.kind == "awake.lease_ended")
+        .collect();
+    assert_eq!(started.len(), 2);
+    assert_eq!(started[0].summary, "Keeping this Mac awake: 1 hour.");
+    assert_eq!(started[1].summary, "Keeping this Mac awake: 1 hour.");
+    assert!(ended.is_empty());
     rig.shutdown().await;
 }
 
