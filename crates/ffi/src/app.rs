@@ -44,6 +44,11 @@ impl Inner {
             data_dir: self.paths.data_dir.display().to_string(),
             socket_path: self.paths.socket.display().to_string(),
             modules: self.kernel.modules(),
+            tray: self.kernel.tray(
+                self.config_notice
+                    .as_ref()
+                    .map(|n| (n.title.as_str(), n.message.as_str())),
+            ),
         }
     }
 

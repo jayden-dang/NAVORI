@@ -119,6 +119,8 @@ pub struct CoreStatus {
     pub data_dir: String,
     pub socket_path: String,
     pub modules: Vec<ModuleInfo>,
+    /// The composed status icon state.
+    pub tray: TrayState,
 }
 
 /// One diagnostic check reported by `doctor`.

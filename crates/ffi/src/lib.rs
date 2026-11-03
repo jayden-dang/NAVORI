@@ -19,6 +19,7 @@ use std::time::Duration;
 use navori_config::{Paths, Profile};
 use navori_ipc::{IpcError, Server};
 use navori_kernel::{DispatchError, Envelope, Risk, Severity};
+use navori_protocol::{TrayGlyph, TrayState};
 use navori_store::Store;
 use tokio::runtime::Runtime;
 use tokio_util::sync::CancellationToken;
@@ -105,6 +106,51 @@ pub struct AwakeView {
     pub problem: Option<String>,
 }
 
+/// Which mark the status icon shows. Mirrors `navori_protocol::TrayGlyph`.
+#[derive(Debug, Clone, PartialEq, uniffi::Enum)]
+pub enum TrayGlyphView {
+    Normal,
+    Lease,
+    AiRunning,
+    Problem,
+}
+
+impl From<TrayGlyph> for TrayGlyphView {
+    fn from(glyph: TrayGlyph) -> Self {
+        match glyph {
+            TrayGlyph::Normal => Self::Normal,
+            TrayGlyph::Lease => Self::Lease,
+            TrayGlyph::AiRunning => Self::AiRunning,
+            TrayGlyph::Problem => Self::Problem,
+        }
+    }
+}
+
+/// The composed status icon state, as the Shell receives it.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct TrayView {
+    pub glyph: TrayGlyphView,
+    /// Something waits for the user.
+    pub attention: bool,
+    /// One line for the status item's text and accessibility description.
+    pub summary: String,
+}
+
+impl From<TrayState> for TrayView {
+    fn from(state: TrayState) -> Self {
+        let TrayState {
+            glyph,
+            attention,
+            summary,
+        } = state;
+        Self {
+            glyph: glyph.into(),
+            attention,
+            summary,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct CoreSnapshot {
     pub version: String,
@@ -124,6 +170,8 @@ pub struct CoreSnapshot {
     pub recent_events: Vec<EventView>,
     /// Awake's published state. Absent when that state will not deserialize.
     pub awake: Option<AwakeView>,
+    /// The status icon state, composed once per snapshot.
+    pub tray: TrayView,
 }
 
 #[derive(Debug, Clone, PartialEq, thiserror::Error, uniffi::Error)]
@@ -418,6 +466,7 @@ fn snapshot(inner: &Inner) -> CoreSnapshot {
             })
             .collect(),
         awake: app::awake_view(&inner.kernel),
+        tray: status.tray.into(),
     }
 }
 

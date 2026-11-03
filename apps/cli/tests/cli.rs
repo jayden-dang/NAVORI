@@ -95,6 +95,39 @@ fn status_json_describes_the_running_core() {
 }
 
 #[test]
+fn status_json_carries_the_icon_state() {
+    let r = running_core();
+    let out = navori(&r.home)
+        .args(["status", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let v: Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(v["tray"]["glyph"], "normal");
+    assert_eq!(v["tray"]["attention"], false);
+    assert_eq!(v["tray"]["summary"], "Navori");
+    assert_eq!(v["pid"], std::process::id());
+    assert_eq!(v["version"], "9.9.9-test");
+    assert_eq!(v["profile"], "dev");
+    assert!(v["data_dir"].is_string());
+    assert!(v["socket_path"].is_string());
+    assert!(v["modules"].is_array());
+}
+
+#[test]
+fn status_plain_output_has_no_icon_line() {
+    let r = running_core();
+    navori(&r.home)
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("glyph").not())
+        .stdout(predicate::str::contains("attention").not());
+}
+
+#[test]
 fn status_plain_is_human_readable() {
     let r = running_core();
     navori(&r.home)
