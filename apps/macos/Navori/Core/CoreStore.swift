@@ -132,6 +132,86 @@ final class CoreStore {
         return name
     }
 
+    var awakeBlockStatus: AwakeBlockStatus {
+        switch awakeStatus {
+        case .off: .off
+        case .notHeld: .notHeld
+        case .unavailable: .unavailable
+        case .on:
+            .on(since: snapshot?.awake?.sinceMs.map(Self.clockText) ?? "")
+        }
+    }
+
+    var awakeLeases: [AwakeLeaseInput] {
+        snapshot?.awake?.leases.compactMap(awakeLeaseInput) ?? []
+    }
+
+    var displayHeld: Bool { snapshot?.awake?.displayHeld ?? false }
+
+    var displayWanted: Bool {
+        snapshot?.awake?.leases.contains { $0.kind == "display" } ?? false
+    }
+
+    func holdOneHour() async {
+        let seconds = AwakeSubmenuState.menuHoldSeconds
+        await performAwake("{\"hold_for\":{\"seconds\":\(seconds)}}")
+    }
+
+    func holdUntilOff() async {
+        await performAwake("\"hold_until_off\"")
+    }
+
+    func setDisplay(on: Bool) async {
+        await performAwake("{\"display\":{\"on\":\(on)}}")
+    }
+
+    func releaseAll() async {
+        await performAwake("\"release_all\"")
+    }
+
+    private func performAwake(_ actionJSON: String) async {
+        do {
+            _ = try await dispatch(module: "awake", actionJSON: actionJSON)
+        } catch {
+            log.error("awake command failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func awakeLeaseInput(_ lease: LeaseView) -> AwakeLeaseInput? {
+        let kind: AwakeLeaseInput.Kind
+        switch lease.kind {
+        case "duration": kind = .duration
+        case "until_off": kind = .untilOff
+        case "display": kind = .display
+        case "command": kind = .command
+        case "session": kind = .session
+        default: return nil
+        }
+        let until = kind == .duration ? lease.endsAtMs.map(Self.clockText) : nil
+        return AwakeLeaseInput(
+            kind: kind,
+            harness: nonempty(lease.harness),
+            label: nonempty(lease.label),
+            pid: lease.pid,
+            stopped: lease.stopped,
+            until: until
+        )
+    }
+
+    private func nonempty(_ value: String?) -> String? {
+        guard let value, value.isEmpty == false else { return nil }
+        return value
+    }
+
+    private static func clockText(_ ms: Int64) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = .current
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: Date(timeIntervalSince1970: TimeInterval(ms) / 1000))
+    }
+
     var health: Health {
         if let startupError { return .down(startupError) }
         guard let snapshot else { return .starting }

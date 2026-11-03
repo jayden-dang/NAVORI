@@ -22,7 +22,7 @@ final class StatusBarController: NSObject {
                 case "core":
                     return AnyView(CoreSubmenuView(store: self.store))
                 case "awake":
-                    return AnyView(EmptyView())
+                    return AnyView(AwakeSubmenuView(store: self.store))
                 default:
                     return AnyView(EmptyView())
                 }
@@ -196,7 +196,6 @@ final class StatusBarController: NSObject {
         ]
     }
 
-    /// Static command ids from the Awake submenu. The view stays empty until that submenu ships.
     private var awakeCommands: [CascadeNode] {
         [
             CascadeNode(id: "awake.hold_hour", isActionable: true),
@@ -211,6 +210,16 @@ final class StatusBarController: NSObject {
         case "settings": showSettings(.general)
         case "about": showSettings(.about)
         case "quit": NSApp.terminate(nil)
+        case "awake.hold_hour":
+            Task { [store] in await store.holdOneHour() }
+        case "awake.hold_until_off":
+            Task { [store] in await store.holdUntilOff() }
+        case "awake.display":
+            let turnOn = store.displayWanted == false
+            Task { [store] in await store.setDisplay(on: turnOn) }
+        case "awake.release_all":
+            guard store.awakeLeases.isEmpty == false else { return }
+            Task { [store] in await store.releaseAll() }
         default: break
         }
     }

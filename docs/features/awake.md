@@ -19,6 +19,12 @@ No `--for` flag means until turned off. `awake run` still runs the command when 
 
 `navori doctor` includes an `awake` row, after `modules`. `navori actions` lists the catalog: `status` (read) and `hold_for`, `hold_until_off`, `display`, `hold_command`, `hold_session`, `stop_session`, `end_session`, `release_all` (write).
 
+## Menu
+
+The Awake row sits above Core. It shows `Off`, `On` with the sources holding, `Not held`, or `Unavailable`.
+
+Open it for `Keep awake for 1 hour` (always 3600 seconds), `Keep awake until I turn it off`, the status block, `Display on` (it reads `Display off` once that Lease exists), and `Release all`. `Release all` stays visible and does nothing while no Lease exists. Holding lists each current Lease: `1 hour` or `Until off`, `Display`, a command's executable, or a session. The menu does not offer a per-Lease release, and opening it does not read the process table or the system's assertions.
+
 Start events: `Keeping this Mac awake: <source>.` End events: reached its end time, exited, stopped, still busy 2 hours after it stopped, Release all. Replacing a manual hold, turning display off, and ending a session emit no end event. `<source>` is a harness name, a duration (`1 hour` or another true length), `until off`, `display`, or the executable name — never a project or branch.
 
 ## What it does not do
