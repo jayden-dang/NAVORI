@@ -68,7 +68,7 @@ Modify:
 - `docs/codebase/dependencies.md` — a `navori-secrets` row in the "Today" table and the Secrets row of the third-party table.
 - `docs/architecture/data.md` — the dev service beside `dev.navori`.
 
-Already done outside this plan: the catalog row (`docs/specs/catalog/app.md`) and the ROAD-19 `After: ROAD-10` edit with `Status: Draft` (commit 167be85).
+Already done outside this plan: the catalog row (`docs/specs/catalog/app.md`) and the ROAD-19 `After: ROAD-10` edit with `Status: Draft` (commit 167be85) and the `crates/ffi/` Surfaces edit of ROAD-11 and ROAD-19 (commit 11676b4), both labelled in the roadmap.
 
 ---
 
@@ -1310,7 +1310,7 @@ In `docs/codebase/dependencies.md`: add to the "Today" table, after the `navori-
 
 - [ ] **Step 3: Verify**
 
-Run the three `rg` commands again — expect: the new row, both service names, the new crate names, and no remaining `keyring` (apple-native). Run: `git diff -U0 docs/codebase/dependencies.md docs/architecture/data.md` — expect: only those lines changed. Run: `git diff $(git merge-base HEAD main) -- docs/roadmap/INDEX.md docs/specs/catalog/app.md` — expect: only `Status: Approved` to `Status: Draft`, ROAD-19 `After: none` to `After: ROAD-10`, and one added `SECRETS` row (SECRETS-9.3, 10.5). Run: `head -4 docs/roadmap/INDEX.md` — expect: `Status: Draft`.
+Run the three `rg` commands again — expect: the new row, both service names, the new crate names, and no remaining `keyring` (apple-native). Run: `git diff -U0 docs/codebase/dependencies.md docs/architecture/data.md` — expect: only those lines changed. Run: `git diff $(git merge-base HEAD main) -- docs/roadmap/INDEX.md docs/specs/catalog/app.md` — expect: only `Status: Approved` to `Status: Draft`, ROAD-19 `After: none` to `After: ROAD-10`, `crates/ffi/` added to the Surfaces of ROAD-11 and ROAD-19 (each with its `agent-decided` marker comment), and one added `SECRETS` row (SECRETS-9.3, 10.5). Run: `head -4 docs/roadmap/INDEX.md` — expect: `Status: Draft`.
 
 - [ ] **Step 4: Commit**
 

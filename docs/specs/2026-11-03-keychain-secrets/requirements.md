@@ -92,7 +92,7 @@ the real Keychain only on request (SECRETS-7.3), and that run is not part of `ca
 
 - **SECRETS-9.1** WHEN the crate lands THE SYSTEM SHALL list `navori-secrets` in the crate table of `docs/codebase/dependencies.md` with its allowed consumers, and SHALL replace the planned `keyring` entry of the Secrets row with the backend crates actually used (`agent-decided`).
 - **SECRETS-9.2** WHEN the crate lands THE SYSTEM SHALL name the dev service `dev.navori.dev` beside `dev.navori` in `docs/architecture/data.md` (`agent-decided`).
-- **SECRETS-9.3** THE SYSTEM SHALL record in `docs/roadmap/INDEX.md` that ROAD-19 comes After ROAD-10, because it stores its token through `crates/secrets/`, and the roadmap SHALL stay Draft (`agent-decided`; applied in this change, listed in the run report).
+- **SECRETS-9.3** THE SYSTEM SHALL record in `docs/roadmap/INDEX.md` that ROAD-19 comes After ROAD-10, because it stores its token through `crates/secrets/`, and that ROAD-11 and ROAD-19 list `crates/ffi/` among their Surfaces (the owner of the Swift-to-Rust save call and the Profile mapping), and the roadmap SHALL stay Draft (`agent-decided`; applied in this change, labelled in the roadmap and listed in the run report).
 
 ## 10. Existing behavior stays intact
 
@@ -104,7 +104,7 @@ Files touched: `Cargo.toml`, `Cargo.lock`, `crates/secrets/` (new), `docs/codeba
 - **SECRETS-10.2** (guard) WHEN a dependency is added THE SYSTEM SHALL CONTINUE TO keep every already locked dependency version in `Cargo.lock` unchanged, unless a backend crate forces a bump, in which case the bump is recorded (Open Questions).
 - **SECRETS-10.3** (guard) WHEN `docs/codebase/dependencies.md` gains the `navori-secrets` row THE SYSTEM SHALL CONTINUE TO allow `modules/*` and `ai/*` to depend on secrets, and to limit the `navori` CLI to `config`, `ipc` and `protocol`.
 - **SECRETS-10.4** (guard) WHEN `docs/architecture/data.md` names the dev service THE SYSTEM SHALL CONTINUE TO say that Keychain items hold the GitHub token and the provider API keys and never sit in the database, the config or the logs.
-- **SECRETS-10.5** (guard) WHEN the roadmap and the catalog are edited THE SYSTEM SHALL CONTINUE TO keep every existing MILE, ROAD and feature code and every other row unchanged, except the ROAD-19 `After` field of SECRETS-9.3.
+- **SECRETS-10.5** (guard) WHEN the roadmap and the catalog are edited THE SYSTEM SHALL CONTINUE TO keep every existing MILE, ROAD and feature code and every other row unchanged, except the ROAD-19 `After` field and the ROAD-11 and ROAD-19 Surfaces of SECRETS-9.3.
 
 ## Out of Scope
 
