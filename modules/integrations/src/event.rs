@@ -44,6 +44,14 @@ pub(crate) fn already_installed(harness: Harness) -> String {
     )
 }
 
-pub(crate) fn install_failed(harness: Harness) -> String {
-    format!("Could not install Navori's hooks for {}.", name(harness))
+pub(crate) fn repaired(harness: Harness) -> String {
+    format!("Repaired Navori's hooks for {}.", name(harness))
+}
+
+pub(crate) fn already_correct(harness: Harness) -> String {
+    format!("Navori's hooks for {} were already correct.", name(harness))
+}
+
+pub(crate) fn failed(harness: Harness, verb: &str) -> String {
+    format!("Could not {verb} Navori's hooks for {}.", name(harness))
 }

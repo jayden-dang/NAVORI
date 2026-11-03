@@ -13,6 +13,8 @@ pub use state::{HarnessStatus, IntegrationsState, Offer, State};
 
 use std::path::PathBuf;
 
+use infra::files::Plan;
+
 use navori_kernel::{ActionError, Module, ModuleCtx, NoConfig, Severity};
 use serde_json::json;
 
@@ -46,52 +48,82 @@ impl Integrations {
 }
 
 impl Integrations {
-    async fn install(
+    async fn change(
         &self,
         ctx: &ModuleCtx<Self>,
         harness: Harness,
+        plan: Plan,
     ) -> Result<IntegrationsState, ActionError> {
+        let words = Words::of(plan);
         let env = self.env.clone();
         let payload = json!({ "harness": harness });
         let done = tokio::task::spawn_blocking(move || {
-            let outcome = infra::files::apply(&env, harness, infra::files::Plan::Install);
+            let outcome = infra::files::apply(&env, harness, plan);
             (outcome, inspect(&env))
         })
         .await;
         let done = match done {
             Ok(done) => done,
             Err(error) => {
-                tracing::warn!(?harness, %error, "the install did not finish");
+                tracing::warn!(?harness, %error, "the {} did not finish", words.verb);
                 ctx.emit(
                     HOOK_FAILED,
                     Severity::Error,
-                    event::install_failed(harness),
+                    event::failed(harness, words.verb),
                     payload,
                 );
                 return Err(ActionError::Failed(format!(
-                    "the install did not finish: {error}"
+                    "the {} did not finish: {error}",
+                    words.verb
                 )));
             }
         };
         match done {
             (Ok(outcome), state) => {
                 let summary = match outcome {
-                    infra::files::Outcome::Written => event::installed(harness),
-                    infra::files::Outcome::Nothing => event::already_installed(harness),
+                    infra::files::Outcome::Written => (words.done)(harness),
+                    infra::files::Outcome::Nothing => (words.already)(harness),
                 };
-                ctx.emit(HOOK_INSTALLED, Severity::Info, summary, payload);
+                ctx.emit(words.kind, Severity::Info, summary, payload);
                 Ok(state)
             }
             (Err(error), _) => {
-                tracing::warn!(?harness, %error, "installing the hooks failed");
+                tracing::warn!(?harness, %error, "{} the hooks failed", words.verb);
                 ctx.emit(
                     HOOK_FAILED,
                     Severity::Error,
-                    event::install_failed(harness),
+                    event::failed(harness, words.verb),
                     payload,
                 );
                 Err(ActionError::Failed(error.to_string()))
             }
+        }
+    }
+}
+
+/// What differs between the actions that share one change path.
+struct Words {
+    verb: &'static str,
+    kind: &'static str,
+    done: fn(Harness) -> String,
+    already: fn(Harness) -> String,
+}
+
+impl Words {
+    fn of(plan: Plan) -> Self {
+        match plan {
+            Plan::Install => Self {
+                verb: "install",
+                kind: HOOK_INSTALLED,
+                done: event::installed,
+                already: event::already_installed,
+            },
+            Plan::Repair => Self {
+                verb: "repair",
+                kind: HOOK_REPAIRED,
+                done: event::repaired,
+                already: event::already_correct,
+            },
         }
     }
 }
@@ -118,10 +150,15 @@ impl Module for Integrations {
                 }
                 IntegrationsAction::Install { harness } => {
                     let harness = *harness;
-                    let result = self.install(ctx, harness).await;
+                    let result = self.change(ctx, harness, Plan::Install).await;
                     req.respond(result);
                 }
-                IntegrationsAction::Repair { .. } | IntegrationsAction::Remove { .. } => {
+                IntegrationsAction::Repair { harness } => {
+                    let harness = *harness;
+                    let result = self.change(ctx, harness, Plan::Repair).await;
+                    req.respond(result);
+                }
+                IntegrationsAction::Remove { .. } => {
                     req.respond::<IntegrationsState>(Err(ActionError::Invalid(
                         "this action is not available yet".to_owned(),
                     )));

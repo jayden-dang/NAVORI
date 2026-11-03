@@ -87,6 +87,7 @@ const NEW_FILE_MODE: u32 = 0o600;
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Plan {
     Install,
+    Repair,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -162,7 +163,7 @@ pub(crate) fn apply(
         });
     }
     let changed = match plan {
-        Plan::Install => domain::converge(&mut doc, harness, env.dev, &env.helper),
+        Plan::Install | Plan::Repair => domain::converge(&mut doc, harness, env.dev, &env.helper),
     };
     if changed == Changed::No && existed {
         return Ok(Outcome::Nothing);
