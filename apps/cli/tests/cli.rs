@@ -398,3 +398,199 @@ fn awake_run_with_the_app_down_creates_no_socket() {
         .join("Library/Application Support/Navori Dev/run/navori.sock");
     assert!(!socket.exists(), "CLI must not create {}", socket.display());
 }
+
+struct Recorder {
+    home: tempfile::TempDir,
+    requests: Arc<std::sync::Mutex<Vec<Value>>>,
+}
+
+fn recording_server() -> Recorder {
+    use std::io::{BufRead, BufReader, Write};
+
+    let home = short_home();
+    let uid = std::fs::metadata(home.path()).unwrap().uid();
+    let socket = navori_config::Paths::new(navori_config::Profile::Dev, home.path(), uid).socket;
+    std::fs::create_dir_all(socket.parent().unwrap()).unwrap();
+    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+    let requests = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = Arc::clone(&requests);
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(stream) = stream else { break };
+            let seen = Arc::clone(&seen);
+            std::thread::spawn(move || {
+                let mut writer = stream.try_clone().unwrap();
+                for line in BufReader::new(stream).lines() {
+                    let Ok(line) = line else { break };
+                    let request: Value = serde_json::from_str(&line).unwrap();
+                    let reply = serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": request["id"],
+                        "result": {},
+                    });
+                    seen.lock().unwrap().push(request);
+                    if writeln!(writer, "{reply}").is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+    });
+    Recorder { home, requests }
+}
+
+impl Recorder {
+    fn hook(&self, payload: &str) -> Vec<Value> {
+        navori(&self.home)
+            .args(["--profile", "dev", "hook"])
+            .write_stdin(payload.to_owned())
+            .assert()
+            .success()
+            .stdout("")
+            .stderr("");
+        self.requests.lock().unwrap().clone()
+    }
+}
+
+fn dispatched_action(request: &Value) -> &Value {
+    assert_eq!(request["method"], "core.dispatch");
+    assert_eq!(request["params"]["module"], "awake");
+    &request["params"]["action"]
+}
+
+#[test]
+fn a_prompt_submit_sends_hold_session_with_its_own_pids() {
+    let server = recording_server();
+
+    let requests = server.hook(r#"{"hook_event_name":"UserPromptSubmit","session_id":"s-1"}"#);
+
+    assert_eq!(requests.len(), 1);
+    let hold = &dispatched_action(&requests[0])["hold_session"];
+    assert_eq!(hold["session_id"], "s-1");
+    assert!(hold["pid"].as_i64().unwrap() > 0);
+    assert_ne!(hold["pid"].as_i64().unwrap(), i64::from(std::process::id()));
+    assert_eq!(
+        hold["ppid"].as_i64().unwrap(),
+        i64::from(std::process::id())
+    );
+}
+
+#[test]
+fn a_stop_without_a_reason_sends_stop_session() {
+    let server = recording_server();
+
+    let requests = server.hook(r#"{"hook_event_name":"Stop","session_id":"s-1"}"#);
+
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"stop_session": {"session_id": "s-1"}})
+    );
+}
+
+#[test]
+fn a_stop_with_reason_end_turn_sends_stop_session() {
+    let server = recording_server();
+
+    let requests =
+        server.hook(r#"{"hook_event_name":"Stop","session_id":"s-1","reason":"end_turn"}"#);
+
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"stop_session": {"session_id": "s-1"}})
+    );
+}
+
+#[test]
+fn a_stop_with_another_reason_sends_nothing() {
+    let server = recording_server();
+
+    let requests =
+        server.hook(r#"{"hook_event_name":"Stop","session_id":"s-1","reason":"tool_use"}"#);
+
+    assert!(requests.is_empty());
+}
+
+#[test]
+fn a_stop_cancelled_sends_stop_session() {
+    let server = recording_server();
+
+    let requests = server.hook(r#"{"hook_event_name":"StopCancelled","session_id":"s-1"}"#);
+
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"stop_session": {"session_id": "s-1"}})
+    );
+}
+
+#[test]
+fn a_stop_failure_sends_stop_session() {
+    let server = recording_server();
+
+    let requests = server.hook(r#"{"hook_event_name":"StopFailure","session_id":"s-1"}"#);
+
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"stop_session": {"session_id": "s-1"}})
+    );
+}
+
+#[test]
+fn a_session_end_sends_end_session_with_no_pid() {
+    let server = recording_server();
+
+    let requests = server.hook(r#"{"hook_event_name":"SessionEnd","session_id":"s-1"}"#);
+
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"end_session": {"session_id": "s-1"}})
+    );
+}
+
+#[test]
+fn an_unknown_event_sends_nothing() {
+    let server = recording_server();
+
+    let requests = server.hook(r#"{"hook_event_name":"PreToolUse","session_id":"s-1"}"#);
+
+    assert!(requests.is_empty());
+}
+
+#[test]
+fn a_payload_sends_nothing_but_the_session_id_and_pids() {
+    let server = recording_server();
+
+    let requests = server.hook(
+        r#"{"hook_event_name":"UserPromptSubmit","session_id":"s-1","prompt":"SECRET-PROMPT-TEXT","cwd":"/private/place"}"#,
+    );
+
+    assert_eq!(requests.len(), 1);
+    let sent = requests[0].to_string();
+    assert!(!sent.contains("SECRET-PROMPT-TEXT"));
+    assert!(!sent.contains("/private/place"));
+    let hold = dispatched_action(&requests[0])["hold_session"]
+        .as_object()
+        .unwrap();
+    let mut keys: Vec<_> = hold.keys().map(String::as_str).collect();
+    keys.sort_unstable();
+    assert_eq!(keys, ["pid", "ppid", "session_id"]);
+}
+
+#[test]
+fn a_grok_payload_with_both_key_spellings_is_read_by_the_snake_case_keys() {
+    let server = recording_server();
+
+    let requests = server.hook(
+        r#"{"hook_event_name":"SessionEnd","hookEventName":"Stop","session_id":"snake","sessionId":"camel"}"#,
+    );
+
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"end_session": {"session_id": "snake"}})
+    );
+}

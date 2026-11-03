@@ -17,6 +17,8 @@ use navori_protocol::rpc::method;
 use navori_protocol::{ActionSpec, Check, CoreStatus, Event, ModuleState};
 use serde_json::{Value, json};
 
+mod hook;
+
 #[derive(Debug, Parser)]
 #[command(name = "navori", version, about = "Talk to the running Navori app")]
 struct Cli {
@@ -58,6 +60,8 @@ enum Command {
         /// The action as JSON: `"name"` or `{"name": {...}}`.
         action: String,
     },
+    /// Read a Harness hook payload on stdin and update session Leases.
+    Hook,
     /// Keep this Mac awake.
     Awake {
         #[command(subcommand)]
@@ -119,6 +123,10 @@ fn main() -> ExitCode {
         Command::Awake {
             command: AwakeCommand::Run { command },
         } => runtime.block_on(awake_run(&profile, command)),
+        Command::Hook => {
+            runtime.block_on(run_hook(&profile));
+            ExitCode::SUCCESS
+        }
         command => match runtime.block_on(run(Cli { profile, command })) {
             Ok(()) => ExitCode::SUCCESS,
             Err(Failure::Usage(m)) => {
@@ -241,8 +249,37 @@ async fn run(cli: Cli) -> Result<(), Failure> {
             AwakeCommand::Run { .. } => unreachable!("handled before connect"),
         },
         Command::Doctor { .. } => unreachable!("handled above"),
+        Command::Hook => unreachable!("handled before connect"),
     }
     Ok(())
+}
+
+async fn run_hook(profile: &str) {
+    let mut stdin = Vec::new();
+    if std::io::Read::read_to_end(&mut std::io::stdin(), &mut stdin).is_err() {
+        return;
+    }
+    let Some(plan) = hook::plan(
+        &stdin,
+        std::process::id(),
+        std::os::unix::process::parent_id(),
+    ) else {
+        return;
+    };
+    let Ok(socket) = socket_path(profile) else {
+        return;
+    };
+    let send = async {
+        let mut client = Client::connect(&socket).await.ok()?;
+        client
+            .call(
+                method::DISPATCH,
+                json!({ "module": "awake", "action": plan.action }),
+            )
+            .await
+            .ok()
+    };
+    let _ = tokio::time::timeout(plan.deadline, send).await;
 }
 
 async fn dispatch_awake(client: &mut Client, action: Value) -> Result<Value, Failure> {
