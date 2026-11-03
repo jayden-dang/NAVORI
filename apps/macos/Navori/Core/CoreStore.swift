@@ -122,7 +122,9 @@ final class CoreStore {
             problem: awake.problem,
             systemHeld: awake.systemHeld,
             hasLease: awake.leases.isEmpty == false,
-            sources: awake.leases.compactMap(awakeSourceName)
+            sources: awake.leases.compactMap {
+                AwakeLeaseMap.sourceName(kind: $0.kind, harness: $0.harness, label: $0.label)
+            }
         )
     }
 
@@ -145,23 +147,16 @@ final class CoreStore {
         )
     }
 
-    /// Session rows name the harness only. Other leases use the label the module already published.
-    private func awakeSourceName(_ lease: LeaseView) -> String? {
-        let name = lease.kind == "session" ? lease.harness : lease.label
-        guard let name, name.isEmpty == false else { return nil }
-        return name
-    }
-
     var awakeBlockStatus: AwakeBlockStatus {
         switch awakeStatus {
         case .off: .off
         case .notHeld: .notHeld
         case .unavailable: .unavailable
         case .on:
-            .on(since: snapshot?.awake?.sinceMs.map(Self.clockText) ?? "")
+            .on(since: snapshot?.awake?.sinceMs.map { AwakeLeaseMap.clockText($0) } ?? "")
         case .problem:
             if snapshot?.awake?.systemHeld == true {
-                .on(since: snapshot?.awake?.sinceMs.map(Self.clockText) ?? "")
+                .on(since: snapshot?.awake?.sinceMs.map { AwakeLeaseMap.clockText($0) } ?? "")
             } else {
                 .off
             }
@@ -169,7 +164,16 @@ final class CoreStore {
     }
 
     var awakeLeases: [AwakeLeaseInput] {
-        snapshot?.awake?.leases.compactMap(awakeLeaseInput) ?? []
+        snapshot?.awake?.leases.compactMap { lease in
+            AwakeLeaseMap.lease(
+                kind: lease.kind,
+                harness: lease.harness,
+                label: lease.label,
+                pid: lease.pid,
+                stopped: lease.stopped,
+                endsAtMs: lease.endsAtMs
+            )
+        } ?? []
     }
 
     var displayHeld: Bool { snapshot?.awake?.displayHeld ?? false }
@@ -200,7 +204,7 @@ final class CoreStore {
             _ = try await dispatch(module: "awake", actionJSON: actionJSON)
             awakeActionFailure = nil
         } catch {
-            let message = error.localizedDescription
+            let message = CoreStartupBanner.menuFailure(for: error)
             log.error("awake command failed: \(message, privacy: .public)")
             awakeActionFailure = AwakeActionFailure(
                 request: request,
@@ -208,41 +212,6 @@ final class CoreStore {
                 marks: awakeMarks
             )
         }
-    }
-
-    private func awakeLeaseInput(_ lease: LeaseView) -> AwakeLeaseInput? {
-        let kind: AwakeLeaseInput.Kind
-        switch lease.kind {
-        case "duration": kind = .duration
-        case "until_off": kind = .untilOff
-        case "display": kind = .display
-        case "command": kind = .command
-        case "session": kind = .session
-        default: return nil
-        }
-        let until = kind == .duration ? lease.endsAtMs.map(Self.clockText) : nil
-        return AwakeLeaseInput(
-            kind: kind,
-            harness: nonempty(lease.harness),
-            label: nonempty(lease.label),
-            pid: lease.pid,
-            stopped: lease.stopped,
-            until: until
-        )
-    }
-
-    private func nonempty(_ value: String?) -> String? {
-        guard let value, value.isEmpty == false else { return nil }
-        return value
-    }
-
-    private static func clockText(_ ms: Int64) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = .current
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: Date(timeIntervalSince1970: TimeInterval(ms) / 1000))
     }
 
     var health: Health {
