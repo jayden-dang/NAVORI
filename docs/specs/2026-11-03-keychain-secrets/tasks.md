@@ -1306,7 +1306,7 @@ Run: `rg -n 'navori-secrets' docs/codebase/dependencies.md` — expect: only the
 
 - [ ] **Step 2: Edit**
 
-In `docs/codebase/dependencies.md`: add to the "Today" table, after the `navori-procs` row, `| \`navori-secrets\` | — | allowed: none — leaf; consumed by \`modules/*\` and \`ai/*\` (rows below) and opened by the composition root \`navori-ffi\` (which may depend on any foundation crate) |`; replace the Secrets row of the third-party table with `| Secrets | \`keyring-core\`, \`apple-native-keyring-store\` (feature \`keychain\`) | — |`. In `docs/architecture/data.md` line 33: write `Keychain items, service \`dev.navori\` for the release Profile and \`dev.navori.dev\` for the dev Profile (R2, R4)`, keeping the second cell unchanged (GitHub token, AI provider API keys; never in the database, config or logs).
+In `docs/codebase/dependencies.md`: add to the "Today" table, after the `navori-procs` row, `| \`navori-secrets\` | — | allowed: none — leaf; consumed by \`modules/*\` and \`ai/*\` (rows below) and may be opened by the composition root \`navori-ffi\` (it may depend on any foundation crate) |`; replace the Secrets row of the third-party table with `| Secrets | \`keyring-core\`, \`apple-native-keyring-store\` (feature \`keychain\`) | — |`. In `docs/architecture/data.md` line 33: write `Keychain items, service \`dev.navori\` for the release Profile and \`dev.navori.dev\` for the dev Profile (R2, R4)`, keeping the second cell unchanged (GitHub token, AI provider API keys; never in the database, config or logs).
 
 - [ ] **Step 3: Verify**
 
