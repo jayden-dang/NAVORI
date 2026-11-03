@@ -35,6 +35,10 @@ fn backups(dir: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
+fn ordered(doc: &Value) -> String {
+    serde_json::to_string(doc).unwrap()
+}
+
 fn ours(doc: &Value, event: &str, command: &str) -> usize {
     doc["hooks"][event]
         .as_array()
@@ -126,6 +130,9 @@ async fn repair_removes_an_entry_for_an_event_install_would_not_write() {
         doc["hooks"]["PreToolUse"],
         json!([group(vec![handler("echo foreign", 1)])])
     );
+    let mut expected = complete(&release_command(), &THREE);
+    expected["hooks"]["PreToolUse"] = json!([group(vec![handler("echo foreign", 1)])]);
+    assert_eq!(ordered(&doc), ordered(&expected));
 }
 
 #[tokio::test]

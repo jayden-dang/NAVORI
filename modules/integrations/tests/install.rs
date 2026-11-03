@@ -107,6 +107,22 @@ async fn installing_for_grok_creates_navori_json_with_five_events() {
 }
 
 #[tokio::test]
+async fn a_second_install_for_grok_on_the_dev_profile_changes_nothing_and_writes_no_backup() {
+    let rig = Rig::dev();
+    rig.make_dir(".grok/hooks");
+    install(&rig, "grok").await.unwrap();
+    let before = tree(rig.home.path());
+    let body = std::fs::read_to_string(rig.path(GROK_FILE)).unwrap();
+
+    let reply = install(&rig, "grok").await.unwrap();
+
+    assert_eq!(tree(rig.home.path()), before);
+    assert_eq!(std::fs::read_to_string(rig.path(GROK_FILE)).unwrap(), body);
+    assert!(backups(&rig.path(".grok/hooks")).is_empty());
+    assert_eq!(reply["harnesses"][2]["state"], "installed");
+}
+
+#[tokio::test]
 async fn installing_for_grok_creates_the_hooks_directory_when_grok_exists() {
     let rig = Rig::release();
     rig.make_dir(".grok");
