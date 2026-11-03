@@ -592,10 +592,13 @@ pub(crate) fn harness_name(harness: Harness) -> &'static str {
 
 fn manual_label(lease: &Manual) -> Option<String> {
     match lease {
-        Manual::Duration { started, deadline } => match deadline.duration_since(*started) {
-            Ok(span) if span == Duration::from_secs(3_600) => Some("1 hour".to_owned()),
-            _ => None,
-        },
+        Manual::Duration { started, deadline } => {
+            let seconds = deadline
+                .duration_since(*started)
+                .map(|span| span.as_secs())
+                .unwrap_or(0);
+            Some(crate::event::duration_source(seconds))
+        }
         Manual::UntilOff { .. } => Some("Until off".to_owned()),
     }
 }

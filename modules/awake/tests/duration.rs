@@ -89,6 +89,40 @@ async fn a_ten_second_hold_starts_as_ten_seconds_not_one_hour() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_duration_lease_label_is_the_plain_english_length() {
+    let cases = [
+        (30 * 60, "30 minutes"),
+        (90, "90 seconds"),
+        (10, "10 seconds"),
+        (2 * 3_600, "2 hours"),
+        (86_400, "1 day"),
+        (SEVEN_DAYS, "7 days"),
+        (1, "1 second"),
+        (3_600, "1 hour"),
+    ];
+    for (seconds, label) in cases {
+        let rig = Rig::new();
+        let state = rig.dispatch(hold(seconds)).await.unwrap();
+        assert_eq!(
+            state["leases"][0]["label"],
+            json!(label),
+            "{seconds} seconds published the wrong label"
+        );
+        assert_ne!(state["leases"][0]["label"], "Manual");
+        let summary = rig
+            .kernel
+            .recent_events(10)
+            .unwrap()
+            .into_iter()
+            .find(|event| event.kind == "awake.lease_started")
+            .map(|event| event.summary)
+            .unwrap_or_default();
+        assert_eq!(summary, format!("Keeping this Mac awake: {label}."));
+        rig.shutdown().await;
+    }
+}
+
+#[tokio::test(start_paused = true)]
 async fn two_duration_requests_keep_one_lease_and_restart_the_hour() {
     let rig = Rig::new();
     let first = rig.dispatch(hold(3600)).await.unwrap();
