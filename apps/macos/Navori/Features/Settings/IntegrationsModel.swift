@@ -1,6 +1,7 @@
 import Foundation
 import NavoriBanner
 import Observation
+import NavoriPanel
 import OSLog
 
 struct IntegrationRow: Decodable, Equatable, Identifiable {
@@ -57,7 +58,8 @@ final class IntegrationsModel {
     }
 
     private(set) var rows: [IntegrationRow] = []
-    private(set) var error: String?
+    private var errorLine = ActionErrorLine()
+    var error: String? { errorLine.message }
     private(set) var isBusy = false
 
     @ObservationIgnored private let store: CoreStore
@@ -83,9 +85,9 @@ final class IntegrationsModel {
                 module: "integrations",
                 actionJSON: "{\"\(action.rawValue)\":{\"harness\":\"\(harness)\"}}"
             )
-            error = nil
+            errorLine.actionSucceeded()
         } catch {
-            report(error, doing: action.rawValue)
+            report(error, doing: action.rawValue, fromAction: true)
         }
         await load()
     }
@@ -96,15 +98,15 @@ final class IntegrationsModel {
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             rows = try decoder.decode(IntegrationsReply.self, from: Data(reply.utf8)).harnesses
-            error = nil
+            errorLine.statusLoaded()
         } catch {
-            report(error, doing: "status")
+            report(error, doing: "status", fromAction: false)
         }
     }
 
-    private func report(_ failure: Error, doing what: String) {
+    private func report(_ failure: Error, doing what: String, fromAction: Bool) {
         let message = CoreStartupBanner.menuFailure(for: failure)
         log.error("integrations \(what, privacy: .public) failed: \(message, privacy: .public)")
-        error = message
+        if fromAction { errorLine.actionFailed(message) } else { errorLine.statusFailed(message) }
     }
 }
