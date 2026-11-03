@@ -38,7 +38,7 @@ Terms used below:
 
 - **HOOKS-1.1** WHEN the Hook command reads a payload whose event is `UserPromptSubmit` THE SYSTEM SHALL dispatch the Awake Action `hold_session` with the payload's session id, the command's own pid and its parent's pid. [Lock, docs/ARCHITECTURE.md:304-306, 311]
 - **HOOKS-1.2** WHEN the Hook command reads a payload whose event is `Stop` and which carries no `reason`, or a `reason` equal to `end_turn`, THE SYSTEM SHALL dispatch `stop_session` with the session id. [Lock, ARCHITECTURE.md:304-306; keying the Grok filter on the payload's `reason` and not on the Harness is agent-decided]
-- **HOOKS-1.3** WHEN the Hook command reads a `Stop` payload whose `reason` is anything other than `end_turn` THE SYSTEM SHALL dispatch nothing. [Lock for Grok, ARCHITECTURE.md:305; applies to any Harness: agent-decided]
+- **HOOKS-1.3** WHEN the Hook command reads a `Stop` payload whose `reason` is anything other than `end_turn` THE SYSTEM SHALL dispatch nothing. This drops the extra observe-only `Stop` that Grok fires at session end (`~/.grok/docs/user-guide/10-hooks.md:677, 703`). [Lock for Grok, ARCHITECTURE.md:305; applying it to any Harness is agent-decided and Unverified for Claude Code and Codex, see Open Questions]
 - **HOOKS-1.4** WHEN the Hook command reads a payload whose event is `StopCancelled` or `StopFailure` THE SYSTEM SHALL dispatch `stop_session` with the session id. [Lock, ARCHITECTURE.md:305]
 - **HOOKS-1.5** WHEN the Hook command reads a payload whose event is `SessionEnd` THE SYSTEM SHALL dispatch `end_session` with the session id and SHALL send no pid. [Lock, ARCHITECTURE.md:311; AWAKE close-package.md:10]
 - **HOOKS-1.6** THE SYSTEM SHALL read the event from `hook_event_name` and the session id from `session_id` — the two keys Grok verifiably sends beside its camelCase keys (`~/.grok/docs/user-guide/10-hooks.md:673-677`). [Lock for the fields, ARCHITECTURE.md:300; Claude Code and Codex key names Unverified]
@@ -49,7 +49,7 @@ Terms used below:
 
 ## 2. A hook never blocks a Harness
 
-**Story:** As the user, I want a stopped Navori, a bad payload or a slow Core to never stall or fail a prompt, so that the hook can be left installed without a cost.
+**Story:** As the user, I want to quit Navori and keep prompting Claude Code, Codex or Grok, so that a prompt neither stalls nor fails because the hook has no Core to reach.
 
 - **HOOKS-2.1** THE SYSTEM SHALL end the Hook command with exit code 0 in every case, including an unreadable or invalid payload, a missing event or session id, an unknown event, no socket, a Core that is not running, a Core error, an Action reply of invalid or not-a-Harness, and its own deadline. [agent-decided; research note `harness-hook-blocking` says exit 2 blocks a prompt]
 - **HOOKS-2.2** THE SYSTEM SHALL write nothing to standard output and nothing to standard error from the Hook command. [agent-decided, picks-r1 F5; whether Claude or Codex show stderr on exit 0 is Unverified]
@@ -79,15 +79,15 @@ Terms used below:
 
 **Story:** As the user, I want to press Install on a Harness and have Navori add its hooks without disturbing mine, so that I set it up once and never edit a config by hand.
 
-- **HOOKS-4.1** WHEN the user installs for Claude Code or Codex THE SYSTEM SHALL add Hook entries for `UserPromptSubmit`, `Stop` and `SessionEnd`. [Lock, ARCHITECTURE.md:304, 306]
+- **HOOKS-4.1** WHEN the user installs for Claude Code or Codex THE SYSTEM SHALL add Hook entries for `UserPromptSubmit`, `Stop` and `SessionEnd`; for Codex, once the check task of HOOKS-4.5 is done. [Lock, ARCHITECTURE.md:304, 306]
 - **HOOKS-4.2** WHEN the user installs for Grok Build THE SYSTEM SHALL write `~/.grok/hooks/navori.json` with Hook entries for `UserPromptSubmit`, `Stop`, `StopCancelled`, `StopFailure` and `SessionEnd`. [Lock, ARCHITECTURE.md:305]
 - **HOOKS-4.3** THE SYSTEM SHALL write each Hook entry as a matcher group holding one handler of type `command`, with the command described in HOOKS-4.4 and the timeout of HOOKS-4.5, and without `async`. [Weigh: research note says `async: true` can reparent the ppid chain to launchd; the group shape is the one Claude settings, `~/.codex/hooks.json` and Grok files already use]
 - **HOOKS-4.4** THE SYSTEM SHALL write the command as the quoted absolute path of the Helper followed by ` hook` for the release profile, and the quoted Helper path followed by ` --profile dev hook` for the dev profile. THE SYSTEM SHALL NOT use the `~/.local/bin/navori` link. [Weigh, picks-r1 F4; ARCH-14. Reasons: a hook runs with a minimal PATH, and the link exists only after the user installs the CLI]
-- **HOOKS-4.5** THE SYSTEM SHALL write `timeout` as whole seconds: 2 for every event except `SessionEnd`, and 1 for `SessionEnd`. [agent-decided; the Codex key name and unit for 0.166 are Unverified]
+- **HOOKS-4.5** THE SYSTEM SHALL write `timeout` for Claude Code and Grok as whole seconds: 2 for every event except `SessionEnd`, and 1 for `SessionEnd`. For Codex THE SYSTEM SHALL write the key and unit that the design's check task finds, and Install for Codex SHALL NOT be built before that task is done. [agent-decided; Grok allows fractions in seconds, `~/.grok/docs/user-guide/10-hooks.md:185`; the Codex key name and unit for 0.166 are Unverified]
 - **HOOKS-4.6** THE SYSTEM SHALL take the Helper path from the Shell at start, in the Core's configuration. [Weigh, picks-r1 F4; `apps/macos/Navori/App/AppEnvironment.swift:33`]
 - **HOOKS-4.7** WHEN the user installs and the Hook file exists THE SYSTEM SHALL write a Backup before changing it. [Lock, ARCHITECTURE.md:314; Backup place and name agent-decided]
 - **HOOKS-4.8** WHEN the user installs THE SYSTEM SHALL keep every key, value and array order of the file that is not a Hook entry of the running profile. File whitespace may be rewritten. [Lock "never overwrites other hooks", ARCHITECTURE.md:314; the whitespace allowance is agent-decided and narrows the close package's "every unrelated byte". Design risk: `serde_json` is built without `preserve_order` (Cargo.toml:49), so object key order needs that feature or another reader]
-- **HOOKS-4.9** WHEN the user installs and the Hook file does not exist THE SYSTEM SHALL create it, and SHALL NOT create the Harness's config directory. [agent-decided; Weigh, picks-r1 F7]
+- **HOOKS-4.9** WHEN the user installs and the Hook file does not exist THE SYSTEM SHALL create it, and SHALL NOT create the Harness's config directory (`~/.claude`, `~/.codex`, `~/.grok`). For Grok it SHALL create the `~/.grok/hooks` directory when `~/.grok` exists. [agent-decided; Weigh, picks-r1 F7]
 - **HOOKS-4.10** WHEN the user installs and the file already holds the running profile's complete correct set THE SYSTEM SHALL leave the file unchanged and write no Backup. [agent-decided]
 - **HOOKS-4.11** IF the target Hook file cannot be parsed THEN THE SYSTEM SHALL change nothing, write no Backup and return an error naming the file and the parse failure. [agent-decided; THR-9]
 - **HOOKS-4.12** THE SYSTEM SHALL write the Hook file by writing a temporary file in the same directory and renaming it, so a failure part-way leaves the original intact. [agent-decided]
@@ -107,7 +107,7 @@ Terms used below:
 
 ## 6. Remove a Harness's hook
 
-**Story:** As the user, I want to take Navori's hook out of a Harness and keep everything else in its config, so that removing Navori leaves nothing of it behind.
+**Story:** As the user, I want to take Navori's hook out of a Harness and keep everything else in its config, so that removing Navori leaves nothing of Navori's hooks behind.
 
 - **HOOKS-6.1** WHEN the user removes for Claude Code or Codex THE SYSTEM SHALL delete only the running profile's Hook entries, and any array or object that its removal leaves empty and that Navori created, and keep the file. [Lock "never overwrites other hooks", ARCHITECTURE.md:314; empty-container rule agent-decided, picks-r1 F8]
 - **HOOKS-6.2** WHEN the user removes for Grok Build and `navori.json` holds only Hook entries of Navori THE SYSTEM SHALL delete the file after writing a Backup. [agent-decided, picks-r1 F8]
@@ -179,8 +179,9 @@ Files this change touches: `apps/cli/src/main.rs`, `apps/cli/tests/cli.rs`, `cra
 
 ## Open Questions
 
-- Claude Code and Codex stdin key names for `hook_event_name` and `session_id`, and the Codex `hooks.json` timeout key and unit for 0.166 — owner: harness-hooks-work, check task in design (a recorded real payload, or `research`) — 2026-11-03 — forbid-guess (cấm đoán: do not write a Codex timeout unit or a Claude key name into code before it is seen).
-- Whether Claude Code or Codex show a hook's standard error when it exits 0, and so whether HOOKS-2.2 is needed or only harmless — owner: operator dogfood — 2026-11-03 — forbid-guess (cấm đoán: do not add a stderr line on the strength of a guess).
-- The start cost of the `navori` CLI against the 0.7 s `SessionEnd` deadline of HOOKS-2.3 — owner: harness-hooks-work, measured in design — 2026-11-03 — forbid-guess (cấm đoán: do not shorten the deadline before it is measured).
-- Whether Grok's daemon route leaves a live Harness ancestor for a hook's pid chain, and so whether a Grok Session Lease starts there — owner: operator dogfood — 2026-11-03 — forbid-guess (cấm đoán: do not claim Grok hooks keep the Mac awake until a real Grok session has been watched).
-- Whether a signed build writing into `~/.claude`, `~/.codex` and `~/.grok` triggers a macOS permission prompt — owner: operator dogfood — 2026-11-03 — forbid-guess (cấm đoán: do not claim Install works on a signed build until it has run on one).
+- Whether a Claude Code or Codex `Stop` payload carries a `reason`, and with what values, which decides whether HOOKS-1.3 can drop a real turn end — owner: harness-hooks-work, check task in design (a recorded payload) — 2026-11-03 — forbid-guess: do not widen or narrow the `reason` rule before a real payload is seen.
+- Claude Code and Codex stdin key names for `hook_event_name` and `session_id`, and the Codex `hooks.json` timeout key and unit for 0.166 — owner: harness-hooks-work, check task in design (a recorded real payload, or `research`) — 2026-11-03 — forbid-guess: do not write a Codex timeout unit or a Claude key name into code before it is seen.
+- Whether Claude Code or Codex show a hook's standard error when it exits 0, and so whether HOOKS-2.2 is needed or only harmless — owner: operator dogfood — 2026-11-03 — forbid-guess: do not add a stderr line on the strength of a guess.
+- The start cost of the `navori` CLI against the 0.7 s `SessionEnd` deadline of HOOKS-2.3 — owner: harness-hooks-work, measured in design — 2026-11-03 — forbid-guess: do not shorten the deadline before it is measured.
+- Whether Grok's daemon route leaves a live Harness ancestor for a hook's pid chain, and so whether a Grok Session Lease starts there — owner: operator dogfood — 2026-11-03 — forbid-guess: do not claim Grok hooks keep the Mac awake until a real Grok session has been watched.
+- Whether a signed build writing into `~/.claude`, `~/.codex` and `~/.grok` triggers a macOS permission prompt — owner: operator dogfood — 2026-11-03 — forbid-guess: do not claim Install works on a signed build until it has run on one.
