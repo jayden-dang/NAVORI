@@ -28,7 +28,7 @@ Settings has a fourth tab, `Integrations`, before About. It lists Claude Code, C
 
 ## Codex
 
-The Codex row reports its state as found and offers nothing, with the reason `The Codex timeout unit is not verified yet.` The reason shows only when the `~/.codex` directory exists and its Hook file parses. Install, Repair and Remove reply with an error for Codex. Codex hooks do not work from Navori yet.
+The Codex row reports its state as found and offers nothing, with the reason `The Codex timeout unit is not verified yet.` The reason shows when the `~/.codex` directory exists and its Hook file is absent or parses; otherwise the row keeps its Not found or Unreadable reason. Install, Repair and Remove reply with an error for Codex. Codex hooks do not work from Navori yet.
 
 ## Commands
 
