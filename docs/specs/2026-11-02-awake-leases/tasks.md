@@ -498,11 +498,11 @@ _Requirements: AWAKE-13.1, AWAKE-13.2, AWAKE-13.3, AWAKE-13.4_
 
 **Depends-on:** Task 7, Task 13, Task 14
 
-- [ ] **Step 1: Write real-OS tests:** `pmset_lists_one_system_assertion_for_a_lease`, `pmset_lists_system_and_display_together` (first real test of two at once), `releasing_display_leaves_system_listed`, `ending_the_last_lease_clears_pmset`. Filter by the test's own unique assertion name, because other apps hold assertions too.
+- [x] **Step 1: Write real-OS tests:** `pmset_lists_one_system_assertion_for_a_lease`, `pmset_lists_system_and_display_together` (first real test of two at once), `releasing_display_leaves_system_listed`, `ending_the_last_lease_clears_pmset`. Filter by the test's own unique assertion name, because other apps hold assertions too.
 Run: `cargo nextest run -p navori-mod-awake --test real_os` — expect: pass.
-- [ ] **Step 2: Measure by hand on `cargo xtask run`, and record each:** assertion gone after `kill -9` of the app · a running `awake run` Lease across an app quit and reopen, with recovery time · `kill -9` on the CLI with the child alive · `Snapshot::take` cost on this Mac in a release build · real session ids from Claude Code, Codex and Grok against `[A-Za-z0-9._:-]`, from each tool's own docs or a harmless hook-free source.
-- [ ] **Step 3: Record what stays open, and who owes it:** Display alone stopping idle sleep · a Lease sleeping through its deadline · timers in dark wake (each needs a real sleep; the user) · a real `Stop` trace, `caffeinate` at `Stop`, background work after `Stop` (ROAD-9, which installs hooks). Do not invent results.
-- [ ] **Step 4: Commit** the test only: `git commit -m "test(awake): prove assertions against pmset"`
+- [x] **Step 2: Measure by hand on `cargo xtask run`, and record each:** assertion gone after `kill -9` of the app · a running `awake run` Lease across an app quit and reopen, with recovery time · `kill -9` on the CLI with the child alive · `Snapshot::take` cost on this Mac in a release build · real session ids from Claude Code, Codex and Grok against `[A-Za-z0-9._:-]`, from each tool's own docs or a harmless hook-free source.
+- [x] **Step 3: Record what stays open, and who owes it:** Display alone stopping idle sleep · a Lease sleeping through its deadline · timers in dark wake (each needs a real sleep; the user) · a real `Stop` trace, `caffeinate` at `Stop`, background work after `Stop` (ROAD-9, which installs hooks). Do not invent results.
+- [x] **Step 4: Commit** the test only: `git commit -m "test(awake): prove assertions against pmset"`
 
 _Requirements: AWAKE-1.2, AWAKE-1.7, AWAKE-7.1, AWAKE-7.3_
 
