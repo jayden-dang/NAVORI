@@ -20,7 +20,7 @@ Design: ./design.md
 
 **Tech Stack:** Rust 2024, clap 4, tokio (current-thread in the hook), serde_json with `preserve_order`, tempfile, schemars, UniFFI 0.32, Swift (SwiftUI). No new third-party dependency: `tempfile` and `serde_json` are already in the workspace.
 
-**Delivery:** Tasks 1–10 are the build. Tasks 11–12 are research with operator-recorded input and are not run live by an agent. Task 13 waits on Task 12. Task 14 is docs and the final guard check. Task 15 is operator dogfood and is not part of any build wave.
+**Delivery:** If Task 12 stays unverified, Task 13 does not run and the end report lists HOOKS-3.10 and HOOKS-4.1 for Codex as **unmet**, not done. Tasks 1–10 are the build. Tasks 11–12 are research with operator-recorded input and are not run live by an agent. Task 13 waits on Task 12. Task 14 is docs and the final guard check. Task 15 is operator dogfood and is not part of any build wave.
 
 ## Global Constraints
 
@@ -119,7 +119,7 @@ _Requirements: HOOKS-4.8_
 
 **Depends-on:** none
 
-- [ ] **Step 1: Write failing tests** in `apps/cli/tests/cli.rs`, each starting a recording server (a `UnixListener` at `navori_config::Paths::new(Profile::Dev, home, uid).socket`, answering with the request's own `id` as `{"jsonrpc":"2.0","id":<id>,"result":{}}` and storing the request; it creates the socket's parent `run/` directory first, and the error reply shape is `{"jsonrpc":"2.0","id":<id>,"error":{"code":-32000,"message":"…"}}`): `a_prompt_submit_sends_hold_session_with_its_own_pids`, `a_stop_without_a_reason_sends_stop_session`, `a_stop_with_reason_end_turn_sends_stop_session`, `a_stop_with_another_reason_sends_nothing`, `a_stop_cancelled_sends_stop_session`, `a_stop_failure_sends_stop_session`, `a_session_end_sends_end_session_with_no_pid`, `an_unknown_event_sends_nothing`, `a_payload_sends_nothing_but_the_session_id_and_pids` (a prompt text field in the payload never appears in the recorded request), `a_grok_payload_with_both_key_spellings_is_read_by_the_snake_case_keys`. Run the binary with `HOME` set to the temp home, `--profile dev hook` and the payload on stdin; every row also asserts exit 0 and empty stdout and stderr.
+- [ ] **Step 1: Write failing tests** in `apps/cli/tests/cli.rs`, each starting a recording server (a `UnixListener` at `navori_config::Paths::new(Profile::Dev, home, uid).socket`, answering with the request's own `id` as `{"jsonrpc":"2.0","id":<id>,"result":{}}` and storing the request; it creates the socket's parent `run/` directory first, and the error reply shape is `{"jsonrpc":"2.0","id":<id>,"error":{"code":-32000,"message":"…"}}`): `a_prompt_submit_sends_hold_session_with_its_own_pids`, `a_stop_without_a_reason_sends_stop_session`, `a_stop_with_reason_end_turn_sends_stop_session`, `a_stop_with_another_reason_sends_nothing` (the `reason` rule is the Grok-verified one, `10-hooks.md:677, 703`; applying it to Claude Code and Codex is provisional until Task 11 and is labelled so in a code comment), `a_stop_cancelled_sends_stop_session`, `a_stop_failure_sends_stop_session`, `a_session_end_sends_end_session_with_no_pid`, `an_unknown_event_sends_nothing`, `a_payload_sends_nothing_but_the_session_id_and_pids` (a prompt text field in the payload never appears in the recorded request), `a_grok_payload_with_both_key_spellings_is_read_by_the_snake_case_keys`. Run the binary with `HOME` set to the temp home, `--profile dev hook` and the payload on stdin; every row also asserts exit 0 and empty stdout and stderr.
 Run: `cargo nextest run -p navori-cli --test cli` — expect: unrecognized subcommand `hook`.
 - [ ] **Step 2: Implement** `hook.rs`: parse only `hook_event_name`, `session_id`, `reason` with serde (unknown fields ignored); map per `design.md` ("`navori hook` command", step 2); `i32::try_from` on both pids, nothing sent if either fails; deadline 0.7 s for `SessionEnd`, 1.5 s otherwise. Add `Command::Hook` to the clap enum with no arguments (and a `Command::Hook => unreachable!()` arm in the exhaustive `run()` match, since `main()` handles it first), and a minimal `run_hook` that reads all of stdin, builds the plan and makes one `core.dispatch` call with `module: "awake"`. Bounds and failure handling come in Task 3.
 Run: same command — expect: pass.
@@ -161,20 +161,20 @@ _Requirements: HOOKS-2.1, HOOKS-2.2, HOOKS-2.3, HOOKS-2.4, HOOKS-8.4, HOOKS-9.1_
 ### Task 4: Measure the hook's start cost (check C3)
 
 **Files:**
-- Create: `.skills/HOOKS/measure-hook.md` (git-ignored; created by this task)
+- Create: `/Users/jayden/Developer/experiments/NAVORI/.skills/_pending-harness-hooks/auto/measure-hook.md` (the run directory; not tracked)
 - Test: a throwaway `apps/cli/tests/scratch_cost.rs`, deleted before finishing
 
 **Reuse:** rung 2 — the recording-server helper from Task 2 in `apps/cli/tests/cli.rs`
 
 **Interfaces:**
 - Consumes: the release-built `navori`, the recording server
-- Produces: measured median and p95 of one `navori hook` run, recorded in `.skills/HOOKS/measure-hook.md`
+- Produces: measured median and p95 of one `navori hook` run, recorded in the run directory's `measure-hook.md`
 
 **Depends-on:** Task 3
 
 - [ ] **Step 1: Build** `cargo build --release -p navori-cli` — expect: builds.
 - [ ] **Step 2: Measure.** In the scratch test, over a temp home, run `target/release/navori` explicitly (`assert_cmd::cargo_bin` returns the debug binary) 50 times with a `UserPromptSubmit` payload against a recording server that replies at once, and 50 times with the server absent. Record median and p95 wall time of each set. Never touch the real dev app or its data directory.
-- [ ] **Step 3: Compare.** The deadline for `SessionEnd` is 0.7 s (HOOKS-2.3, agent-decided). **If the p95 against an answering server exceeds 350 ms (half of that deadline, agent-decided), stop and report: HOOKS-2.3 needs a decision.** Otherwise write the numbers and the machine model into `.skills/HOOKS/measure-hook.md`.
+- [ ] **Step 3: Compare.** The deadline for `SessionEnd` is 0.7 s (HOOKS-2.3, agent-decided). **If the p95 against an answering server exceeds 350 ms (half of that deadline, agent-decided), stop and report: HOOKS-2.3 needs a decision.** Otherwise write the numbers and the machine model into `measure-hook.md` in the run directory.
 - [ ] **Step 4: Delete the scratch test.** No commit is needed when nothing tracked changed.
 
 _Requirements: HOOKS-2.3, HOOKS-10.2_
@@ -277,7 +277,7 @@ _Requirements: HOOKS-5.1, HOOKS-5.2, HOOKS-5.3, HOOKS-5.4, HOOKS-5.5_
 
 **Depends-on:** Task 7
 
-- [ ] **Step 1: Write failing tests** in `tests/remove.rs`: `removing_from_claude_drops_only_navoris_entries_and_keeps_every_foreign_hook_and_key_order` (with a foreign key removed-neighbour in the middle); `an_event_array_emptied_by_removal_is_dropped_and_a_foreign_one_stays`; `a_hooks_object_emptied_by_removal_is_dropped_but_the_file_stays`; `removing_from_grok_deletes_navori_json_after_a_backup_when_it_holds_only_navori_entries`; `removing_from_grok_keeps_the_file_when_it_holds_anything_else`; `removing_when_nothing_of_the_profile_is_there_changes_nothing_and_writes_no_backup`; `remove_refuses_an_unparseable_file`; `remove_writes_through_a_symlink`; `dev_remove_leaves_a_release_entry_alone`; `a_removal_emits_one_event`.
+- [ ] **Step 1: Write failing tests** in `tests/remove.rs`: `removing_from_claude_drops_only_navoris_entries_and_keeps_every_foreign_hook_and_key_order` (with a foreign key between two of Navori's keys); `an_event_array_emptied_by_removal_is_dropped_and_a_foreign_one_stays`; `a_hooks_object_emptied_by_removal_is_dropped_but_the_file_stays`; `removing_from_grok_deletes_navori_json_after_a_backup_when_it_holds_only_navori_entries`; `removing_from_grok_keeps_the_file_when_it_holds_anything_else`; `removing_when_nothing_of_the_profile_is_there_changes_nothing_and_writes_no_backup`; `remove_refuses_an_unparseable_file`; `remove_writes_through_a_symlink`; `dev_remove_leaves_a_release_entry_alone`; `a_removal_emits_one_event`.
 Run: `cargo nextest run -p navori-mod-integrations --test remove` — expect: the Action replies `Invalid`.
 - [ ] **Step 2: Implement** `strip` and the `Remove` branch; a Grok document that is empty after `strip` becomes `Plan::Delete` (backup first), Claude and Codex files are never deleted.
 Run: same command — expect: pass.
@@ -353,7 +353,7 @@ _Requirements: HOOKS-3.1, HOOKS-3.2, HOOKS-3.9, HOOKS-3.10, HOOKS-9.4, HOOKS-10.
 
 - [ ] **Step 1: Research** the documented payloads with `research` (read only; no Harness run by an agent). Cite each source.
 - [ ] **Step 2: Ask the operator for recorded payloads.** A live Harness run touches that Harness's real session data outside the worktree and is a charter hard stop for this work session. State in the note that a recorded `UserPromptSubmit`, `Stop` and `SessionEnd` payload per Harness is needed from the operator and which of HOOKS-1.3, 1.6 depend on it.
-- [ ] **Step 3: If the keys differ** from `hook_event_name` / `session_id`, or `Stop` carries a `reason` with other values, **stop and report**: requirements HOOKS-1.3 and 1.6 need a decision.
+- [ ] **Step 3: If the keys differ** from `hook_event_name` / `session_id`, or `Stop` carries a `reason` with other values, **stop and report**: requirements HOOKS-1.3 and 1.6 need a decision, and Task 2's `reason` rule goes back for one.
 
 _Requirements: HOOKS-1.3, HOOKS-1.6_
 
@@ -399,7 +399,7 @@ _Requirements: HOOKS-4.5_
 - [ ] **Step 3: Run** `cargo xtask ci` — expect: pass.
 - [ ] **Step 4: Commit** `git commit -m "feat(integrations): install Navori's hooks into Codex"`
 
-_Requirements: HOOKS-4.1, HOOKS-4.5_
+_Requirements: HOOKS-3.10, HOOKS-4.1, HOOKS-4.5_
 
 ---
 
