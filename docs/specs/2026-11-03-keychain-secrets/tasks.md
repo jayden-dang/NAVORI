@@ -42,7 +42,7 @@ Compact delta every task inherits:
 - **Secrets in output** — `Debug`, `Display` and error text of this crate never contain a value; the backend error is never formatted, logged or `unwrap`ped (design decision 5). Secret-shaped fixtures are fake and split with `concat!` (testing.md).
 - **Testing** — test-first. Tests live in `crates/secrets/tests/` and use the public API (testing.md:14); test names are sentences in domain language. Fakes only at the system boundary (the Keychain).
 - **Lints** — no `unwrap`/`expect` outside tests. Clippy's `allow-expect-in-tests` covers only `#[test]` functions, so every test file with helpers that call `expect` starts with `#![allow(clippy::unwrap_used, clippy::expect_used)]`; `tests/common/mod.rs` also allows `dead_code` because each test crate uses a different subset. `missing_debug_implementations` is on and CI denies warnings.
-- **Formatting and commits** — before every gate run `cargo fmt --all`. Each commit step stages the named paths with `git add` first. Conventional Commits, English, one logical change, every commit builds. In this run commits are local only: no push, no PR, no issue.
+- **Formatting and commits** — the code blocks below are content, not hand-aligned layout: `cargo fmt --all` reformats them, and it runs before every gate. Run the clippy gate with `--all-targets` exactly as written (without it the crate-private helpers added in Task 4 are unused until Task 5). Each commit step stages the named paths with `git add` first. Conventional Commits, English, one logical change, every commit builds. In this run commits are local only: no push, no PR, no issue.
 - **Commands** — task gate: `cargo fmt --all`, then `cargo nextest run -p navori-secrets` and `cargo clippy -p navori-secrets --all-targets -- -D warnings`. `cargo xtask ci` runs at Tasks 1, 6 and 9 only (it also compiles the Swift shell).
 - **Team** — Solo band (`docs/agents/project.md`).
 
@@ -64,7 +64,7 @@ Create:
 
 Modify:
 - `Cargo.toml` — `members`, internal path dependency, two external dependencies.
-- `Cargo.lock` — six new packages (expected, not verified until Task 1's build).
+- `Cargo.lock` — six new third-party packages plus the workspace package `navori-secrets` (expected, not verified until Task 1's build).
 - `docs/codebase/dependencies.md` — a `navori-secrets` row in the "Today" table and the Secrets row of the third-party table.
 - `docs/architecture/data.md` — the dev service beside `dev.navori`.
 
@@ -126,11 +126,18 @@ toml.workspace = true
 workspace = true
 ```
 
-`crates/secrets/src/lib.rs`: a `//!` block saying the crate keeps Navori's own tokens and API keys in the macOS Keychain only (ARCH-8), never prints a value, and has no `unsafe`.
+`crates/secrets/src/lib.rs`:
+
+```rust
+//! Navori's own secrets (tokens and API keys), kept only in the macOS Keychain (ARCH-8).
+//!
+//! A value never appears in `Debug`, `Display` or an error from this crate, and the crate
+//! contains no `unsafe` code (ARCH-9).
+```
 
 - [ ] **Step 4: Build and read the lockfile delta**
 
-Run: `cargo build -p navori-secrets` — expect: success. Run: `git diff --stat Cargo.lock` and `git diff Cargo.lock | grep '^-version'` — expect: only added packages (`keyring-core`, `apple-native-keyring-store`, `security-framework`, `security-framework-sys`, `core-foundation`, `core-foundation-sys`) and no `-version` line. If a locked version moved, add it to `requirements.md` Open Questions (SECRETS-10.2) before going on.
+Run: `cargo build -p navori-secrets` — expect: success. Run: `git diff --stat Cargo.lock` and `git diff Cargo.lock | grep '^-version'` — expect: only added packages (`navori-secrets`, `keyring-core`, `apple-native-keyring-store`, `security-framework`, `security-framework-sys`, `core-foundation`, `core-foundation-sys`) and no `-version` line. If a locked version moved, add it to `requirements.md` Open Questions (SECRETS-10.2) before going on.
 
 - [ ] **Step 5: Gate and commit**
 
@@ -189,13 +196,75 @@ fn an_empty_part_a_slash_and_a_control_character_are_each_rejected() {
         assert_eq!((err.part, err.problem), (part, problem), "{kind:?}/{name:?}");
     }
 }
+
+#[test]
+fn each_rejection_says_which_part_and_what_is_wrong() {
+    let cases = [
+        ("", "x", "kind is empty"),
+        ("a/b", "x", "kind contains `/`"),
+        ("k", "", "name is empty"),
+        ("k", "t\tb", "name contains a control character"),
+    ];
+    for (kind, name, expected) in cases {
+        let shown = SecretKey::new(kind, name).expect_err("rejected").to_string();
+        assert!(shown.contains(expected), "{shown}");
+    }
+}
 ```
 
 Run: `cargo nextest run -p navori-secrets --test names` — expect: compile error, `SecretKey` not found.
 
 - [ ] **Step 2: Implement**
 
-`crates/secrets/src/key.rs` defines `KeyPart` and `KeyProblem` (both `Debug, Clone, Copy, PartialEq, Eq`, each with a `Display`: `kind`/`name` and `empty`/``contains `/` ``/`contains a control character`), and `KeyError` with `#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]` and ``#[error("secret key {part} {problem}; use a non-empty {part} without `/` or control characters")]``. Then:
+`crates/secrets/src/key.rs`:
+
+```rust
+use std::fmt;
+
+/// Which half of a secret key is invalid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyPart {
+    Kind,
+    Name,
+}
+
+impl fmt::Display for KeyPart {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Kind => "kind",
+            Self::Name => "name",
+        })
+    }
+}
+
+/// What is wrong with it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyProblem {
+    Empty,
+    Slash,
+    Control,
+}
+
+impl fmt::Display for KeyProblem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Empty => "is empty",
+            Self::Slash => "contains `/`",
+            Self::Control => "contains a control character",
+        })
+    }
+}
+
+/// A secret key was refused before any Keychain call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("secret key {part} {problem}; use a non-empty {part} without `/` or control characters")]
+pub struct KeyError {
+    pub part: KeyPart,
+    pub problem: KeyProblem,
+}
+```
+
+Then, in the same file:
 
 ```rust
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -229,11 +298,18 @@ fn check(part: KeyPart, text: &str) -> Result<(), KeyError> {
 }
 ```
 
-`lib.rs` gains `mod key; pub use key::*;`. The crate-private accessors (`account`, `kind`, `name`) arrive in Task 4 with their first caller, so this task's clippy gate has no unused code (the derived `PartialEq` reads both fields).
+`lib.rs` gains these two lines:
+
+```rust
+mod key;
+pub use key::*;
+```
+
+The crate-private accessors (`account`, `kind`, `name`) arrive in Task 4 with their first caller, so this task's clippy gate has no unused code (the derived `PartialEq` reads both fields).
 
 - [ ] **Step 3: Run and gate**
 
-Run: `cargo fmt --all`, then `cargo nextest run -p navori-secrets --test names` — expect: 3 passed. Run: `cargo clippy -p navori-secrets --all-targets -- -D warnings` — expect: clean.
+Run: `cargo fmt --all`, then `cargo nextest run -p navori-secrets --test names` — expect: 4 passed. Run: `cargo clippy -p navori-secrets --all-targets -- -D warnings` — expect: clean.
 
 - [ ] **Step 4: Commit**
 
@@ -334,7 +410,14 @@ impl KeychainService {
 }
 ```
 
-`lib.rs` gains `mod secret; pub use secret::*;`. That `Secret` has no `Display`, `Serialize` or `Clone` is not testable without a compile-fail harness; it is checked by a search in Task 9.
+`lib.rs` gains:
+
+```rust
+mod secret;
+pub use secret::*;
+```
+
+That `Secret` has no `Display`, `Serialize` or `Clone` is not testable without a compile-fail harness; it is checked by a search in Task 9.
 
 - [ ] **Step 3: Run and gate**
 
@@ -710,7 +793,16 @@ impl SecretStore for MemoryStore {
 }
 ```
 
-`lib.rs` gains `mod error; mod store; pub use error::*; pub use store::*;` and `#[cfg(feature = "fake")] pub mod fake;`.
+`lib.rs` gains:
+
+```rust
+mod error;
+mod store;
+#[cfg(feature = "fake")]
+pub mod fake;
+pub use error::*;
+pub use store::*;
+```
 
 - [ ] **Step 4: Run and gate**
 
@@ -966,11 +1058,18 @@ impl SecretStore for KeychainStore {
 }
 ```
 
-`lib.rs` gains `mod keychain; pub use keychain::*;`. The crate declares no `log` or `tracing` dependency, so nothing here emits a log line.
+`lib.rs` gains:
+
+```rust
+mod keychain;
+pub use keychain::*;
+```
+
+The crate declares no `log` or `tracing` dependency, so nothing here emits a log line.
 
 - [ ] **Step 3: Run and gate**
 
-Run: `cargo fmt --all`, then `cargo nextest run -p navori-secrets` — expect: all pass. If `Arc<apple_native_keyring_store::keychain::Store>` does not coerce to `Arc<dyn CredentialStoreApi + Send + Sync>` in `open`, stop and record it as a design finding. Run: `cargo clippy -p navori-secrets --all-targets -- -D warnings` — expect: clean.
+Run: `cargo fmt --all`, then `cargo nextest run -p navori-secrets` — expect: all pass. Run: `cargo clippy -p navori-secrets --all-targets -- -D warnings` — expect: clean.
 
 - [ ] **Step 4: Commit**
 
@@ -985,7 +1084,7 @@ _Requirements: SECRETS-2.1, SECRETS-2.2, SECRETS-2.3, SECRETS-2.4, SECRETS-2.5, 
 **Files:**
 - Test: `crates/secrets/tests/keychain_real.rs`
 
-**Reuse:** none — new code (rung 7) over a new dependency (decision 1); no installed dependency covers the Keychain
+**Reuse:** rung 2 — the `fake` feature plus self dev-dependency pattern of `crates/macos/Cargo.toml:11,22` and `crates/macos/src/lib.rs:15-16`; the fake itself is rung 7 because `keyring_core::mock` prints secret bytes in `Debug` and logs credentials
 
 **Interfaces:**
 - Consumes: `KeychainStore::open`, `KeychainService::DEV`, the contract helpers (Tasks 4, 5).
@@ -1134,7 +1233,7 @@ fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
         let path = entry.path();
-        if matches!(entry.file_name().to_str(), Some("target" | "build" | ".git")) {
+        if matches!(entry.file_name().to_str(), Some("target" | "build" | ".git" | ".worktrees" | "node_modules")) {
             continue;
         }
         if path.is_dir() {
@@ -1150,14 +1249,15 @@ fn only_the_manual_run_opens_the_real_keychain_and_it_is_ignored_by_default() {
     let needle = concat!("Keychain", "Store::open(");
     let manual = crate_dir().join("tests/keychain_real.rs").canonicalize().expect("manual run exists");
     let mut files = Vec::new();
-    for top in ["crates", "modules", "apps", "xtask"] {
-        rust_files(&workspace_root().join(top), &mut files);
-    }
+    rust_files(&workspace_root(), &mut files);
     assert!(!files.is_empty(), "the scan found no Rust files; the workspace root is wrong");
     for file in files {
         let text = fs::read_to_string(&file).expect("read");
         if file.canonicalize().ok().as_deref() == Some(manual.as_path()) {
-            assert!(text.contains("#[ignore"), "the manual run must stay #[ignore]d");
+            assert!(
+                text.lines().any(|line| line.trim_start().starts_with("#[ignore")),
+                "the manual run must stay #[ignore]d"
+            );
         } else if file.components().any(|part| part.as_os_str() == "tests") {
             assert!(!text.contains(needle), "{} opens the real Keychain", file.display());
         }
@@ -1198,13 +1298,15 @@ _Requirements: SECRETS-2.6, SECRETS-7.4, SECRETS-8.2, SECRETS-8.3_
 
 **Depends-on:** Task 3
 
+**Collisions (load-subgraph blast_radius):** `docs/codebase/dependencies.md` is also in the Files of the PROCS, AWAKE and HOOKS plans, and `docs/architecture/data.md` in the AWAKE and KCONTRACT plans. Those plans add or edit other rows of the same tables; this task adds only the `navori-secrets` row, the Secrets row and line 33. On a merge conflict keep both sides' rows; never reorder or reformat the table.
+
 - [ ] **Step 1: Show what is missing**
 
 Run: `rg -n 'navori-secrets' docs/codebase/dependencies.md` — expect: only the `ai/*` row (line 39) and no row of its own in the "Today" table. Run: `rg -n 'dev.navori.dev' docs/architecture/data.md` — expect: no match. Run: `rg -n 'keyring' docs/codebase/dependencies.md` — expect: the Secrets row naming `keyring` (apple-native) under Planned.
 
 - [ ] **Step 2: Edit**
 
-In `docs/codebase/dependencies.md`: add to the "Today" table, after the `navori-procs` row, `| \`navori-secrets\` | — | allowed: none — leaf; consumed by \`modules/*\` and \`ai/*\` (rows below) |`; replace the Secrets row of the third-party table with `| Secrets | \`keyring-core\`, \`apple-native-keyring-store\` (feature \`keychain\`) | — |`. In `docs/architecture/data.md` line 33: write `Keychain items, service \`dev.navori\` for the release Profile and \`dev.navori.dev\` for the dev Profile (R2, R4)`, keeping the second cell unchanged (GitHub token, AI provider API keys; never in the database, config or logs).
+In `docs/codebase/dependencies.md`: add to the "Today" table, after the `navori-procs` row, `| \`navori-secrets\` | — | allowed: none — leaf; consumed by \`modules/*\` and \`ai/*\` (rows below) and opened by the composition root \`navori-ffi\` (which may depend on any foundation crate) |`; replace the Secrets row of the third-party table with `| Secrets | \`keyring-core\`, \`apple-native-keyring-store\` (feature \`keychain\`) | — |`. In `docs/architecture/data.md` line 33: write `Keychain items, service \`dev.navori\` for the release Profile and \`dev.navori.dev\` for the dev Profile (R2, R4)`, keeping the second cell unchanged (GitHub token, AI provider API keys; never in the database, config or logs).
 
 - [ ] **Step 3: Verify**
 
