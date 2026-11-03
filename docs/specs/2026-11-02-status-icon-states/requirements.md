@@ -180,7 +180,7 @@ Files this feature touches, with what they guard:
 
 - **Performance:** **ICON-11.1** WHEN `cargo xtask perf` runs THE SYSTEM SHALL stay inside the GOAL-11 budget in `docs/standards/performance.md`, with no signal, phase or metric added by this feature — verified by `cargo xtask perf`.
 - **Performance:** **ICON-11.2** WHEN this feature is delivered THE SYSTEM SHALL have Navori's CPU during the Loop recorded in this file, measured by hand as the median of 5 windows of 12 seconds on a debug Sample with the panel closed, against the static Icon, using the rule that 0.05% rounds to 0.1 and fails. Delivery needs the number recorded, not a passing number. A result above 0.0 after rounding reopens the Loop (see Comes back if).
-  - **Loop cost: not yet measured.** Owed by the user; it needs a live GUI. On a debug build with the AI Sample on and the panel closed, and again with the static normal Sample, run `/usr/bin/top -l 6 -s 12 -stats cpu -pid <Navori Dev pid>`, drop the first sample (cumulative), and take the median of the other 5 windows. Do the same for WindowServer. Record both below with the machine and its load. If Navori rounds above 0.0, the Loop reopens.
+  - **Loop cost: not yet measured.** Owed by the user; it needs a live GUI. On a debug build with the AI Sample on and the panel closed, and again with the static normal Sample, run `/usr/bin/top -l 6 -s 12 -stats cpu -pid <Navori Dev pid>`, drop the first sample (cumulative), and take the median of the other 5 windows. Do the same for WindowServer (pid from `pgrep -x WindowServer`). Record both below with the machine and its load. If Navori rounds above 0.0, the Loop reopens.
 
     | Case | Navori CPU % | WindowServer CPU % | Machine and load |
     |---|---|---|---|

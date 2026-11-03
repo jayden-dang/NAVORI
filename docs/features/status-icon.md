@@ -21,6 +21,10 @@ Awake is the one Module that contributes today: `lease` ("Keeping this Mac awake
 
 `TrayState` and `TrayGlyph` (`normal`, `lease`, `ai_running`, `problem`) live in `navori_protocol`; `CoreStatus.tray` carries them. Through UniFFI they are `TrayView` and `TrayGlyphView` on `CoreSnapshot.tray`. The raw text of a bad config value does not enter `tray`.
 
+## Settings
+
+None: there is no Settings tab and no config key for the icon.
+
 ## CLI
 
 `navori status --json` includes `"tray": {"glyph": "normal", "attention": false, "summary": "Navori"}` beside the existing fields. Plain `navori status` prints no icon line.
@@ -35,13 +39,13 @@ Awake is the one Module that contributes today: `lease` ("Keeping this Mac awake
 
 Motion plays in Core Animation, with no `Timer`, `DispatchSourceTimer` or `CADisplayLink` (ARCH-16), and only on opacity.
 
-- **Loop:** while the glyph is `ai_running`, opacity fades 1.0 to 0.35 over 1 second, forever.
-- **Beat:** one dip to 0.2 over 0.25 seconds when attention newly turns on after the icon has drawn a real snapshot (not from Starting or Core-down).
+- **Loop:** while the glyph is `ai_running`, opacity fades 1.0 to 0.35 over 1 second each way (autoreverse, a 2 second cycle), forever.
+- **Beat:** one dip to 0.2 over 0.25 seconds each way (0.5 seconds in all) when attention newly turns on after the icon has drawn a real snapshot (not from Starting or Core-down).
 - **Reduce Motion** on: neither plays. Every glyph and the attention dot are carried in shape, so the icon reads with motion off and without color. Changing the setting re-renders the icon.
 
 ## Samples (debug builds)
 
-The dev Preview menu has an `Icon samples` list: Normal, Keeping awake, AI running and Problem, each with and without attention, plus Core not running and Starting. A choice is held on the real status item until `Turn off`, and the real snapshot returns with no Beat. `Play beat` plays one Beat. Samples dispatch no Action and are compiled out of release.
+The dev Preview menu has an `Icon samples` list: Normal, Keeping awake, AI running and Problem, each with and without attention, plus Core not running and Starting (dimmed). A choice is held on the real status item until `Turn off`, and the real snapshot returns with no Beat. `Play beat` plays one Beat. Samples dispatch no Action and are compiled out of release.
 
 ## The app icon
 
