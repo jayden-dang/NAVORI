@@ -258,6 +258,36 @@ async fn a_pid_is_classified_once() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn an_unreadable_live_pid_is_not_an_empty_hold() {
+    let rig = Rig::new();
+    rig.processes.add(command(PID));
+    rig.processes.fail_entry(PID, ReadError::Denied);
+    let err = rig.dispatch(hold_command(PID)).await.unwrap_err();
+    assert!(
+        matches!(
+            err,
+            DispatchError::Action(ActionError::Failed(ref message))
+                if message == "the process list could not be read (reading the process failed); retry the hold"
+        ),
+        "{err:?}"
+    );
+    let state = rig.kernel.state("awake").unwrap();
+    assert_eq!(lease_count(&state), 0);
+    assert_eq!(state["system_held"], false);
+    assert_eq!(state["problem"], Value::Null);
+    assert!(rig.power.held().is_empty());
+    assert!(rig.exits.watched().is_empty());
+    let started = rig
+        .kernel
+        .recent_events(10)
+        .unwrap()
+        .into_iter()
+        .any(|event| event.kind == "awake.lease_started");
+    assert!(!started, "awake run must not treat this answer as a held lease");
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_process_of_another_user_is_refused() {
     let rig = Rig::new();
     rig.processes

@@ -224,7 +224,10 @@ impl Awake {
                     "pid {pid} belongs to another user"
                 )));
             }
-            ProcessClass::Finished | ProcessClass::Unreadable => return Ok(None),
+            ProcessClass::Finished => return Ok(None),
+            ProcessClass::Unreadable => {
+                return Err(platform_failed("reading the process failed"));
+            }
         };
         let label = match self
             .platform
