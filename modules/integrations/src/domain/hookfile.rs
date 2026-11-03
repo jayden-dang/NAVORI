@@ -194,6 +194,46 @@ pub(crate) fn converge(doc: &mut Value, harness: Harness, dev: bool, helper: &Pa
     }
 }
 
+/// Takes the running profile's handlers out of `doc` and nothing else, then drops each group,
+/// event array and `hooks` object that this removal itself left empty. `doc` must already have
+/// passed `classify` without being unreadable.
+pub(crate) fn strip(doc: &mut Value, dev: bool) -> Changed {
+    let Some(root) = doc.as_object_mut() else {
+        return Changed::No;
+    };
+    let Some(events) = root.get_mut("hooks").and_then(Value::as_object_mut) else {
+        return Changed::No;
+    };
+    let mut changed = false;
+    let names: Vec<String> = events.keys().cloned().collect();
+    for name in names {
+        let Some(groups) = events.get_mut(&name).and_then(Value::as_array_mut) else {
+            continue;
+        };
+        let mut event_touched = false;
+        groups.retain_mut(|group| {
+            let Some(handlers) = group.get_mut("hooks").and_then(Value::as_array_mut) else {
+                return true;
+            };
+            let count = handlers.len();
+            handlers.retain(|handler| !is_ours(handler, dev));
+            let touched = handlers.len() != count;
+            event_touched |= touched;
+            !(touched && handlers.is_empty())
+        });
+        if event_touched {
+            changed = true;
+            if groups.is_empty() {
+                events.shift_remove(&name);
+            }
+        }
+    }
+    if changed && events.is_empty() {
+        root.shift_remove("hooks");
+    }
+    if changed { Changed::Yes } else { Changed::No }
+}
+
 fn canonical_group(handler: &Handler) -> Value {
     json!({ "hooks": [handler.to_value()] })
 }

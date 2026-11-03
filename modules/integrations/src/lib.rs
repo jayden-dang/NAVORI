@@ -88,7 +88,7 @@ impl Integrations {
                 Ok(state)
             }
             (Err(error), _) => {
-                tracing::warn!(?harness, %error, "{} the hooks failed", words.verb);
+                tracing::warn!(?harness, %error, "could not {} the hooks", words.verb);
                 ctx.emit(
                     HOOK_FAILED,
                     Severity::Error,
@@ -117,6 +117,12 @@ impl Words {
                 kind: HOOK_INSTALLED,
                 done: event::installed,
                 already: event::already_installed,
+            },
+            Plan::Remove | Plan::Delete => Self {
+                verb: "remove",
+                kind: HOOK_REMOVED,
+                done: event::removed,
+                already: event::nothing_to_remove,
             },
             Plan::Repair => Self {
                 verb: "repair",
@@ -158,10 +164,10 @@ impl Module for Integrations {
                     let result = self.change(ctx, harness, Plan::Repair).await;
                     req.respond(result);
                 }
-                IntegrationsAction::Remove { .. } => {
-                    req.respond::<IntegrationsState>(Err(ActionError::Invalid(
-                        "this action is not available yet".to_owned(),
-                    )));
+                IntegrationsAction::Remove { harness } => {
+                    let harness = *harness;
+                    let result = self.change(ctx, harness, Plan::Remove).await;
+                    req.respond(result);
                 }
             }
         }

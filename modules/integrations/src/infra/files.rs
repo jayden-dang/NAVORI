@@ -88,6 +88,9 @@ const NEW_FILE_MODE: u32 = 0o600;
 pub(crate) enum Plan {
     Install,
     Repair,
+    Remove,
+    /// A `Remove` that leaves a Grok file with nothing in it.
+    Delete,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -164,10 +167,17 @@ pub(crate) fn apply(
     }
     let changed = match plan {
         Plan::Install | Plan::Repair => domain::converge(&mut doc, harness, env.dev, &env.helper),
+        Plan::Remove | Plan::Delete => domain::strip(&mut doc, env.dev),
     };
-    if changed == Changed::No && existed {
+    let removing = matches!(plan, Plan::Remove | Plan::Delete);
+    if changed == Changed::No && (existed || removing) {
         return Ok(Outcome::Nothing);
     }
+    let plan = if removing && harness == Harness::Grok && doc == json!({}) {
+        Plan::Delete
+    } else {
+        plan
+    };
 
     let dir = target
         .path
@@ -180,7 +190,12 @@ pub(crate) fn apply(
     if existed {
         copy_beside(&target.path, target.mode, unix_seconds())?;
     }
-    write_atomically(&target, &dir, &doc, existed)?;
+    if matches!(plan, Plan::Delete) {
+        let link = hook_file(&env.home, harness);
+        std::fs::remove_file(&link).map_err(io("delete", &link))?;
+    } else {
+        write_atomically(&target, &dir, &doc, existed)?;
+    }
     Ok(Outcome::Written)
 }
 

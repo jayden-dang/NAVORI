@@ -55,3 +55,14 @@ pub(crate) fn already_correct(harness: Harness) -> String {
 pub(crate) fn failed(harness: Harness, verb: &str) -> String {
     format!("Could not {verb} Navori's hooks for {}.", name(harness))
 }
+
+pub(crate) fn removed(harness: Harness) -> String {
+    format!("Removed Navori's hooks from {}.", name(harness))
+}
+
+pub(crate) fn nothing_to_remove(harness: Harness) -> String {
+    format!(
+        "There were no hooks of Navori to remove from {}.",
+        name(harness)
+    )
+}
