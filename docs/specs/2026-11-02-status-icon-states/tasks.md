@@ -222,11 +222,11 @@ _Requirements: ICON-7.2, ICON-10.6, ICON-10.7, ICON-10.8, ICON-10.9_
 
 **Depends-on:** Task 5
 
-- [ ] **Step 1: Implement** `StatusIconImage` from the coordinates in `ui-brief.md`, with a flipped 18 pt `NSImage`, `isTemplate = true` and the mark's clear-then-fill. Replace `observeHealth` and `render(health:)`; delete `CoreStore.Health` and `health`. `appearsDisabled` is true only for `.starting`. Keep the `statusItemDrawn` block and `didScheduleStatusMark` as they are.
-- [ ] **Step 2: Verify** `cargo xtask ci` — expect: pass. `grep -rn 'store.health\|CoreStore.Health' apps/macos` — expect: nothing.
+- [x] **Step 1: Implement** `StatusIconImage` from the coordinates in `ui-brief.md`, with a flipped 18 pt `NSImage`, `isTemplate = true` and the mark's clear-then-fill. Replace `observeHealth` and `render(health:)`; delete `CoreStore.Health` and `health`. `appearsDisabled` is true only for `.starting`. Keep the `statusItemDrawn` block and `didScheduleStatusMark` as they are.
+- [x] **Step 2: Verify** `cargo xtask ci` — expect: pass. `grep -rn 'store.health\|CoreStore.Health' apps/macos` — expect: nothing.
 - [ ] **Step 3: Check by hand** with `cargo xtask run` in a dark menu bar. The icon shows the normal N. `"build/dev/Navori Dev.app/Contents/Helpers/navori" --profile dev awake hold --for 1h` shows the tile, and `awake release-all` returns the N. Left click toggles the panel and a second click closes it; right click and control-click show the native menu with `Open`, `Settings…`, `Open Logs Folder` and `Quit`; `Open Logs Folder` opens the folder; the tooltip is the app name; the Core submenu appears when the first snapshot arrives with the panel open. Put a garbage file at `<temp home>/Library/Application Support/Navori Dev/navori.db` and launch the binary directly under `NAVORI_PERF=1 NAVORI_PERF_HOME=<temp home>`: the icon shows the folded ×. During launch it shows the dim outline N. VoiceOver reads the summary, including a bad config value.
-- [ ] **Step 4: Run** `cargo xtask perf` — expect: pass, with `statusItemDrawn` logged once per launch and `SIGUSR1` and `SIGUSR2` still opening the real menu and Core Submenu.
-- [ ] **Step 5: Commit** `feat(shell): draw the fold glyphs on the status item`.
+- [x] **Step 4: Run** `cargo xtask perf` — expect: pass, with `statusItemDrawn` logged once per launch and `SIGUSR1` and `SIGUSR2` still opening the real menu and Core Submenu.
+- [x] **Step 5: Commit** `feat(shell): draw the fold glyphs on the status item`.
 
 _Requirements: ICON-5.1, ICON-5.5, ICON-6.5, ICON-7.1, ICON-7.3, ICON-7.4, ICON-7.7, ICON-7.8, ICON-7.9, ICON-10.10, ICON-10.12, ICON-10.13, ICON-10.15, ICON-10.16, ICON-10.17_
 
