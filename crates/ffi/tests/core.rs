@@ -38,6 +38,11 @@ fn config(home: &tempfile::TempDir) -> CoreConfig {
         uid: std::os::unix::fs::MetadataExt::uid(&std::fs::metadata(home.path()).unwrap()),
         app_version: "0.1.0-test".into(),
         log_to_file: false,
+        helper_path: home
+            .path()
+            .join("Navori Dev.app/Contents/Helpers/navori")
+            .to_string_lossy()
+            .into_owned(),
     }
 }
 
@@ -781,6 +786,34 @@ fn a_stray_awake_table_in_config_raises_no_notice() {
     let awake = awake_of(&core);
     assert!(awake.leases.is_empty(), "{awake:?}");
     assert!(!awake.system_held);
+    core.shutdown();
+}
+
+#[test]
+fn dispatching_integrations_status_lists_three_harnesses_over_a_temp_home() {
+    let home = home();
+    std::fs::create_dir_all(home.path().join(".claude")).unwrap();
+    let (core, _) = start(&home);
+    let answer: serde_json::Value =
+        serde_json::from_str(&dispatch_json(&core, "integrations", "\"status\"")).unwrap();
+    let rows = answer["harnesses"].as_array().unwrap();
+    let seen: Vec<(&str, &str)> = rows
+        .iter()
+        .map(|row| {
+            (
+                row["harness"].as_str().unwrap(),
+                row["state"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        seen,
+        [
+            ("claude", "not_installed"),
+            ("codex", "not_found"),
+            ("grok", "not_found")
+        ]
+    );
     core.shutdown();
 }
 

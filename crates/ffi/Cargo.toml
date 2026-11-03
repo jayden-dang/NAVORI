@@ -26,6 +26,7 @@ navori-config.workspace = true
 navori-ipc.workspace = true
 navori-kernel.workspace = true
 navori-mod-awake.workspace = true
+navori-mod-integrations.workspace = true
 navori-protocol.workspace = true
 navori-redact.workspace = true
 navori-store.workspace = true

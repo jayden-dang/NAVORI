@@ -55,6 +55,11 @@ fn start_core(config_toml: Option<&str>) -> Running {
             uid: std::fs::metadata(home.path()).unwrap().uid(),
             app_version: "9.9.9-test".into(),
             log_to_file: false,
+            helper_path: home
+                .path()
+                .join("Navori Dev.app/Contents/Helpers/navori")
+                .to_string_lossy()
+                .into_owned(),
         },
         Arc::new(Ignore),
     )

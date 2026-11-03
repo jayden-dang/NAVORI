@@ -28,7 +28,8 @@ final class CoreStore {
             homeDir: AppEnvironment.coreHome,
             uid: UInt32(getuid()),
             appVersion: AppEnvironment.version,
-            logToFile: true
+            logToFile: true,
+            helperPath: AppEnvironment.cliURL.path
         )
         do {
             let core = try NavoriCore.start(config: config, listener: SnapshotRelay(store: self))

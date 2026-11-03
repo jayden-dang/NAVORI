@@ -13,6 +13,7 @@ use navori_config::{
 use navori_ipc::Handler;
 use navori_kernel::{DispatchError, Kernel, Module, ModuleState};
 use navori_mod_awake::{Awake, AwakeState, LeaseState, Platform, Timing};
+use navori_mod_integrations::{Integrations, IntegrationsEnv};
 use navori_protocol::{Check, CoreStatus, Envelope, Event, ModuleInfo, Severity, rpc};
 use navori_store::Store;
 use serde_json::{Value, json};
@@ -29,6 +30,8 @@ pub struct Inner {
     pub version: String,
     pub pid: u32,
     pub config_notice: Option<crate::ConfigNotice>,
+    #[expect(dead_code, reason = "read by the doctor row")]
+    pub integrations: IntegrationsEnv,
     /// Set once, right after the single-instance check passes.
     pub last_unclean_exit: std::sync::OnceLock<Option<String>>,
 }
@@ -243,6 +246,7 @@ pub fn build_kernel(
     sections: serde_json::Map<String, serde_json::Value>,
     sweep: &JournalSweep,
     name: &str,
+    integrations: IntegrationsEnv,
 ) -> Kernel {
     let builder = match sweep {
         JournalSweep::KeepDays(days) => Kernel::builder(store).journal_retention_days(*days),
@@ -251,6 +255,7 @@ pub fn build_kernel(
     builder
         .config_sections(sections)
         .register(Awake::new(Platform::mac(), name, Timing::FIXED))
+        .register(Integrations::new(integrations))
         .start()
 }
 

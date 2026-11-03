@@ -673,6 +673,7 @@ dependencies = [
  "navori-kernel",
  "navori-macos",
  "navori-mod-awake",
+ "navori-mod-integrations",
  "navori-protocol",
  "navori-redact",
  "navori-store",
@@ -747,6 +748,21 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "navori-mod-integrations"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "navori-kernel",
+ "navori-store",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
  "tokio",
  "tracing",
 ]
