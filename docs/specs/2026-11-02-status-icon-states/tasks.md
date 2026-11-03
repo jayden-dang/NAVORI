@@ -197,12 +197,12 @@ _Requirements: ICON-4.1, ICON-4.2, ICON-4.3, ICON-4.4, ICON-4.5, ICON-10.5_
 
 **Depends-on:** Task 3
 
-- [ ] **Step 1: Write failing tests** in `CoreRowStateTests.swift`: `a_config_notice_alone_needs_attention`; `a_refused_lease_with_every_module_running_stays_running`; `a_failed_or_restarting_module_needs_attention`; `a_starting_or_stopped_module_stays_running`; `a_failed_core_is_not_running`; `no_snapshot_is_starting`. In `StatusIconTests.swift`: `a_failed_core_is_core_down_whatever_the_core_said`; `no_core_state_yet_is_starting`; `a_core_state_is_used_unchanged`.
-- [ ] **Step 2: Run** `cargo xtask build-core && swift test --arch arm64 --package-path apps/macos --filter 'CoreRowStateTests|StatusIconTests'` — expect: does not compile, the initializers are missing.
-- [ ] **Step 3: Implement.** The initializer counts only `failed` and `restarting` as degraded. `coreStatus` reads it. The new `StatusIconState` initializer returns `coreDown` with `Core not running` when the Core failed, `starting` with `Starting` when `core` is nil, and otherwise `core`. `statusIcon` calls it with a mapping of `snapshot?.tray`, which is the only reader of `tray`. `health` stays until Task 6.
-- [ ] **Step 4: Verify** the same command — expect: pass. `cargo xtask ci` — expect: pass. `grep -rln 'import NavoriCore' apps/macos/Navori apps/macos/NavoriPanel apps/macos/NavoriBanner` — expect: only `CoreStore.swift` and `CoreStartupBanner.swift`.
+- [x] **Step 1: Write failing tests** in `CoreRowStateTests.swift`: `a_config_notice_alone_needs_attention`; `a_refused_lease_with_every_module_running_stays_running`; `a_failed_or_restarting_module_needs_attention`; `a_starting_or_stopped_module_stays_running`; `a_failed_core_is_not_running`; `no_snapshot_is_starting`. In `StatusIconTests.swift`: `a_failed_core_is_core_down_whatever_the_core_said`; `no_core_state_yet_is_starting`; `a_core_state_is_used_unchanged`.
+- [x] **Step 2: Run** `cargo xtask build-core && swift test --arch arm64 --package-path apps/macos --filter 'CoreRowStateTests|StatusIconTests'` — expect: does not compile, the initializers are missing.
+- [x] **Step 3: Implement.** The initializer counts only `failed` and `restarting` as degraded. `coreStatus` reads it. The new `StatusIconState` initializer returns `coreDown` with `Core not running` when the Core failed, `starting` with `Starting` when `core` is nil, and otherwise `core`. `statusIcon` calls it with a mapping of `snapshot?.tray`, which is the only reader of `tray`. `health` stays until Task 6.
+- [x] **Step 4: Verify** the same command — expect: pass. `cargo xtask ci` — expect: pass. `grep -rln 'import NavoriCore' apps/macos/Navori apps/macos/NavoriPanel apps/macos/NavoriBanner` — expect: only `CoreStore.swift` and `CoreStartupBanner.swift`.
 - [ ] **Step 5: Check by hand** with `cargo xtask run`: a bad value in `config.toml` shows the banner and `Needs attention` on the Core row, as it does today.
-- [ ] **Step 6: Commit** `refactor(shell): give the status item one plain value`.
+- [x] **Step 6: Commit** `refactor(shell): give the status item one plain value`.
 
 _Requirements: ICON-7.2, ICON-10.6, ICON-10.7, ICON-10.8, ICON-10.9_
 
