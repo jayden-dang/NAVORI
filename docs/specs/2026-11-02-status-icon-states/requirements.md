@@ -1,7 +1,7 @@
 # Requirements: Status icon states
 
 Feature code: ICON
-Status: Approved
+Status: In-progress
 Date: 2026-11-02
 
 <!--
