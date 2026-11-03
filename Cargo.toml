@@ -12,6 +12,7 @@ members = [
     "crates/ffi",
     "apps/cli",
     "xtask",
+    "modules/awake",
 ]
 
 [workspace.package]
@@ -30,6 +31,7 @@ navori-kernel = { path = "crates/kernel" }
 navori-ipc = { path = "crates/ipc" }
 navori-macos = { path = "crates/macos" }
 navori-procs = { path = "crates/procs" }
+navori-mod-awake = { path = "modules/awake" }
 
 # Versions = latest stable on crates.io as of 2026-11-01 (`cargo xtask outdated` re-checks).
 anyhow = "1.0.104"

@@ -19,7 +19,7 @@ Date: 2026-11-01
 | 0 | success |
 | 1 | the command ran and failed (action error, failing `doctor` check) |
 | 2 | usage error (bad arguments, invalid JSON, unknown profile) |
-| 3 | the app is not running |
+| 3 | the app is not running. `navori awake run` is the exception: its exit code is the child's, so 3 can mean the child exited 3 while the app is up |
 
 ## Logging
 

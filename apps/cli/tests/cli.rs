@@ -1,8 +1,9 @@
 //! The real `navori` binary against a real core running in this test process.
 #![allow(clippy::unwrap_used)]
 
-use std::os::unix::fs::MetadataExt;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use assert_cmd::Command;
 use navori_ffi::{CoreConfig, CoreSnapshot, NavoriCore, SnapshotListener};
@@ -63,6 +64,14 @@ fn start_core(config_toml: Option<&str>) -> Running {
 
 fn navori(home: &tempfile::TempDir) -> Command {
     let mut cmd = Command::cargo_bin("navori").unwrap();
+    cmd.env("HOME", home.path())
+        .env("NAVORI_PROFILE", "dev")
+        .env_remove("NAVORI_LOG");
+    cmd
+}
+
+fn navori_process(home: &tempfile::TempDir) -> std::process::Command {
+    let mut cmd = std::process::Command::new(assert_cmd::cargo::cargo_bin("navori"));
     cmd.env("HOME", home.path())
         .env("NAVORI_PROFILE", "dev")
         .env_remove("NAVORI_LOG");
@@ -193,4 +202,169 @@ fn an_unknown_profile_is_a_usage_error() {
         .args(["--profile", "prod", "status"])
         .assert()
         .code(2);
+}
+
+#[test]
+fn awake_hold_for_an_hour_shows_in_status() {
+    let r = running_core();
+    navori(&r.home)
+        .args(["awake", "hold", "--for", "1h"])
+        .assert()
+        .success();
+    navori(&r.home)
+        .args(["awake", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("1 Lease"))
+        .stdout(predicate::str::contains("1 hour"));
+}
+
+#[test]
+fn awake_hold_with_no_flag_is_until_off() {
+    let r = running_core();
+    navori(&r.home).args(["awake", "hold"]).assert().success();
+    navori(&r.home)
+        .args(["awake", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("1 Lease"))
+        .stdout(predicate::str::contains("Until off"));
+}
+
+#[test]
+fn awake_release_all_ends_the_lease() {
+    let r = running_core();
+    navori(&r.home)
+        .args(["awake", "hold", "--for", "1h"])
+        .assert()
+        .success();
+    navori(&r.home)
+        .args(["awake", "release-all"])
+        .assert()
+        .success();
+    navori(&r.home)
+        .args(["awake", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("0 Leases"))
+        .stdout(predicate::str::contains("1 hour").not());
+}
+
+#[test]
+fn a_bad_duration_is_a_usage_error() {
+    let home = short_home();
+    navori(&home)
+        .args(["awake", "hold", "--for", "nope"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("duration"));
+}
+
+#[test]
+fn awake_status_with_the_app_down_exits_3() {
+    let home = short_home();
+    navori(&home)
+        .args(["awake", "status"])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("not running"));
+}
+
+#[test]
+fn awake_run_holds_while_the_command_runs() {
+    let r = running_core();
+    let mut child = navori_process(&r.home)
+        .args(["awake", "run", "--", "sleep", "5"])
+        .spawn()
+        .unwrap();
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let mut status_out = String::new();
+    while Instant::now() < deadline {
+        let output = navori(&r.home).args(["awake", "status"]).output().unwrap();
+        status_out = String::from_utf8_lossy(&output.stdout).into_owned();
+        if status_out.contains("1 Lease") && status_out.contains("sleep") {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert!(
+        status_out.contains("1 Lease") && status_out.contains("sleep"),
+        "status while sleep runs: {status_out}"
+    );
+
+    let finished = child.wait().unwrap();
+    assert!(finished.success(), "{finished:?}");
+}
+
+#[test]
+fn awake_run_exits_with_the_commands_code() {
+    let r = running_core();
+    for code in [0, 3, 7] {
+        navori(&r.home)
+            .args(["awake", "run", "--", "sh", "-c", &format!("exit {code}")])
+            .assert()
+            .code(code);
+    }
+}
+
+#[test]
+fn awake_run_with_the_app_down_still_runs_and_warns_once_on_stderr() {
+    let home = short_home();
+    let marker = home.path().join("ran");
+    navori(&home)
+        .args(["awake", "run", "--", "/usr/bin/touch"])
+        .arg(&marker)
+        .assert()
+        .code(0)
+        .stderr(predicate::eq(
+            "navori: no Lease held because Navori is not running\n",
+        ));
+    assert!(marker.exists(), "command should still have run");
+}
+
+#[test]
+fn awake_run_with_a_missing_command_exits_127() {
+    let home = short_home();
+    navori(&home)
+        .args(["awake", "run", "--", "navori-awake-run-missing-command"])
+        .assert()
+        .code(127);
+}
+
+#[test]
+fn awake_run_on_a_non_executable_file_exits_126() {
+    let home = short_home();
+    let path = home.path().join("not-executable");
+    std::fs::write(&path, b"#!/bin/sh\nexit 0\n").unwrap();
+    let mut perms = std::fs::metadata(&path).unwrap().permissions();
+    perms.set_mode(0o644);
+    std::fs::set_permissions(&path, perms).unwrap();
+    navori(&home)
+        .args(["awake", "run", "--"])
+        .arg(&path)
+        .assert()
+        .code(126);
+}
+
+#[test]
+fn awake_run_exits_128_plus_the_signal() {
+    let home = short_home();
+    navori(&home)
+        .args(["awake", "run", "--", "sh", "-c", "kill -s TERM $$"])
+        .assert()
+        .code(143);
+}
+
+#[test]
+fn awake_run_with_the_app_down_creates_no_socket() {
+    let home = short_home();
+    navori(&home)
+        .args(["awake", "run", "--", "/usr/bin/true"])
+        .assert()
+        .code(0);
+    let socket = home
+        .path()
+        .join("Library/Application Support/Navori Dev/run/navori.sock");
+    assert!(!socket.exists(), "CLI must not create {}", socket.display());
 }

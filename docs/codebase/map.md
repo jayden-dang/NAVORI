@@ -26,7 +26,9 @@ Where things live in this repository and where new code belongs. Covers the top-
 | `xtask/` | Build, bundle, sign, install, CI, dependency rules (`cargo xtask <command>`). |
 | `crates/macos/` | `navori-macos` — platform FFI behind safe traits `ProcessSource`, `ExitSource` and `PowerAssertions`. The only hand-written `unsafe`. |
 | `crates/procs/` | `navori-procs` — process snapshot, project/worktree resolver, Harness table, child activity and exit watcher. No `unsafe`. |
+| `modules/awake/` | `navori-mod-awake` — feature Module: Leases and the power assertion. |
 | `docs/` | Product (`product/`), architecture (`architecture/`, `ARCHITECTURE.md`), codebase (`codebase/`), standards (`standards/`), UI briefs (`design/`), specs (`specs/`), ADRs (`adr/`), agent config (`agents/`). |
+| `docs/features/` | One short user-facing note per shipped feature. |
 | Root files | `Cargo.toml` (workspace, dependencies, lints), `rust-toolchain.toml`, `.cargo/config.toml` (xtask alias, deployment target), `clippy.toml`, `AGENTS.md`, `CONTEXT.md`, `README.md`. |
 
 **Planned** (created by the release that first needs them — never as empty folders)
@@ -34,10 +36,9 @@ Where things live in this repository and where new code belongs. Covers the top-
 | Path | Purpose |
 |---|---|
 | `crates/secrets/` | `navori-secrets` — Keychain (R2). |
-| `modules/` | One crate per feature module: `awake/` (R1), `inbox/` (R2), `ports/` (R3), `github/` (R4). |
+| `modules/` | Remaining feature modules: `inbox/` (R2), `ports/` (R3), `github/` (R4). |
 | `ai/` | AI runtime crates: `llm/`, `models/`, `context/`, `agent/`, `memory/` (R2), `triggers/` (R5), `mcp/` (R6). |
 | `integrations/` | Files Navori installs into other tools: `claude-code/`, `codex/`, `grok/` hook and MCP snippets (R1, R6). |
-| `docs/features/` | One short user-facing note per shipped feature. |
 
 ## Placement rules
 

@@ -41,7 +41,7 @@ let package = Package(
         ),
         .testTarget(
             name: "NavoriBannerTests",
-            dependencies: ["NavoriBanner", "NavoriCore"],
+            dependencies: ["NavoriBanner", "NavoriCore", "NavoriPanel"],
             path: "Tests/NavoriBannerTests",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),

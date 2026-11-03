@@ -24,9 +24,10 @@ links it into `~/.local/bin`. Talk to the dev build with `--profile dev`:
 
 ```sh
 navori status      # version, uptime, module health
-navori doctor      # config, database, IPC, modules, logs
+navori doctor      # config, database, IPC, modules, logs, awake
 navori events      # journal, newest first
 navori actions     # every action modules accept, with risk level
+navori awake       # hold, release-all, status, run
 navori dispatch system '"ping"'
 ```
 

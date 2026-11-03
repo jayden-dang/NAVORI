@@ -151,7 +151,7 @@ pub trait AssistantStream: Send + Sync { fn on_event(&self, e: AssistantEvent); 
 ```
 
 #### Data types
-- Module State/Action derive `uniffi::Record` / `uniffi::Enum` **behind the `ffi` feature** (`#[cfg_attr(feature = "ffi", derive(uniffi::Record))]`) → modules still do not depend on UniFFI when building the CLI/tests, yet Swift gets fully typed values (`GithubState`, `AwakeAction`…) without hand-written mirror types.
+- The Awake record (`AwakeView`) is declared in `navori-ffi` and sits on `CoreSnapshot`. `modules/awake` does not depend on UniFFI; FFI converts through the Module's Rust type. Swift gets a typed view without a hand-written mirror.
 - `ModuleSnapshot` / `ModuleCommand` are aggregate enums, extended by one variant per new module.
 
 #### Known risks & how they are handled
@@ -281,20 +281,17 @@ user/trigger ─► assemble context ─► Model Router ─► stream ─┬─
 ### Seed: process model — `navori-procs` (R1, R3)
 
 Awake, Ports and the Context Engine all need to know "which project does this process belong to, and who started it":
-- **ProcessTable** (implemented in `navori-macos` behind `ProcessSource`; listed via `sysctl(KERN_PROC_ALL)`): pid, ppid, uid, exe, argv, cwd, start time.
-- **ProjectResolver**: cwd → `.git` → repo root; `.git` is a file → **worktree** → `{project, worktree, branch}`.
-- **HarnessCatalog**: recognizes Claude Code, Codex, and Grok, and the terminal host.
+- **Snapshot** (from `navori-procs`, over `ProcessSource` in `navori-macos`; listed via `sysctl(KERN_PROC_ALL)`): pid, ppid, uid, exe, argv, cwd, start time.
+- **resolve_location**: cwd → `.git` → repo root; `.git` is a file → **worktree** → `{project, worktree, branch}`.
+- **harness_of**: recognizes Claude Code, Codex, and Grok, and the terminal host.
 - **ProcWatcher**: `kqueue EVFILT_PROC/NOTE_EXIT` → learns of a process death immediately, no polling.
 
 ### Seed: Awake (R1)
 
-**Lease model**:
-```rust
-struct Lease { id, source: Manual | Timer | Process{pid} | Agent{harness, session_id, pid} | Command,
-               mode: System | Display, expires_at: Option<_>, grace: Duration }
-```
-- **Reconciler**: with ≥ 1 lease → hold exactly one IOKit assertion (`PreventUserIdleSystemSleep`, + `PreventUserIdleDisplaySleep` if needed). Idempotent.
-- A lease ends when: released · TTL expires · the process dies (kqueue) · the app exits (the OS reclaims the assertion itself).
+Shipped behavior, commands, and events live in `docs/features/awake.md` and `docs/specs/2026-11-02-awake-leases/`. This seed is not a second action catalog.
+
+- **Reconciler**: with ≥ 1 lease → hold at most one IOKit assertion per kind (`PreventUserIdleSystemSleep`, and `PreventUserIdleDisplaySleep` if a Lease asks for the display). Idempotent.
+- A lease ends when: released · TTL expires · the process dies (kqueue). The assertion follows the process (the OS reclaims it when the app exits). Rows for process-owned Leases survive a restart, and on reopen the assertion returns if the process is still the same.
 
 **Harness integration — verified on the machine (2026-11-01)**: all three harnesses have Claude Code-style hooks (JSON via stdin, with `hook_event_name` + session id + `cwd`). So **one** `navori hook` command serves all of them.
 
@@ -304,7 +301,7 @@ struct Lease { id, source: Manual | Timer | Process{pid} | Agent{harness, sessio
 | Grok Build (`grok` 1.0.70) | `~/.grok/hooks/navori.json` | `UserPromptSubmit` | `Stop` (only when `reason == "end_turn"`), `StopCancelled`, `StopFailure` | `SessionEnd` |
 | Codex (`codex-cli` 0.166) | `~/.codex/hooks.json` | `UserPromptSubmit` | `Stop` | `SessionEnd` |
 | Any command | — | `navori awake run -- <cmd>` | — | when the command exits |
-| Harness without hooks | — | auto-detect via HarnessCatalog | silent for N minutes | process dies |
+| Harness without hooks | — | auto-detect via harness_of | silent for N minutes | process dies |
 
 Important details:
 - **Harness identification**: `navori hook` sends its pid and ppid over IPC, and the Core walks the process tree while the request is open. Resolve the Harness on `UserPromptSubmit` and `Stop`, never on `SessionEnd` (1–1.5 s budgets; 2026-11-01 harness-hook research note). No arguments needed.
@@ -313,7 +310,6 @@ Important details:
 - **Installation**: Settings → Integrations has Install/Repair/Remove buttons per harness. Navori **merges** into the existing config file (backup before writing, never overwriting other hooks), and `navori doctor` checks whether the hook is still correct.
 - **Safety net**: if a hook fails or does not run → kqueue (process death) + TTL still guarantee the lease cannot hang forever.
 
-AI tools: `awake.status` (Read), `awake.hold{duration, reason}` (Write), `awake.release` (Write).
 Out of scope (decided): staying awake with the lid closed.
 
 ### Seed: Ports (R3)

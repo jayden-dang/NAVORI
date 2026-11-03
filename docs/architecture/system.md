@@ -55,13 +55,13 @@ Status: **Built** = in the tree at R0 · **Built (Rn)** = in the tree since that
 | Config | Built | Profiles (`release`/`dev`), filesystem layout, `config.toml`. | `crates/config` |
 | IPC | Built | JSON-RPC 2.0 over a user-private Unix socket; doubles as the single-instance lock. | `crates/ipc` |
 | Protocol | Built | Wire types shared by every layer (Envelope, ActionSpec, Event, status, RPC frames). | `crates/protocol` |
-| `navori` CLI | Built | `status`, `doctor`, `events`, `actions`, `dispatch`; later `hook`, `awake`, `ask`, `mcp`. | `apps/cli` |
+| `navori` CLI | Built | `status`, `doctor`, `events`, `actions`, `dispatch`, `awake`; later `hook`, `ask`, `mcp`. | `apps/cli` |
 | xtask | Built | Build core + bindings, bundle, sign, install, CI gate, dependency rules. | `xtask` |
 | Scheduler | Built | Periodic work for all modules: fast while the menu is open, slow in the background, a timer parks on uptime, and an overdue timer may fire during dark wake (ARCH-16). | `crates/kernel` |
 | Platform FFI | Built (R1) | Safe traits `ProcessSource`, `ExitSource` and `PowerAssertions` (`MacProcesses`, `KqueueExits`, `MacPower`). The only hand-written `unsafe` (ARCH-9). | `crates/macos` |
 | Process model | Built (R1) | Snapshot, project/worktree location, Harness table, child activity and process-exit watcher. No `unsafe`. Uses `ProcessSource` and `ExitSource`. | `crates/procs` |
 | Secrets | Planned (R2) | Keychain storage for tokens and API keys (ARCH-8). | `crates/secrets` |
-| Awake module | Planned (R1) | Leases → one power assertion; harness-session tracking. | `modules/awake` |
+| Awake module | Built (R1) | Leases → at most one power assertion per kind; harness-session tracking. | `modules/awake` |
 | Ports module | Planned (R3) | Listening ports by project/worktree/harness; stop with approval. | `modules/ports` |
 | GitHub module | Planned (R4) | PR inbox, checks, approve/merge; OAuth device flow (ADR 0002). | `modules/github` |
 | Needs you inbox | Planned (R2) | Decisions, To-dos and Updates between the user and Navori AI; approvals for Destructive Actions. | proposed `modules/inbox` |

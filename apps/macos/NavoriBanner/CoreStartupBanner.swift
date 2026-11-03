@@ -19,4 +19,9 @@ public enum CoreStartupBanner {
             return "core is shut down"
         }
     }
+
+    /// Awake menu failure text. A core rejection stores the action sentence, not `String(reflecting:)`.
+    public static func menuFailure(for error: Error) -> String {
+        message(for: error)
+    }
 }

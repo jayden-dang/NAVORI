@@ -34,15 +34,12 @@ The user's words (verbatim, in order; the Vietnamese quotes are kept as-is, with
 
 ## Surface 1 — Level-0 menu
 
-- **Layout:** 360pt wide, 5pt padding. Fixed order:
-  1. The **Ask Navori…** field (`⌥ Space`) — no title/caption row above it.
-  2. Separator → **Needs you** header + total count (right-aligned).
-  3. Up to **3** inbox items (see the inbox rules), then `Show all N ›` when N > 3.
-  4. Separator → 3 feature rows, **one line each**: icon · name · *one* important piece of info (right-aligned) · `›`
-     - **Awake** — `● On · Claude, Codex` (green dot when on; `Off` when off)
-     - **Ports** — `17 open`
-     - **Pull Requests** — `1 to review · ● 2 failing` (the failing part shows only when > 0)
-  5. Separator → `Settings… ⌘,` · `About Navori` · `Quit Navori ⌘Q`.
+- **Layout:** 360pt wide, 5pt padding. Shipped order:
+  1. Any banners (the core did not start, an unexpected quit, a config problem).
+  2. **Awake** — one line: icon `cup.and.saucer` · name · one value · chevron. `Off` with no dot; green dot `On · <sources>` while a Lease holds the system assertion; orange dot `Not held` when a Lease exists and that assertion does not; `Unavailable` with no submenu when the record is missing or the module has stopped.
+  3. **Core** — one line, with the dev chip on the dev profile. Its submenu is unchanged.
+  4. Separator → `Settings… ⌘,` · `About Navori` · `Quit Navori ⌘Q`.
+  - Ask, Needs you, Ports and Pull Requests are not on level 0. They stay in the dev-only preview until those features ship.
   - No account, API quota, or "updated" row at level 0.
 - **Components:**
   - Menu + submenu cascade: `new (rung 7) — panel cascade` on `StatusPanel` (`NSPanel`). Reason: Amendment 10.
@@ -52,7 +49,7 @@ The user's words (verbatim, in order; the Vietnamese quotes are kept as-is, with
   - Inbox row: `new (rung 7) — InboxRowView` (see Surface 2).
   - Status dot: `rung 2 — status dot`.
   - Icons: `rung 1 — SF Symbols` (monochrome rendering): `sparkle`, `cup.and.saucer`, `point.3.connected.trianglepath.dotted`, `arrow.triangle.pull`, `gearshape`, `bell`, `square`.
-- **States:** default · hover/selected (accent background with 8pt corners, white text + icon) · empty inbox (`✓ You're all caught up`, the menu gets shorter) · core not running (`rung 2 — Banner` error style in the inbox position: "Navori core isn't running" + `Restart`) · GitHub offline (`Pull Requests  offline · 5 min ago`) · Awake off (`Off`, no dot).
+- **States:** default · hover/selected (accent background with 8pt corners, white text + icon) · empty inbox (`✓ You're all caught up`, the menu gets shorter) · core not running (`rung 2 — Banner` error style in the inbox position: "Navori core isn't running" + `Restart`) · GitHub offline (`Pull Requests  offline · 5 min ago`) · Awake off (`Off`, no dot) · Awake on (green dot, `On · <sources>`) · Awake not held (orange dot, `Not held`) · Awake unavailable (`Unavailable`, no submenu).
 - **Type & color:** SF Pro 14pt title/item, 13pt right-aligned value (`secondaryLabelColor`), 12pt secondary line. SF Mono 11.5pt for port numbers, `#PR`, pid. Monochrome icons in `secondaryLabelColor` (white when selected). Semantic color is **only** the 7pt dot (`systemGreen` on/pass, `systemRed` fail, `systemOrange` conflict, `systemBlue` review/decision). No color tiles, gradients, or multicolor icons.
 - **A11y:** NSMenu-style keyboard navigation, built by the panel cascade (↑↓, → opens a submenu, ← closes, Return, Esc); VoiceOver reads "title, secondary line, time" as one; state is never conveyed by color alone (always text: "2 failing", "On"); respects Reduce Transparency (opaque material) and Reduce Motion; inline button hit area ≥ 24pt tall.
 
@@ -76,14 +73,16 @@ The inbox is **the shared decision place between the user and Navori AI** — it
 - **Type & color:** title 14pt regular (Update is lighter: lead `tertiaryLabelColor`); reason 12pt `secondaryLabelColor`; buttons 12.5pt medium, 24pt tall; when the row is selected: the primary button inverts to a white background with accent text, the secondary button gets a 22% white background.
 - **A11y:** inline buttons are in the row's Tab order; VoiceOver reads the item kind ("Decision: Stop 3 idle servers…, needs your approval"); shortcuts: Return = primary button, ⌘⌫ = dismiss.
 
-## Surface 3 — Awake submenu (+ Agent sessions, Integrations)
+## Surface 3 — Awake submenu
 
-- **Layout:** quick commands (`Keep awake for 1 hour`, `Keep awake until I turn it off`, `Let my Mac sleep now`) → **status block** `Awake · since 11:38` + "3 leases · system sleep blocked · display may sleep" with inline buttons `Pause 15m · Display on · Release all` → header **Holding**: each lease on 2 lines (`Claude · NAVORI/main` / `working · pid 23719`, time right-aligned; hover → `Release` button) → `Agent sessions [6] ›`, `Integrations [3] ›`.
-  - Level 3 **Agent sessions:** every open harness session (claude/codex/grok), status, time; hover → `Show terminal`, `Keep awake for this session`.
-  - Level 3 **Integrations:** Claude Code / Grok Build / Codex with the hook file path and `● installed` status; click → Repair. Note: Grok also reads Claude's hooks, so events are de-duplicated per session.
-- **Components:** `new (rung 7) — StatusBlockView` (icon, title + subtitle, description line, inline button row — shared with Ports/project); count capsule `new (rung 7) — CountBadge`; hover actions `new (rung 7) — RowActionButton` (icon 26×22).
-- **States:** off (status block "Awake off" + a prominent `Keep awake for 1 hour`) · no Agent session Leases · hook not installed (Integrations shows `● not installed` + an inbox To-do "Install the Grok hook").
-- **Type & color / A11y:** as Surface 1; hover buttons must be keyboard-reachable (Tab within the row).
+- **Layout:** `Keep awake for 1 hour`, `Keep awake until I turn it off`, then the status block, then `Display on` (it reads `Display off` once that Lease exists), then `Release all`, then a **Holding** header and one row per Lease.
+  - Status block: `Awake off` / `No Leases` when nothing is held; `Awake · since 11:38` / `2 Leases · idle sleep blocked`, plus `· display kept on` while a display Lease is held; `Can't hold this Mac awake` / `macOS refused the request. Navori keeps trying.` when the system assertion is refused; `Display not held` when the display assertion is refused.
+  - `Release all` stays visible. With no Lease it is dimmed and does nothing.
+  - Holding: `1 hour` with `until 11:38` right-aligned when the manual hold has an end; `Until off`; `Display`; a command as `<exe name>` / `running · pid 23719`; a session as `Claude Code · NAVORI/main` / `working · pid 23719`, or `stopped · background work · pid 23719` when stopped. No per-Lease release.
+  - No Agent sessions row and no Integrations row.
+- **Components:** commands are `MenuRowView` rows (`isDimmed` when `Release all` has nothing to end). The status block is `StatusBlockView`. Holding uses `SectionTitle` and a plain two-line row. Those rows are not cascade nodes.
+- **States:** off (`Awake off`, `Release all` dimmed) · on · system assertion refused · display assertion refused (`Display not held`, button reads `Display off`).
+- **Type & color / A11y:** as Surface 1. ↑ and ↓ reach the four commands. VoiceOver reads each command, the status block, and each Holding row as one sentence. The status block and Holding rows take no keyboard stop.
 
 ## Surface 4 — Ports submenu (+ Project)
 

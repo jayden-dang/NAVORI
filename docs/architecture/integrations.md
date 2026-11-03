@@ -17,13 +17,13 @@ Not covered here: the internal Rust ⇄ Swift boundary (`system.md`, `runtime.md
 |---|---|---|
 | `navori` CLI and local scripts | in | JSON-RPC 2.0, one JSON object per line, over the user-private Unix socket; methods `core.status`, `core.actions`, `core.dispatch`, `core.events`, `core.doctor`; requests ≤ 1 MiB; peer UID must match. |
 | macOS Login Items (`SMAppService`) | out | `SMAppService.mainApp` register/unregister; fallback: a user LaunchAgent `~/Library/LaunchAgents/<bundle-id>.login.plist` that opens the app at login. |
+| IOKit power management | out | `IOPMAssertionCreateWithName` with `PreventUserIdleSystemSleep` (+ `PreventUserIdleDisplaySleep` when a Lease asks for the display); at most one assertion per kind; released by the OS if the process dies. |
 
 **Planned**
 
 | System | Direction | Contract |
 |---|---|---|
 | Harness hooks — Claude Code, Codex, Grok Build (R1) | in (events) · out (hook install) | Each harness runs `navori hook` on lifecycle events with JSON on stdin (`hook_event_name`, session id, `cwd`). Files: `~/.claude/settings.json`, `~/.codex/hooks.json`, `~/.grok/hooks/navori.json`. Events: `UserPromptSubmit` → acquire a Lease; `Stop` (Grok: only `reason == "end_turn"`; also `StopCancelled`, `StopFailure`) → release after grace; `SessionEnd` → release now. Navori merges its entries into these files (backup first, never removing other hooks). |
-| IOKit power management (R1) | out | `IOPMAssertionCreateWithName` with `PreventUserIdleSystemSleep` (+ `PreventUserIdleDisplaySleep` when a Lease asks for the display); exactly one assertion held while any Lease exists; released by the OS if the process dies. |
 | BSD process APIs — libproc, `sysctl`, kqueue, signals (R1, R3) | in · out | Read the process table (pid, ppid, uid, exe, argv, cwd), listening TCP sockets and process-exit events (`EVFILT_PROC/NOTE_EXIT`); stop processes with `SIGTERM` to the process group, then `SIGKILL` after 3 s. Only processes of the current UID. |
 | Cloud LLM providers (R2) | out | Four adapter families over HTTPS + SSE: `anthropic` (Messages API), `openai` (Responses API), `openai_compat` (Chat Completions — DeepSeek, xAI, OpenRouter, Groq, Mistral, Ollama/LM Studio, custom endpoints), `gemini`. One API key per provider, in the Keychain. Every request passes the Context Gateway (redaction, audit). |
 | macOS frameworks via PlatformServices (R2) | in · out | `UserNotifications` (out), `NSWorkspace` + Accessibility (frontmost app, window title, selected text), `ScreenCaptureKit` (screen capture excluding denylisted apps), `Vision` (on-device OCR), `CoreImage` (blur secrets). Each needs its macOS permission, requested on first use. |

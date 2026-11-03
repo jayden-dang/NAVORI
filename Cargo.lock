@@ -671,6 +671,8 @@ dependencies = [
  "navori-config",
  "navori-ipc",
  "navori-kernel",
+ "navori-macos",
+ "navori-mod-awake",
  "navori-protocol",
  "navori-redact",
  "navori-store",
@@ -729,6 +731,23 @@ dependencies = [
  "objc2-io-kit",
  "tempfile",
  "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "navori-mod-awake"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "navori-kernel",
+ "navori-macos",
+ "navori-procs",
+ "navori-store",
+ "rusqlite",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
  "tracing",
 ]
 

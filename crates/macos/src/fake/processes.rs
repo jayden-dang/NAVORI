@@ -82,6 +82,8 @@ struct State {
     reads: Vec<(i32, &'static str)>,
     /// `entry` for these pids fails with this error. `skip` successful calls happen first.
     entry_errors: Vec<(i32, u32, ReadError)>,
+    list_calls: usize,
+    fail_list: bool,
 }
 
 /// [`ProcessSource`](crate::ProcessSource) backed by the processes added in this process.
@@ -110,6 +112,8 @@ impl FakeProcesses {
                 pending: Vec::new(),
                 reads: Vec::new(),
                 entry_errors: Vec::new(),
+                list_calls: 0,
+                fail_list: false,
             }),
         }
     }
@@ -163,6 +167,16 @@ impl FakeProcesses {
         lock(&self.state).reads.clone()
     }
 
+    /// How many times [`ProcessSource::list`] has been called.
+    pub fn list_calls(&self) -> usize {
+        lock(&self.state).list_calls
+    }
+
+    /// When `fail` is true, later [`ProcessSource::list`] calls return a sysctl error.
+    pub fn fail_list(&self, fail: bool) {
+        lock(&self.state).fail_list = fail;
+    }
+
     fn read<T>(
         &self,
         pid: i32,
@@ -185,7 +199,12 @@ impl ProcessSource for FakeProcesses {
     }
 
     fn list(&self) -> Result<Vec<ProcEntry>, PlatformError> {
-        Ok(lock(&self.state).processes.iter().map(entry_of).collect())
+        let mut state = lock(&self.state);
+        state.list_calls += 1;
+        if state.fail_list {
+            return Err(PlatformError::Sysctl { errno: 1 });
+        }
+        Ok(state.processes.iter().map(entry_of).collect())
     }
 
     fn entry(&self, pid: i32) -> Result<ProcEntry, ReadError> {

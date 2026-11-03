@@ -10,6 +10,7 @@ struct MenuRow {
     let dot: StatusDot?
     let opensSubmenu: Bool
     let shortcut: KeyEquivalent?
+    var isDimmed: Bool = false
 }
 
 struct MenuRowView: View {
@@ -29,6 +30,7 @@ struct MenuRowView: View {
                 Text(row.title)
                     .font(.system(size: 14))
                     .foregroundStyle(selected ? Color.white : Color(nsColor: .labelColor))
+                    .opacity(row.isDimmed ? 0.45 : 1)
                     .lineLimit(1)
                 if row.id == "core", AppEnvironment.isDev {
                     Text("DEV")
@@ -48,6 +50,7 @@ struct MenuRowView: View {
                     Text(value)
                         .font(.system(size: 13))
                         .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
+                        .opacity(row.isDimmed ? 0.45 : 1)
                         .lineLimit(1)
                 }
                 if let shortcut = row.shortcut {
@@ -103,6 +106,7 @@ struct MenuRowView: View {
                     .font(.system(size: 13))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
+                    .opacity(row.isDimmed ? 0.45 : 1)
             }
         }
         .frame(width: 20, height: 20)

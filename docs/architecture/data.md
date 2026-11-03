@@ -24,13 +24,13 @@ Paths are shown for `release`; `dev` uses `Navori Dev` in place of `Navori`. Not
 | Session marker `~/Library/Application Support/Navori/session.marker` | Exists while the Core runs (pid, start time, redacted panic text); a leftover one means the last session ended uncleanly. |
 | Logs `~/Library/Logs/Navori/navori.YYYY-MM-DD.log` | `tracing` output, daily rotation, 14 files kept; no prompt content or secrets unless debug is on. |
 | Socket `~/Library/Application Support/Navori/run/navori.sock` | Not data at rest — the IPC endpoint and single-instance lock, in a `0700` directory. |
+| `awake_leases` | Process-owned (session and command) Leases: pid and process start time, plus session fields. Manual duration, until-off and display Leases are not stored; they end when the app closes. On reopen, if the process is still the same, the assertion returns. |
 
 **Planned** (schemas are decided in each feature's design, not here)
 
 | Entity / store | Notes |
 |---|---|
 | Keychain items, service `dev.navori` (R2, R4) | GitHub token, AI provider API keys. Never in the database, config or logs (ARCH-8). |
-| `awake_*` (R1) | Leases and their sources; what persists across a restart is decided in the R1 design. |
 | `inbox_*` (R2) | Needs you: Decisions, To-dos, Updates and their outcomes. |
 | `ai_session_*`, usage (R2) | Conversations in the canonical message format, tool calls, token usage and estimated cost per turn. |
 | `memory_*` (R2) | Facts and preferences, episodic summaries, embeddings. Written only after redaction. |
