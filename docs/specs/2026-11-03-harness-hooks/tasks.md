@@ -467,10 +467,10 @@ _Requirements: HOOKS-1.1, HOOKS-2.2, HOOKS-10.7_
 
 **Depends-on:** Task 14
 
-- [ ] **Step 1: Write failing tests.** Installing for Claude adds four entries, with `StopFailure` at timeout 2. A Claude set with the three old events reads Needs repair, and Repair adds the fourth and changes nothing else. Remove drops all four. Codex's required set stays three. Rename `installing_into_a_claude_file_adds_three_entries_and_keeps_foreign_hooks_and_key_order` to say four.
-- [ ] **Step 2: Implement** one separate event list for Claude in `required_events`. Update the fixtures and helpers that spell Claude's complete set. The repair and status tests that use `StopFailure` on Claude as an event Install would not write move to `StopCancelled`, which Claude does not install.
-- [ ] **Step 3: Update docs.** `docs/features/integrations.md`: the Install line, and the Not verified line about interrupts. `docs/architecture/integrations.md`: the event list, if it names Claude's events.
-- [ ] **Step 4: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(integrations): install StopFailure for Claude Code"`
+- [x] **Step 1: Write failing tests.** Installing for Claude adds four entries, with `StopFailure` at timeout 2. A Claude set with the three old events reads Needs repair, and Repair adds the fourth and changes nothing else. Remove drops all four. Codex's required set stays three. Rename `installing_into_a_claude_file_adds_three_entries_and_keeps_foreign_hooks_and_key_order` to say four.
+- [x] **Step 2: Implement** one separate event list for Claude in `required_events`. Update the fixtures and helpers that spell Claude's complete set. The repair and status tests that use `StopFailure` on Claude as an event Install would not write move to `StopCancelled`, which Claude does not install.
+- [x] **Step 3: Update docs.** `docs/features/integrations.md`: the Install line, and the Not verified line about interrupts. `docs/architecture/integrations.md`: the event list, if it names Claude's events.
+- [x] **Step 4: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "feat(integrations): install StopFailure for Claude Code"`
 
 _Requirements: HOOKS-4.16_
