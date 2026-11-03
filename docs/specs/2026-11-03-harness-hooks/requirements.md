@@ -51,7 +51,7 @@ Terms used below:
 
 **Story:** As the user, I want to quit Navori and keep prompting Claude Code, Codex or Grok, so that a prompt neither stalls nor fails because the hook has no Core to reach.
 
-- **HOOKS-2.1** THE SYSTEM SHALL end the Hook command with exit code 0 in every case, including an unreadable or invalid payload, a missing event or session id, an unknown event, no socket, a Core that is not running, a Core error, an Action reply of invalid or not-a-Harness, and its own deadline. [agent-decided; research note `harness-hook-blocking` says exit 2 blocks a prompt]
+- **HOOKS-2.1** THE SYSTEM SHALL end the Hook command with exit code 0 in every case, including an unreadable or invalid payload, a missing event or session id, an unknown event, an unusable environment variable or argument, no socket, a Core that is not running, a Core error, an Action reply of invalid or not-a-Harness, and its own deadline. [agent-decided; research note `harness-hook-blocking` says exit 2 blocks a prompt]
 - **HOOKS-2.2** THE SYSTEM SHALL write nothing to standard output and nothing to standard error from the Hook command. [agent-decided, picks-r1 F5; whether Claude or Codex show stderr on exit 0 is Unverified]
 - **HOOKS-2.3** WHEN the Hook command has not finished its Core call within its client deadline THE SYSTEM SHALL give up and exit. The deadline is 1.5 seconds for `UserPromptSubmit`, `Stop`, `StopCancelled` and `StopFailure`, and 0.7 seconds for `SessionEnd`. [agent-decided; to be re-checked against the measured start cost of the command before design locks it]
 - **HOOKS-2.4** WHEN the Core is not running THE SYSTEM SHALL start no Lease, write no file and not open the app. [Lock, PROCS close-package.md:50 (ROAD-9 owns the Core-not-running case); AWAKE close-package.md:23 for "The CLI does not open the app"]
@@ -73,7 +73,7 @@ Terms used below:
 - **HOOKS-3.9** WHILE a row is Not found THE SYSTEM SHALL disable its Install button and show a one-sentence reason beside it, taken from the Module's status reply and not worded in Swift. [Weigh, picks-r1 F7; ARCH-1]
 - **HOOKS-3.10** THE SYSTEM SHALL offer an Install button on Not installed, a Repair button on Needs repair, and a Remove button on Installed and Needs repair. [Lock, ARCHITECTURE.md:314]
 - **HOOKS-3.11** THE SYSTEM SHALL serve the state, Install, Repair and Remove as Actions of a new Integrations Module — `status` (Risk read), `install`, `repair` and `remove` (Risk write), each taking a `harness` — so that the Shell, `navori dispatch` and Navori AI reach them the same way. [Weigh, picks-r1 F1; ARCH-4]
-- **HOOKS-3.12** THE SYSTEM SHALL read the Hook files only when `status` runs — from the Integrations tab, `navori doctor` or a dispatch — and SHALL NOT poll them or hold a timer. [agent-decided; ARCH-16]
+- **HOOKS-3.12** THE SYSTEM SHALL read the Hook files only when a status is asked for — from the Integrations tab, `navori doctor` or a dispatch — and SHALL NOT poll them or hold a timer. [agent-decided; ARCH-16]
 
 ## 4. Install a Harness's hook
 
@@ -100,7 +100,7 @@ Terms used below:
 **Story:** As the user, I want one Repair button to fix a hook that points at a moved app or lost an event, so that I do not have to find out what changed.
 
 - **HOOKS-5.1** THE SYSTEM SHALL treat a Harness's entries as correct when, for the running profile, every required event has a Hook entry whose command and timeout equal what Install would write now and which has no `async`. [Weigh, picks-r1 F4; research note on `async`]
-- **HOOKS-5.2** THE SYSTEM SHALL recognise the running profile's Hook entry as one whose command ends in `/Contents/Helpers/navori` followed by ` hook` for release, or by ` --profile dev hook` for dev, so a moved app's stale entry is found. [agent-decided; replaces picks-r1 F4's profile-blind rule after review finding 1]
+- **HOOKS-5.2** THE SYSTEM SHALL recognise the running profile's Hook entry as one whose command is a single-quoted program path ending `/Contents/Helpers/navori`, then ` hook` for release or ` --profile dev hook` for dev, so a moved app's stale entry is found; an entry written any other way counts as foreign. [agent-decided; replaces picks-r1 F4's profile-blind rule after review finding 1]
 - **HOOKS-5.3** WHEN the user repairs THE SYSTEM SHALL replace each of the running profile's entries that is not correct, add each missing one and remove each that Install would not write, and SHALL NOT leave two entries of the running profile for one event. [agent-decided]
 - **HOOKS-5.4** WHEN the user repairs THE SYSTEM SHALL follow HOOKS-4.7, 4.8, 4.11, 4.12 and 4.13 as Install does.
 - **HOOKS-5.5** WHEN the user repairs a Harness that is Installed THE SYSTEM SHALL change nothing. [agent-decided]
@@ -109,7 +109,7 @@ Terms used below:
 
 **Story:** As the user, I want to take Navori's hook out of a Harness and keep everything else in its config, so that removing Navori leaves nothing of Navori's hooks behind.
 
-- **HOOKS-6.1** WHEN the user removes for Claude Code or Codex THE SYSTEM SHALL delete only the running profile's Hook entries, and any array or object that its removal leaves empty and that Navori created, and keep the file. [Lock "never overwrites other hooks", ARCHITECTURE.md:314; empty-container rule agent-decided, picks-r1 F8]
+- **HOOKS-6.1** WHEN the user removes for Claude Code or Codex THE SYSTEM SHALL delete only the running profile's Hook entries, and any array or object that its removal leaves empty, and keep the file. [Lock "never overwrites other hooks", ARCHITECTURE.md:314; empty-container rule agent-decided, picks-r1 F8]
 - **HOOKS-6.2** WHEN the user removes for Grok Build and `navori.json` holds only Hook entries of Navori THE SYSTEM SHALL delete the file after writing a Backup. [agent-decided, picks-r1 F8]
 - **HOOKS-6.3** WHEN the user removes for Grok Build and `navori.json` holds anything that is not a Navori Hook entry THE SYSTEM SHALL delete only the running profile's entries and keep the file. [agent-decided, picks-r1 F8; THR-9]
 - **HOOKS-6.4** WHEN the user removes THE SYSTEM SHALL follow HOOKS-4.7, 4.11, 4.12 and 4.13 as Install does.
@@ -123,7 +123,7 @@ Terms used below:
 - **HOOKS-7.2** WHEN no present Harness is Needs repair or Unreadable THE SYSTEM SHALL report the check ok. A Harness that is Not found, or that is Not installed, is not a failure. [Weigh, picks-r1 F3]
 - **HOOKS-7.3** WHEN a present Harness is Needs repair or Unreadable THE SYSTEM SHALL report the check failed. In both cases THE SYSTEM SHALL name every Harness with its state in the check's detail, so a missing hook is reported even when it is not a failure. [Lock "`navori doctor` … report the hook", ARCHITECTURE.md:314-315; the ok/failed split and the detail's shape are agent-decided]
 - **HOOKS-7.4** WHILE the app is not running THE SYSTEM SHALL report no hook state, because the CLI prints only the `app` row then. [agent-decided, accepted in review; `apps/cli/src/main.rs:376-383, 400-401`]
-- **HOOKS-7.5** THE SYSTEM SHALL show in Settings → Integrations and in `navori doctor` the same state for a Harness at one moment, because both come from the Module's `status`. [Weigh, picks-r1 F3]
+- **HOOKS-7.5** THE SYSTEM SHALL show in Settings → Integrations and in `navori doctor` the same state for a Harness at one moment, because both come from the same `inspect` function. [Weigh, picks-r1 F3]
 
 ## 8. The dev and release apps keep separate hooks
 
@@ -132,11 +132,11 @@ Terms used below:
 - **HOOKS-8.1** WHEN the dev profile installs, repairs or removes THE SYSTEM SHALL touch only entries whose command carries `--profile dev` before `hook`, and WHEN the release profile does, only entries that carry none. [agent-decided; ARCH-14, review finding 1]
 - **HOOKS-8.2** WHILE a release entry and a dev entry both exist in one Hook file THE SYSTEM SHALL keep both, and each profile's Settings and doctor SHALL read only its own. [agent-decided; ARCH-14]
 - **HOOKS-8.3** WHEN the dev profile installs while a correct release entry exists THE SYSTEM SHALL leave the release entry byte-identical. [agent-decided; ARCH-14]
-- **HOOKS-8.4** WHEN a Hook entry runs THE SYSTEM SHALL send its events to the Core of the profile the entry names, release or dev, and to no other. [Lock, ARCH-14 (no shared sockets); `apps/cli/src/main.rs:24, 140`]
+- **HOOKS-8.4** WHEN a Hook entry runs THE SYSTEM SHALL send its events to the Core of the profile the entry names, release or dev, and to no other, and SHALL ignore the `NAVORI_PROFILE` environment variable to do so. [Lock, ARCH-14 (no shared sockets); `apps/cli/src/main.rs:24, 140`]
 
 ## 9. Guards on existing behavior
 
-Files this change touches: `apps/cli/src/main.rs`, `apps/cli/tests/cli.rs`, `crates/ffi/src/lib.rs`, `crates/ffi/src/app.rs`, `crates/ffi/tests/core.rs`, `modules/integrations/` (new), `Cargo.toml`, `apps/macos/Navori/Features/Settings/SettingsView.swift`, `apps/macos/Navori/Core/CoreStore.swift`, `apps/macos/Navori/App/AppDelegate.swift`, `docs/features/`, `docs/ARCHITECTURE.md`, `docs/architecture/integrations.md`. `modules/awake/` is read by this feature and not changed: no behavior to guard beyond the lines below.
+Files this change touches: `apps/cli/src/main.rs`, `apps/cli/tests/cli.rs`, `crates/ffi/src/lib.rs`, `crates/ffi/src/app.rs`, `crates/ffi/tests/core.rs`, `modules/integrations/` (new), `Cargo.toml`, `apps/macos/Navori/Features/Settings/SettingsView.swift`, `apps/macos/Navori/Core/CoreStore.swift`, `docs/features/`, `docs/ARCHITECTURE.md`, `docs/architecture/integrations.md`. `modules/awake/` is read by this feature and not changed: no behavior to guard beyond the lines below.
 
 - **HOOKS-9.1** (guard) WHEN any `navori` command other than `hook` runs THE SYSTEM SHALL CONTINUE TO behave and exit as it does today, including exit codes 0, 1, 2 and 3 and `awake run` running its command when the Core is down. [`apps/cli/src/main.rs:3, 295`]
 - **HOOKS-9.2** (guard) WHEN `navori doctor` runs THE SYSTEM SHALL CONTINUE TO print its existing rows, `config`, `database`, `ipc`, `modules`, `awake` and `logs`, in the same order, and exit 0, 1 or 3 by the same rule. [`crates/ffi/src/app.rs:57`]
