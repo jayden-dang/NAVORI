@@ -29,6 +29,7 @@ Slot vs CODE: one home in `plan-milestones` (**ROAD-N is a slot, not a feature**
 - Read issue: `gh issue view <n> --comments`
 - Create issue: `gh issue create --title <t> --body-file <f> --label <l>`
 - Comment: `gh issue comment <n> --body-file <f>`
+- Close: `gh issue close <n> --comment <text>`
 - Edit labels: `gh issue edit <n> --add-label <l> --remove-label <old>`
 - Sub-issues / blocking (rarely needed with Publish unit `feature`). Both endpoints take the
   issue's **id**, not its number — resolve it with

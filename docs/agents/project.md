@@ -33,6 +33,7 @@ to override that default (e.g. once the installed app's data in
 - **Delivery intent:** `Production` — the quality bar the output must meet. A bar, not a release state: **Production** says how well the code must be built, never that the project has shipped.
 - **Lifecycle stage:** `Active development` — where the project is in its life.
 - **Default PR base:** `main` — `land-branch` reads it as the third rung of its base-resolution ladder.
+- **Default landing action:** `merge`
 
 These are distinct from product goals (what success looks like): posture is *how carefully
 to build right now*, not *what to build*.
