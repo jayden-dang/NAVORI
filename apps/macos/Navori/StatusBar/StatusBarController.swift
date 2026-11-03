@@ -116,7 +116,7 @@ final class StatusBarController: NSObject {
         CATransaction.commit()
     }
 
-    /// Opacity motion runs in Core Animation, off the main thread, with no timer (ARCH-16).
+    /// Opacity motion runs in Core Animation, off the main thread, with no timer.
     private func applyMotion(_ plan: StatusIconMotion.Plan) {
         guard let button = item.button else { return }
         if (plan.loop || plan.beat) && !button.wantsLayer { button.wantsLayer = true }

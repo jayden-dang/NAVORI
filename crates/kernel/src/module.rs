@@ -62,18 +62,14 @@ pub trait Module: Send + Sized + 'static {
 
     /// What this Module asks of the status icon, read from its published State.
     ///
-    /// Two rules hold for every implementation: it is a pure function of `state`, cheap and
-    /// free of I/O, because the Kernel calls it on every status read; and it reports only
-    /// what `state` says now, since the Kernel ignores it while the Module is not running.
-    ///
-    /// Two further rules bind what an implementation asks for:
-    /// - A Module reports the problem glyph only when its main function is failing
-    ///   (ICON-3.4: "a Module reports the problem glyph only when its main function is
-    ///   failing").
+    /// Rules for every implementation:
+    /// - It is a pure function of `state`, cheap and free of I/O, because the Kernel calls it
+    ///   on every status read.
+    /// - It reports only what `state` says now, since the Kernel ignores it while the Module
+    ///   is not running.
+    /// - A Module reports the problem glyph only when its main function is failing.
     /// - Attention means Needs you holds a Decision. To-dos, Updates, pull request counts,
-    ///   failing checks and port counts do not turn it on (ICON-5.4: "attention means Needs
-    ///   you holds a Decision, and that To-dos, Updates, pull request counts, failing checks
-    ///   and port counts do not turn it on").
+    ///   failing checks and port counts do not turn it on.
     ///
     /// The default asks for nothing.
     fn tray(_state: &Self::State) -> TrayContribution {

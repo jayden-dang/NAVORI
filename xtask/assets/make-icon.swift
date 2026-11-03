@@ -47,7 +47,8 @@ func render(pixels: Int) -> Data {
 
     // Apple grid: 824 px body centred on the 1024 canvas.
     let body = CGRect(x: 100, y: 100, width: 824, height: 824)
-    let bodyPath = CGPath(roundedRect: body, cornerWidth: 23 * 8.24, cornerHeight: 23 * 8.24, transform: nil)
+    let cornerRadius: CGFloat = 23 * 8.24
+    let bodyPath = CGPath(roundedRect: body, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
 
     // Drop shadow.
     ctx.saveGState()
@@ -77,7 +78,7 @@ func render(pixels: Int) -> Data {
     ctx.saveGState()
     ctx.setStrokeColor(dev ? color(255, 255, 255, 0.10) : color(26, 29, 36, 0.10))
     ctx.setLineWidth(3)
-    ctx.addPath(CGPath(roundedRect: body.insetBy(dx: 1.5, dy: 1.5), cornerWidth: 23 * 8.24 - 1.5, cornerHeight: 23 * 8.24 - 1.5, transform: nil))
+    ctx.addPath(CGPath(roundedRect: body.insetBy(dx: 1.5, dy: 1.5), cornerWidth: cornerRadius - 1.5, cornerHeight: cornerRadius - 1.5, transform: nil))
     ctx.strokePath()
     ctx.restoreGState()
 
