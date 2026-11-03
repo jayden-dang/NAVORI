@@ -34,6 +34,10 @@ impl FakeClock {
         let millis = u64::try_from(by.as_millis()).unwrap();
         self.millis.fetch_add(millis, Ordering::SeqCst);
     }
+
+    pub fn millis(&self) -> i64 {
+        i64::try_from(self.millis.load(Ordering::SeqCst)).unwrap()
+    }
 }
 
 impl WallClock for FakeClock {

@@ -230,11 +230,24 @@ async fn with_the_menu_closed_a_lease_ends_within_30_seconds_of_its_deadline() {
     );
     assert_eq!(rig.power.held().len(), 1);
 
-    rig.advance(Duration::from_secs(20)).await;
-    rig.idle().await;
-    let ended_at = ORIGIN_MS as i64 + 40_000;
-    assert!(ended_at - deadline <= 30_000);
-    assert!(ended_at >= deadline);
+    let mut ended_at = None;
+    for _ in 0..30 {
+        rig.advance(Duration::from_secs(1)).await;
+        rig.idle().await;
+        if lease_count(&rig.kernel.state("awake").unwrap()) == 0 {
+            ended_at = Some(rig.clock.millis());
+            break;
+        }
+    }
+    let ended_at = ended_at.expect("the lease did not end within 30 seconds of its deadline");
+    assert!(
+        ended_at >= deadline,
+        "ended at {ended_at}, deadline {deadline}"
+    );
+    assert!(
+        ended_at - deadline <= 30_000,
+        "ended at {ended_at}, deadline {deadline}"
+    );
     let state = rig.kernel.state("awake").unwrap();
     assert_eq!(lease_count(&state), 0);
     assert_eq!(state["system_held"], false);
