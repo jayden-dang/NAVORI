@@ -14,6 +14,7 @@ Execution-mode: continuous
 Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
+Delivered-by: PR #11
 
 **Goal:** Make the Mac stay awake while Claude Code, Codex or Grok Build works, by adding `navori hook`, an Integrations Module that installs, repairs and removes Navori's hook entries, a `navori doctor` row and a Settings → Integrations tab.
 
