@@ -13,6 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::bus::EventBus;
 use crate::scheduler::{Scheduler, WaitHandle};
+use crate::tray::TrayContribution;
 
 /// Documentation for one variant of a module's action enum.
 #[derive(Debug, Clone, Copy)]
@@ -58,6 +59,16 @@ pub trait Module: Send + Sized + 'static {
     type State: Serialize + Clone + Send + Sync + 'static;
 
     fn initial_state(&self) -> Self::State;
+
+    /// What this Module asks of the status icon, read from its published State.
+    ///
+    /// Two rules hold for every implementation: it is a pure function of `state`, cheap and
+    /// free of I/O, because the Kernel calls it on every status read; and it reports only
+    /// what `state` says now, since the Kernel ignores it while the Module is not running.
+    /// The default asks for nothing.
+    fn tray(_state: &Self::State) -> TrayContribution {
+        TrayContribution::default()
+    }
 
     /// The actor loop. Return `Ok(())` when [`ModuleCtx::recv`] yields `None` (shutdown).
     /// Returning an error or panicking makes the supervisor restart the module with the

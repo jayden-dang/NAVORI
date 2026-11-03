@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use futures::FutureExt;
-use navori_protocol::{ActionSpec, Envelope, Event, ModuleInfo, ModuleState, Severity};
+use navori_protocol::{ActionSpec, Envelope, Event, ModuleInfo, ModuleState, Severity, TrayState};
 use navori_store::{Store, StoreError};
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -17,6 +17,7 @@ use crate::bus::{EventBus, now_ms};
 use crate::module::{ActionError, Module, ModuleAction, ModuleConfig, ModuleCtx, Reply, Request};
 use crate::scheduler::{Scheduler, SystemClock, WallClock};
 use crate::system::{SweepPolicy, System};
+use crate::tray::{TrayContribution, compose_tray};
 
 const INBOX_CAPACITY: usize = 256;
 /// A module that ran this long before crashing gets its restart budget back.
@@ -57,6 +58,7 @@ impl Default for RestartPolicy {
 
 type SendFn = Box<dyn Fn(Value) -> Result<oneshot::Receiver<Reply>, DispatchError> + Send + Sync>;
 type StateFn = Box<dyn Fn() -> Value + Send + Sync>;
+type TrayFn = Box<dyn Fn() -> TrayContribution + Send + Sync>;
 type Launcher = Box<
     dyn FnOnce(
             RestartPolicy,
@@ -71,6 +73,7 @@ struct Registered {
     specs: Vec<ActionSpec>,
     send: SendFn,
     state: StateFn,
+    tray: TrayFn,
     info: Arc<Mutex<ModuleInfo>>,
 }
 
@@ -172,8 +175,14 @@ impl KernelBuilder {
                 .map_err(|_| DispatchError::Unavailable(M::ID.to_owned()))?;
             Ok(rx)
         });
+        let tray_rx = state_rx.clone();
         let state: StateFn =
             Box::new(move || serde_json::to_value(&*state_rx.borrow()).unwrap_or(Value::Null));
+        let tray: TrayFn = Box::new(move || {
+            // Clone out of the borrow so `M::tray` never runs under the watch lock.
+            let current = tray_rx.borrow().clone();
+            M::tray(&current)
+        });
 
         let sup_info = info.clone();
         let plumbing = self.plumbing.clone();
@@ -198,6 +207,7 @@ impl KernelBuilder {
             specs,
             send,
             state,
+            tray,
             info,
         });
         self
@@ -318,6 +328,17 @@ impl Kernel {
 
     pub fn modules(&self) -> Vec<ModuleInfo> {
         self.modules.iter().map(|m| lock(&m.info).clone()).collect()
+    }
+
+    /// The status icon state: Module lifecycle and contributions, plus the config notice as
+    /// `(title, message)`.
+    pub fn tray(&self, notice: Option<(&str, &str)>) -> TrayState {
+        let entries: Vec<_> = self
+            .modules
+            .iter()
+            .map(|m| (lock(&m.info).clone(), (m.tray)()))
+            .collect();
+        compose_tray(&entries, notice)
     }
 
     /// Current state snapshot of `module` as JSON.
