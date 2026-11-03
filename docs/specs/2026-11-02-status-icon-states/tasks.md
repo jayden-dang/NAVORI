@@ -14,6 +14,7 @@ Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
 UI brief: ./ui-brief.md
+Delivered-by: 000c73e81cae861ae4f7be49b94500de30adb4be
 
 **Goal:** Make the menu bar icon and the app icon say what Navori is doing at a glance, from one state the Kernel composes, in the locked Fold look.
 
