@@ -54,30 +54,22 @@ final class StatusBarController: NSObject {
         }
         item.behavior = .terminationOnRemoval
         awakeHadSubmenu = AwakeRowState(status: store.awakeStatus).hasSubmenu
-        observeHealth()
+        observeStatusIcon()
         observeSnapshot()
     }
 
-    /// Re-renders the icon whenever `store.health` changes.
-    private func observeHealth() {
+    /// Re-renders the icon whenever `store.statusIcon` changes.
+    private func observeStatusIcon() {
         withObservationTracking {
-            render(health: store.health)
+            render(store.statusIcon)
         } onChange: { [weak self] in
-            Task { @MainActor in self?.observeHealth() }
+            Task { @MainActor in self?.observeStatusIcon() }
         }
     }
 
-    private func render(health: CoreStore.Health) {
-        let (symbol, description): (String, String) = switch health {
-        case .starting: ("circle.dotted", "Starting")
-        case .ok: ("sparkle", "Navori")
-        case .degraded(let sentence): ("exclamationmark.triangle", sentence)
-        case .down: ("xmark.octagon", "Core not running")
-        }
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: description)
-        image?.isTemplate = true
-        item.button?.image = image
-        item.button?.appearsDisabled = health == .starting
+    private func render(_ state: StatusIconState) {
+        item.button?.image = StatusIconImage.image(state)
+        item.button?.appearsDisabled = state.glyph == .starting
         guard AppEnvironment.perfMode, !didScheduleStatusMark else { return }
         didScheduleStatusMark = true
         CATransaction.begin()

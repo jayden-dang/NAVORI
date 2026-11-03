@@ -12,13 +12,6 @@ import os
 @MainActor
 @Observable
 final class CoreStore {
-    enum Health: Equatable {
-        case starting
-        case ok
-        case degraded(String)
-        case down(String)
-    }
-
     private(set) var snapshot: CoreSnapshot?
     private(set) var startupError: String?
     private(set) var checks: [CheckView] = []
@@ -235,21 +228,6 @@ final class CoreStore {
                 marks: awakeMarks
             )
         }
-    }
-
-    var health: Health {
-        if let startupError { return .down(startupError) }
-        guard let snapshot else { return .starting }
-        if let failed = snapshot.modules.first(where: { $0.state == "failed" }) {
-            return .degraded("\(failed.id) stopped: \(failed.detail ?? "unknown error")")
-        }
-        if let restarting = snapshot.modules.first(where: { $0.state == "restarting" }) {
-            return .degraded("\(restarting.id) is restarting")
-        }
-        if let notice = snapshot.configNotice {
-            return .degraded("\(notice.title). \(notice.message)")
-        }
-        return .ok
     }
 
     fileprivate func apply(_ snapshot: CoreSnapshot) {
