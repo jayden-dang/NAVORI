@@ -35,6 +35,7 @@ final class StatusBarController: NSObject {
     }()
     #if DEBUG
     private var previewPanel: StatusPanel?
+    private var iconSample: StatusIconState?
     #endif
     private var didScheduleStatusMark = false
     private var didReplaceCoreTree = false
@@ -86,11 +87,18 @@ final class StatusBarController: NSObject {
         }
     }
 
-    private func render(_ state: StatusIconState) {
+    private func render(_ real: StatusIconState, allowBeat: Bool = true) {
+        #if DEBUG
+        let state = iconSample ?? real
+        let beatAllowed = allowBeat && iconSample == nil
+        #else
+        let state = real
+        let beatAllowed = allowBeat
+        #endif
         let plan = motion.next(
             state,
             reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
-            allowBeat: true
+            allowBeat: beatAllowed
         )
         if let drawn, drawn.state == state, drawn.loop == plan.loop { return }
         drawn = (state, plan.loop)
@@ -126,14 +134,16 @@ final class StatusBarController: NSObject {
         } else {
             layer.removeAnimation(forKey: "icon.loop")
         }
-        if plan.beat {
-            let beat = CABasicAnimation(keyPath: "opacity")
-            beat.fromValue = 1.0
-            beat.toValue = 0.2
-            beat.duration = 0.25
-            beat.autoreverses = true
-            layer.add(beat, forKey: "icon.beat")
-        }
+        if plan.beat { addBeat(to: layer) }
+    }
+
+    private func addBeat(to layer: CALayer) {
+        let beat = CABasicAnimation(keyPath: "opacity")
+        beat.fromValue = 1.0
+        beat.toValue = 0.2
+        beat.duration = 0.25
+        beat.autoreverses = true
+        layer.add(beat, forKey: "icon.beat")
     }
 
     @objc private func clicked(_ sender: NSStatusBarButton) {
@@ -287,13 +297,31 @@ final class StatusBarController: NSObject {
     }
 
     #if DEBUG
+    /// Holds a Sample on the Icon until cleared; the real snapshot returns with no Beat.
+    func setIconSample(_ sample: StatusIconState?) {
+        iconSample = sample
+        render(store.statusIcon, allowBeat: false)
+    }
+
+    /// Plays one Beat on whatever the Icon shows.
+    func playIconBeat() {
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+              let button = item.button else { return }
+        if !button.wantsLayer { button.wantsLayer = true }
+        if let layer = button.layer { addBeat(to: layer) }
+    }
+
     @objc private func openPreview() {
         panel.close()
         if previewPanel == nil {
             let created = StatusPanel(
-                content: PreviewMenu.content(setTint: { [weak self] tint in
-                    self?.previewPanel?.setTint(tint)
-                }),
+                content: PreviewMenu.content(
+                    setTint: { [weak self] tint in
+                        self?.previewPanel?.setTint(tint)
+                    },
+                    setIconSample: { [weak self] sample in self?.setIconSample(sample) },
+                    playBeat: { [weak self] in self?.playIconBeat() }
+                ),
                 onVisibility: { _ in }
             )
             previewPanel = created
