@@ -304,12 +304,12 @@ _Requirements: HOOKS-6.1, HOOKS-6.2, HOOKS-6.3, HOOKS-6.4, HOOKS-6.5_
 
 **Depends-on:** Task 5
 
-- [ ] **Step 1: Write failing tests** in `crates/ffi/tests/integrations.rs` over a temp home: `doctor_has_an_integrations_row_between_awake_and_logs`; `the_row_is_ok_when_every_harness_is_not_found`; `the_row_is_ok_when_a_harness_is_not_installed`; `the_row_fails_when_a_harness_needs_repair_and_names_it`; `the_row_fails_when_a_hook_file_is_unreadable_and_names_it`; `the_detail_names_all_three_harnesses_with_their_states`; `doctor_and_the_status_action_agree_on_each_harness`; `the_existing_rows_keep_their_order` (config, database, ipc, modules, awake, then the new row, then logs; the old exact-list assertion in `crates/ffi/tests/core.rs` fails first and is updated in this task). In `apps/cli/tests/cli.rs`: `doctor_prints_the_integrations_row_and_exits_1_when_it_fails` and `doctor_with_the_app_down_still_prints_only_the_app_row_and_exits_3` (a characterisation test: it already holds today and guards the behavior).
+- [x] **Step 1: Write failing tests** in `crates/ffi/tests/integrations.rs` over a temp home: `doctor_has_an_integrations_row_between_awake_and_logs`; `the_row_is_ok_when_every_harness_is_not_found`; `the_row_is_ok_when_a_harness_is_not_installed`; `the_row_fails_when_a_harness_needs_repair_and_names_it`; `the_row_fails_when_a_hook_file_is_unreadable_and_names_it`; `the_detail_names_all_three_harnesses_with_their_states`; `doctor_and_the_status_action_agree_on_each_harness`; `the_existing_rows_keep_their_order` (config, database, ipc, modules, awake, then the new row, then logs; the old exact-list assertion in `crates/ffi/tests/core.rs` fails first and is updated in this task). In `apps/cli/tests/cli.rs`: `doctor_prints_the_integrations_row_and_exits_1_when_it_fails` and `doctor_with_the_app_down_still_prints_only_the_app_row_and_exits_3` (a characterisation test: it already holds today and guards the behavior).
 Run: `cargo nextest run -p navori-ffi --test integrations` — expect: no `integrations` row.
-- [ ] **Step 2: Implement** `integrations_check(&IntegrationsState) -> Check` and the push in `Inner::doctor`.
+- [x] **Step 2: Implement** `integrations_check(&IntegrationsState) -> Check` and the push in `Inner::doctor`.
 Run: same command, then `cargo nextest run -p navori-cli --test cli` — expect: pass.
-- [ ] **Step 3: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 4: Commit** `git commit -m "feat(doctor): report each Harness's hook state"`
+- [x] **Step 3: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 4: Commit** `git commit -m "feat(doctor): report each Harness's hook state"`
 
 _Requirements: HOOKS-7.1, HOOKS-7.2, HOOKS-7.3, HOOKS-7.4, HOOKS-7.5, HOOKS-9.2_
 
