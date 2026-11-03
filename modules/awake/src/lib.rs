@@ -17,7 +17,9 @@ pub use event::{LEASE_ENDED, LEASE_STARTED};
 pub use infra::{ExitsFactory, Platform, ProcessFactory};
 pub use state::{AwakeState, LeaseState};
 
-use navori_kernel::{Module, ModuleCtx, NoConfig};
+use navori_kernel::{Module, ModuleCtx, NoConfig, TrayContribution, TrayGlyph};
+
+use crate::actor::SYSTEM_PROBLEM;
 
 impl Module for Awake {
     const ID: &'static str = "awake";
@@ -27,6 +29,25 @@ impl Module for Awake {
 
     fn initial_state(&self) -> AwakeState {
         AwakeState::idle()
+    }
+
+    fn tray(state: &AwakeState) -> TrayContribution {
+        // Reads only `leases` and `system_held`: the problem glyph is for a Lease macOS
+        // will not hold, not for the other things that can go wrong in this Module.
+        let glyph = if state.leases.is_empty() {
+            None
+        } else if state.system_held {
+            Some((TrayGlyph::Lease, "Keeping this Mac awake".to_owned()))
+        } else {
+            Some((
+                TrayGlyph::Problem,
+                format!("Can't hold this Mac awake. {SYSTEM_PROBLEM}"),
+            ))
+        };
+        TrayContribution {
+            glyph,
+            attention: None,
+        }
     }
 
     async fn run(&mut self, ctx: &mut ModuleCtx<Self>) -> anyhow::Result<()> {
