@@ -7,7 +7,6 @@ mod infra;
 mod state;
 
 pub use action::{Harness, IntegrationsAction};
-pub use domain::{Classification, classify};
 pub use event::{HOOK_FAILED, HOOK_INSTALLED, HOOK_REMOVED, HOOK_REPAIRED};
 pub use state::{HarnessStatus, IntegrationsState, Offer, State};
 

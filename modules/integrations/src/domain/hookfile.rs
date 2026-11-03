@@ -66,25 +66,22 @@ pub(crate) fn desired(harness: Harness, dev: bool, helper: &Path) -> Vec<(Event,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Classification {
-    pub state: State,
-    /// How many of the running profile's handlers the file holds.
-    pub ours: usize,
+pub(crate) struct Classification {
+    pub(crate) state: State,
     /// Why the file cannot be judged, when `state` is `Unreadable`.
-    pub reason: Option<String>,
+    pub(crate) reason: Option<String>,
 }
 
 fn unreadable(reason: String) -> Classification {
     Classification {
         state: State::Unreadable,
-        ours: 0,
         reason: Some(reason),
     }
 }
 
 /// What a parsed Hook file says about the running profile's hooks. Never `NotFound`: whether
 /// the Harness exists is decided before a file is read.
-pub fn classify(doc: &Value, harness: Harness, dev: bool, helper: &Path) -> Classification {
+pub(crate) fn classify(doc: &Value, harness: Harness, dev: bool, helper: &Path) -> Classification {
     let Some(root) = doc.as_object() else {
         return unreadable("the top level is not a JSON object".to_owned());
     };
@@ -141,7 +138,6 @@ pub fn classify(doc: &Value, harness: Harness, dev: bool, helper: &Path) -> Clas
     };
     Classification {
         state,
-        ours,
         reason: None,
     }
 }
@@ -288,84 +284,4 @@ fn is_ours(handler: &Value, dev: bool) -> bool {
         .get("command")
         .and_then(Value::as_str)
         .is_some_and(|command| is_navori_command(command, dev))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn desired_lists_the_events_of_each_harness_with_their_timeouts() {
-        let helper = Path::new("/A/Navori.app/Contents/Helpers/navori");
-        let claude = desired(Harness::Claude, false, helper);
-        let names: Vec<_> = claude.iter().map(|(e, h)| (*e, h.timeout)).collect();
-        assert_eq!(
-            names,
-            [("UserPromptSubmit", 2), ("Stop", 2), ("SessionEnd", 1)]
-        );
-        assert_eq!(desired(Harness::Grok, false, helper).len(), 5);
-    }
-
-    #[test]
-    fn a_quote_in_the_helper_path_is_escaped() {
-        let helper = Path::new("/A/It's/Navori.app/Contents/Helpers/navori");
-        let wanted = desired(Harness::Claude, true, helper);
-        assert_eq!(
-            wanted[0].1.command,
-            "'/A/It'\\''s/Navori.app/Contents/Helpers/navori' --profile dev hook"
-        );
-    }
-
-    fn ours() -> Value {
-        json!({ "type": "command", "command": "'/A/Navori.app/Contents/Helpers/navori' hook", "timeout": 2 })
-    }
-
-    fn helper() -> &'static Path {
-        Path::new("/A/Navori.app/Contents/Helpers/navori")
-    }
-
-    #[test]
-    fn converge_takes_ours_out_of_an_unwanted_event_without_moving_other_keys() {
-        let foreign = json!({ "hooks": [{ "type": "command", "command": "x" }] });
-        let mut doc = json!({ "hooks": {
-            "A": [foreign.clone()],
-            "StopFailure": [{ "hooks": [ours()] }],
-            "B": [foreign.clone()],
-            "C": [foreign]
-        }});
-        assert_eq!(
-            converge(&mut doc, Harness::Claude, false, helper()),
-            Changed::Yes
-        );
-        let keys: Vec<_> = doc["hooks"].as_object().unwrap().keys().cloned().collect();
-        assert_eq!(
-            keys,
-            ["A", "B", "C", "UserPromptSubmit", "Stop", "SessionEnd"]
-        );
-    }
-
-    #[test]
-    fn converge_keeps_the_foreign_handler_of_a_shared_group_and_one_copy_of_ours() {
-        let foreign = json!({ "type": "command", "command": "x" });
-        let mut doc = json!({ "hooks": { "Stop": [
-            { "matcher": "m", "hooks": [ours(), foreign.clone()] },
-            { "hooks": [ours()] },
-            { "hooks": [ours()] }
-        ]}});
-        converge(&mut doc, Harness::Claude, false, helper());
-        let stop = doc["hooks"]["Stop"].as_array().unwrap();
-        assert_eq!(stop.len(), 2);
-        assert_eq!(stop[0], json!({ "matcher": "m", "hooks": [foreign] }));
-        assert_eq!(stop[1], json!({ "hooks": [ours()] }));
-    }
-
-    #[test]
-    fn converge_on_a_correct_file_changes_nothing() {
-        let mut doc = json!({});
-        converge(&mut doc, Harness::Grok, true, helper());
-        assert_eq!(
-            converge(&mut doc, Harness::Grok, true, helper()),
-            Changed::No
-        );
-    }
 }

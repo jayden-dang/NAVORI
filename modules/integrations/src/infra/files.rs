@@ -271,6 +271,7 @@ fn write_atomically(
     Ok(())
 }
 
+// These two have no public seam: the clock and a file appearing mid-apply cannot be driven from outside.
 #[cfg(test)]
 mod tests {
     use super::{Target, copy_beside, write_atomically};

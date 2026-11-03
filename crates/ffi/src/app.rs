@@ -333,7 +333,6 @@ fn awake_is_down(kernel: &Kernel) -> bool {
     })
 }
 
-/// One fixed doctor row: passing with `no problem` or the lease count, failing with the problem.
 pub fn integrations_check(state: &IntegrationsState) -> Check {
     let failed = state
         .harnesses
@@ -366,6 +365,7 @@ fn state_word(state: State) -> &'static str {
     }
 }
 
+/// One fixed doctor row: passing with `no problem` or the lease count, failing with the problem.
 pub fn awake_check(view: Option<&crate::AwakeView>) -> Check {
     let Some(view) = view else {
         return check(
