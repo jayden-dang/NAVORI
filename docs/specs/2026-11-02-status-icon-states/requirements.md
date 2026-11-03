@@ -250,8 +250,8 @@ These conditions reopen a decision. They are not requirements.
 
 ## Open Questions
 
-- The dev app icon's look: `design-solution` proposes, the user approves — Jayden Đặng — 2026-11-03 — forbid-guess.
-- The wording of the Lease, AI running, normal and Decision sentences, and of any Preview control: `design-solution` proposes, the user approves — Jayden Đặng — 2026-11-02 — forbid-guess.
-- The type names, and the glyph names in the JSON: `design-solution` proposes, the user approves — Jayden Đặng — 2026-11-02 — forbid-guess.
-- The `tray()` signature, including whether a Module's signal can be expressed from its `State` alone: `design-solution` proposes after reading the merged code — Jayden Đặng — 2026-11-02 — forbid-guess.
-- How the Core row reads the result while keeping ICON-10.6 and ICON-10.7: `design-solution` proposes — Jayden Đặng — 2026-11-02 — forbid-guess.
+- The dev app icon's look: `design-solution` proposes, the user approves — Jayden Đặng — 2026-11-03 — forbid-guess. Resolved by design.md decision 10.
+- The wording of the Lease, AI running, normal and Decision sentences, and of any Preview control: `design-solution` proposes, the user approves — Jayden Đặng — 2026-11-02 — forbid-guess. Resolved by design.md decision 8.
+- The type names, and the glyph names in the JSON: `design-solution` proposes, the user approves — Jayden Đặng — 2026-11-02 — forbid-guess. Resolved by design.md decision 9.
+- The `tray()` signature, including whether a Module's signal can be expressed from its `State` alone: `design-solution` proposes after reading the merged code — Jayden Đặng — 2026-11-02 — forbid-guess. Resolved by design.md decision 1.
+- How the Core row reads the result while keeping ICON-10.6 and ICON-10.7: `design-solution` proposes — Jayden Đặng — 2026-11-02 — forbid-guess. Resolved by design.md decision 5.

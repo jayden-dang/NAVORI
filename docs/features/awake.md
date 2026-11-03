@@ -4,6 +4,8 @@ Keep this Mac awake from the terminal for a time, until turned off, or for a com
 
 Navori holds at most one `PreventUserIdleSystemSleep` assertion while any Lease exists, and one `PreventUserIdleDisplaySleep` when a Lease asks for the display. Process-owned (session and command) Leases are stored with pid and process start time. Manual duration, until-off and display Leases are not stored; they end when the app closes. On reopen, if the process is still the same, the assertion returns.
 
+Awake drives the menubar icon through its `tray()` contribution: the Lease glyph while held, the problem glyph when macOS refuses.
+
 There is no Settings tab and no `[awake]` section.
 
 ## Commands
