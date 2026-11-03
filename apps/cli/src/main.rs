@@ -8,7 +8,7 @@ use std::os::unix::fs::MetadataExt;
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::process::{ExitCode, Stdio};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use clap::{Parser, Subcommand};
 use navori_config::{Paths, Profile};
@@ -107,7 +107,28 @@ impl From<IpcError> for Failure {
     }
 }
 
+fn hook_profile(args: &[OsString]) -> Option<&'static str> {
+    let rest = match args.first()? {
+        flag if flag == "--profile" => args.get(2..)?,
+        flag if flag.to_str().is_some_and(|f| f.starts_with("--profile=")) => &args[1..],
+        _ => args,
+    };
+    if rest.first()? != "hook" {
+        return None;
+    }
+    let dev = args
+        .windows(2)
+        .any(|w| w[0] == "--profile" && w[1] == "dev")
+        || args.iter().any(|a| a == "--profile=dev");
+    Some(if dev { "dev" } else { "release" })
+}
+
 fn main() -> ExitCode {
+    let start = Instant::now();
+    let args: Vec<OsString> = std::env::args_os().skip(1).collect();
+    if let Some(profile) = hook_profile(&args) {
+        hook::run(profile, start);
+    }
     let Cli { profile, command } = Cli::parse();
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -123,10 +144,7 @@ fn main() -> ExitCode {
         Command::Awake {
             command: AwakeCommand::Run { command },
         } => runtime.block_on(awake_run(&profile, command)),
-        Command::Hook => {
-            runtime.block_on(run_hook(&profile));
-            ExitCode::SUCCESS
-        }
+        Command::Hook => hook::run(&profile, start),
         command => match runtime.block_on(run(Cli { profile, command })) {
             Ok(()) => ExitCode::SUCCESS,
             Err(Failure::Usage(m)) => {
@@ -252,34 +270,6 @@ async fn run(cli: Cli) -> Result<(), Failure> {
         Command::Hook => unreachable!("handled before connect"),
     }
     Ok(())
-}
-
-async fn run_hook(profile: &str) {
-    let mut stdin = Vec::new();
-    if std::io::Read::read_to_end(&mut std::io::stdin(), &mut stdin).is_err() {
-        return;
-    }
-    let Some(plan) = hook::plan(
-        &stdin,
-        std::process::id(),
-        std::os::unix::process::parent_id(),
-    ) else {
-        return;
-    };
-    let Ok(socket) = socket_path(profile) else {
-        return;
-    };
-    let send = async {
-        let mut client = Client::connect(&socket).await.ok()?;
-        client
-            .call(
-                method::DISPATCH,
-                json!({ "module": "awake", "action": plan.action }),
-            )
-            .await
-            .ok()
-    };
-    let _ = tokio::time::timeout(plan.deadline, send).await;
 }
 
 async fn dispatch_awake(client: &mut Client, action: Value) -> Result<Value, Failure> {
