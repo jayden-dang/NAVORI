@@ -252,12 +252,12 @@ _Requirements: HOOKS-4.1, HOOKS-4.2, HOOKS-4.3, HOOKS-4.4, HOOKS-4.5, HOOKS-4.7,
 
 **Depends-on:** Task 6
 
-- [ ] **Step 1: Write failing tests** in `tests/repair.rs`: `repair_replaces_an_entry_whose_helper_moved_and_leaves_one_entry_per_event`; `repair_adds_a_missing_event`; `repair_removes_an_async_flag`; `repair_removes_an_entry_for_an_event_install_would_not_write`; `repair_moves_a_handler_out_of_a_group_with_a_matcher_and_keeps_the_matcher_group`; `repair_on_an_installed_harness_changes_nothing_and_writes_no_backup`; `repair_writes_a_backup_and_refuses_an_unparseable_file`; `repair_touches_only_the_running_profiles_entry`; `a_repair_emits_one_event`; `repair_leaves_a_double_quoted_hand_edited_entry_alone_as_foreign`.
+- [x] **Step 1: Write failing tests** in `tests/repair.rs`: `repair_replaces_an_entry_whose_helper_moved_and_leaves_one_entry_per_event`; `repair_adds_a_missing_event`; `repair_removes_an_async_flag`; `repair_removes_an_entry_for_an_event_install_would_not_write`; `repair_moves_a_handler_out_of_a_group_with_a_matcher_and_keeps_the_matcher_group`; `repair_on_an_installed_harness_changes_nothing_and_writes_no_backup`; `repair_writes_a_backup_and_refuses_an_unparseable_file`; `repair_touches_only_the_running_profiles_entry`; `a_repair_emits_one_event`; `repair_leaves_a_double_quoted_hand_edited_entry_alone_as_foreign`.
 Run: `cargo nextest run -p navori-mod-integrations --test repair` — expect: the Action replies `Invalid`.
-- [ ] **Step 2: Implement** the `Repair` branch as `converge` plus the shared `apply`, and its Event sentence.
+- [x] **Step 2: Implement** the `Repair` branch as `converge` plus the shared `apply`, and its Event sentence.
 Run: same command — expect: pass.
-- [ ] **Step 3: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 4: Commit** `git commit -m "feat(integrations): repair a drifted hook in place"`
+- [x] **Step 3: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 4: Commit** `git commit -m "feat(integrations): repair a drifted hook in place"`
 
 _Requirements: HOOKS-5.1, HOOKS-5.2, HOOKS-5.3, HOOKS-5.4, HOOKS-5.5_
 
