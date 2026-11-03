@@ -8,7 +8,8 @@ use crate::state::State;
 
 pub(crate) type Event = &'static str;
 
-const CLAUDE_AND_CODEX_EVENTS: [Event; 3] = ["UserPromptSubmit", "Stop", "SessionEnd"];
+const CLAUDE_EVENTS: [Event; 4] = ["UserPromptSubmit", "Stop", "StopFailure", "SessionEnd"];
+const CODEX_EVENTS: [Event; 3] = ["UserPromptSubmit", "Stop", "SessionEnd"];
 const GROK_EVENTS: [Event; 5] = [
     "UserPromptSubmit",
     "Stop",
@@ -21,7 +22,8 @@ const SESSION_END: Event = "SessionEnd";
 
 pub(crate) fn required_events(harness: Harness) -> &'static [Event] {
     match harness {
-        Harness::Claude | Harness::Codex => &CLAUDE_AND_CODEX_EVENTS,
+        Harness::Claude => &CLAUDE_EVENTS,
+        Harness::Codex => &CODEX_EVENTS,
         Harness::Grok => &GROK_EVENTS,
     }
 }

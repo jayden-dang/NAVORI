@@ -3,7 +3,7 @@
 mod common;
 
 use common::{
-    DEV_HELPER, FIVE, RELEASE_HELPER, Rig, THREE, command, complete, group, handler, tree,
+    CLAUDE, DEV_HELPER, FIVE, RELEASE_HELPER, Rig, THREE, command, complete, group, handler, tree,
 };
 use serde_json::{Value, json};
 
@@ -106,17 +106,26 @@ async fn a_set_missing_an_event_needs_repair() {
 }
 
 #[tokio::test]
+async fn a_claude_set_of_the_three_older_events_needs_repair() {
+    let rig = Rig::release();
+    rig.write_json(CLAUDE_FILE, &complete(&release_command(), &THREE));
+    let row = rig.row("claude").await;
+    assert_eq!(row["state"], "needs_repair");
+    assert_eq!(offers(&row), ["repair", "remove"]);
+}
+
+#[tokio::test]
 async fn a_stale_helper_path_needs_repair() {
     let rig = Rig::release();
     let stale = command("/Volumes/Old/Navori.app/Contents/Helpers/navori", false);
-    rig.write_json(CLAUDE_FILE, &complete(&stale, &THREE));
+    rig.write_json(CLAUDE_FILE, &complete(&stale, &CLAUDE));
     assert_eq!(rig.row("claude").await["state"], "needs_repair");
 }
 
 #[tokio::test]
 async fn an_async_entry_needs_repair() {
     let rig = Rig::release();
-    let mut doc = complete(&release_command(), &THREE);
+    let mut doc = complete(&release_command(), &CLAUDE);
     doc["hooks"]["Stop"][0]["hooks"][0]["async"] = json!(true);
     rig.write_json(CLAUDE_FILE, &doc);
     assert_eq!(rig.row("claude").await["state"], "needs_repair");
@@ -125,12 +134,12 @@ async fn an_async_entry_needs_repair() {
 #[tokio::test]
 async fn a_handler_sharing_a_group_with_a_matcher_needs_repair() {
     let rig = Rig::release();
-    let mut doc = complete(&release_command(), &THREE);
+    let mut doc = complete(&release_command(), &CLAUDE);
     doc["hooks"]["Stop"][0]["matcher"] = json!("Bash");
     rig.write_json(CLAUDE_FILE, &doc);
     assert_eq!(rig.row("claude").await["state"], "needs_repair");
 
-    let mut shared = complete(&release_command(), &THREE);
+    let mut shared = complete(&release_command(), &CLAUDE);
     shared["hooks"]["Stop"][0]["hooks"]
         .as_array_mut()
         .unwrap()
@@ -186,7 +195,7 @@ async fn a_symlinked_hook_file_is_read_through_the_link() {
 
 #[tokio::test]
 async fn a_dev_entry_does_not_make_the_release_profile_installed() {
-    let dev_only = complete(&dev_command(), &THREE);
+    let dev_only = complete(&dev_command(), &CLAUDE);
 
     let release = Rig::release();
     release.write_json(CLAUDE_FILE, &dev_only);
@@ -196,7 +205,7 @@ async fn a_dev_entry_does_not_make_the_release_profile_installed() {
     dev.write_json(CLAUDE_FILE, &dev_only);
     assert_eq!(dev.row("claude").await["state"], "installed");
 
-    let release_only = complete(&release_command(), &THREE);
+    let release_only = complete(&release_command(), &CLAUDE);
     let dev = Rig::dev();
     dev.write_json(CLAUDE_FILE, &release_only);
     assert_eq!(dev.row("claude").await["state"], "not_installed");
@@ -204,8 +213,8 @@ async fn a_dev_entry_does_not_make_the_release_profile_installed() {
 
 #[tokio::test]
 async fn both_profiles_side_by_side_are_each_read_on_their_own() {
-    let mut doc = complete(&release_command(), &THREE);
-    for event in THREE {
+    let mut doc = complete(&release_command(), &CLAUDE);
+    for event in CLAUDE {
         doc["hooks"][event]
             .as_array_mut()
             .unwrap()
@@ -235,6 +244,9 @@ async fn codex_reports_what_it_finds_and_offers_nothing() {
         reason.contains("Codex timeout unit is not verified yet"),
         "{reason}"
     );
+
+    rig.write_json(CODEX_FILE, &complete(&release_command(), &CLAUDE));
+    assert_eq!(rig.row("codex").await["state"], "needs_repair");
 
     rig.write_json(CODEX_FILE, &complete(&release_command(), &THREE));
     let row = rig.row("codex").await;
@@ -303,7 +315,7 @@ async fn a_command_that_is_not_the_single_quoted_helper_then_hook_reads_not_inst
     ];
     for lookalike in lookalikes {
         for rig in [Rig::release(), Rig::dev()] {
-            rig.write_json(CLAUDE_FILE, &complete(lookalike, &THREE));
+            rig.write_json(CLAUDE_FILE, &complete(lookalike, &CLAUDE));
             assert_eq!(
                 rig.row("claude").await["state"],
                 "not_installed",
@@ -317,6 +329,6 @@ async fn a_command_that_is_not_the_single_quoted_helper_then_hook_reads_not_inst
 async fn a_quote_inside_the_helper_path_is_read_back_as_ours() {
     let rig = Rig::new(false, "/A/It's/Navori.app/Contents/Helpers/navori");
     let written = "'/A/It'\\''s/Navori.app/Contents/Helpers/navori' hook";
-    rig.write_json(CLAUDE_FILE, &complete(written, &THREE));
+    rig.write_json(CLAUDE_FILE, &complete(written, &CLAUDE));
     assert_eq!(rig.row("claude").await["state"], "installed");
 }

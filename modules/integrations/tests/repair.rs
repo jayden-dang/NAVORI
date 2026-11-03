@@ -5,7 +5,7 @@ mod common;
 use std::path::{Path, PathBuf};
 
 use common::{
-    DEV_HELPER, FIVE, RELEASE_HELPER, Rig, THREE, command, complete, group, handler, tree,
+    CLAUDE, DEV_HELPER, FIVE, RELEASE_HELPER, Rig, THREE, command, complete, group, handler, tree,
 };
 use serde_json::{Value, json};
 
@@ -70,12 +70,12 @@ async fn assert_repairs_to_installed(rig: &Rig, file: &str, harness: &str) -> Va
 async fn repair_replaces_an_entry_whose_helper_moved_and_leaves_one_entry_per_event() {
     let rig = Rig::release();
     let stale = command("/Volumes/Old/Navori.app/Contents/Helpers/navori", false);
-    rig.write_json(CLAUDE_FILE, &complete(&stale, &THREE));
+    rig.write_json(CLAUDE_FILE, &complete(&stale, &CLAUDE));
 
     let doc = assert_repairs_to_installed(&rig, CLAUDE_FILE, "claude").await;
 
-    assert_eq!(doc, complete(&release_command(), &THREE));
-    for event in THREE {
+    assert_eq!(doc, complete(&release_command(), &CLAUDE));
+    for event in CLAUDE {
         assert_eq!(ours(&doc, event, &release_command()), 1, "{event}");
         assert_eq!(ours(&doc, event, &stale), 0, "{event}");
     }
@@ -98,39 +98,56 @@ async fn repair_adds_a_missing_event() {
     let claude = assert_repairs_to_installed(&rig, CLAUDE_FILE, "claude").await;
     let grok = assert_repairs_to_installed(&rig, GROK_FILE, "grok").await;
 
-    assert_eq!(claude, complete(&release_command(), &THREE));
+    assert_eq!(claude, complete(&release_command(), &CLAUDE));
     assert_eq!(grok, complete(&release_command(), &FIVE));
+}
+
+#[tokio::test]
+async fn repair_adds_stop_failure_to_a_claude_set_of_the_three_older_events() {
+    let rig = Rig::release();
+    let mut old = complete(&release_command(), &THREE);
+    old["hooks"]["PreToolUse"] = json!([group(vec![handler("echo foreign", 1)])]);
+    rig.write_json(CLAUDE_FILE, &old);
+
+    let doc = assert_repairs_to_installed(&rig, CLAUDE_FILE, "claude").await;
+
+    let mut expected = complete(&release_command(), &CLAUDE);
+    expected["hooks"]["PreToolUse"] = json!([group(vec![handler("echo foreign", 1)])]);
+    assert_eq!(doc, expected);
+    for event in THREE {
+        assert_eq!(doc["hooks"][event], old["hooks"][event], "{event}");
+    }
 }
 
 #[tokio::test]
 async fn repair_removes_an_async_flag() {
     let rig = Rig::release();
-    let mut doc = complete(&release_command(), &THREE);
+    let mut doc = complete(&release_command(), &CLAUDE);
     doc["hooks"]["Stop"][0]["hooks"][0]["async"] = json!(true);
     rig.write_json(CLAUDE_FILE, &doc);
 
     let doc = assert_repairs_to_installed(&rig, CLAUDE_FILE, "claude").await;
 
     assert!(doc["hooks"]["Stop"][0]["hooks"][0].get("async").is_none());
-    assert_eq!(doc, complete(&release_command(), &THREE));
+    assert_eq!(doc, complete(&release_command(), &CLAUDE));
 }
 
 #[tokio::test]
 async fn repair_removes_an_entry_for_an_event_install_would_not_write() {
     let rig = Rig::release();
-    let mut doc = complete(&release_command(), &THREE);
-    doc["hooks"]["StopFailure"] = json!([group(vec![handler(&release_command(), 2)])]);
+    let mut doc = complete(&release_command(), &CLAUDE);
+    doc["hooks"]["StopCancelled"] = json!([group(vec![handler(&release_command(), 2)])]);
     doc["hooks"]["PreToolUse"] = json!([group(vec![handler("echo foreign", 1)])]);
     rig.write_json(CLAUDE_FILE, &doc);
 
     let doc = assert_repairs_to_installed(&rig, CLAUDE_FILE, "claude").await;
 
-    assert!(doc["hooks"].get("StopFailure").is_none());
+    assert!(doc["hooks"].get("StopCancelled").is_none());
     assert_eq!(
         doc["hooks"]["PreToolUse"],
         json!([group(vec![handler("echo foreign", 1)])])
     );
-    let mut expected = complete(&release_command(), &THREE);
+    let mut expected = complete(&release_command(), &CLAUDE);
     expected["hooks"]["PreToolUse"] = json!([group(vec![handler("echo foreign", 1)])]);
     assert_eq!(ordered(&doc), ordered(&expected));
 }
@@ -138,7 +155,7 @@ async fn repair_removes_an_entry_for_an_event_install_would_not_write() {
 #[tokio::test]
 async fn a_wrong_timeout_on_an_otherwise_correct_set_needs_repair_and_is_repaired() {
     let rig = Rig::release();
-    let mut doc = complete(&release_command(), &THREE);
+    let mut doc = complete(&release_command(), &CLAUDE);
     doc["hooks"]["Stop"][0]["hooks"][0]["timeout"] = json!(30);
     rig.write_json(CLAUDE_FILE, &doc);
 
@@ -150,7 +167,7 @@ async fn a_wrong_timeout_on_an_otherwise_correct_set_needs_repair_and_is_repaire
 #[tokio::test]
 async fn a_duplicate_handler_in_one_event_needs_repair_and_is_repaired_to_one() {
     let rig = Rig::release();
-    let mut doc = complete(&release_command(), &THREE);
+    let mut doc = complete(&release_command(), &CLAUDE);
     doc["hooks"]["Stop"]
         .as_array_mut()
         .unwrap()
@@ -160,13 +177,13 @@ async fn a_duplicate_handler_in_one_event_needs_repair_and_is_repaired_to_one() 
     let doc = assert_repairs_to_installed(&rig, CLAUDE_FILE, "claude").await;
 
     assert_eq!(ours(&doc, "Stop", &release_command()), 1);
-    assert_eq!(doc, complete(&release_command(), &THREE));
+    assert_eq!(doc, complete(&release_command(), &CLAUDE));
 }
 
 #[tokio::test]
 async fn repair_moves_a_handler_out_of_a_group_with_a_matcher_and_keeps_the_matcher_group() {
     let rig = Rig::release();
-    let mut doc = complete(&release_command(), &THREE);
+    let mut doc = complete(&release_command(), &CLAUDE);
     doc["hooks"]["Stop"] = json!([{
         "matcher": "Bash",
         "hooks": [handler("echo foreign", 1), handler(&release_command(), 2)]
@@ -187,7 +204,7 @@ async fn repair_moves_a_handler_out_of_a_group_with_a_matcher_and_keeps_the_matc
 #[tokio::test]
 async fn repair_on_an_installed_harness_changes_nothing_and_writes_no_backup() {
     let rig = Rig::release();
-    let body = serde_json::to_string_pretty(&complete(&release_command(), &THREE)).unwrap();
+    let body = serde_json::to_string_pretty(&complete(&release_command(), &CLAUDE)).unwrap();
     rig.write(CLAUDE_FILE, &body);
     let before = tree(rig.home.path());
 
@@ -206,7 +223,7 @@ async fn repair_on_an_installed_harness_changes_nothing_and_writes_no_backup() {
 async fn repair_writes_a_backup_and_refuses_an_unparseable_file() {
     let rig = Rig::release();
     let stale = command("/Volumes/Old/Navori.app/Contents/Helpers/navori", false);
-    let body = serde_json::to_string_pretty(&complete(&stale, &THREE)).unwrap();
+    let body = serde_json::to_string_pretty(&complete(&stale, &CLAUDE)).unwrap();
     rig.write(CLAUDE_FILE, &body);
 
     repair(&rig, "claude").await.unwrap();
@@ -243,7 +260,7 @@ async fn repair_touches_only_the_running_profiles_entry() {
     repair(&rig, "claude").await.unwrap();
 
     let doc = read_json(&rig.path(CLAUDE_FILE));
-    for event in THREE {
+    for event in CLAUDE {
         assert_eq!(
             serde_json::to_string(&doc["hooks"][event][0]).unwrap(),
             serde_json::to_string(&before["hooks"][event][0]).unwrap(),
@@ -258,7 +275,7 @@ async fn repair_touches_only_the_running_profiles_entry() {
 async fn a_repair_emits_one_event() {
     let rig = Rig::release();
     let stale = command("/Volumes/Old/Navori.app/Contents/Helpers/navori", false);
-    rig.write_json(CLAUDE_FILE, &complete(&stale, &THREE));
+    rig.write_json(CLAUDE_FILE, &complete(&stale, &CLAUDE));
 
     repair(&rig, "claude").await.unwrap();
     assert!(repair(&rig, "grok").await.is_err());
@@ -283,7 +300,7 @@ async fn a_repair_emits_one_event() {
 #[tokio::test]
 async fn a_repair_that_finds_nothing_to_do_still_emits_one_event_with_its_own_sentence() {
     let rig = Rig::release();
-    rig.write_json(CLAUDE_FILE, &complete(&release_command(), &THREE));
+    rig.write_json(CLAUDE_FILE, &complete(&release_command(), &CLAUDE));
 
     repair(&rig, "claude").await.unwrap();
 
@@ -300,7 +317,7 @@ async fn a_repair_that_finds_nothing_to_do_still_emits_one_event_with_its_own_se
 async fn repair_leaves_a_double_quoted_hand_edited_entry_alone_as_foreign() {
     let rig = Rig::release();
     let hand = "\"/Applications/Navori.app/Contents/Helpers/navori\" hook";
-    let mut doc = complete(&release_command(), &THREE);
+    let mut doc = complete(&release_command(), &CLAUDE);
     doc["hooks"]["Stop"] = json!([group(vec![handler(hand, 2)])]);
     rig.write_json(CLAUDE_FILE, &doc);
 

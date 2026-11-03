@@ -100,7 +100,7 @@ pub fn group(handlers: Vec<Value>) -> Value {
     json!({ "hooks": handlers })
 }
 
-/// The three events Claude Code and Codex use, written as Navori would.
+/// A complete hook set for `events`, written as Navori would.
 pub fn complete(command: &str, events: &[&str]) -> Value {
     let mut hooks = serde_json::Map::new();
     for event in events {
@@ -114,6 +114,7 @@ pub fn complete(command: &str, events: &[&str]) -> Value {
 }
 
 pub const THREE: [&str; 3] = ["UserPromptSubmit", "Stop", "SessionEnd"];
+pub const CLAUDE: [&str; 4] = ["UserPromptSubmit", "Stop", "StopFailure", "SessionEnd"];
 pub const FIVE: [&str; 5] = [
     "UserPromptSubmit",
     "Stop",

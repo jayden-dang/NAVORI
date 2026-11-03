@@ -5,7 +5,7 @@ mod common;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
-use common::{DEV_HELPER, FIVE, RELEASE_HELPER, Rig, THREE, command, complete, tree};
+use common::{CLAUDE, DEV_HELPER, FIVE, RELEASE_HELPER, Rig, command, complete, tree};
 use serde_json::{Value, json};
 
 const CLAUDE_FILE: &str = ".claude/settings.json";
@@ -53,7 +53,7 @@ fn handlers(doc: &Value) -> Vec<&Value> {
 }
 
 #[tokio::test]
-async fn installing_into_a_claude_file_adds_three_entries_and_keeps_foreign_hooks_and_key_order() {
+async fn installing_into_a_claude_file_adds_four_entries_and_keeps_foreign_hooks_and_key_order() {
     let rig = Rig::release();
     rig.write(CLAUDE_FILE, FOREIGN);
 
@@ -63,16 +63,26 @@ async fn installing_into_a_claude_file_adds_three_entries_and_keeps_foreign_hook
     assert_eq!(keys(&doc), ["model", "hooks", "permissions", "theme"]);
     assert_eq!(
         keys(&doc["hooks"]),
-        ["PreToolUse", "Stop", "UserPromptSubmit", "SessionEnd"]
+        [
+            "PreToolUse",
+            "Stop",
+            "UserPromptSubmit",
+            "StopFailure",
+            "SessionEnd"
+        ]
     );
-    let expected = complete(&command(RELEASE_HELPER, false), &THREE);
-    for event in THREE {
+    let expected = complete(&command(RELEASE_HELPER, false), &CLAUDE);
+    for event in CLAUDE {
         let ours = expected["hooks"][event][0].clone();
         assert!(
             doc["hooks"][event].as_array().unwrap().contains(&ours),
             "{event}"
         );
     }
+    assert_eq!(
+        doc["hooks"]["StopFailure"][0]["hooks"][0]["timeout"],
+        json!(2)
+    );
     let claude = reply["harnesses"][0].clone();
     assert_eq!(claude["harness"], "claude");
     assert_eq!(claude["state"], "installed");
@@ -162,7 +172,7 @@ async fn a_backup_is_written_beside_the_file_before_the_change() {
 async fn installing_when_the_file_is_already_correct_changes_nothing_and_writes_no_backup() {
     let rig = Rig::release();
     let body =
-        serde_json::to_string_pretty(&complete(&command(RELEASE_HELPER, false), &THREE)).unwrap();
+        serde_json::to_string_pretty(&complete(&command(RELEASE_HELPER, false), &CLAUDE)).unwrap();
     rig.write(CLAUDE_FILE, &body);
     let before = tree(rig.home.path());
 
@@ -378,7 +388,7 @@ async fn dev_install_leaves_a_release_entry_byte_identical() {
     install(&rig, "claude").await.unwrap();
 
     let doc = read_json(&rig.path(CLAUDE_FILE));
-    for event in THREE {
+    for event in CLAUDE {
         assert_eq!(
             serde_json::to_string(&doc["hooks"][event][0]).unwrap(),
             serde_json::to_string(&before["hooks"][event][0]).unwrap(),

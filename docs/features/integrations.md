@@ -53,7 +53,7 @@ Only these paths, under the home directory the Core was started with, and their 
 - Codex: `~/.codex/hooks.json` (never written yet)
 - Grok Build: `~/.grok/hooks/navori.json`
 
-Install adds a `UserPromptSubmit`, `Stop` and `SessionEnd` entry for Claude Code, and those plus `StopCancelled` and `StopFailure` for Grok. Each entry is one command handler, with the quoted absolute path of the app's `Contents/Helpers/navori` followed by ` hook` (` --profile dev hook` for the dev app), and a timeout of 2 seconds (1 for `SessionEnd`). It never uses `~/.local/bin/navori`. Install never creates `~/.claude`, `~/.codex` or `~/.grok`; for Grok it creates `~/.grok/hooks` when `~/.grok` exists.
+Install adds a `UserPromptSubmit`, `Stop`, `StopFailure` and `SessionEnd` entry for Claude Code, and `UserPromptSubmit`, `Stop`, `StopCancelled`, `StopFailure` and `SessionEnd` for Grok. Each entry is one command handler, with the quoted absolute path of the app's `Contents/Helpers/navori` followed by ` hook` (` --profile dev hook` for the dev app), and a timeout of 2 seconds (1 for `SessionEnd`). It never uses `~/.local/bin/navori`. Install never creates `~/.claude`, `~/.codex` or `~/.grok`; for Grok it creates `~/.grok/hooks` when `~/.grok` exists.
 
 - Every other key, hook and array order stays. Whitespace may be rewritten.
 - Before changing an existing file, Navori copies it to `<name>.navori-bak-<seconds>` beside it. A file already correct, or with nothing to remove, is not touched and gets no Backup. Backups are never pruned.
@@ -67,12 +67,12 @@ Install adds a `UserPromptSubmit`, `Stop` and `SessionEnd` entry for Claude Code
 
 None of this has run against a live Harness or a signed build. Open:
 
-- Everything this page says about what a Harness sends or does comes from its documentation and has not been observed. That includes whether real Claude Code and Codex `Stop` payloads carry no `reason`, as documented, and whether the three events carry `hook_event_name` and `session_id` as documented.
+- Everything this page says about what a Harness sends or does comes from its documentation and has not been observed. That includes whether real Claude Code and Codex `Stop` payloads carry no `reason`, as documented, and whether the events carry `hook_event_name` and `session_id` as documented.
 - The Codex `timeout` unit, and whether Codex runs `command` through a shell. This is why Codex is not installable.
 - Whether you see the standard error of a Claude Code or Codex hook that exits 0 (the command prints none).
 - Whether Grok's daemon route leaves a live Harness process above the hook, so a Grok Session Lease starts at all.
 - Whether a signed build writing into `~/.claude`, `~/.codex` and `~/.grok` triggers a macOS permission prompt.
-- Claude Code's `Stop` does not run on an interrupt and an API error fires `StopFailure`, which Claude Code does not install. A Lease can then last until the next `Stop`, `SessionEnd`, the Harness exiting or the 8 hour TTL. Whether to install `StopFailure` is the operator's choice.
+- Claude Code's `Stop` does not run on an interrupt, and no other event fires there either, so a Lease can stay open until the next `Stop`, `SessionEnd`, the Harness exiting or the 8 hour TTL. An API error fires `StopFailure`, which Install now adds, but that has not been observed with a live Harness.
 - Codex skips a new or changed hook until you review it in `/hooks`, and every Repair changes its hash. A Codex hook reported as Installed may not run yet. Grok and Claude Code trust is a documentation read only.
 - Keyboard and VoiceOver walks of the Integrations tab.
 

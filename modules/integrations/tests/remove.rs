@@ -5,7 +5,7 @@ mod common;
 use std::path::{Path, PathBuf};
 
 use common::{
-    DEV_HELPER, FIVE, RELEASE_HELPER, Rig, THREE, command, complete, group, handler, tree,
+    CLAUDE, DEV_HELPER, FIVE, RELEASE_HELPER, Rig, command, complete, group, handler, tree,
 };
 use serde_json::{Value, json};
 
@@ -60,6 +60,7 @@ async fn removing_from_claude_drops_only_navoris_entries_and_keeps_every_foreign
                 { "matcher": "m", "hooks": [handler(&ours, 2), foreign()] },
                 group(vec![handler(&ours, 2)])
             ],
+            "StopFailure": [group(vec![handler(&ours, 2)])],
             "PostToolUse": [group(vec![foreign()])],
             "SessionEnd": [group(vec![handler(&ours, 1)])]
         },
@@ -90,7 +91,7 @@ async fn removing_from_claude_drops_only_navoris_entries_and_keeps_every_foreign
 #[tokio::test]
 async fn an_event_array_emptied_by_removal_is_dropped_and_a_foreign_one_stays() {
     let rig = Rig::release();
-    let mut before = complete(&release_command(), &THREE);
+    let mut before = complete(&release_command(), &CLAUDE);
     before["hooks"]["Notification"] = json!([]);
     before["hooks"]["Stop"]
         .as_array_mut()
@@ -110,7 +111,7 @@ async fn an_event_array_emptied_by_removal_is_dropped_and_a_foreign_one_stays() 
 #[tokio::test]
 async fn a_hooks_object_emptied_by_removal_is_dropped_but_the_file_stays() {
     let rig = Rig::release();
-    let mut before = complete(&release_command(), &THREE);
+    let mut before = complete(&release_command(), &CLAUDE);
     before["model"] = json!("opus");
     rig.write_json(CLAUDE_FILE, &before);
 
@@ -122,7 +123,7 @@ async fn a_hooks_object_emptied_by_removal_is_dropped_but_the_file_stays() {
     );
 
     let only = Rig::release();
-    only.write_json(CLAUDE_FILE, &complete(&release_command(), &THREE));
+    only.write_json(CLAUDE_FILE, &complete(&release_command(), &CLAUDE));
     remove(&only, "claude").await.unwrap();
     assert_eq!(read_json(&only.path(CLAUDE_FILE)), json!({}));
 }
@@ -194,7 +195,7 @@ async fn removing_from_grok_keeps_the_file_when_it_holds_anything_else() {
 async fn removing_when_nothing_of_the_profile_is_there_changes_nothing_and_writes_no_backup() {
     let rig = Rig::release();
     let other = command(DEV_HELPER, true);
-    let mut claude = complete(&other, &THREE);
+    let mut claude = complete(&other, &CLAUDE);
     claude["hooks"]["Stop"]
         .as_array_mut()
         .unwrap()
@@ -233,7 +234,7 @@ async fn remove_refuses_an_unparseable_file() {
 async fn remove_writes_through_a_symlink() {
     let rig = Rig::release();
     rig.make_dir(".claude");
-    let mut before = complete(&release_command(), &THREE);
+    let mut before = complete(&release_command(), &CLAUDE);
     before["model"] = json!("opus");
     rig.write_json("dotfiles/settings.json", &before);
     let link = rig.path(CLAUDE_FILE);
@@ -291,8 +292,8 @@ async fn dev_remove_leaves_a_release_entry_alone() {
     let rig = Rig::dev();
     let release = release_command();
     let dev = command(DEV_HELPER, true);
-    let mut doc = complete(&release, &THREE);
-    for event in THREE {
+    let mut doc = complete(&release, &CLAUDE);
+    for event in CLAUDE {
         doc["hooks"][event]
             .as_array_mut()
             .unwrap()
@@ -304,14 +305,14 @@ async fn dev_remove_leaves_a_release_entry_alone() {
 
     assert_eq!(
         read_json(&rig.path(CLAUDE_FILE)),
-        complete(&release, &THREE)
+        complete(&release, &CLAUDE)
     );
 }
 
 #[tokio::test]
 async fn a_removal_emits_one_event() {
     let rig = Rig::release();
-    rig.write_json(CLAUDE_FILE, &complete(&release_command(), &THREE));
+    rig.write_json(CLAUDE_FILE, &complete(&release_command(), &CLAUDE));
 
     remove(&rig, "claude").await.unwrap();
     assert!(remove(&rig, "grok").await.is_err());
