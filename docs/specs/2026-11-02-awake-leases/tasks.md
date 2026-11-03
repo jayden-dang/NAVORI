@@ -13,6 +13,7 @@ Execution-mode: continuous
 Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
+Delivered-by: af477352183df3e30c91594d737f2a958658cab3
 
 **Goal:** Let the user keep the Mac awake by hand from the terminal and the menu, for a time, until turned off or for a command's life, and give the hook work a session Lease Action that needs no Module change.
 
