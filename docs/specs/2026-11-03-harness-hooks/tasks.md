@@ -329,11 +329,11 @@ _Requirements: HOOKS-7.1, HOOKS-7.2, HOOKS-7.3, HOOKS-7.4, HOOKS-7.5, HOOKS-9.2_
 
 **Depends-on:** Task 7, Task 8
 
-- [ ] **Step 1: Add the tab.** `SettingsTab` gains `integrations`; the `TabView` gets a fourth `tabItem` and tag; the Diagnostics hint text names the new `integrations` row. Run: `swift build` through `cargo xtask ci` later in Step 4 — expect: compile error for the missing view.
-- [ ] **Step 2: Write the model and view.** `IntegrationsModel` decodes the reply with `JSONDecoder` (`convertFromSnakeCase`), refreshes on appear and after every Action, logs and shows an error line on a dispatch failure. The tab lists Claude Code, Codex, Grok Build in that order; each row shows a text label and an SF Symbol per state, the `reason` caption, and Install / Repair / Remove (Install visible for `not_found` and `not_installed` and disabled unless `offers` has it; Repair for `needs_repair`; Remove when offered; nothing for `unreadable`); every button has an accessibility label naming its Harness. No `NavoriCore` import.
-- [ ] **Step 3: Note the manual check.** Whether three rows fit the 560×420 window needs the built app, which an agent does not launch against real data in this run; it is left to the operator in Task 15 Step 3.
-- [ ] **Step 4: Run** `cargo xtask ci` — expect: pass, with the Swift Shell compiled and `swift test` green.
-- [ ] **Step 5: Commit** `git commit -m "feat(settings): add an Integrations tab for Harness hooks"`
+- [x] **Step 1: Add the tab.** `SettingsTab` gains `integrations`; the `TabView` gets a fourth `tabItem` and tag; the Diagnostics hint text names the new `integrations` row. Run: `swift build` through `cargo xtask ci` later in Step 4 — expect: compile error for the missing view.
+- [x] **Step 2: Write the model and view.** `IntegrationsModel` decodes the reply with `JSONDecoder` (`convertFromSnakeCase`), refreshes on appear and after every Action, logs and shows an error line on a dispatch failure. The tab lists Claude Code, Codex, Grok Build in that order; each row shows a text label and an SF Symbol per state, the `reason` caption, and Install / Repair / Remove (Install visible for `not_found` and `not_installed` and disabled unless `offers` has it; Repair for `needs_repair`; Remove when offered; nothing for `unreadable`); every button has an accessibility label naming its Harness. No `NavoriCore` import.
+- [x] **Step 3: Note the manual check.** Whether three rows fit the 560×420 window needs the built app, which an agent does not launch against real data in this run; it is left to the operator in Task 15 Step 3.
+- [x] **Step 4: Run** `cargo xtask ci` — expect: pass, with the Swift Shell compiled and `swift test` green.
+- [x] **Step 5: Commit** `git commit -m "feat(settings): add an Integrations tab for Harness hooks"`
 
 _Requirements: HOOKS-3.1, HOOKS-3.2, HOOKS-3.9, HOOKS-3.10, HOOKS-9.4, HOOKS-10.7_
 
