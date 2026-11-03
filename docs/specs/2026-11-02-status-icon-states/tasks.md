@@ -84,6 +84,8 @@ Retrieval (`load-subgraph`, schema 1.1, recipe `fsubr-1.2`, run once on this map
 | `docs/specs/2026-11-02-menubar-visual-foundation/requirements.md` | changed | strike MENU-G4 |
 | `docs/specs/2026-11-02-status-icon-states/requirements.md` | changed | recorded Loop numbers |
 | `docs/features/status-icon.md` | new | feature note, as `docs/features/awake.md` |
+| `docs/codebase/modules.md` | changed | lists the tray surfaces added in protocol, kernel, ffi and awake |
+| `docs/agents/verify.md` | changed | the `status` row names the composed icon state (`tray`) |
 
 ---
 
