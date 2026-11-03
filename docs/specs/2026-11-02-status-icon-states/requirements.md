@@ -188,7 +188,19 @@ Files this feature touches, with what they guard:
     | AI Sample, panel closed (run 2) | 0.0 (5 of 5 windows 0.0) | 28.3 (21.5, 28.3, 32.4, 34.3, 27.6) | same |
     | Normal Sample (static) | 0.0 (5 of 5 windows 0.0) | 5.9 (5.8, 6.7, 5.9, 5.8, 6.1) | same |
 
-    Navori's own CPU rounds to 0.0, so the reopen condition for ICON-11.2 is not met. WindowServer rose from about 6% with the static icon to about 28-33% while the Loop ran, in both runs. ICON-11.3 asks for no budget on it, so this is recorded and not judged here; it is the cost of the Loop to the system and the owner may want to weigh it.
+    Navori's own CPU rounds to 0.0, so the reopen condition for ICON-11.2 is not met. In the first build WindowServer rose from about 6% with the static icon to about 28-33% while the Loop ran, in both runs. ICON-11.3 asks for no budget on it, so that was recorded and not judged.
+
+    **Fix, measured the same day.** The cost came from the render server redrawing the menu bar at the display rate for as long as the opacity animation ran. Giving the Loop `preferredFrameRateRange` of 8 to 12, preferred 10, keeps the same smooth 1 to 0.35 pulse and removes the cost. Measured with the same method, one after the other with load average about 2.6:
+
+    | Build | Navori CPU % | WindowServer CPU % (median, windows) |
+    |---|---|---|
+    | AI Sample, no frame-rate hint (first build) | 0.0 | 36.7 (36.5, 36.4, 36.9, 37.1, 36.7) |
+    | AI Sample, 15 fps hint | 0.0 | 11.5 (13.6, 11.8, 11.5, 11.3, 11.1) |
+    | AI Sample, 10 fps hint (shipped) | 0.0 | 8.2 (9.8, 9.1, 8.0, 8.2, 8.0) |
+    | AI Sample, 10 fps hint, final build | 0.0 | 5.5 (9.1, 5.8, 5.3, 5.5, 5.5) |
+    | Normal Sample (static), same final build | 0.0 | 5.9 (8.2, 5.5, 5.9, 6.0, 5.9) |
+
+    Discrete stepped opacity was tried as well (8 steps per cycle: 14.3; 4 steps: 8.9, with a visibly coarse pulse); the frame-rate hint beats both because it keeps the smooth pulse. Measured on one 3440x1440 display; a ProMotion panel was not tried.
 - **Performance:** **ICON-11.3** WHEN that measurement is taken THE SYSTEM SHALL have WindowServer's CPU recorded beside it, with no budget, and no wake-up count offered as evidence, because the counter read 0 for a 10 fps timer in the spike — verified by reading the recorded numbers.
 - **Performance:** **ICON-11.4** WHILE the menu is closed THE SYSTEM SHALL fire no timer more often than every 30 seconds for the Icon (ARCH-16) — verified by searching the Icon's drawing code for `Timer`, `DispatchSourceTimer` and `CADisplayLink`. This is not recorded as met until the Loop's drawing method is chosen.
 - **Security:** **ICON-11.5** THE SYSTEM SHALL NOT put the raw text of a bad config value, or a TOML source snippet, in `tray`, which crosses the local IPC socket (TB-2) — verified by a test in `crates/ffi/tests/config_privacy.rs` reading `tray` with a bad value in `config.toml`.
