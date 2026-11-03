@@ -188,9 +188,21 @@ Files this feature touches, with what they guard:
     | AI Sample, panel closed (run 2) | 0.0 (5 of 5 windows 0.0) | 28.3 (21.5, 28.3, 32.4, 34.3, 27.6) | same |
     | Normal Sample (static) | 0.0 (5 of 5 windows 0.0) | 5.9 (5.8, 6.7, 5.9, 5.8, 6.1) | same |
 
-    Navori's own CPU rounds to 0.0, so the reopen condition for ICON-11.2 is not met. WindowServer rose from about 6% with the static icon to about 28-33% while the Loop ran, in both runs. ICON-11.3 asks for no budget on it, so this is recorded and not judged here; it is the cost of the Loop to the system and the owner may want to weigh it.
+    Navori's own CPU rounds to 0.0, so the reopen condition for ICON-11.2 is not met. In the first build WindowServer rose from about 6% with the static icon to about 28-33% while the Loop ran, in both runs. ICON-11.3 asks for no budget on it, so that was recorded and not judged.
+
+    **Fix, measured the same day.** Only CPU was measured, so the mechanism is not proven; the numbers are consistent with the render server redrawing the menu bar at the display rate for as long as the opacity animation ran. Giving the Loop `preferredFrameRateRange` of 8 to 12, preferred 10, keeps the same smooth 1 to 0.35 pulse and removes most of the cost. Measured with the same method, one after the other with load average about 2.6:
+
+    | Build | Navori CPU % | WindowServer CPU % (median, windows) |
+    |---|---|---|
+    | AI Sample, no frame-rate hint (first build; a third run at load about 2.6, not part of the 28-33 pair above) | 0.0 (5 of 5 windows 0.0) | 36.7 (36.5, 36.4, 36.9, 37.1, 36.7) |
+    | AI Sample, 15 fps hint | 0.0 (5 of 5 windows 0.0) | 11.5 (13.6, 11.8, 11.5, 11.3, 11.1) |
+    | AI Sample, 10 fps hint (shipped) | 0.0 (5 of 5 windows 0.0) | 8.2 (9.8, 9.1, 8.0, 8.2, 8.0) |
+    | AI Sample, 10 fps hint, final build | 0.0 (5 of 5 windows 0.0) | 5.5 (9.1, 5.8, 5.3, 5.5, 5.5) |
+    | Normal Sample (static), same final build | 0.0 (5 of 5 windows 0.0) | 5.9 (8.2, 5.5, 5.9, 6.0, 5.9) |
+
+    The matched pair that supports "the Loop now costs no more than the static icon" is the final build, 5.5 against 5.9. The 8.2 and 5.5 rows are the same hint on two runs, so measurement noise is about 3 points. Discrete stepped opacity was tried as well, as single runs: 8 steps per cycle gave 14.3 at load 5.0 (windows 17.7, 14.8, 14.3, 12.7, 11.8) and 4 steps gave 8.9 at load 3.8 (windows 23.2, 8.5, 8.1, 16.3, 8.9), with a visibly coarse pulse; the frame-rate hint keeps the smooth pulse. Measured on one 3440x1440 display; a ProMotion panel was not tried.
 - **Performance:** **ICON-11.3** WHEN that measurement is taken THE SYSTEM SHALL have WindowServer's CPU recorded beside it, with no budget, and no wake-up count offered as evidence, because the counter read 0 for a 10 fps timer in the spike — verified by reading the recorded numbers.
-- **Performance:** **ICON-11.4** WHILE the menu is closed THE SYSTEM SHALL fire no timer more often than every 30 seconds for the Icon (ARCH-16) — verified by searching the Icon's drawing code for `Timer`, `DispatchSourceTimer` and `CADisplayLink`. This is not recorded as met until the Loop's drawing method is chosen.
+- **Performance:** **ICON-11.4** WHILE the menu is closed THE SYSTEM SHALL fire no timer more often than every 30 seconds for the Icon (ARCH-16) — verified by searching the Icon's drawing code for `Timer`, `DispatchSourceTimer` and `CADisplayLink`. Met: the Loop is a Core Animation opacity animation, and a search of `StatusIconImage.swift`, `StatusBarController.swift` and `NavoriPanel/StatusIcon.swift` for `Timer`, `DispatchSourceTimer` and `CADisplayLink` returns nothing.
 - **Security:** **ICON-11.5** THE SYSTEM SHALL NOT put the raw text of a bad config value, or a TOML source snippet, in `tray`, which crosses the local IPC socket (TB-2) — verified by a test in `crates/ffi/tests/config_privacy.rs` reading `tray` with a bad value in `config.toml`.
 - **Reliability:** None — no standing target; `docs/ops/reliability.md` does not exist. The failure paths are in stories 2, 4 and 7.
 - **Accessibility:** **ICON-11.6** THE SYSTEM SHALL carry every glyph and attention in shape, so that each stays readable with motion off and without color — verified by a manual walk of every Sample with Reduce Motion on. No `docs/standards/accessibility.md` exists; VoiceOver and Reduce Motion are in stories 6 and 8.

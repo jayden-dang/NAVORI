@@ -129,6 +129,9 @@ final class StatusBarController: NSObject {
                 loop.duration = 1
                 loop.autoreverses = true
                 loop.repeatCount = .infinity
+                // A frame-rate hint keeps the render server from redrawing at the display rate for
+                // the whole pulse; 10 fps still reads as one smooth pulse.
+                loop.preferredFrameRateRange = CAFrameRateRange(minimum: 8, maximum: 12, preferred: 10)
                 layer.add(loop, forKey: "icon.loop")
             }
         } else {
