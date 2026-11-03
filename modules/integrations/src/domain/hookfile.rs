@@ -154,33 +154,32 @@ pub(crate) enum Changed {
 pub(crate) fn converge(doc: &mut Value, harness: Harness, dev: bool, helper: &Path) -> Changed {
     let before = doc.clone();
     let wanted = desired(harness, dev, helper);
-    if let Some(root) = doc.as_object_mut() {
-        let hooks = root
-            .entry("hooks")
-            .or_insert_with(|| Value::Object(Map::new()));
-        if let Some(events) = hooks.as_object_mut() {
-            let present: Vec<String> = events.keys().cloned().collect();
-            for event in present {
-                let want = wanted
-                    .iter()
-                    .find(|(name, _)| *name == event)
-                    .map(|(_, h)| h);
-                let Some(slot) = events.get_mut(&event) else {
-                    continue;
-                };
-                let Some(groups) = slot.as_array_mut() else {
-                    continue;
-                };
-                let removed = settle_event(groups, want, dev);
-                if removed && groups.is_empty() {
-                    events.shift_remove(&event);
-                }
-            }
-            for (event, handler) in &wanted {
-                if !events.contains_key(*event) {
-                    events.insert((*event).to_owned(), json!([canonical_group(handler)]));
-                }
-            }
+    let Some(root) = doc.as_object_mut() else {
+        return Changed::No;
+    };
+    let hooks = root
+        .entry("hooks")
+        .or_insert_with(|| Value::Object(Map::new()));
+    let Some(events) = hooks.as_object_mut() else {
+        return Changed::No;
+    };
+    let present: Vec<String> = events.keys().cloned().collect();
+    for event in present {
+        let want = wanted
+            .iter()
+            .find(|(name, _)| *name == event)
+            .map(|(_, h)| h);
+        let Some(groups) = events.get_mut(&event).and_then(Value::as_array_mut) else {
+            continue;
+        };
+        let removed = settle_event(groups, want, dev);
+        if removed && groups.is_empty() {
+            events.shift_remove(&event);
+        }
+    }
+    for (event, handler) in &wanted {
+        if !events.contains_key(*event) {
+            events.insert((*event).to_owned(), json!([canonical_group(handler)]));
         }
     }
     if *doc == before {
