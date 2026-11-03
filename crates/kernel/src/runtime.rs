@@ -1,6 +1,7 @@
 //! Kernel: module registry, command routing and supervision.
 
-use std::panic::AssertUnwindSafe;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -178,10 +179,23 @@ impl KernelBuilder {
         let tray_rx = state_rx.clone();
         let state: StateFn =
             Box::new(move || serde_json::to_value(&*state_rx.borrow()).unwrap_or(Value::Null));
+        let tray_broken = AtomicBool::new(false);
         let tray: TrayFn = Box::new(move || {
+            if tray_broken.load(Ordering::Relaxed) {
+                return TrayContribution::default();
+            }
             // Clone out of the borrow so `M::tray` never runs under the watch lock.
             let current = tray_rx.borrow().clone();
-            M::tray(&current)
+            // A panic in Module code must not take down a status read; the Module then
+            // asks for nothing, and is not called again.
+            catch_unwind(AssertUnwindSafe(|| M::tray(&current))).unwrap_or_else(|_| {
+                tray_broken.store(true, Ordering::Relaxed);
+                tracing::warn!(
+                    module = M::ID,
+                    "module tray panicked; ignoring it from now on"
+                );
+                TrayContribution::default()
+            })
         });
 
         let sup_info = info.clone();
