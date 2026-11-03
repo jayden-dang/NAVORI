@@ -26,12 +26,21 @@ pub(crate) enum Read {
     Unreadable(String),
 }
 
-fn config_dir(home: &Path, harness: Harness) -> PathBuf {
-    home.join(match harness {
+pub(crate) fn dir_name(harness: Harness) -> &'static str {
+    match harness {
         Harness::Claude => ".claude",
         Harness::Codex => ".codex",
         Harness::Grok => ".grok",
-    })
+    }
+}
+
+fn config_dir(home: &Path, harness: Harness) -> PathBuf {
+    home.join(dir_name(harness))
+}
+
+/// Why Navori's hooks cannot be written for `harness` yet, when that is so.
+pub(crate) fn not_installable_yet(harness: Harness) -> Option<String> {
+    (harness == Harness::Codex).then(event::codex_unverified)
 }
 
 pub(crate) fn hook_file(home: &Path, harness: Harness) -> PathBuf {
@@ -89,8 +98,6 @@ pub(crate) enum Plan {
     Install,
     Repair,
     Remove,
-    /// A `Remove` that leaves a Grok file with nothing in it.
-    Delete,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -129,17 +136,17 @@ pub(crate) fn apply(
     harness: Harness,
     plan: Plan,
 ) -> Result<Outcome, ApplyError> {
-    if harness == Harness::Codex {
+    if let Some(why) = not_installable_yet(harness) {
         return Err(ApplyError::Unavailable(format!(
-            "Hooks for Codex cannot be installed yet. {}",
-            event::codex_unverified()
+            "Hooks for {} cannot be installed yet. {why}",
+            event::name(harness)
         )));
     }
     if env.helper.as_os_str().is_empty() {
         return Err(ApplyError::NoHelper);
     }
     let file = hook_file(&env.home, harness);
-    let (mut doc, target) = match read(env, harness) {
+    let (mut doc, target, existed) = match read(env, harness) {
         Read::NoDir => {
             return Err(ApplyError::NoConfigDir {
                 dir: config_dir(&env.home, harness),
@@ -150,13 +157,13 @@ pub(crate) fn apply(
         Read::NoFile => (
             json!({}),
             Target {
-                path: file,
+                path: file.clone(),
                 mode: NEW_FILE_MODE,
             },
+            false,
         ),
-        Read::Doc(doc, target) => (doc, target),
+        Read::Doc(doc, target) => (doc, target, true),
     };
-    let existed = target.path.exists();
 
     let verdict = domain::classify(&doc, harness, env.dev, &env.helper);
     if verdict.state == State::Unreadable {
@@ -165,21 +172,19 @@ pub(crate) fn apply(
             reason: verdict.reason.unwrap_or_default(),
         });
     }
-    let changed = match plan {
-        Plan::Install | Plan::Repair => domain::converge(&mut doc, harness, env.dev, &env.helper),
-        Plan::Remove | Plan::Delete => domain::strip(&mut doc, env.dev),
+    let removing = matches!(plan, Plan::Remove);
+    let changed = if removing {
+        domain::strip(&mut doc, env.dev)
+    } else {
+        domain::converge(&mut doc, harness, env.dev, &env.helper)
     };
-    let removing = matches!(plan, Plan::Remove | Plan::Delete);
     if changed == Changed::No && (existed || removing) {
         return Ok(Outcome::Nothing);
     }
-    let is_link = std::fs::symlink_metadata(hook_file(&env.home, harness))
-        .is_ok_and(|meta| meta.file_type().is_symlink());
-    let plan = if removing && harness == Harness::Grok && doc == json!({}) && !is_link {
-        Plan::Delete
-    } else {
-        plan
-    };
+    let delete = removing
+        && harness == Harness::Grok
+        && doc == json!({})
+        && !std::fs::symlink_metadata(&file).is_ok_and(|meta| meta.file_type().is_symlink());
 
     let dir = target
         .path
@@ -192,8 +197,7 @@ pub(crate) fn apply(
     if existed {
         copy_beside(&target.path, target.mode, unix_seconds())?;
     }
-    if matches!(plan, Plan::Delete) {
-        let file = hook_file(&env.home, harness);
+    if delete {
         std::fs::remove_file(&file).map_err(io("delete", &file))?;
     } else {
         write_atomically(&target, &dir, &doc, existed)?;

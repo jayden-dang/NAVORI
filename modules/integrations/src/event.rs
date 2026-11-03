@@ -1,4 +1,5 @@
 use crate::action::Harness;
+use crate::infra::files;
 
 pub const HOOK_INSTALLED: &str = "integrations.hook_installed";
 pub const HOOK_REPAIRED: &str = "integrations.hook_repaired";
@@ -14,13 +15,9 @@ pub(crate) fn name(harness: Harness) -> &'static str {
 }
 
 pub(crate) fn not_found(harness: Harness) -> String {
-    let dir = match harness {
-        Harness::Claude => "~/.claude",
-        Harness::Codex => "~/.codex",
-        Harness::Grok => "~/.grok",
-    };
     format!(
-        "There is no {dir} directory, so {} is not set up on this Mac.",
+        "There is no ~/{} directory, so {} is not set up on this Mac.",
+        files::dir_name(harness),
         name(harness)
     )
 }

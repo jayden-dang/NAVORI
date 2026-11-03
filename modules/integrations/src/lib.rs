@@ -117,7 +117,7 @@ impl Words {
                 done: event::installed,
                 already: event::already_installed,
             },
-            Plan::Remove | Plan::Delete => Self {
+            Plan::Remove => Self {
                 verb: "remove",
                 kind: HOOK_REMOVED,
                 done: event::removed,

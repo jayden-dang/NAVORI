@@ -50,16 +50,15 @@ pub(crate) fn row(env: &IntegrationsEnv, harness: Harness) -> HarnessStatus {
             (state, reason.map(|failure| event::unreadable(&failure)))
         }
     };
-    let (offers, reason) = if harness == Harness::Codex {
-        let reason = match state {
-            State::NotInstalled | State::Installed | State::NeedsRepair => {
-                Some(event::codex_unverified())
-            }
-            State::NotFound | State::Unreadable => reason,
-        };
-        (Vec::new(), reason)
-    } else {
-        (offers_for(state), reason)
+    let (offers, reason) = match files::not_installable_yet(harness) {
+        Some(why) => {
+            let reason = match state {
+                State::NotInstalled | State::Installed | State::NeedsRepair => Some(why),
+                State::NotFound | State::Unreadable => reason,
+            };
+            (Vec::new(), reason)
+        }
+        None => (offers_for(state), reason),
     };
     HarnessStatus {
         harness,
