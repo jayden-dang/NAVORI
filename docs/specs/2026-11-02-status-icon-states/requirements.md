@@ -16,7 +16,9 @@ Roadmap item: ROAD-35 (MILE-2) · Tracker: #8 · Decisions: frame-change close p
 
 Delivery order: this feature starts after ROAD-8 (AWAKE) merges. Design is written against that code.
 
-It changes one thing in MENU's spec: MENU-G4 ("the same four symbols") is replaced by stories 2 and 7, because a config notice no longer draws the triangle and new glyphs exist. It also changes what the status item says: today's health text is one of failed, restarting or config, and the summary carries the glyph's sentence and the config notice together. It moves `tray()` ahead of `context()`, which `docs/ARCHITECTURE.md:106` places together in MILE-3; `context()` stays in MILE-3.
+The look is locked in `./ui-brief.md`. It replaces the sparkle logo and the SF Symbols on the status item.
+
+It changes one thing in MENU's spec: MENU-G4 ("the same four symbols") is replaced by stories 2 and 7, because a config notice no longer draws the triangle and new glyphs exist. It also changes what the status item says: today's health text is one of failed, restarting or config, and the summary carries the glyph's sentence and the config notice together. It moves `tray()` ahead of `context()`, which `docs/ARCHITECTURE.md:107` places together in MILE-3; `context()` stays in MILE-3.
 
 Terms used below:
 - **The system** — the Kernel, the Awake Module, `navori-ffi`, the `navori` CLI and the Shell code that draws the status item.
@@ -56,7 +58,7 @@ Terms used below:
 **Story:** As the developer building a later Module, I want to add a signal by writing only that Module's `tray()`, so that the icon's composition never needs editing for a new source.
 
 - **ICON-3.1** THE SYSTEM SHALL give every Module a `tray()` that reports nothing unless the Module overrides it.
-- **ICON-3.2** WHEN a running Module's `tray()` reports a glyph, an attention or a sentence THE SYSTEM SHALL use it in the icon state with no edit to the composing code — verified by a test Module in `crates/kernel/tests`.
+- **ICON-3.2** WHEN a running Module's `tray()` reports a glyph with its sentence, or attention with its clause, THE SYSTEM SHALL use it in the icon state with no edit to the composing code — verified by a test Module in `crates/kernel/tests`.
 - **ICON-3.3** THE SYSTEM SHALL take failed, restarting and the config notice as the composer's own inputs, not as results of `tray()`.
 - **ICON-3.4** THE SYSTEM SHALL state in the doc comment of `tray()` that a Module reports the problem glyph only when its main function is failing.
 
@@ -100,8 +102,11 @@ Terms used below:
 - **ICON-7.2** THE SYSTEM SHALL draw from a plain Swift value that `CoreStore` maps from the icon state, so that the drawing code and the Preview need no generated types (ARCH-2).
 - **ICON-7.3** THE SYSTEM SHALL draw each glyph and attention as a monochrome template image.
 - **ICON-7.4** THE SYSTEM SHALL give the AI running glyph a static image different from the normal glyph's.
-- **ICON-7.5** (guard) IF the Core fails to start THE SYSTEM SHALL CONTINUE TO draw `xmark.octagon` with the description `Core not running` — verified by hand with a data directory the Core cannot open.
-- **ICON-7.6** (guard) WHILE no snapshot has arrived and the Core has not failed THE SYSTEM SHALL CONTINUE TO draw `circle.dotted`, dimmed, with the description `Starting` (the dimming is MENU-G11).
+- ~~**ICON-7.5**~~ (guard) replaced by ICON-7.7: the locked set replaces `xmark.octagon`.
+- ~~**ICON-7.6**~~ (guard) replaced by ICON-7.8: the locked set replaces `circle.dotted`.
+- **ICON-7.7** IF the Core fails to start THE SYSTEM SHALL draw the Core not running glyph from `./ui-brief.md`, with the description `Core not running` — verified by hand with a data directory the Core cannot open.
+- **ICON-7.8** WHILE no snapshot has arrived and the Core has not failed THE SYSTEM SHALL draw the Starting glyph from `./ui-brief.md`, dimmed (MENU-G11), with the description `Starting`.
+- **ICON-7.9** THE SYSTEM SHALL draw every glyph and the attention mark from the shapes in `./ui-brief.md`.
 
 ## 8. See the Icon move only when it means something
 
@@ -141,10 +146,11 @@ Files this feature touches, with what they guard:
 | `modules/awake/` (gains `tray()`) | ICON-10.5 |
 | `apps/cli/src/main.rs` (`print_status` decodes the grown `CoreStatus`), `apps/cli/tests/cli.rs` | ICON-1.4, ICON-10.3 |
 | `apps/macos/Navori/Core/CoreStore.swift` | ICON-6.6, ICON-6.7, ICON-10.6, ICON-10.7, ICON-10.8, ICON-10.9 |
-| `apps/macos/Navori/StatusBar/StatusBarController.swift` | ICON-7.5, ICON-7.6, ICON-10.10, ICON-10.11, ICON-10.12, ICON-10.13, ICON-10.15, ICON-10.16, ICON-10.17 |
+| `apps/macos/Navori/StatusBar/StatusBarController.swift` | ICON-7.7, ICON-7.8, ICON-10.10, ICON-10.11, ICON-10.12, ICON-10.13, ICON-10.15, ICON-10.16, ICON-10.17 |
 | `apps/macos/Navori/Features/Panel/PanelView.swift` (reads `coreStatus`) | ICON-10.6, ICON-10.7 |
 | `apps/macos/Navori/Features/Preview/` | ICON-10.14 |
 | `apps/macos/NavoriPanel/` (new plain value), `apps/macos/Tests/NavoriPanelTests/CoreRowStateTests.swift` | ICON-10.6, ICON-10.7 |
+| `xtask/assets/make-icon.swift`, `xtask/assets/AppIcon.icns`, `xtask/assets/AppIconDev.icns` | ICON-12.2, ICON-12.3 |
 | `docs/ARCHITECTURE.md`, MENU's `requirements.md` | no behavior to guard |
 | MENU's `design.md` and `tasks.md`, which cite MENU-G4 | no behavior to guard: a closed record of what was true at delivery, left as it is |
 
@@ -173,12 +179,20 @@ Files this feature touches, with what they guard:
 **Story:** As a stakeholder, I want measurable quality targets for this feature, so that how-well is not left implicit.
 
 - **Performance:** **ICON-11.1** WHEN `cargo xtask perf` runs THE SYSTEM SHALL stay inside the GOAL-11 budget in `docs/standards/performance.md`, with no signal, phase or metric added by this feature — verified by `cargo xtask perf`.
-- **Performance:** **ICON-11.2** WHEN this feature is delivered THE SYSTEM SHALL have Navori's CPU during the Loop recorded in this file, measured by hand for about 12 seconds on a debug Sample with the panel closed, against the static Icon, using the rule that 0.05% rounds to 0.1 and fails. Delivery needs the number recorded, not a passing number. A result above 0.0 after rounding reopens the Loop (see Comes back if).
+- **Performance:** **ICON-11.2** WHEN this feature is delivered THE SYSTEM SHALL have Navori's CPU during the Loop recorded in this file, measured by hand as the median of 5 windows of 12 seconds on a debug Sample with the panel closed, against the static Icon, using the rule that 0.05% rounds to 0.1 and fails. Delivery needs the number recorded, not a passing number. A result above 0.0 after rounding reopens the Loop (see Comes back if).
 - **Performance:** **ICON-11.3** WHEN that measurement is taken THE SYSTEM SHALL have WindowServer's CPU recorded beside it, with no budget, and no wake-up count offered as evidence, because the counter read 0 for a 10 fps timer in the spike — verified by reading the recorded numbers.
 - **Performance:** **ICON-11.4** WHILE the menu is closed THE SYSTEM SHALL fire no timer more often than every 30 seconds for the Icon (ARCH-16) — verified by searching the Icon's drawing code for `Timer`, `DispatchSourceTimer` and `CADisplayLink`. This is not recorded as met until the Loop's drawing method is chosen.
 - **Security:** **ICON-11.5** THE SYSTEM SHALL NOT put the raw text of a bad config value, or a TOML source snippet, in `tray`, which crosses the local IPC socket (TB-2) — verified by a test in `crates/ffi/tests/config_privacy.rs` reading `tray` with a bad value in `config.toml`.
 - **Reliability:** None — no standing target; `docs/ops/reliability.md` does not exist. The failure paths are in stories 2, 4 and 7.
 - **Accessibility:** **ICON-11.6** THE SYSTEM SHALL carry every glyph and attention in shape, so that each stays readable with motion off and without color — verified by a manual walk of every Sample with Reduce Motion on. No `docs/standards/accessibility.md` exists; VoiceOver and Reduce Motion are in stories 6 and 8.
+
+## 12. See the new logo
+
+**Story:** As the user, I want to install Navori and see the folded N as its app icon in Finder and the Dock, so that the app looks like what the menu bar shows.
+
+- **ICON-12.1** THE SYSTEM SHALL draw the release app icon from the logo artwork in `./ui-brief.md`, at every size in the iconset.
+- **ICON-12.2** (guard) WHEN the dev bundle is built THE SYSTEM SHALL CONTINUE TO give it an app icon visibly different from the release icon, so that the two installs can be told apart.
+- **ICON-12.3** (guard) WHEN `cargo xtask icon` runs THE SYSTEM SHALL CONTINUE TO regenerate both `.icns` files from `make-icon.swift`.
 
 ## Out of Scope
 
@@ -191,6 +205,7 @@ Files this feature touches, with what they guard:
 - A new signal, phase or metric in `cargo xtask perf`, and any fake icon state under `NAVORI_PERF=1`.
 - A line for the icon state in the plain output of `navori status`.
 - `context()`. It stays in MILE-3.
+- The `cup.and.saucer` icon on the Awake row in the menu, which AWAKE shipped. It stays.
 
 ## Not locked
 
@@ -198,9 +213,8 @@ Recorded so that nobody reads these as requirements.
 
 - `Inner::status()` calling the composer and passing the notice in: design confirms the exact call.
 - How `tray()` sits beside the state closure at `crates/kernel/src/runtime.rs:175`.
-- A Loop or Beat must not restart when the Shell reassigns the image, which happens on every snapshot today (`StatusBarController.swift:70`, re-run through the observation at `:53`).
+- A Loop or Beat must not restart when the Shell reassigns the image, which happens on every snapshot today (`StatusBarController.render`, re-run by its observation).
 - A panic inside `tray()` must not take down the status path. How is for design.
-- `cup.and.saucer` for the Lease glyph, which would match the Awake row.
 - The status block's text in AWAKE's design as the sentence for ICON-4.3.
 - If the config sentence is shortened later, cut only the fix-it advice, and re-check KCONTRACT-2.4 and KCONTRACT-2.5.
 - A plain-output line for `summary`, later, if it is read by eye often.
@@ -230,7 +244,7 @@ These conditions reopen a decision. They are not requirements.
 
 ## Open Questions
 
-- The symbol for each glyph, the attention shape and the Beat's length: judged in the Sample control — Jayden Đặng — 2026-11-02 — forbid-guess.
+- The dev app icon's look: `design-solution` proposes, the user approves — Jayden Đặng — 2026-11-03 — forbid-guess.
 - The wording of the Lease, AI running, normal and Decision sentences, and of any Preview control: `design-solution` proposes, the user approves — Jayden Đặng — 2026-11-02 — forbid-guess.
 - The type names, and the glyph names in the JSON: `design-solution` proposes, the user approves — Jayden Đặng — 2026-11-02 — forbid-guess.
 - The `tray()` signature, including whether a Module's signal can be expressed from its `State` alone: `design-solution` proposes after reading the merged code — Jayden Đặng — 2026-11-02 — forbid-guess.
