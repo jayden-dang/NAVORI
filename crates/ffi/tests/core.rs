@@ -758,7 +758,7 @@ fn the_snapshot_carries_awake_after_a_hold() {
 }
 
 #[test]
-fn an_idle_core_reports_a_passing_awake_row_and_keeps_the_five_others() {
+fn an_idle_core_reports_a_passing_awake_row_and_keeps_the_other_rows() {
     let home = home();
     let (core, _) = start(&home);
     eventually(|| core.doctor().iter().all(|check| check.ok));
@@ -766,7 +766,15 @@ fn an_idle_core_reports_a_passing_awake_row_and_keeps_the_five_others() {
     let names: Vec<_> = checks.iter().map(|check| check.name.as_str()).collect();
     assert_eq!(
         names,
-        ["config", "database", "ipc", "modules", "awake", "logs"]
+        [
+            "config",
+            "database",
+            "ipc",
+            "modules",
+            "awake",
+            "integrations",
+            "logs"
+        ]
     );
     let awake = checks.iter().find(|check| check.name == "awake").unwrap();
     assert!(awake.ok);

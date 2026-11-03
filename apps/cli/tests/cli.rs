@@ -216,6 +216,32 @@ fn doctor_passes_on_a_healthy_core() {
 }
 
 #[test]
+fn doctor_prints_the_integrations_row_and_exits_1_when_it_fails() {
+    let r = running_core();
+    let hooks = r.home.path().join(".grok/hooks");
+    std::fs::create_dir_all(&hooks).unwrap();
+    std::fs::write(hooks.join("navori.json"), "{ \"hooks\": ").unwrap();
+    navori(&r.home)
+        .arg("doctor")
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("✗ integrations"))
+        .stdout(predicate::str::contains("grok: unreadable"));
+}
+
+#[test]
+fn doctor_with_the_app_down_still_prints_only_the_app_row_and_exits_3() {
+    let home = short_home();
+    std::fs::create_dir_all(home.path().join(".claude")).unwrap();
+    navori(&home)
+        .arg("doctor")
+        .assert()
+        .code(3)
+        .stdout(predicate::str::contains("✗ app"))
+        .stdout(predicate::str::contains("integrations").not());
+}
+
+#[test]
 fn every_command_reports_when_the_app_is_not_running() {
     let home = short_home();
     navori(&home)
