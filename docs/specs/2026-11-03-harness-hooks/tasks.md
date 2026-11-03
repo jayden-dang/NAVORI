@@ -173,10 +173,10 @@ _Requirements: HOOKS-2.1, HOOKS-2.2, HOOKS-2.3, HOOKS-2.4, HOOKS-8.4, HOOKS-9.1_
 
 **Depends-on:** Task 3
 
-- [ ] **Step 1: Build** `cargo build --release -p navori-cli` — expect: builds.
-- [ ] **Step 2: Measure.** In the scratch test, over a temp home, run `target/release/navori` explicitly (`assert_cmd::cargo_bin` returns the debug binary) 50 times with a `UserPromptSubmit` payload against a recording server that replies at once, and 50 times with the server absent. Record median and p95 wall time of each set. Never touch the real dev app or its data directory.
-- [ ] **Step 3: Compare.** The deadline for `SessionEnd` is 0.7 s (HOOKS-2.3, agent-decided). **If the p95 against an answering server exceeds 350 ms (half of that deadline, agent-decided), stop and report: HOOKS-2.3 needs a decision.** Otherwise write the numbers and the machine model into `measure-hook.md` in the run directory.
-- [ ] **Step 4: Delete the scratch test.** No commit is needed when nothing tracked changed.
+- [x] **Step 1: Build** `cargo build --release -p navori-cli` — expect: builds.
+- [x] **Step 2: Measure.** In the scratch test, over a temp home, run `target/release/navori` explicitly (`assert_cmd::cargo_bin` returns the debug binary) 50 times with a `UserPromptSubmit` payload against a recording server that replies at once, and 50 times with the server absent. Record median and p95 wall time of each set. Never touch the real dev app or its data directory.
+- [x] **Step 3: Compare.** The deadline for `SessionEnd` is 0.7 s (HOOKS-2.3, agent-decided). **If the p95 against an answering server exceeds 350 ms (half of that deadline, agent-decided), stop and report: HOOKS-2.3 needs a decision.** Otherwise write the numbers and the machine model into `measure-hook.md` in the run directory.
+- [x] **Step 4: Delete the scratch test.** No commit is needed when nothing tracked changed.
 
 _Requirements: HOOKS-2.3, HOOKS-10.2_
 
