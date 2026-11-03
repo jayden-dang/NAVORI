@@ -123,7 +123,7 @@ Terms used below:
 - **HOOKS-7.2** WHEN no present Harness is Needs repair or Unreadable THE SYSTEM SHALL report the check ok. A Harness that is Not found, or that is Not installed, is not a failure. [Weigh, picks-r1 F3]
 - **HOOKS-7.3** WHEN a present Harness is Needs repair or Unreadable THE SYSTEM SHALL report the check failed. In both cases THE SYSTEM SHALL name every Harness with its state in the check's detail, so a missing hook is reported even when it is not a failure. [Lock "`navori doctor` … report the hook", ARCHITECTURE.md:314-315; the ok/failed split and the detail's shape are agent-decided]
 - **HOOKS-7.4** WHILE the app is not running THE SYSTEM SHALL report no hook state, because the CLI prints only the `app` row then. [agent-decided, accepted in review; `apps/cli/src/main.rs:376-383, 400-401`]
-- **HOOKS-7.5** THE SYSTEM SHALL show in Settings → Integrations and in `navori doctor` the same state for a Harness at one moment, because both come from the same `inspect` function. [Weigh, picks-r1 F3]
+- **HOOKS-7.5** THE SYSTEM SHALL show in Settings → Integrations and in `navori doctor` the same state for a Harness at one moment, because both come from the same computation. [Weigh, picks-r1 F3]
 
 ## 8. The dev and release apps keep separate hooks
 
@@ -132,7 +132,7 @@ Terms used below:
 - **HOOKS-8.1** WHEN the dev profile installs, repairs or removes THE SYSTEM SHALL touch only entries whose command carries `--profile dev` before `hook`, and WHEN the release profile does, only entries that carry none. [agent-decided; ARCH-14, review finding 1]
 - **HOOKS-8.2** WHILE a release entry and a dev entry both exist in one Hook file THE SYSTEM SHALL keep both, and each profile's Settings and doctor SHALL read only its own. [agent-decided; ARCH-14]
 - **HOOKS-8.3** WHEN the dev profile installs while a correct release entry exists THE SYSTEM SHALL leave the release entry byte-identical. [agent-decided; ARCH-14]
-- **HOOKS-8.4** WHEN a Hook entry runs THE SYSTEM SHALL send its events to the Core of the profile the entry names, release or dev, and to no other, and SHALL ignore the `NAVORI_PROFILE` environment variable to do so. [Lock, ARCH-14 (no shared sockets); `apps/cli/src/main.rs:24, 140`]
+- **HOOKS-8.4** WHEN a Hook entry runs THE SYSTEM SHALL send its events to the Core of the profile the entry names, release or dev, and to no other, and SHALL ignore the `NAVORI_PROFILE` environment variable to do so. [Lock for the separation, ARCH-14 (no shared sockets), `apps/cli/src/main.rs:24, 140`; ignoring the variable is agent-decided]
 
 ## 9. Guards on existing behavior
 
