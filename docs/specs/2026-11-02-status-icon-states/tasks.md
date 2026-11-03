@@ -148,11 +148,11 @@ _Requirements: ICON-2.1, ICON-2.5, ICON-3.1, ICON-3.2, ICON-3.4, ICON-5.2, ICON-
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1: Write failing tests.** In `apps/cli/tests/cli.rs`: `status_json_carries_the_icon_state`, asserting `glyph` is `normal`, `attention` is false and `summary` is `Navori`, and that `pid`, `version`, `profile`, `data_dir`, `socket_path` and `modules` stay; `status_plain_output_has_no_icon_line`. In `crates/ffi/tests/core.rs`: `the_snapshot_and_the_status_carry_the_same_icon_state`; `a_bad_value_is_named_in_the_icon_summary` with `log_level`; `a_whole_file_fallback_says_so_in_the_icon_summary`. In `crates/ffi/tests/config_privacy.rs`: extend `surface()` with `snapshot.tray.summary`.
-- [ ] **Step 2: Run** `cargo nextest run -p navori-ffi --test core` — expect: does not compile, `tray` is missing.
-- [ ] **Step 3: Implement.** `Inner::status()` passes `config_notice`'s `title` and `message` to `self.kernel.tray`. `snapshot()` moves `tray` from the status it read, with no second composition. `apps/cli/src/main.rs` is not edited.
-- [ ] **Step 4: Verify** `cargo nextest run -p navori-ffi --test core`, `cargo nextest run -p navori-ffi --test config_privacy`, `cargo nextest run -p navori-cli --test cli` — expect: pass, including `snapshot_pushes_coalesce_at_33ms` and `a_secret_in_a_bad_value_reaches_no_report` unchanged. `cargo xtask ci` — expect: pass.
-- [ ] **Step 5: Commit** `feat(ffi): carry the icon state to the cli and the snapshot`.
+- [x] **Step 1: Write failing tests.** In `apps/cli/tests/cli.rs`: `status_json_carries_the_icon_state`, asserting `glyph` is `normal`, `attention` is false and `summary` is `Navori`, and that `pid`, `version`, `profile`, `data_dir`, `socket_path` and `modules` stay; `status_plain_output_has_no_icon_line`. In `crates/ffi/tests/core.rs`: `the_snapshot_and_the_status_carry_the_same_icon_state`; `a_bad_value_is_named_in_the_icon_summary` with `log_level`; `a_whole_file_fallback_says_so_in_the_icon_summary`. In `crates/ffi/tests/config_privacy.rs`: extend `surface()` with `snapshot.tray.summary`.
+- [x] **Step 2: Run** `cargo nextest run -p navori-ffi --test core` — expect: does not compile, `tray` is missing.
+- [x] **Step 3: Implement.** `Inner::status()` passes `config_notice`'s `title` and `message` to `self.kernel.tray`. `snapshot()` moves `tray` from the status it read, with no second composition. `apps/cli/src/main.rs` is not edited.
+- [x] **Step 4: Verify** `cargo nextest run -p navori-ffi --test core`, `cargo nextest run -p navori-ffi --test config_privacy`, `cargo nextest run -p navori-cli --test cli` — expect: pass, including `snapshot_pushes_coalesce_at_33ms` and `a_secret_in_a_bad_value_reaches_no_report` unchanged. `cargo xtask ci` — expect: pass.
+- [x] **Step 5: Commit** `feat(ffi): carry the icon state to the cli and the snapshot`.
 
 _Requirements: ICON-1.1, ICON-1.2, ICON-1.3, ICON-1.4, ICON-6.6, ICON-10.3, ICON-10.4, ICON-11.5_
 
