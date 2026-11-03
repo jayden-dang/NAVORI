@@ -522,10 +522,10 @@ _Requirements: AWAKE-1.2, AWAKE-1.7, AWAKE-7.1, AWAKE-7.3_
 
 **Depends-on:** Task 16
 
-- [ ] **Step 1: Edit.** `integrations.md:26` and `ARCHITECTURE.md:296` become at most one assertion per kind. `ARCHITECTURE.md:297` says the assertion follows the process, and rows for process-owned Leases survive. `ARCHITECTURE.md:154` describes the record in `navori-ffi`. Replace `ProcessTable`, `ProjectResolver` and `HarnessCatalog` at `ARCHITECTURE.md:284-286` and `:307` with `Snapshot`, `resolve_location` and `harness_of`. `data.md:33` states what persists. `system.md:64`, `modules.md`, `map.md` and `dependencies.md` say Built. `verify.md` and `README.md:27` list `awake`, and `verify.md` gains a Drive entry for `navori awake`. Do not touch `docs/standards/errors-logging.md`: its line 30 already says every Module has a doctor check.
-- [ ] **Step 2: Write** `docs/features/awake.md`: what it does, the commands, what it does not do, the DoD item 5 gap in the wording of `requirements.md`, and which Must-measure items stay open, since `.skills/AWAKE/measurements.md` is git-ignored.
-- [ ] **Step 3: Verify** `grep -rnE "exactly one|ProcessTable|HarnessCatalog|ProjectResolver" docs/ARCHITECTURE.md docs/architecture/integrations.md` — expect: no match on an assertion line, and none of the three old names. `grep -n "Comes back if" -c docs/features/awake.md` — expect: 0.
-- [ ] **Step 4: Commit** `git commit -m "docs(awake): align the seed, spine and feature note with what shipped"`
+- [x] **Step 1: Edit.** `integrations.md:26` and `ARCHITECTURE.md:296` become at most one assertion per kind. `ARCHITECTURE.md:297` says the assertion follows the process, and rows for process-owned Leases survive. `ARCHITECTURE.md:154` describes the record in `navori-ffi`. Replace `ProcessTable`, `ProjectResolver` and `HarnessCatalog` at `ARCHITECTURE.md:284-286` and `:307` with `Snapshot`, `resolve_location` and `harness_of`. `data.md:33` states what persists. `system.md:64`, `modules.md`, `map.md` and `dependencies.md` say Built. `verify.md` and `README.md:27` list `awake`, and `verify.md` gains a Drive entry for `navori awake`. Do not touch `docs/standards/errors-logging.md`: its line 30 already says every Module has a doctor check.
+- [x] **Step 2: Write** `docs/features/awake.md`: what it does, the commands, what it does not do, the DoD item 5 gap in the wording of `requirements.md`, and which Must-measure items stay open, since `.skills/AWAKE/measurements.md` is git-ignored.
+- [x] **Step 3: Verify** `grep -rnE "exactly one|ProcessTable|HarnessCatalog|ProjectResolver" docs/ARCHITECTURE.md docs/architecture/integrations.md` — expect: no match on an assertion line, and none of the three old names. `grep -n "Comes back if" -c docs/features/awake.md` — expect: 0.
+- [x] **Step 4: Commit** `git commit -m "docs(awake): align the seed, spine and feature note with what shipped"`
 
 _Requirements: AWAKE-12.1_
 
