@@ -270,11 +270,11 @@ _Requirements: ICON-8.1, ICON-8.2, ICON-8.3, ICON-8.4, ICON-8.5, ICON-8.6, ICON-
 
 **Depends-on:** Task 7
 
-- [ ] **Step 1: Implement** a row in the Preview offering each glyph with attention off and on, Core-down, Core-starting, `Play beat` and `Turn off`, with descriptions from Decision 8. The controller holds the Sample and `render` draws `sample ?? store.statusIcon`. Choosing or clearing calls `next` with `allowBeat: false`. Everything is in `#if DEBUG`. The Sample row dispatches no Action.
-- [ ] **Step 2: Verify** `cargo xtask ci` — expect: pass.
+- [x] **Step 1: Implement** a row in the Preview offering each glyph with attention off and on, Core-down, Core-starting, `Play beat` and `Turn off`, with descriptions from Decision 8. The controller holds the Sample and `render` draws `sample ?? store.statusIcon`. Choosing or clearing calls `next` with `allowBeat: false`. Everything is in `#if DEBUG`. The Sample row dispatches no Action.
+- [x] **Step 2: Verify** `cargo xtask ci` — expect: pass.
 - [ ] **Step 3: Check by hand** with `cargo xtask run`: every Sample draws on the real status item; the AI Sample loops; `Play beat` plays; a Sample stays after a click closes the Preview; `Turn off` returns to the real state with no Beat; the right-click menu keeps its four items, with `Open Menu Preview` only here.
-- [ ] **Step 4: Check the binary:** `swift build --arch arm64 --package-path apps/macos -c release`, then `strings "$(swift build --arch arm64 --package-path apps/macos -c release --show-bin-path)/Navori" | grep -c NAVORI-ICON-SAMPLE` — expect: 0. `swift build --arch arm64 --package-path apps/macos`, then the same `strings` line with `-c release` dropped — expect: at least 1.
-- [ ] **Step 5: Commit** `feat(shell): add icon samples to the dev preview`.
+- [x] **Step 4: Check the binary:** `swift build --arch arm64 --package-path apps/macos -c release`, then `strings "$(swift build --arch arm64 --package-path apps/macos -c release --show-bin-path)/Navori" | grep -c NAVORI-ICON-SAMPLE` — expect: 0. `swift build --arch arm64 --package-path apps/macos`, then the same `strings` line with `-c release` dropped — expect: at least 1.
+- [x] **Step 5: Commit** `feat(shell): add icon samples to the dev preview`.
 
 _Requirements: ICON-9.1, ICON-9.2, ICON-9.3, ICON-9.4, ICON-9.5, ICON-9.6, ICON-10.11, ICON-10.14_
 
