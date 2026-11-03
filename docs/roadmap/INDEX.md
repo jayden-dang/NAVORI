@@ -63,7 +63,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 - **ROAD-6** platform-and-process-model — After: none — Surfaces: `crates/macos/`, `crates/procs/`
 - **ROAD-7** kernel-contract-extensions — After: none — Surfaces: `crates/kernel/`, `crates/protocol/`, `crates/ffi/`
 - **ROAD-8** awake-leases — After: ROAD-6, ROAD-7 — Surfaces: `modules/awake/`, `crates/ffi/`, `apps/macos/Navori/Features/`, `apps/cli/`
-- **ROAD-9** harness-hooks — After: ROAD-8 — Surfaces: `apps/cli/`, `modules/integrations/`, `crates/ffi/`, `apps/macos/Navori/Features/Settings/`
+- **ROAD-9** harness-hooks — After: ROAD-8 — Surfaces: `apps/cli/`, `modules/integrations/`, `crates/ffi/`, `apps/macos/Navori/Features/Settings/` <!-- surfaces edited by an agent, agent-decided, 2026-11-03 (harness-hooks run); not the operator's choice -->
 - **ROAD-28** soak-and-hang-check — After: ROAD-5 — Surfaces: `xtask/`, `apps/macos/Navori/`
 - **ROAD-34** menubar-visual-foundation — After: none — Surfaces: `apps/macos/Navori/StatusBar/`, `apps/macos/Navori/Features/Panel/`, `apps/macos/Navori/Features/Settings/`, `apps/macos/NavoriPanel/`, `apps/macos/Package.swift`, `.cargo/config.toml`, `xtask/`
 - **ROAD-35** status-icon-states — After: ROAD-7, ROAD-8, ROAD-34 — Surfaces: `modules/awake/`, `crates/kernel/`, `crates/protocol/`, `crates/ffi/`, `apps/cli/`, `apps/macos/Navori/Core/`, `apps/macos/Navori/StatusBar/`, `apps/macos/NavoriPanel/`, `xtask/assets/`

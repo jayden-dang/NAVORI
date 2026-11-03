@@ -338,43 +338,43 @@ _Requirements: HOOKS-3.1, HOOKS-3.2, HOOKS-3.9, HOOKS-3.10, HOOKS-9.4, HOOKS-10.
 
 ---
 
-### Task 11: Find the Claude Code and Codex hook payload keys and the `Stop` `reason` (check C1) — research, operator-recorded
+### Task 11: Confirm the Claude Code and Codex payloads against recorded ones (check C1) — operator-recorded
 
 **Files:**
-- Create: `.skills/research/2026-11-03-harness-hook-payloads.md` (git-ignored)
+- Create: `/Users/jayden/Developer/experiments/NAVORI/.skills/_pending-harness-hooks/auto/payloads-claude-codex.md` (the operator's recorded payloads; not tracked)
 
-**Reuse:** `research` skill; Context7 for current library docs; the Harnesses' own docs on disk, read only
+**Reuse:** the documentation answers already in `research-hooks-claude-codex.md` (run directory): Claude Code `session_id` and `hook_event_name` are common fields (raw); Claude Code and Codex `Stop` carry no `reason` (docs summaries)
 
 **Interfaces:**
-- Consumes: none
-- Produces: a cited note: the stdin keys for event and session id in Claude Code and Codex, whether `Stop` carries `reason`, with confidence labels
+- Consumes: `research-hooks-claude-codex.md`
+- Produces: a recorded `UserPromptSubmit`, `Stop` and `SessionEnd` payload per Harness, compared with the documentation
 
 **Depends-on:** none
 
-- [ ] **Step 1: Research** the documented payloads with `research` (read only; no Harness run by an agent). Cite each source.
-- [ ] **Step 2: Ask the operator for recorded payloads.** A live Harness run touches that Harness's real session data outside the worktree and is a charter hard stop for this work session. State in the note that a recorded `UserPromptSubmit`, `Stop` and `SessionEnd` payload per Harness is needed from the operator and which of HOOKS-1.3, 1.6 depend on it.
-- [ ] **Step 3: If the keys differ** from `hook_event_name` / `session_id`, or `Stop` carries a `reason` with other values, **stop and report**: requirements HOOKS-1.3 and 1.6 need a decision, and Task 2's `reason` rule goes back for one.
+- [ ] **Step 1: Documentation is done.** The research step is complete; do not repeat it. Only a recorded payload is open.
+- [ ] **Step 2: Ask the operator for the recorded payloads.** A live Harness run touches that Harness's real session data outside the worktree, a charter hard stop for this work session, so an agent does not run Claude Code or Codex here.
+- [ ] **Step 3: Compare.** If a key differs from `hook_event_name` / `session_id`, or `Stop` carries a `reason`, **stop and report**: HOOKS-1.3 and 1.6 need a decision, and Task 2's `reason` rule goes back for one.
 
 _Requirements: HOOKS-1.3, HOOKS-1.6_
 
 ---
 
-### Task 12: Find the Codex `hooks.json` timeout unit and shell behavior (check C2) — research, operator-recorded
+### Task 12: Confirm the Codex `timeout` unit and shell behavior on 0.166 (check C2) — operator-recorded
 
 **Files:**
-- Create: `.skills/research/2026-11-03-codex-hook-timeout.md` (git-ignored)
+- Create: `/Users/jayden/Developer/experiments/NAVORI/.skills/_pending-harness-hooks/auto/codex-timeout-run.md` (the operator's recorded run; not tracked)
 
-**Reuse:** `research` skill; Context7 for the pinned Codex version; the real `~/.codex/hooks.json` read only (the key `timeout` is seen there; the unit is not)
+**Reuse:** `research-hooks-claude-codex.md` (run directory): the key `timeout` is confirmed locally; the unit is documented as seconds (raw) without a version; shell versus exec is not stated
 
 **Interfaces:**
-- Consumes: none
-- Produces: a cited note: the Codex timeout unit, whether `command` runs through a shell (so a single-quoted path with a space works), and the `SessionEnd` clamp
+- Consumes: `research-hooks-claude-codex.md`
+- Produces: the confirmed `timeout` unit and whether `command` runs through a shell on Codex 0.166
 
 **Depends-on:** none
 
-- [ ] **Step 1: Research** the pinned Codex version's hook documentation and source with `research`/Context7. Label each fact `verified-doc` or `recalled-unverified`.
-- [ ] **Step 2: Ask the operator** for a recorded run if the docs leave the unit open (a sleeping hook under a temp config); an agent does not run Codex here.
-- [ ] **Step 3: If the unit or the shell behavior stays unverified,** leave Task 13 blocked and say so in the report.
+- [ ] **Step 1: Documentation is done.** Nothing more to read here.
+- [ ] **Step 2: Ask the operator** for one recorded run on 0.166: a hook that sleeps longer than its `timeout`, and a hook whose command is a single-quoted path containing a space. An agent does not run Codex here.
+- [ ] **Step 3: If the unit or the shell behavior stays unconfirmed,** leave Task 13 blocked and say so in the report.
 
 _Requirements: HOOKS-4.5_
 
@@ -442,6 +442,7 @@ _Requirements: HOOKS-3.11, HOOKS-7.1, HOOKS-9.3, HOOKS-9.7, HOOKS-10.1_
 
 - [ ] **Step 1: Operator, with real Claude Code, Codex and Grok sessions and a signed dev build:** Install each Harness's hook from Settings → Integrations; confirm a session Lease appears on a prompt and ends after the turn; confirm Remove restores the config; confirm a dev install leaves a release entry alone.
 - [ ] **Step 2: Operator records:** whether macOS asks for permission to write `~/.claude`, `~/.codex` and `~/.grok`; whether Claude Code or Codex show a hook's standard error on exit 0; whether Grok's daemon route leaves a live Harness ancestor; how long after process start a `UserPromptSubmit` payload reaches stdin (a payload later than 0.7 s starts no Lease); Claude Code and Codex payload keys and `Stop` `reason`.
-- [ ] **Step 3: Operator runs the keyboard and VoiceOver walk** of the Integrations tab and confirms its rows fit the 560×420 window.
+- [ ] **Step 3: Operator checks the two documented gaps** (see the Known risks in `design.md`): whether Esc or an API error in a real Claude Code session leaves the Lease open until the next turn, `SessionEnd`, exit or the TTL; and whether a freshly installed Codex hook waits for trust in `/hooks` before it runs. Neither result is decided by this plan.
+- [ ] **Step 4: Operator runs the keyboard and VoiceOver walk** of the Integrations tab and confirms its rows fit the 560×420 window.
 
 _Requirements: HOOKS-1.1, HOOKS-2.2, HOOKS-10.7_
