@@ -475,10 +475,10 @@ _Requirements: AWAKE-9.1, AWAKE-9.2, AWAKE-9.3, AWAKE-9.4, AWAKE-9.5, AWAKE-13.7
 
 **Depends-on:** Task 14
 
-- [ ] **Step 1: Write tests:** `an_hour_with_no_lease_reads_nothing_and_calls_nothing`, `opening_the_panel_takes_no_snapshot` (with a session Lease held: `list_calls` unchanged across a panel toggle), `with_the_menu_closed_two_timer_wakes_are_30_seconds_apart`. Fix any defect they find in `modules/awake/src/actor.rs`.
+- [x] **Step 1: Write tests:** `an_hour_with_no_lease_reads_nothing_and_calls_nothing`, `opening_the_panel_takes_no_snapshot` (with a session Lease held: `list_calls` unchanged across a panel toggle), `with_the_menu_closed_two_timer_wakes_are_30_seconds_apart`. Fix any defect they find in `modules/awake/src/actor.rs`.
 Run: `cargo nextest run -p navori-mod-awake --test idle` — expect: pass.
-- [ ] **Step 2: Run** `cargo xtask perf` with no Lease held — expect: every GOAL-11 budget passes, including `submenu_open_ms` ≤ 16 ms on the Core Submenu. No `perf-baseline.json` exists unless PERF Task 12 ran, so the regression check may skip and print why; report that. Do not record a baseline.
-- [ ] **Step 3: Commit** `git commit -m "test(awake): prove the idle Module reads nothing and arms nothing"`
+- [x] **Step 2: Run** `cargo xtask perf` with no Lease held — expect: every GOAL-11 budget passes, including `submenu_open_ms` ≤ 16 ms on the Core Submenu. No `perf-baseline.json` exists unless PERF Task 12 ran, so the regression check may skip and print why; report that. Do not record a baseline.
+- [x] **Step 3: Commit** `git commit -m "test(awake): prove the idle Module reads nothing and arms nothing"`
 
 _Requirements: AWAKE-13.1, AWAKE-13.2, AWAKE-13.3, AWAKE-13.4_
 
