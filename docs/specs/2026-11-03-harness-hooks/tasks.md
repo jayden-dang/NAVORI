@@ -7,8 +7,9 @@
 > for tracking.
 
 Feature code: HOOKS
-Status: Draft
+Status: Approved
 Date: 2026-11-03
+Approved by the operator ("approve", 2026-11-03, on the review page at c2da2f5, no card selected).
 Execution-mode: unset
 Max-concurrency: auto
 Requirements: ./requirements.md
