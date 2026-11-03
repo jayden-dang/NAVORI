@@ -61,42 +61,26 @@ impl Integrations {
             (outcome, inspect(&env))
         })
         .await;
-        let done = match done {
-            Ok(done) => done,
-            Err(error) => {
-                tracing::warn!(?harness, %error, "the {} did not finish", words.verb);
-                ctx.emit(
-                    HOOK_FAILED,
-                    Severity::Error,
-                    event::failed(harness, words.verb),
-                    payload,
-                );
-                return Err(ActionError::Failed(format!(
-                    "the {} did not finish: {error}",
-                    words.verb
-                )));
-            }
-        };
-        match done {
-            (Ok(outcome), state) => {
+        let message = match done {
+            Ok((Ok(outcome), state)) => {
                 let summary = match outcome {
                     infra::files::Outcome::Written => (words.done)(harness),
                     infra::files::Outcome::Nothing => (words.already)(harness),
                 };
                 ctx.emit(words.kind, Severity::Info, summary, payload);
-                Ok(state)
+                return Ok(state);
             }
-            (Err(error), _) => {
-                tracing::warn!(?harness, %error, "could not {} the hooks", words.verb);
-                ctx.emit(
-                    HOOK_FAILED,
-                    Severity::Error,
-                    event::failed(harness, words.verb),
-                    payload,
-                );
-                Err(ActionError::Failed(error.to_string()))
-            }
-        }
+            Ok((Err(error), _)) => error.to_string(),
+            Err(error) => format!("the {} did not finish: {error}", words.verb),
+        };
+        tracing::warn!(?harness, %message, "could not {} the hooks", words.verb);
+        ctx.emit(
+            HOOK_FAILED,
+            Severity::Error,
+            event::failed(harness, words.verb),
+            payload,
+        );
+        Err(ActionError::Failed(message))
     }
 }
 
@@ -145,30 +129,21 @@ impl Module for Integrations {
 
     async fn run(&mut self, ctx: &mut ModuleCtx<Self>) -> anyhow::Result<()> {
         while let Some(req) = ctx.recv().await {
-            match &req.action {
+            let (harness, plan) = match &req.action {
                 IntegrationsAction::Status => {
                     let env = self.env.clone();
                     let scan = tokio::task::spawn_blocking(move || inspect(&env)).await;
                     req.respond(scan.map_err(|e| {
                         ActionError::Failed(format!("the hook scan did not finish: {e}"))
                     }));
+                    continue;
                 }
-                IntegrationsAction::Install { harness } => {
-                    let harness = *harness;
-                    let result = self.change(ctx, harness, Plan::Install).await;
-                    req.respond(result);
-                }
-                IntegrationsAction::Repair { harness } => {
-                    let harness = *harness;
-                    let result = self.change(ctx, harness, Plan::Repair).await;
-                    req.respond(result);
-                }
-                IntegrationsAction::Remove { harness } => {
-                    let harness = *harness;
-                    let result = self.change(ctx, harness, Plan::Remove).await;
-                    req.respond(result);
-                }
-            }
+                IntegrationsAction::Install { harness } => (*harness, Plan::Install),
+                IntegrationsAction::Repair { harness } => (*harness, Plan::Repair),
+                IntegrationsAction::Remove { harness } => (*harness, Plan::Remove),
+            };
+            let result = self.change(ctx, harness, plan).await;
+            req.respond(result);
         }
         Ok(())
     }
