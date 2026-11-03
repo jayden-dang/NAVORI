@@ -37,4 +37,43 @@ struct CoreRowStateTests {
         #expect(CoreStatus(health: .degraded) == .needsAttention)
         #expect(CoreStatus(health: .down) == .notRunning)
     }
+
+    private func status(
+        coreFailed: Bool = false,
+        hasSnapshot: Bool = true,
+        modules: [String] = ["running"],
+        notice: Bool = false
+    ) -> CoreStatus {
+        CoreStatus(health: CoreHealth(
+            coreFailed: coreFailed,
+            hasSnapshot: hasSnapshot,
+            moduleStates: modules,
+            hasConfigNotice: notice
+        ))
+    }
+
+    @Test func a_config_notice_alone_needs_attention() {
+        #expect(status(notice: true) == .needsAttention)
+    }
+
+    @Test func a_refused_lease_with_every_module_running_stays_running() {
+        #expect(status(modules: ["running", "running"], notice: false) == .running)
+    }
+
+    @Test func a_failed_or_restarting_module_needs_attention() {
+        #expect(status(modules: ["running", "failed"]) == .needsAttention)
+        #expect(status(modules: ["restarting"]) == .needsAttention)
+    }
+
+    @Test func a_starting_or_stopped_module_stays_running() {
+        #expect(status(modules: ["starting", "stopped"]) == .running)
+    }
+
+    @Test func a_failed_core_is_not_running() {
+        #expect(status(coreFailed: true, hasSnapshot: true, modules: ["failed"], notice: true) == .notRunning)
+    }
+
+    @Test func no_snapshot_is_starting() {
+        #expect(status(hasSnapshot: false, modules: []) == .starting)
+    }
 }

@@ -107,11 +107,34 @@ final class CoreStore {
     var hasSnapshot: Bool { snapshot != nil }
 
     var coreStatus: CoreStatus {
-        switch health {
-        case .starting: CoreStatus(health: .starting)
-        case .ok: CoreStatus(health: .ok)
-        case .degraded: CoreStatus(health: .degraded)
-        case .down: CoreStatus(health: .down)
+        CoreStatus(health: CoreHealth(
+            coreFailed: startupError != nil,
+            hasSnapshot: snapshot != nil,
+            moduleStates: snapshot?.modules.map(\.state) ?? [],
+            hasConfigNotice: snapshot?.configNotice != nil
+        ))
+    }
+
+    /// The status item's one value. The only reader of `snapshot.tray`.
+    var statusIcon: StatusIconState {
+        StatusIconState(
+            coreFailed: startupError != nil,
+            core: snapshot.map { snapshot in
+                StatusIconState(
+                    glyph: Self.glyph(snapshot.tray.glyph),
+                    attention: snapshot.tray.attention,
+                    description: snapshot.tray.summary
+                )
+            }
+        )
+    }
+
+    private static func glyph(_ glyph: TrayGlyphView) -> StatusIconGlyph {
+        switch glyph {
+        case .normal: .normal
+        case .lease: .lease
+        case .aiRunning: .aiRunning
+        case .problem: .problem
         }
     }
 
