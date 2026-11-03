@@ -26,8 +26,8 @@ impl Rig {
         Self::new(true, DEV_HELPER)
     }
 
-    fn new(dev: bool, helper: &str) -> Self {
-        let home = tempfile::tempdir().unwrap();
+    pub fn new(dev: bool, helper: &str) -> Self {
+        let home = tempfile::Builder::new().tempdir_in("/tmp").unwrap();
         let env = IntegrationsEnv {
             home: home.path().to_path_buf(),
             dev,

@@ -32,3 +32,18 @@ pub(crate) fn unreadable(failure: &str) -> String {
 pub(crate) fn codex_unverified() -> String {
     "The Codex timeout unit is not verified yet.".to_owned()
 }
+
+pub(crate) fn installed(harness: Harness) -> String {
+    format!("Installed Navori's hooks for {}.", name(harness))
+}
+
+pub(crate) fn already_installed(harness: Harness) -> String {
+    format!(
+        "Navori's hooks for {} were already in place.",
+        name(harness)
+    )
+}
+
+pub(crate) fn install_failed(harness: Harness) -> String {
+    format!("Could not install Navori's hooks for {}.", name(harness))
+}

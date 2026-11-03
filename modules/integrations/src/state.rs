@@ -44,7 +44,7 @@ pub(crate) fn row(env: &IntegrationsEnv, harness: Harness) -> HarnessStatus {
         Read::NoDir => (State::NotFound, Some(event::not_found(harness))),
         Read::NoFile => (State::NotInstalled, None),
         Read::Unreadable(failure) => (State::Unreadable, Some(event::unreadable(&failure))),
-        Read::Doc(doc) => {
+        Read::Doc(doc, _) => {
             let Classification { state, reason, .. } =
                 domain::classify(&doc, harness, env.dev, &env.helper);
             (state, reason.map(|failure| event::unreadable(&failure)))

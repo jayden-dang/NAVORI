@@ -1,0 +1,13 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "'/Applications/Navori.app/Contents/Helpers/navori' hook", "timeout": 2 } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "'/Applications/Navori.app/Contents/Helpers/navori' hook", "timeout": 2 } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "'/Applications/Navori.app/Contents/Helpers/navori' hook", "timeout": 1 } ] }
+    ]
+  }
+}

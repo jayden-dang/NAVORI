@@ -146,6 +146,103 @@ pub fn classify(doc: &Value, harness: Harness, dev: bool, helper: &Path) -> Clas
     }
 }
 
+/// Whether `converge` altered the tree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Changed {
+    Yes,
+    No,
+}
+
+/// Brings the running profile's hooks in `doc` to exactly the desired set and touches nothing
+/// else. `doc` must already have passed `classify` without being unreadable.
+pub(crate) fn converge(doc: &mut Value, harness: Harness, dev: bool, helper: &Path) -> Changed {
+    let before = doc.clone();
+    let wanted = desired(harness, dev, helper);
+    if let Some(root) = doc.as_object_mut() {
+        let hooks = root
+            .entry("hooks")
+            .or_insert_with(|| Value::Object(Map::new()));
+        if let Some(events) = hooks.as_object_mut() {
+            let present: Vec<String> = events.keys().cloned().collect();
+            for event in present {
+                let want = wanted
+                    .iter()
+                    .find(|(name, _)| *name == event)
+                    .map(|(_, h)| h);
+                let Some(slot) = events.get_mut(&event) else {
+                    continue;
+                };
+                let Some(groups) = slot.as_array_mut() else {
+                    continue;
+                };
+                let removed = settle_event(groups, want, dev);
+                if removed && groups.is_empty() {
+                    events.shift_remove(&event);
+                }
+            }
+            for (event, handler) in &wanted {
+                if !events.contains_key(*event) {
+                    events.insert((*event).to_owned(), json!([canonical_group(handler)]));
+                }
+            }
+        }
+    }
+    if *doc == before {
+        Changed::No
+    } else {
+        Changed::Yes
+    }
+}
+
+fn canonical_group(handler: &Handler) -> Value {
+    json!({ "hooks": [handler.to_value()] })
+}
+
+/// Keeps the first canonical group of ours (rewritten to `want`), takes ours out of every other
+/// place, appends a canonical group when none was kept. Returns whether anything of ours was
+/// taken out of a group.
+fn settle_event(groups: &mut Vec<Value>, want: Option<&Handler>, dev: bool) -> bool {
+    let mut kept = false;
+    let mut removed = false;
+    let mut settled = Vec::with_capacity(groups.len());
+    for mut group in std::mem::take(groups) {
+        if let (Some(want), false) = (want, kept)
+            && is_canonical_ours(&group, dev)
+        {
+            kept = true;
+            group["hooks"][0] = want.to_value();
+            settled.push(group);
+            continue;
+        }
+        if let Some(handlers) = group.get_mut("hooks").and_then(Value::as_array_mut) {
+            let count = handlers.len();
+            handlers.retain(|handler| !is_ours(handler, dev));
+            if handlers.len() != count {
+                removed = true;
+                if handlers.is_empty() {
+                    continue;
+                }
+            }
+        }
+        settled.push(group);
+    }
+    if let (Some(want), false) = (want, kept) {
+        settled.push(canonical_group(want));
+    }
+    *groups = settled;
+    removed
+}
+
+fn is_canonical_ours(group: &Value, dev: bool) -> bool {
+    group.as_object().is_some_and(|object| {
+        object.len() == 1
+            && object
+                .get("hooks")
+                .and_then(Value::as_array)
+                .is_some_and(|handlers| handlers.len() == 1 && is_ours(&handlers[0], dev))
+    })
+}
+
 fn is_ours(handler: &Value, dev: bool) -> bool {
     handler
         .get("command")
@@ -176,6 +273,59 @@ mod tests {
         assert_eq!(
             wanted[0].1.command,
             "'/A/It'\\''s/Navori.app/Contents/Helpers/navori' --profile dev hook"
+        );
+    }
+
+    fn ours() -> Value {
+        json!({ "type": "command", "command": "'/A/Navori.app/Contents/Helpers/navori' hook", "timeout": 2 })
+    }
+
+    fn helper() -> &'static Path {
+        Path::new("/A/Navori.app/Contents/Helpers/navori")
+    }
+
+    #[test]
+    fn converge_takes_ours_out_of_an_unwanted_event_without_moving_other_keys() {
+        let foreign = json!({ "hooks": [{ "type": "command", "command": "x" }] });
+        let mut doc = json!({ "hooks": {
+            "A": [foreign.clone()],
+            "StopFailure": [{ "hooks": [ours()] }],
+            "B": [foreign.clone()],
+            "C": [foreign]
+        }});
+        assert_eq!(
+            converge(&mut doc, Harness::Claude, false, helper()),
+            Changed::Yes
+        );
+        let keys: Vec<_> = doc["hooks"].as_object().unwrap().keys().cloned().collect();
+        assert_eq!(
+            keys,
+            ["A", "B", "C", "UserPromptSubmit", "Stop", "SessionEnd"]
+        );
+    }
+
+    #[test]
+    fn converge_keeps_the_foreign_handler_of_a_shared_group_and_one_copy_of_ours() {
+        let foreign = json!({ "type": "command", "command": "x" });
+        let mut doc = json!({ "hooks": { "Stop": [
+            { "matcher": "m", "hooks": [ours(), foreign.clone()] },
+            { "hooks": [ours()] },
+            { "hooks": [ours()] }
+        ]}});
+        converge(&mut doc, Harness::Claude, false, helper());
+        let stop = doc["hooks"]["Stop"].as_array().unwrap();
+        assert_eq!(stop.len(), 2);
+        assert_eq!(stop[0], json!({ "matcher": "m", "hooks": [foreign] }));
+        assert_eq!(stop[1], json!({ "hooks": [ours()] }));
+    }
+
+    #[test]
+    fn converge_on_a_correct_file_changes_nothing() {
+        let mut doc = json!({});
+        converge(&mut doc, Harness::Grok, true, helper());
+        assert_eq!(
+            converge(&mut doc, Harness::Grok, true, helper()),
+            Changed::No
         );
     }
 }

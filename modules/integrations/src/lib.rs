@@ -13,7 +13,8 @@ pub use state::{HarnessStatus, IntegrationsState, Offer, State};
 
 use std::path::PathBuf;
 
-use navori_kernel::{ActionError, Module, ModuleCtx, NoConfig};
+use navori_kernel::{ActionError, Module, ModuleCtx, NoConfig, Severity};
+use serde_json::json;
 
 /// Where the Harness config lives and which Helper the hooks must point at.
 #[derive(Debug, Clone)]
@@ -44,6 +45,43 @@ impl Integrations {
     }
 }
 
+impl Integrations {
+    async fn install(
+        &self,
+        ctx: &ModuleCtx<Self>,
+        harness: Harness,
+    ) -> Result<IntegrationsState, ActionError> {
+        let env = self.env.clone();
+        let done = tokio::task::spawn_blocking(move || {
+            let outcome = infra::files::apply(&env, harness, infra::files::Plan::Install);
+            (outcome, inspect(&env))
+        })
+        .await
+        .map_err(|e| ActionError::Failed(format!("the install did not finish: {e}")))?;
+        let payload = json!({ "harness": harness });
+        match done {
+            (Ok(outcome), state) => {
+                let summary = match outcome {
+                    infra::files::Outcome::Written => event::installed(harness),
+                    infra::files::Outcome::Nothing => event::already_installed(harness),
+                };
+                ctx.emit(HOOK_INSTALLED, Severity::Info, summary, payload);
+                Ok(state)
+            }
+            (Err(error), _) => {
+                tracing::warn!(?harness, %error, "installing the hooks failed");
+                ctx.emit(
+                    HOOK_FAILED,
+                    Severity::Error,
+                    event::install_failed(harness),
+                    payload,
+                );
+                Err(ActionError::Failed(error.to_string()))
+            }
+        }
+    }
+}
+
 impl Module for Integrations {
     const ID: &'static str = "integrations";
     type Action = IntegrationsAction;
@@ -64,9 +102,12 @@ impl Module for Integrations {
                         ActionError::Failed(format!("the hook scan did not finish: {e}"))
                     }));
                 }
-                IntegrationsAction::Install { .. }
-                | IntegrationsAction::Repair { .. }
-                | IntegrationsAction::Remove { .. } => {
+                IntegrationsAction::Install { harness } => {
+                    let harness = *harness;
+                    let result = self.install(ctx, harness).await;
+                    req.respond(result);
+                }
+                IntegrationsAction::Repair { .. } | IntegrationsAction::Remove { .. } => {
                     req.respond::<IntegrationsState>(Err(ActionError::Invalid(
                         "this action is not available yet".to_owned(),
                     )));
