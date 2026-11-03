@@ -301,7 +301,7 @@ Shipped behavior, commands, and events live in `docs/features/awake.md` and `doc
 
 | Harness | Hook | acquire | release after grace | release immediately |
 |---|---|---|---|---|
-| Claude Code | `~/.claude/settings.json` | `UserPromptSubmit` | `Stop` | `SessionEnd` |
+| Claude Code | `~/.claude/settings.json` | `UserPromptSubmit` | `Stop`, `StopFailure` | `SessionEnd` |
 | Grok Build (`grok` 1.0.70) | `~/.grok/hooks/navori.json` | `UserPromptSubmit` | `Stop` (only when `reason == "end_turn"`), `StopCancelled`, `StopFailure` | `SessionEnd` |
 | Codex (`codex-cli` 0.166) | `~/.codex/hooks.json` | `UserPromptSubmit` | `Stop` | `SessionEnd` |
 | Any command | — | `navori awake run -- <cmd>` | — | when the command exits |

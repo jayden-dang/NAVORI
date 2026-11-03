@@ -38,6 +38,11 @@ fn config(home: &tempfile::TempDir) -> CoreConfig {
         uid: std::os::unix::fs::MetadataExt::uid(&std::fs::metadata(home.path()).unwrap()),
         app_version: "0.1.0-test".into(),
         log_to_file: false,
+        helper_path: home
+            .path()
+            .join("Navori Dev.app/Contents/Helpers/navori")
+            .to_string_lossy()
+            .into_owned(),
     }
 }
 
@@ -753,7 +758,7 @@ fn the_snapshot_carries_awake_after_a_hold() {
 }
 
 #[test]
-fn an_idle_core_reports_a_passing_awake_row_and_keeps_the_five_others() {
+fn an_idle_core_reports_a_passing_awake_row_and_keeps_the_other_rows() {
     let home = home();
     let (core, _) = start(&home);
     eventually(|| core.doctor().iter().all(|check| check.ok));
@@ -761,7 +766,15 @@ fn an_idle_core_reports_a_passing_awake_row_and_keeps_the_five_others() {
     let names: Vec<_> = checks.iter().map(|check| check.name.as_str()).collect();
     assert_eq!(
         names,
-        ["config", "database", "ipc", "modules", "awake", "logs"]
+        [
+            "config",
+            "database",
+            "ipc",
+            "modules",
+            "awake",
+            "integrations",
+            "logs"
+        ]
     );
     let awake = checks.iter().find(|check| check.name == "awake").unwrap();
     assert!(awake.ok);
@@ -781,6 +794,34 @@ fn a_stray_awake_table_in_config_raises_no_notice() {
     let awake = awake_of(&core);
     assert!(awake.leases.is_empty(), "{awake:?}");
     assert!(!awake.system_held);
+    core.shutdown();
+}
+
+#[test]
+fn dispatching_integrations_status_lists_three_harnesses_over_a_temp_home() {
+    let home = home();
+    std::fs::create_dir_all(home.path().join(".claude")).unwrap();
+    let (core, _) = start(&home);
+    let answer: serde_json::Value =
+        serde_json::from_str(&dispatch_json(&core, "integrations", "\"status\"")).unwrap();
+    let rows = answer["harnesses"].as_array().unwrap();
+    let seen: Vec<(&str, &str)> = rows
+        .iter()
+        .map(|row| {
+            (
+                row["harness"].as_str().unwrap(),
+                row["state"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        seen,
+        [
+            ("claude", "not_installed"),
+            ("codex", "not_found"),
+            ("grok", "not_found")
+        ]
+    );
     core.shutdown();
 }
 

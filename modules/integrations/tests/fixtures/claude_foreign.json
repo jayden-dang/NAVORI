@@ -1,0 +1,13 @@
+{
+  "model": "opus",
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [ { "type": "command", "command": "/usr/local/bin/audit.sh" } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "/usr/local/bin/notify.sh", "timeout": 5 } ] }
+    ]
+  },
+  "permissions": { "allow": ["Bash(ls:*)"] },
+  "theme": "dark"
+}

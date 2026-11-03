@@ -13,6 +13,7 @@ members = [
     "apps/cli",
     "xtask",
     "modules/awake",
+    "modules/integrations",
 ]
 
 [workspace.package]
@@ -32,6 +33,7 @@ navori-ipc = { path = "crates/ipc" }
 navori-macos = { path = "crates/macos" }
 navori-procs = { path = "crates/procs" }
 navori-mod-awake = { path = "modules/awake" }
+navori-mod-integrations = { path = "modules/integrations" }
 
 # Versions = latest stable on crates.io as of 2026-11-01 (`cargo xtask outdated` re-checks).
 anyhow = "1.0.104"
@@ -46,7 +48,7 @@ regex = "1.13.1"
 rusqlite = { version = "0.41.1", features = ["bundled", "backup"] }
 schemars = "1.2.3"
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
+serde_json = { version = "1.0.154", features = ["preserve_order"] }
 tempfile = "3.27.0"
 thiserror = "2.0.21"
 time = { version = "0.3.55", features = ["formatting", "macros"] }

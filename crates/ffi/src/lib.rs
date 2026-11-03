@@ -19,6 +19,7 @@ use std::time::Duration;
 use navori_config::{Paths, Profile};
 use navori_ipc::{IpcError, Server};
 use navori_kernel::{DispatchError, Envelope, Risk, Severity};
+use navori_mod_integrations::IntegrationsEnv;
 use navori_protocol::{TrayGlyph, TrayState};
 use navori_store::Store;
 use tokio::runtime::Runtime;
@@ -41,6 +42,8 @@ pub struct CoreConfig {
     pub app_version: String,
     /// Write logs under `~/Library/Logs/Navori` (or `Navori Dev`). Off in tests.
     pub log_to_file: bool,
+    /// The Helper the Harness hooks run: `…/Contents/Helpers/navori` inside the app.
+    pub helper_path: String,
 }
 
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
@@ -251,6 +254,11 @@ impl NavoriCore {
             .map_err(|e| startup("runtime", e))?;
         let handle = runtime.handle().clone();
 
+        let integrations = IntegrationsEnv {
+            home: PathBuf::from(&config.home_dir),
+            dev: profile == Profile::Dev,
+            helper: PathBuf::from(&config.helper_path),
+        };
         let store =
             Store::open(&paths.db_file, &paths.backups_dir).map_err(|e| startup("database", e))?;
         let kernel = handle.block_on(async {
@@ -259,6 +267,7 @@ impl NavoriCore {
                 loaded.sections,
                 &loaded.sweep,
                 assertion_name(profile),
+                integrations.clone(),
             )
         });
         let config_notice = app::config_notice(
@@ -281,6 +290,7 @@ impl NavoriCore {
             version: config.app_version.clone(),
             pid,
             config_notice,
+            integrations,
             last_unclean_exit: OnceLock::new(),
         });
         let server = match handle.block_on(Server::bind(

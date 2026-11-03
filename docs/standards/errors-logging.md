@@ -6,7 +6,7 @@ Date: 2026-11-01
 ## Errors
 
 - Library crates define `thiserror` enums; binaries and composition roots (`navori-ffi`, `apps/cli`, `xtask`) use `anyhow` at the edges.
-- Never swallow an error. Either handle it, return it, or log it with `tracing::warn!/error!` and surface it to the user — a silent fallback is a defect.
+- Never swallow an error. Either handle it, return it, or log it with `tracing::warn!/error!` and surface it to the user — a silent fallback is a defect. `navori hook` is the one exemption: a Harness runs it on every prompt, so it drops every failure, prints nothing and writes no file.
 - An error message says what went wrong and how to fix it, with the path or value involved: `invalid config …/config.toml: journal.retention_days must be at least 1`. No apologies, no vague "something went wrong".
 - A missing or invalid config never stops the app (ARCH-13): run with defaults and show the error (panel banner, `navori doctor`).
 - Errors crossing FFI become a `CoreError` variant with a readable message; panics are caught by UniFFI and recorded in the session marker (redacted).
@@ -20,6 +20,8 @@ Date: 2026-11-01
 | 1 | the command ran and failed (action error, failing `doctor` check) |
 | 2 | usage error (bad arguments, invalid JSON, unknown profile) |
 | 3 | the app is not running. `navori awake run` is the exception: its exit code is the child's, so 3 can mean the child exited 3 while the app is up |
+
+`navori hook` always exits 0, including for usage errors and when the app is not running, because a non-zero exit can block a Harness prompt.
 
 ## Logging
 

@@ -45,7 +45,10 @@ One read-only check: is this instance worth driving?
 ```
 
 Pass: exit 0, every line ✓ (app reachable at the dev socket, config, database, IPC,
-modules, logs, awake). Exit 3 = app not running → Launch first. Any other failure: do not Drive;
+modules, logs, awake, integrations). The `integrations` row fails, and doctor exits 1, when a
+Harness hook needs repair or its file is unreadable. A dev build run from another worktree can
+cause this, because the hook entry names that build's path; that is not a defect of this
+instance. Exit 3 = app not running → Launch first. Any other failure: do not Drive;
 fix Launch or record the blocker.
 
 ## Drive
@@ -95,6 +98,7 @@ Index:
 | Action catalog | `actions --json` | lists `system.ping` (read) and `system.prune_journal` |
 | Dispatch | `dispatch system '"ping"'` | prints `"pong"` |
 | Awake | `awake status`, `hold`, `release-all`, `run -- <cmd>` | a lease is listed while held; gone after `release-all` or when the command exits |
+| Integrations | `dispatch integrations ...`, `doctor` | Install writes the Harness hook entries into the Hook file under the temp home; Remove takes them out |
 | Menubar panel | click the Navori Dev menu bar icon | manual drive only for now (see below) |
 
 ### Health
@@ -150,6 +154,21 @@ Index:
   3. `"$CLI" --profile dev awake run -- sleep 5` — the command's exit code, even 3; with the Core off the command still runs.
 - **Gotchas:** no flag on `hold` means until turned off. `Display on` has no CLI verb; dispatch `{"display":{"on":true}}`. Session hold is `dispatch`, not a CLI verb.
 - **Persist check:** a command or session lease is still listed after quit and relaunch if the process is still the same; a duration or until-off lease is not.
+
+### Integrations
+
+- **Sub-features:** status, install, repair and remove of Navori's hooks in the Claude Code, Codex and Grok Build Hook files; the `integrations` doctor row
+- **How to get to it (user POV):** Settings, Integrations tab.
+- **Driving it with the CLI:** `"$CLI" --profile dev dispatch integrations '"status"'`, then
+  `'{"install":{"harness":"claude"}}'`, `'{"repair":{"harness":"claude"}}'` and
+  `'{"remove":{"harness":"claude"}}'`; `"$CLI" --profile dev doctor` for the row.
+- **Gotchas:** a dev build's Core uses the real home, so Install writes real Harness files
+  (`~/.claude/settings.json`, `~/.grok/hooks/navori.json`). Agents drive this only over a temp
+  home: launch with `NAVORI_PERF=1 NAVORI_PERF_HOME=<tmp> HOME=<tmp>` and create `<tmp>/.claude`
+  first, since Install never creates a Harness directory. Codex is listed but its actions reply
+  with an error. Never run a live Harness against it.
+- **Persist check:** the Hook file under the temp home holds the entries after Install and
+  after relaunch; Remove takes them out and leaves a `.navori-bak-<seconds>` Backup beside it.
 
 ### Menubar panel
 

@@ -28,6 +28,11 @@ fn start(home: &tempfile::TempDir) -> Arc<NavoriCore> {
             uid: std::fs::metadata(home.path()).unwrap().uid(),
             app_version: "0.1.0-test".into(),
             log_to_file: true,
+            helper_path: home
+                .path()
+                .join("Navori Dev.app/Contents/Helpers/navori")
+                .to_string_lossy()
+                .into_owned(),
         },
         Arc::new(Ignore),
     )

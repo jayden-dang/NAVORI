@@ -8,7 +8,7 @@ use std::os::unix::fs::MetadataExt;
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::process::{ExitCode, Stdio};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use clap::{Parser, Subcommand};
 use navori_config::{Paths, Profile};
@@ -16,6 +16,8 @@ use navori_ipc::{Client, IpcError};
 use navori_protocol::rpc::method;
 use navori_protocol::{ActionSpec, Check, CoreStatus, Event, ModuleState};
 use serde_json::{Value, json};
+
+mod hook;
 
 #[derive(Debug, Parser)]
 #[command(name = "navori", version, about = "Talk to the running Navori app")]
@@ -58,6 +60,8 @@ enum Command {
         /// The action as JSON: `"name"` or `{"name": {...}}`.
         action: String,
     },
+    /// Read a Harness hook payload on stdin and update session Leases.
+    Hook,
     /// Keep this Mac awake.
     Awake {
         #[command(subcommand)]
@@ -103,7 +107,28 @@ impl From<IpcError> for Failure {
     }
 }
 
+fn hook_profile(args: &[OsString]) -> Option<&'static str> {
+    let rest = match args.first()? {
+        flag if flag == "--profile" => args.get(2..)?,
+        flag if flag.to_str().is_some_and(|f| f.starts_with("--profile=")) => &args[1..],
+        _ => args,
+    };
+    if rest.first()? != "hook" {
+        return None;
+    }
+    let dev = args
+        .windows(2)
+        .any(|w| w[0] == "--profile" && w[1] == "dev")
+        || args.iter().any(|a| a == "--profile=dev");
+    Some(if dev { "dev" } else { "release" })
+}
+
 fn main() -> ExitCode {
+    let start = Instant::now();
+    let args: Vec<OsString> = std::env::args_os().skip(1).collect();
+    if let Some(profile) = hook_profile(&args) {
+        hook::run(profile, start);
+    }
     let Cli { profile, command } = Cli::parse();
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -119,6 +144,8 @@ fn main() -> ExitCode {
         Command::Awake {
             command: AwakeCommand::Run { command },
         } => runtime.block_on(awake_run(&profile, command)),
+        // `hook_profile` takes every hook invocation first; this arm only keeps the match total and fail-open.
+        Command::Hook => hook::run("release", start),
         command => match runtime.block_on(run(Cli { profile, command })) {
             Ok(()) => ExitCode::SUCCESS,
             Err(Failure::Usage(m)) => {
@@ -241,6 +268,7 @@ async fn run(cli: Cli) -> Result<(), Failure> {
             AwakeCommand::Run { .. } => unreachable!("handled before connect"),
         },
         Command::Doctor { .. } => unreachable!("handled above"),
+        Command::Hook => unreachable!("handled before connect"),
     }
     Ok(())
 }

@@ -1,7 +1,7 @@
 # Requirements: Harness hooks
 
 Feature code: HOOKS
-Status: Approved
+Status: In-progress
 Date: 2026-11-03
 Approved by the operator ("approve", 2026-11-03, on the review page at c2da2f5, no card selected).
 
@@ -13,7 +13,7 @@ Rules:
 - IDs are immutable once Status is Approved. Retire by strikethrough — never renumber.
 -->
 
-Roadmap item: ROAD-9 (MILE-2) · Tracker: #9 (assigned to the user, `ready-for-agent`) · Decisions: frame-change close package `close-package.md`, approved by `harness-hooks-interpret` in round 2 of an unattended run (charter `.skills/_pending-harness-hooks/auto/charter.md`). **The operator has not read this file.**
+Roadmap item: ROAD-9 (MILE-2) · Tracker: #9 · Decisions: frame-change close package `close-package.md`, approved by `harness-hooks-interpret` in round 2 of an unattended run (charter `.skills/_pending-harness-hooks/auto/charter.md`). The operator approved this file on 2026-11-03 (line 6) and amended it the same day (HOOKS-4.16).
 
 Source classes. Each criterion that fixes a choice carries one of these beside it:
 - **Lock** — the charter's decided lines, cited by `file:line`.
@@ -95,6 +95,7 @@ Terms used below:
 - **HOOKS-4.13** IF the Hook file path is a symbolic link THEN THE SYSTEM SHALL write to the file it points to and keep the link. [agent-decided; dotfile managers link these files]
 - **HOOKS-4.14** WHEN an Install, Repair or Remove ends THE SYSTEM SHALL emit an Event with a one-sentence summary naming the Harness and the outcome, and an error-severity Event when it fails. [agent-decided; AWAKE close-package.md:27 (lock 19) says ROAD-8's own Actions and Events ship with ROAD-8, and this applies the same Definition-of-Done rule to the new Module by analogy]
 - **HOOKS-4.15** THE SYSTEM SHALL write to the three Hook file paths and their Backups only, resolving `~` from the Core's configured home directory. [agent-decided; TB-7]
+- **HOOKS-4.16** WHEN the user installs for Claude Code THE SYSTEM SHALL also add a Hook entry for `StopFailure`, so that an API error lets the Session Lease end. A user interrupt fires no event, so that path keeps the gap recorded in Open Questions. [Operator's choice, 2026-11-03; `StopFailure` as an event: code.claude.com/docs/en/hooks]
 
 ## 5. Repair a hook that drifted
 
@@ -186,5 +187,5 @@ Files this change touches: `apps/cli/src/main.rs`, `apps/cli/tests/cli.rs`, `cra
 - The start cost of the `navori` CLI against the 0.7 s `SessionEnd` deadline of HOOKS-2.3 — owner: harness-hooks-work, measured in Task 4 — 2026-11-03 — forbid-guess: do not shorten the deadline before it is measured.
 - Whether Grok's daemon route leaves a live Harness ancestor for a hook's pid chain, and so whether a Grok Session Lease starts there — owner: operator dogfood, Task 15 — 2026-11-03 — forbid-guess: do not claim Grok hooks keep the Mac awake until a real Grok session has been watched.
 - Whether a signed build writing into `~/.claude`, `~/.codex` and `~/.grok` triggers a macOS permission prompt — owner: operator dogfood, Task 15 — 2026-11-03 — forbid-guess: do not claim Install works on a signed build until it has run on one.
-- Claude Code's `Stop` does not run on a user interrupt and API errors fire `StopFailure` instead (code.claude.com/docs/en/hooks), so a Session Lease can last until the next turn's `Stop`, `SessionEnd`, the Harness process exiting or the 8 h TTL, and the milestone outcome ("goes back to normal sleep after they stop") is not fully met on that path. This gap is unrun, not measured. Whether to install `StopFailure` for Claude Code, which would change HOOKS-4.1, is the operator's choice (open, card D1). Codex is unchecked: it has an `Interrupt` event, and whether `Stop` runs on an interrupt is not stated — owner: operator — 2026-11-03 — forbid-guess: do not add `StopFailure` for Claude Code or change HOOKS-4.1 before the operator decides.
+- Claude Code's `Stop` does not run on a user interrupt (code.claude.com/docs/en/hooks), and no other event fires then, so a Session Lease can last until the next turn's `Stop`, `SessionEnd`, the Harness process exiting or the 8 h TTL. The milestone outcome ("goes back to normal sleep after they stop") is not fully met on that path. This gap is unrun, not measured. API errors are closed by HOOKS-4.16. Codex is unchecked: it has an `Interrupt` event, and whether `Stop` runs on an interrupt is not stated — owner: operator — 2026-11-03 — forbid-guess: do not treat an interrupt as covered until a real session has been watched.
 - Codex skips a new or changed hook until the user reviews and trusts it in `/hooks` (docs, raw), and every Repair changes the hook's hash. So a Codex hook that Navori reports as Installed may not run yet. Grok lists its own global hooks and the Claude Code settings file it reads as trusted "After folder trust" (`~/.grok/docs/user-guide/10-hooks.md:68-69`, verified locally), which is a folder trust and not a per-hook review; it states no hash-based hook review. The Claude Code page read for the research note states no trust step, and the audit reports that Claude Code normally picks up direct edits to its hooks through a file watcher (stated by the audit, not seen in the pages read here). Both are documentation reads, unrun. What Settings and `navori doctor` should say about this is undecided — owner: operator — 2026-11-03 — forbid-guess: do not word a Codex row as working until the hook is trusted.

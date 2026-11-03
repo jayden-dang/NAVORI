@@ -13,6 +13,9 @@ use navori_config::{
 use navori_ipc::Handler;
 use navori_kernel::{DispatchError, Kernel, Module, ModuleState};
 use navori_mod_awake::{Awake, AwakeState, LeaseState, Platform, Timing};
+use navori_mod_integrations::{
+    Harness, Integrations, IntegrationsEnv, IntegrationsState, State, inspect,
+};
 use navori_protocol::{Check, CoreStatus, Envelope, Event, ModuleInfo, Severity, rpc};
 use navori_store::Store;
 use serde_json::{Value, json};
@@ -29,6 +32,7 @@ pub struct Inner {
     pub version: String,
     pub pid: u32,
     pub config_notice: Option<crate::ConfigNotice>,
+    pub integrations: IntegrationsEnv,
     /// Set once, right after the single-instance check passes.
     pub last_unclean_exit: std::sync::OnceLock<Option<String>>,
 }
@@ -121,6 +125,7 @@ impl Inner {
         });
 
         checks.push(awake_check(awake_view(&self.kernel).as_ref()));
+        checks.push(integrations_check(&inspect(&self.integrations)));
 
         let probe = self.paths.logs_dir.join(".write-probe");
         checks.push(
@@ -243,6 +248,7 @@ pub fn build_kernel(
     sections: serde_json::Map<String, serde_json::Value>,
     sweep: &JournalSweep,
     name: &str,
+    integrations: IntegrationsEnv,
 ) -> Kernel {
     let builder = match sweep {
         JournalSweep::KeepDays(days) => Kernel::builder(store).journal_retention_days(*days),
@@ -251,6 +257,7 @@ pub fn build_kernel(
     builder
         .config_sections(sections)
         .register(Awake::new(Platform::mac(), name, Timing::FIXED))
+        .register(Integrations::new(integrations))
         .start()
 }
 
@@ -324,6 +331,38 @@ fn awake_is_down(kernel: &Kernel) -> bool {
                 ModuleState::Failed { .. } | ModuleState::Stopped
             )
     })
+}
+
+pub fn integrations_check(state: &IntegrationsState) -> Check {
+    let failed = state
+        .harnesses
+        .iter()
+        .any(|row| matches!(row.state, State::NeedsRepair | State::Unreadable));
+    let detail = state
+        .harnesses
+        .iter()
+        .map(|row| format!("{}: {}", harness_word(row.harness), state_word(row.state)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    check("integrations", !failed, detail)
+}
+
+fn harness_word(harness: Harness) -> &'static str {
+    match harness {
+        Harness::Claude => "claude",
+        Harness::Codex => "codex",
+        Harness::Grok => "grok",
+    }
+}
+
+fn state_word(state: State) -> &'static str {
+    match state {
+        State::NotFound => "not found",
+        State::NotInstalled => "not installed",
+        State::Installed => "installed",
+        State::NeedsRepair => "needs repair",
+        State::Unreadable => "unreadable",
+    }
 }
 
 /// One fixed doctor row: passing with `no problem` or the lease count, failing with the problem.
