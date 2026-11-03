@@ -172,11 +172,11 @@ _Requirements: ICON-1.1, ICON-1.2, ICON-1.3, ICON-1.4, ICON-6.6, ICON-10.3, ICON
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Write failing tests** in `modules/awake/tests/tray.rs`: `no_lease_reports_nothing`; `a_held_lease_reports_the_lease_glyph`; `a_display_lease_counts_as_a_lease`; `a_refused_lease_reports_the_problem_glyph_and_says_it_cannot_hold`; `a_refused_lease_never_says_the_mac_is_held`; `other_problems_do_not_report_the_problem_glyph` (table-driven over `display`, `release`, `store`, `platform`, `exits` texts, with `system_held` true); `a_refusal_through_the_kernel_reports_no_assertion_and_the_problem_glyph`, using the `refusal.rs` setup and `Kernel::tray`.
-- [ ] **Step 2: Run** `cargo nextest run -p navori-mod-awake --test tray` — expect: failures, the default reports nothing.
-- [ ] **Step 3: Implement** `Awake::tray` reading only `leases` and `system_held`.
-- [ ] **Step 4: Verify** the same command — expect: pass. `cargo xtask ci` — expect: pass.
-- [ ] **Step 5: Commit** `feat(awake): show a held or refused lease in the icon state`.
+- [x] **Step 1: Write failing tests** in `modules/awake/tests/tray.rs`: `no_lease_reports_nothing`; `a_held_lease_reports_the_lease_glyph`; `a_display_lease_counts_as_a_lease`; `a_refused_lease_reports_the_problem_glyph_and_says_it_cannot_hold`; `a_refused_lease_never_says_the_mac_is_held`; `other_problems_do_not_report_the_problem_glyph` (table-driven over `display`, `release`, `store`, `platform`, `exits` texts, with `system_held` true); `a_refusal_through_the_kernel_reports_no_assertion_and_the_problem_glyph`, using the `refusal.rs` setup and `Kernel::tray`.
+- [x] **Step 2: Run** `cargo nextest run -p navori-mod-awake --test tray` — expect: failures, the default reports nothing.
+- [x] **Step 3: Implement** `Awake::tray` reading only `leases` and `system_held`.
+- [x] **Step 4: Verify** the same command — expect: pass. `cargo xtask ci` — expect: pass.
+- [x] **Step 5: Commit** `feat(awake): show a held or refused lease in the icon state`.
 
 _Requirements: ICON-4.1, ICON-4.2, ICON-4.3, ICON-4.4, ICON-4.5, ICON-10.5_
 
