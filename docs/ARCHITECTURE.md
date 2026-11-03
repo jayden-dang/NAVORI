@@ -288,11 +288,8 @@ Awake, Ports and the Context Engine all need to know "which project does this pr
 
 ### Seed: Awake (R1)
 
-**Lease model**:
-```rust
-struct Lease { id, source: Manual | Timer | Process{pid} | Agent{harness, session_id, pid} | Command,
-               mode: System | Display, expires_at: Option<_>, grace: Duration }
-```
+Shipped behavior, commands, and events live in `docs/features/awake.md` and `docs/specs/2026-11-02-awake-leases/`. This seed is not a second action catalog.
+
 - **Reconciler**: with ≥ 1 lease → hold at most one IOKit assertion per kind (`PreventUserIdleSystemSleep`, and `PreventUserIdleDisplaySleep` if a Lease asks for the display). Idempotent.
 - A lease ends when: released · TTL expires · the process dies (kqueue). The assertion follows the process (the OS reclaims it when the app exits). Rows for process-owned Leases survive a restart, and on reopen the assertion returns if the process is still the same.
 
@@ -313,7 +310,6 @@ Important details:
 - **Installation**: Settings → Integrations has Install/Repair/Remove buttons per harness. Navori **merges** into the existing config file (backup before writing, never overwriting other hooks), and `navori doctor` checks whether the hook is still correct.
 - **Safety net**: if a hook fails or does not run → kqueue (process death) + TTL still guarantee the lease cannot hang forever.
 
-AI tools: `awake.status` (Read), `awake.hold{duration, reason}` (Write), `awake.release` (Write).
 Out of scope (decided): staying awake with the lid closed.
 
 ### Seed: Ports (R3)

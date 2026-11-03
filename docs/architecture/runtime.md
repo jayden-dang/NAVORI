@@ -22,7 +22,7 @@ Not covered here: what each component is for (`system.md`), what is stored where
 | `navori` CLI | Short-lived process (current-thread runtime), one socket connection per command; exits 0/1/2/3. Lives in `Navori.app/Contents/Helpers/`. |
 | Hook invocations (planned, R1) | `navori hook` processes spawned by Claude Code, Codex and Grok Build hooks; they call the running app over the socket and exit. |
 | `navori mcp` (planned, R6) | Long-lived stdio process spawned by an MCP client (Claude Code, Codex, Grok); proxies tool calls to the running app over the socket. |
-| Observed processes (planned, R1/R3) | Harness sessions and dev servers Navori watches (kqueue process-exit) or stops; never owned by Navori. |
+| Observed processes | Awake starts a kqueue process-exit watch (`EVFILT_PROC/NOTE_EXIT`) for a process-owned Lease and drops it when that Lease ends. The process is never owned by Navori. Stopping a dev server is still planned (R3). |
 
 ## Lifecycle
 
