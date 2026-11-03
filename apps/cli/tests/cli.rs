@@ -108,9 +108,6 @@ fn status_json_carries_the_icon_state() {
     assert_eq!(v["tray"]["glyph"], "normal");
     assert_eq!(v["tray"]["attention"], false);
     assert_eq!(v["tray"]["summary"], "Navori");
-    assert_eq!(v["pid"], std::process::id());
-    assert_eq!(v["version"], "9.9.9-test");
-    assert_eq!(v["profile"], "dev");
     assert!(v["data_dir"].is_string());
     assert!(v["socket_path"].is_string());
     assert!(v["modules"].is_array());

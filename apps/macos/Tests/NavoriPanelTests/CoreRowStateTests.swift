@@ -56,7 +56,7 @@ struct CoreRowStateTests {
         #expect(status(notice: true) == .needsAttention)
     }
 
-    @Test func a_refused_lease_with_every_module_running_stays_running() {
+    @Test func every_module_running_without_a_notice_is_running() {
         #expect(status(modules: ["running", "running"], notice: false) == .running)
     }
 

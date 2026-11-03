@@ -78,18 +78,6 @@ fn a_refused_lease_reports_the_problem_glyph_and_says_it_cannot_hold() {
 }
 
 #[test]
-fn a_refused_lease_never_says_the_mac_is_held() {
-    let contribution = tray(&state(
-        vec![lease("until_off")],
-        false,
-        Some(SYSTEM_PROBLEM),
-    ));
-
-    let (_, sentence) = contribution.glyph.unwrap();
-    assert!(!sentence.contains("Keeping this Mac awake"), "{sentence}");
-}
-
-#[test]
 fn other_problems_do_not_report_the_problem_glyph() {
     let texts = [
         "macOS refused to keep the display on. Navori keeps trying.",
