@@ -62,4 +62,4 @@ The app icon is the folded-N logo, drawn by `xtask/assets/make-icon.swift` into 
 - The Loop's CPU for Navori and for WindowServer, per `/usr/bin/top -l 6 -s 12 -stats cpu -pid <pid>`: owed by the user. A result above 0.0 reopens the Loop.
 - The hand walk of every Sample in dark and light bars, with Reduce Motion on and off and with VoiceOver, including the menu-open highlight and `appearsDisabled`, and a Beat during the Loop: owed by the user.
 
-`cargo xtask perf` stays inside budget with no metric, phase or signal added.
+`cargo xtask perf` stays inside budget with no metric, phase or signal added. Measured 2026-11-03 on b4e093a (no `--record`): cold_start 76.4 ms of 200, menu_open_after_launch 54.2 of 80, menu_reopen 12.1 of 50, footprint_menu_open 29.2 MB of 60, idle_cpu 0 %, idle_wakeups 0 /s, idle_footprint 20.2 MB of 30, app_size 9.2 MB of 25, submenu_open 4.3 ms of 16.
