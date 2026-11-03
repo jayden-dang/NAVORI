@@ -293,10 +293,10 @@ _Requirements: ICON-9.1, ICON-9.2, ICON-9.3, ICON-9.4, ICON-9.5, ICON-9.6, ICON-
 
 **Depends-on:** none
 
-- [ ] **Step 1: Implement.** Remove `sparkle` and its two calls. Draw the three planes from `ui-brief.md` in the 824 px body: a brief unit is 8.24 px from the body's origin at (100, 100), with the y axis flipped. Release: the brief's gradient and colors, and rework the three effects written for a dark body: the white top highlight, the white hairline and the white glow behind the old sparkle. Dev: today's slate-blue body and effects, with the N in light tones.
-- [ ] **Step 2: Regenerate and check by hand.** `cargo xtask icon`, then `sips -s format png -Z 512 xtask/assets/AppIcon.icns --out /tmp/navori-icon-release.png` and the same for `AppIconDev.icns`. View both, and the small sizes in Finder; release and dev are clearly different.
+- [x] **Step 1: Implement.** Remove `sparkle` and its two calls. Draw the three planes from `ui-brief.md` in the 824 px body: a brief unit is 8.24 px from the body's origin at (100, 100), with the y axis flipped. Release: the brief's gradient and colors, and rework the three effects written for a dark body: the white top highlight, the white hairline and the white glow behind the old sparkle. Dev: today's slate-blue body and effects, with the N in light tones.
+- [x] **Step 2: Regenerate and check by hand.** `cargo xtask icon`, then `sips -s format png -Z 512 xtask/assets/AppIcon.icns --out /tmp/navori-icon-release.png` and the same for `AppIconDev.icns`. View both, and the small sizes in Finder; release and dev are clearly different.
 - [ ] **Step 3: Verify** `cargo xtask ci` — expect: pass. `cargo xtask run` — expect: the dev app shows the dev icon in Finder and the Dock.
-- [ ] **Step 4: Commit** `feat(build): draw the fold logo as the app icon`.
+- [x] **Step 4: Commit** `feat(build): draw the fold logo as the app icon`.
 
 _Requirements: ICON-12.1, ICON-12.2, ICON-12.3_
 
