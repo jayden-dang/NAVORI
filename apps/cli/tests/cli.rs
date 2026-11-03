@@ -697,6 +697,7 @@ fn assert_silent_success(output: &std::process::Output) {
 
 const PROMPT: &str = r#"{"hook_event_name":"UserPromptSubmit","session_id":"s-1"}"#;
 const SESSION_END: &str = r#"{"hook_event_name":"SessionEnd","session_id":"s-1"}"#;
+const STOP: &str = r#"{"hook_event_name":"Stop","session_id":"s-1"}"#;
 
 #[test]
 fn a_core_that_is_not_running_gives_exit_0_and_no_output() {
@@ -728,7 +729,25 @@ fn a_session_end_gives_up_within_one_second_when_the_core_never_answers() {
     let server = recording_server_replying(Reply::Never);
     let (output, took) = run_hook_with(hook_cmd(&server.home), SESSION_END);
     assert_silent_success(&output);
+    assert_eq!(server.requests.lock().unwrap().len(), 1);
+    assert!(
+        took >= Duration::from_millis(500),
+        "gave up early: {took:?}"
+    );
     assert!(took < start_cost + Duration::from_secs(1), "took {took:?}");
+}
+
+#[test]
+fn a_stop_against_a_running_core_finishes_inside_its_deadline() {
+    let start_cost = process_start_cost();
+    let running = start_core(None);
+    let (output, took) = run_hook_with(hook_cmd(&running.home), STOP);
+    println!("hook round trip against a running core: {took:?}");
+    assert_silent_success(&output);
+    assert!(
+        took < start_cost + Duration::from_millis(1500),
+        "took {took:?}"
+    );
 }
 
 #[test]
@@ -775,8 +794,9 @@ fn a_reply_of_invalid_for_a_non_harness_pid_gives_exit_0() {
 
 #[test]
 fn a_bad_profile_variable_gives_exit_0_and_no_output() {
-    let server = recording_server();
-    let mut cmd = navori_process(&server.home);
+    let home = short_home();
+    let release = serve(home.path(), navori_config::Profile::Release, Reply::Result);
+    let mut cmd = navori_process(&home);
     cmd.arg("hook")
         .env("NAVORI_PROFILE", "bogus")
         .stdin(std::process::Stdio::piped())
@@ -784,6 +804,7 @@ fn a_bad_profile_variable_gives_exit_0_and_no_output() {
         .stderr(std::process::Stdio::piped());
     let (output, _) = run_hook_with(cmd, PROMPT);
     assert_silent_success(&output);
+    assert_eq!(release.lock().unwrap().len(), 1);
 }
 
 #[test]

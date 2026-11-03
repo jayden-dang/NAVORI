@@ -83,12 +83,12 @@ impl Rig {
     }
 }
 
+/// `helper` must hold no single quote.
 pub fn command(helper: &str, dev: bool) -> String {
-    let quoted = helper.replace('\'', "'\\''");
     if dev {
-        format!("'{quoted}' --profile dev hook")
+        format!("'{helper}' --profile dev hook")
     } else {
-        format!("'{quoted}' hook")
+        format!("'{helper}' hook")
     }
 }
 

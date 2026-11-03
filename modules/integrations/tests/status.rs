@@ -277,17 +277,6 @@ async fn status_changes_no_file_and_creates_no_directory() {
 }
 
 #[tokio::test]
-async fn the_other_actions_are_not_answered_yet() {
-    let rig = Rig::release();
-    for action in ["install", "repair", "remove"] {
-        let err = rig
-            .dispatch(json!({ action: { "harness": "claude" } }))
-            .await;
-        assert!(err.is_err(), "{action}");
-    }
-}
-
-#[tokio::test]
 async fn the_published_state_stays_empty() {
     let rig = Rig::release();
     rig.make_dir(".claude");
@@ -296,4 +285,38 @@ async fn the_published_state_stays_empty() {
         rig.kernel.state("integrations").unwrap(),
         json!({ "harnesses": [] })
     );
+}
+
+#[tokio::test]
+async fn a_command_that_is_not_the_single_quoted_helper_then_hook_reads_not_installed() {
+    let lookalikes = [
+        "\"/A/Navori.app/Contents/Helpers/navori\" hook",
+        "/A/Navori.app/Contents/Helpers/navori hook",
+        "'/A/Navori.app/Contents/Helpers/navori' hook extra",
+        "'/A/Navori.app/Contents/Helpers/navori' hook; rm -rf x",
+        "'/A/Navori.app/Contents/Helpers/other' hook",
+        "'/A/Navori.app/Contents/Helpers/navori'",
+        "'/A/Navori.app/Contents/Helpers/navori' --profile dev hook ",
+        "'/A/Navori.app/Contents/Helpers/navori'\\",
+        "''",
+        "",
+    ];
+    for lookalike in lookalikes {
+        for rig in [Rig::release(), Rig::dev()] {
+            rig.write_json(CLAUDE_FILE, &complete(lookalike, &THREE));
+            assert_eq!(
+                rig.row("claude").await["state"],
+                "not_installed",
+                "{lookalike}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_quote_inside_the_helper_path_is_read_back_as_ours() {
+    let rig = Rig::new(false, "/A/It's/Navori.app/Contents/Helpers/navori");
+    let written = "'/A/It'\\''s/Navori.app/Contents/Helpers/navori' hook";
+    rig.write_json(CLAUDE_FILE, &complete(written, &THREE));
+    assert_eq!(rig.row("claude").await["state"], "installed");
 }
