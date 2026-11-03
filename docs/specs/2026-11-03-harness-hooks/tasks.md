@@ -418,11 +418,11 @@ _Requirements: HOOKS-3.10, HOOKS-4.1, HOOKS-4.5_
 
 **Depends-on:** Task 10
 
-- [ ] **Step 1: Write `docs/features/integrations.md`** with commands, Actions, Events, the doctor row, files touched, and a "Not verified" list copied from `requirements.md` Open Questions.
-- [ ] **Step 2: Update** `docs/codebase/modules.md` (new module row, `navori-ffi` and CLI rows), `dependencies.md` (the new module row), `map.md:29`, `docs/architecture/integrations.md` (move the Harness-hooks row from Planned to Built, no more than the contract that shipped), and the lines of `docs/features/awake.md` that say hook install is not there and there is no Settings tab.
-- [ ] **Step 3: Check the guards.** Run `git diff main --stat -- modules/awake/` — expect: empty (Awake untouched). Run `cargo nextest run -p navori-mod-awake` — expect: pass. Run `cargo xtask perf` (it redirects the Core home with `NAVORI_PERF_HOME`, `AppEnvironment.swift:25-27`; confirm the new `helperPath` does not make it read the real home) — expect: pass inside the GOAL-11 budget; if it fails on machine noise, report the run and do not record a baseline.
-- [ ] **Step 4: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "docs(hooks): describe the Integrations Module and navori hook"`
+- [x] **Step 1: Write `docs/features/integrations.md`** with commands, Actions, Events, the doctor row, files touched, and a "Not verified" list copied from `requirements.md` Open Questions.
+- [x] **Step 2: Update** `docs/codebase/modules.md` (new module row, `navori-ffi` and CLI rows), `dependencies.md` (the new module row), `map.md:29`, `docs/architecture/integrations.md` (move the Harness-hooks row from Planned to Built, no more than the contract that shipped), and the lines of `docs/features/awake.md` that say hook install is not there and there is no Settings tab.
+- [x] **Step 3: Check the guards.** Run `git diff main --stat -- modules/awake/` — expect: empty (Awake untouched). Run `cargo nextest run -p navori-mod-awake` — expect: pass. Run `cargo xtask perf` (it redirects the Core home with `NAVORI_PERF_HOME`, `AppEnvironment.swift:25-27`; confirm the new `helperPath` does not make it read the real home) — expect: pass inside the GOAL-11 budget; if it fails on machine noise, report the run and do not record a baseline.
+- [x] **Step 4: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "docs(hooks): describe the Integrations Module and navori hook"`
 
 _Requirements: HOOKS-3.11, HOOKS-7.1, HOOKS-9.3, HOOKS-9.7, HOOKS-10.1_
 
