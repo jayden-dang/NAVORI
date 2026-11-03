@@ -173,7 +173,9 @@ pub(crate) fn apply(
     if changed == Changed::No && (existed || removing) {
         return Ok(Outcome::Nothing);
     }
-    let plan = if removing && harness == Harness::Grok && doc == json!({}) {
+    let is_link = std::fs::symlink_metadata(hook_file(&env.home, harness))
+        .is_ok_and(|meta| meta.file_type().is_symlink());
+    let plan = if removing && harness == Harness::Grok && doc == json!({}) && !is_link {
         Plan::Delete
     } else {
         plan
@@ -191,8 +193,8 @@ pub(crate) fn apply(
         copy_beside(&target.path, target.mode, unix_seconds())?;
     }
     if matches!(plan, Plan::Delete) {
-        let link = hook_file(&env.home, harness);
-        std::fs::remove_file(&link).map_err(io("delete", &link))?;
+        let file = hook_file(&env.home, harness);
+        std::fs::remove_file(&file).map_err(io("delete", &file))?;
     } else {
         write_atomically(&target, &dir, &doc, existed)?;
     }

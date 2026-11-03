@@ -256,18 +256,34 @@ async fn remove_writes_through_a_symlink() {
 }
 
 #[tokio::test]
-async fn deleting_a_symlinked_grok_file_leaves_no_dangling_link() {
+async fn removing_from_a_symlinked_grok_file_keeps_the_link_and_writes_an_empty_document_through_it()
+ {
     let rig = Rig::release();
     rig.make_dir(".grok/hooks");
     rig.write_json("dotfiles/navori.json", &complete(&release_command(), &FIVE));
+    let body = read_text(&rig.path("dotfiles/navori.json"));
     let link = rig.path(GROK_FILE);
     std::os::unix::fs::symlink(rig.path("dotfiles/navori.json"), &link).unwrap();
 
     remove(&rig, "grok").await.unwrap();
 
-    assert!(std::fs::symlink_metadata(&link).is_err());
-    assert_eq!(backups(&rig.path("dotfiles")).len(), 1);
+    assert!(
+        std::fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert_eq!(read_json(&rig.path("dotfiles/navori.json")), json!({}));
+    let found = backups(&rig.path("dotfiles"));
+    assert_eq!(found.len(), 1);
+    assert_eq!(read_text(&found[0]), body);
+    assert!(backups(&rig.path(".grok/hooks")).is_empty());
     assert_eq!(rig.row("grok").await["state"], "not_installed");
+
+    remove(&rig, "grok").await.unwrap();
+
+    assert_eq!(backups(&rig.path("dotfiles")).len(), 1);
+    assert_eq!(read_json(&rig.path("dotfiles/navori.json")), json!({}));
 }
 
 #[tokio::test]
