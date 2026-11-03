@@ -13,7 +13,7 @@ Rules:
 - IDs are immutable once Status is Approved. Retire by strikethrough — never renumber.
 -->
 
-Roadmap item: ROAD-9 (MILE-2) · Tracker: #9 (assigned to the user, `status:shaping`) · Decisions: frame-change close package `close-package.md`, approved by `harness-hooks-interpret` in round 2 of an unattended run (charter `.skills/_pending-harness-hooks/auto/charter.md`). **The operator has not read this file.**
+Roadmap item: ROAD-9 (MILE-2) · Tracker: #9 (assigned to the user, `ready-for-agent`) · Decisions: frame-change close package `close-package.md`, approved by `harness-hooks-interpret` in round 2 of an unattended run (charter `.skills/_pending-harness-hooks/auto/charter.md`). **The operator has not read this file.**
 
 Source classes. Each criterion that fixes a choice carries one of these beside it:
 - **Lock** — the charter's decided lines, cited by `file:line`.
