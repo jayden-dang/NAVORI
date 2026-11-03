@@ -39,6 +39,9 @@ final class StatusBarController: NSObject {
     private var didScheduleStatusMark = false
     private var didReplaceCoreTree = false
     private var awakeHadSubmenu = false
+    private var motion = StatusIconMotion()
+    private var drawn: (state: StatusIconState, loop: Bool)?
+    private var accessibilityObserver: NSObjectProtocol?
 
     init(store: CoreStore, openSettings: @escaping (SettingsTab) -> Void) {
         self.store = store
@@ -54,8 +57,24 @@ final class StatusBarController: NSObject {
         }
         item.behavior = .terminationOnRemoval
         awakeHadSubmenu = AwakeRowState(status: store.awakeStatus).hasSubmenu
+        accessibilityObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: NSWorkspace.shared,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.render(self.store.statusIcon)
+            }
+        }
         observeStatusIcon()
         observeSnapshot()
+    }
+
+    isolated deinit {
+        if let accessibilityObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(accessibilityObserver)
+        }
     }
 
     /// Re-renders the icon whenever `store.statusIcon` changes.
@@ -68,8 +87,16 @@ final class StatusBarController: NSObject {
     }
 
     private func render(_ state: StatusIconState) {
+        let plan = motion.next(
+            state,
+            reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+            allowBeat: true
+        )
+        if let drawn, drawn.state == state, drawn.loop == plan.loop { return }
+        drawn = (state, plan.loop)
         item.button?.image = StatusIconImage.image(state)
         item.button?.appearsDisabled = state.glyph == .starting
+        applyMotion(plan)
         guard AppEnvironment.perfMode, !didScheduleStatusMark else { return }
         didScheduleStatusMark = true
         CATransaction.begin()
@@ -79,6 +106,34 @@ final class StatusBarController: NSObject {
             }
         }
         CATransaction.commit()
+    }
+
+    /// Opacity motion runs in Core Animation, off the main thread, with no timer (ARCH-16).
+    private func applyMotion(_ plan: StatusIconMotion.Plan) {
+        guard let button = item.button else { return }
+        if (plan.loop || plan.beat) && !button.wantsLayer { button.wantsLayer = true }
+        guard let layer = button.layer else { return }
+        if plan.loop {
+            if layer.animation(forKey: "icon.loop") == nil {
+                let loop = CABasicAnimation(keyPath: "opacity")
+                loop.fromValue = 1.0
+                loop.toValue = 0.35
+                loop.duration = 1
+                loop.autoreverses = true
+                loop.repeatCount = .infinity
+                layer.add(loop, forKey: "icon.loop")
+            }
+        } else {
+            layer.removeAnimation(forKey: "icon.loop")
+        }
+        if plan.beat {
+            let beat = CABasicAnimation(keyPath: "opacity")
+            beat.fromValue = 1.0
+            beat.toValue = 0.2
+            beat.duration = 0.25
+            beat.autoreverses = true
+            layer.add(beat, forKey: "icon.beat")
+        }
     }
 
     @objc private func clicked(_ sender: NSStatusBarButton) {
