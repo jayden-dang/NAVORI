@@ -2,7 +2,7 @@
 
 The menubar icon shows what Navori is doing now: one of four marks from the Core, two the Shell draws when the Core cannot speak, and an attention dot on top. `navori status --json` reports the same Core result.
 
-**Pending, not done:** the Loop's CPU cost (ICON-11.2, ICON-11.3) and the by-hand walk of every Sample (ICON-11.6) have not been run. The numbers are placeholders marked `Not yet measured` in `docs/specs/2026-11-02-status-icon-states/requirements.md`. Until they are taken, the Loop is delivered but not proven free.
+**Verified by hand on 2026-11-03** on a debug build: every Sample on the real status item, the Loop, the Beat, Reduce Motion (launched with it on, and toggled live in System Settings), a bad `config.toml`, an unreadable database, and the app icon. Numbers and the one open question are under "Measured" below.
 
 ## What the Kernel composes
 
@@ -57,9 +57,19 @@ The app icon is the folded-N logo, drawn by `xtask/assets/make-icon.swift` into 
 - Offer an `ai_running` source: no Module reports it yet.
 - Turn attention on for To-dos, Updates, pull request counts, failing checks or port counts; only a Decision waiting for the user does.
 
-## Still to measure
+## Measured
 
-- The Loop's CPU for Navori and for WindowServer, per `/usr/bin/top -l 6 -s 12 -stats cpu -pid <pid>`: owed by the user. A result above 0.0 reopens the Loop.
-- The hand walk of every Sample in dark and light bars, with Reduce Motion on and off and with VoiceOver, including the menu-open highlight and `appearsDisabled`, and a Beat during the Loop: owed by the user.
+- **Loop cost.** Navori's CPU is 0.0% (median of 5 windows of 12 s, in two runs) during the Loop and with the static icon. WindowServer is about 6% with the static icon and 28-33% while the Loop runs (two runs). The table is in `docs/specs/2026-11-02-status-icon-states/requirements.md` under ICON-11.2. WindowServer has no budget in the spec; the cost is recorded, not judged.
+- **Glyphs.** All ten Samples draw as designed in a dark menu bar; the AI Sample dims and recovers, `Play beat` dims once, and a Beat during the Loop leaves the Loop going.
+- **Reduce Motion.** With it on at launch the AI Sample stays at full opacity. Toggling it in System Settings while the Loop plays stops the Loop at once, and turning it off starts it again.
+- **Core states.** A bad `config.toml` keeps the normal glyph, names `log_level` without its value in the summary, and shows the banner and `Needs attention` on the Core row. An unreadable database shows the folded cross and reads "Core not running".
+- **Accessibility description.** The status item's accessibility description is the summary for each state checked (Normal, Problem with attention, AI with attention, Core not running, Starting). This is what VoiceOver reads; VoiceOver itself was not run.
+- **App icon.** Finder and the Dock resolve the dev bundle to the slate-blue icon and the release file to the paper-white one. `/Applications/Navori.app` still shows the old icon until `cargo xtask install` replaces it.
+
+## Not verified
+
+- The icon in a light menu bar: with the light appearance on, this display's menu bar stayed dark, so it was not seen light.
+- The real Starting state at launch: it lasts less than one screenshot interval; its shape is verified through the Sample.
+- VoiceOver itself reading the item.
 
 `cargo xtask perf` stays inside budget with no metric, phase or signal added. Measured 2026-11-03 on b4e093a (no `--record`): cold_start 76.4 ms of 200, menu_open_after_launch 54.2 of 80, menu_reopen 12.1 of 50, footprint_menu_open 29.2 MB of 60, idle_cpu 0 %, idle_wakeups 0 /s, idle_footprint 20.2 MB of 30, app_size 9.2 MB of 25, submenu_open 4.3 ms of 16.

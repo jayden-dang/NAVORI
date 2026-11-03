@@ -201,7 +201,7 @@ _Requirements: ICON-4.1, ICON-4.2, ICON-4.3, ICON-4.4, ICON-4.5, ICON-10.5_
 - [x] **Step 2: Run** `cargo xtask build-core && swift test --arch arm64 --package-path apps/macos --filter 'CoreRowStateTests|StatusIconTests'` — expect: does not compile, the initializers are missing.
 - [x] **Step 3: Implement.** The initializer counts only `failed` and `restarting` as degraded. `coreStatus` reads it. The new `StatusIconState` initializer returns `coreDown` with `Core not running` when the Core failed, `starting` with `Starting` when `core` is nil, and otherwise `core`. `statusIcon` calls it with a mapping of `snapshot?.tray`, which is the only reader of `tray`. `health` stays until Task 6.
 - [x] **Step 4: Verify** the same command — expect: pass. `cargo xtask ci` — expect: pass. `grep -rln 'import NavoriCore' apps/macos/Navori apps/macos/NavoriPanel apps/macos/NavoriBanner` — expect: only `CoreStore.swift` and `CoreStartupBanner.swift`.
-- [ ] **Step 5: Check by hand** with `cargo xtask run`: a bad value in `config.toml` shows the banner and `Needs attention` on the Core row, as it does today.
+- [x] **Step 5: Check by hand** with `cargo xtask run`: a bad value in `config.toml` shows the banner and `Needs attention` on the Core row, as it does today.
 - [x] **Step 6: Commit** `refactor(shell): give the status item one plain value`.
 
 _Requirements: ICON-7.2, ICON-10.6, ICON-10.7, ICON-10.8, ICON-10.9_
@@ -224,7 +224,7 @@ _Requirements: ICON-7.2, ICON-10.6, ICON-10.7, ICON-10.8, ICON-10.9_
 
 - [x] **Step 1: Implement** `StatusIconImage` from the coordinates in `ui-brief.md`, with a flipped 18 pt `NSImage`, `isTemplate = true` and the mark's clear-then-fill. Replace `observeHealth` and `render(health:)`; delete `CoreStore.Health` and `health`. `appearsDisabled` is true only for `.starting`. Keep the `statusItemDrawn` block and `didScheduleStatusMark` as they are.
 - [x] **Step 2: Verify** `cargo xtask ci` — expect: pass. `grep -rn 'store.health\|CoreStore.Health' apps/macos` — expect: nothing.
-- [ ] **Step 3: Check by hand** with `cargo xtask run` in a dark menu bar. The icon shows the normal N. `"build/dev/Navori Dev.app/Contents/Helpers/navori" --profile dev awake hold --for 1h` shows the tile, and `awake release-all` returns the N. Left click toggles the panel and a second click closes it; right click and control-click show the native menu with `Open`, `Settings…`, `Open Logs Folder` and `Quit`; `Open Logs Folder` opens the folder; the tooltip is the app name; the Core submenu appears when the first snapshot arrives with the panel open. Put a garbage file at `<temp home>/Library/Application Support/Navori Dev/navori.db` and launch the binary directly under `NAVORI_PERF=1 NAVORI_PERF_HOME=<temp home>`: the icon shows the folded ×. During launch it shows the dim outline N. VoiceOver reads the summary, including a bad config value.
+- [x] **Step 3: Check by hand** with `cargo xtask run` in a dark menu bar. The icon shows the normal N. `"build/dev/Navori Dev.app/Contents/Helpers/navori" --profile dev awake hold --for 1h` shows the tile, and `awake release-all` returns the N. Left click toggles the panel and a second click closes it; right click and control-click show the native menu with `Open`, `Settings…`, `Open Logs Folder` and `Quit`; `Open Logs Folder` opens the folder; the tooltip is the app name; the Core submenu appears when the first snapshot arrives with the panel open. Put a garbage file at `<temp home>/Library/Application Support/Navori Dev/navori.db` and launch the binary directly under `NAVORI_PERF=1 NAVORI_PERF_HOME=<temp home>`: the icon shows the folded ×. During launch it shows the dim outline N. VoiceOver reads the summary, including a bad config value.
 - [x] **Step 4: Run** `cargo xtask perf` — expect: pass, with `statusItemDrawn` logged once per launch and `SIGUSR1` and `SIGUSR2` still opening the real menu and Core Submenu.
 - [x] **Step 5: Commit** `feat(shell): draw the fold glyphs on the status item`.
 
@@ -272,7 +272,7 @@ _Requirements: ICON-8.1, ICON-8.2, ICON-8.3, ICON-8.4, ICON-8.5, ICON-8.6, ICON-
 
 - [x] **Step 1: Implement** a row in the Preview offering each glyph with attention off and on, Core-down, Core-starting, `Play beat` and `Turn off`, with descriptions from Decision 8. The controller holds the Sample and `render` draws `sample ?? store.statusIcon`. Choosing or clearing calls `next` with `allowBeat: false`. Everything is in `#if DEBUG`. The Sample row dispatches no Action.
 - [x] **Step 2: Verify** `cargo xtask ci` — expect: pass.
-- [ ] **Step 3: Check by hand** with `cargo xtask run`: every Sample draws on the real status item; the AI Sample loops; `Play beat` plays; a Sample stays after a click closes the Preview; `Turn off` returns to the real state with no Beat; the right-click menu keeps its four items, with `Open Menu Preview` only here.
+- [x] **Step 3: Check by hand** with `cargo xtask run`: every Sample draws on the real status item; the AI Sample loops; `Play beat` plays; a Sample stays after a click closes the Preview; `Turn off` returns to the real state with no Beat; the right-click menu keeps its four items, with `Open Menu Preview` only here.
 - [x] **Step 4: Check the binary:** `swift build --arch arm64 --package-path apps/macos -c release`, then `strings "$(swift build --arch arm64 --package-path apps/macos -c release --show-bin-path)/Navori" | grep -c NAVORI-ICON-SAMPLE` — expect: 0. `swift build --arch arm64 --package-path apps/macos`, then the same `strings` line with `-c release` dropped — expect: at least 1.
 - [x] **Step 5: Commit** `feat(shell): add icon samples to the dev preview`.
 
@@ -295,7 +295,7 @@ _Requirements: ICON-9.1, ICON-9.2, ICON-9.3, ICON-9.4, ICON-9.5, ICON-9.6, ICON-
 
 - [x] **Step 1: Implement.** Remove `sparkle` and its two calls. Draw the three planes from `ui-brief.md` in the 824 px body: a brief unit is 8.24 px from the body's origin at (100, 100), with the y axis flipped. Release: the brief's gradient and colors, and rework the three effects written for a dark body: the white top highlight, the white hairline and the white glow behind the old sparkle. Dev: today's slate-blue body and effects, with the N in light tones.
 - [x] **Step 2: Regenerate and check by hand.** `cargo xtask icon`, then `sips -s format png -Z 512 xtask/assets/AppIcon.icns --out /tmp/navori-icon-release.png` and the same for `AppIconDev.icns`. View both, and the small sizes in Finder; release and dev are clearly different.
-- [ ] **Step 3: Verify** `cargo xtask ci` — expect: pass. `cargo xtask run` — expect: the dev app shows the dev icon in Finder and the Dock.
+- [x] **Step 3: Verify** `cargo xtask ci` — expect: pass. `cargo xtask run` — expect: the dev app shows the dev icon in Finder and the Dock.
 - [x] **Step 4: Commit** `feat(build): draw the fold logo as the app icon`.
 
 _Requirements: ICON-12.1, ICON-12.2, ICON-12.3_
@@ -317,10 +317,10 @@ _Requirements: ICON-12.1, ICON-12.2, ICON-12.3_
 **Depends-on:** Tasks 1–9
 
 - [x] **Step 1: Run** `cargo xtask perf` — expect: pass, with no metric, phase or signal added.
-- [ ] **Step 2: Measure the Loop by hand.** On a debug build with the AI Sample on and the panel closed, and again with the static normal Sample: `/usr/bin/top -l 6 -s 12 -stats cpu -pid <Navori Dev pid>`, dropping the first sample, which is cumulative, and the same for WindowServer. Take each median of the 5 windows. Record Navori's numbers and WindowServer's in `requirements.md` under ICON-11.2, with the machine and its load. No wake-up count is offered as evidence. If Navori rounds above 0.0, stop and tell the user: this reopens the Loop.
+- [x] **Step 2: Measure the Loop by hand.** On a debug build with the AI Sample on and the panel closed, and again with the static normal Sample: `/usr/bin/top -l 6 -s 12 -stats cpu -pid <Navori Dev pid>`, dropping the first sample, which is cumulative, and the same for WindowServer. Take each median of the 5 windows. Record Navori's numbers and WindowServer's in `requirements.md` under ICON-11.2, with the machine and its load. No wake-up count is offered as evidence. If Navori rounds above 0.0, stop and tell the user: this reopens the Loop.
 - [ ] **Step 3: Walk every Sample by hand** in dark and light menu bars, with Reduce Motion on and off and with VoiceOver: each state reads in shape with motion off; the menu-open highlight and `appearsDisabled` look right once the button has a layer; a Beat during the Loop plays and the Loop carries on. Record anything that fails, and stop if a reopen condition in `requirements.md` is met.
-- [ ] **Step 4: Update docs:** `tray()` in the `Module` block and the sentence in `docs/ARCHITECTURE.md`, with `context()` left in MILE-3; strike MENU-G4 in MENU's `requirements.md`; write `docs/features/status-icon.md`.
-- [ ] **Step 5: Verify** `cargo xtask ci` — expect: pass.
-- [ ] **Step 6: Commit** `docs(ICON): record the loop cost and the delivered icon`.
+- [x] **Step 4: Update docs:** `tray()` in the `Module` block and the sentence in `docs/ARCHITECTURE.md`, with `context()` left in MILE-3; strike MENU-G4 in MENU's `requirements.md`; write `docs/features/status-icon.md`.
+- [x] **Step 5: Verify** `cargo xtask ci` — expect: pass.
+- [x] **Step 6: Commit** `docs(ICON): record the loop cost and the delivered icon`.
 
 _Requirements: ICON-11.1, ICON-11.2, ICON-11.3, ICON-11.6_

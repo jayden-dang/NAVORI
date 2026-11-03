@@ -180,12 +180,15 @@ Files this feature touches, with what they guard:
 
 - **Performance:** **ICON-11.1** WHEN `cargo xtask perf` runs THE SYSTEM SHALL stay inside the GOAL-11 budget in `docs/standards/performance.md`, with no signal, phase or metric added by this feature — verified by `cargo xtask perf`.
 - **Performance:** **ICON-11.2** WHEN this feature is delivered THE SYSTEM SHALL have Navori's CPU during the Loop recorded in this file, measured by hand as the median of 5 windows of 12 seconds on a debug Sample with the panel closed, against the static Icon, using the rule that 0.05% rounds to 0.1 and fails. Delivery needs the number recorded, not a passing number. A result above 0.0 after rounding reopens the Loop (see Comes back if).
-  - **Loop cost: not yet measured.** Owed by the user; it needs a live GUI. On a debug build with the AI Sample on and the panel closed, and again with the static normal Sample, run `/usr/bin/top -l 6 -s 12 -stats cpu -pid <Navori Dev pid>`, drop the first sample (cumulative), and take the median of the other 5 windows. Do the same for WindowServer (pid from `pgrep -x WindowServer`). Record both below with the machine and its load. If Navori rounds above 0.0, the Loop reopens.
+  - **Loop cost, measured 2026-11-03.** Debug build (`cargo xtask run`) on an Apple M5 Pro (Mac17,9), macOS 27.0.1, one 3440x1440 display, dark appearance, load average about 3 with the release Navori, terminals and other apps running. Samples were picked from the right-click `Open Menu Preview`, with the panel closed. Each case is `/usr/bin/top -l 6 -s 12 -stats pid,command,cpu -pid <pid>` run for the Navori Dev pid and for WindowServer at the same time. The first window is cumulative and dropped; the figure is the median of the other 5.
 
     | Case | Navori CPU % | WindowServer CPU % | Machine and load |
     |---|---|---|---|
-    | AI Sample, panel closed | Not yet measured | Not yet measured | Not yet measured |
-    | Normal Sample (static) | Not yet measured | Not yet measured | Not yet measured |
+    | AI Sample, panel closed (run 1) | 0.0 (5 of 5 windows 0.0) | 33.3 (32.6, 31.5, 33.3, 36.3, 33.7) | M5 Pro, load avg about 3 |
+    | AI Sample, panel closed (run 2) | 0.0 (5 of 5 windows 0.0) | 28.3 (21.5, 28.3, 32.4, 34.3, 27.6) | same |
+    | Normal Sample (static) | 0.0 (5 of 5 windows 0.0) | 5.9 (5.8, 6.7, 5.9, 5.8, 6.1) | same |
+
+    Navori's own CPU rounds to 0.0, so the reopen condition for ICON-11.2 is not met. WindowServer rose from about 6% with the static icon to about 28-33% while the Loop ran, in both runs. ICON-11.3 asks for no budget on it, so this is recorded and not judged here; it is the cost of the Loop to the system and the owner may want to weigh it.
 - **Performance:** **ICON-11.3** WHEN that measurement is taken THE SYSTEM SHALL have WindowServer's CPU recorded beside it, with no budget, and no wake-up count offered as evidence, because the counter read 0 for a 10 fps timer in the spike — verified by reading the recorded numbers.
 - **Performance:** **ICON-11.4** WHILE the menu is closed THE SYSTEM SHALL fire no timer more often than every 30 seconds for the Icon (ARCH-16) — verified by searching the Icon's drawing code for `Timer`, `DispatchSourceTimer` and `CADisplayLink`. This is not recorded as met until the Loop's drawing method is chosen.
 - **Security:** **ICON-11.5** THE SYSTEM SHALL NOT put the raw text of a bad config value, or a TOML source snippet, in `tray`, which crosses the local IPC socket (TB-2) — verified by a test in `crates/ffi/tests/config_privacy.rs` reading `tray` with a bad value in `config.toml`.
