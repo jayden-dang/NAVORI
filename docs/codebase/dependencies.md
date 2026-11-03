@@ -60,7 +60,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 |---|---|---|
 | Async | `tokio`, `tokio-util`, `futures` | — |
 | Errors | `thiserror` (libraries), `anyhow` (edges) | — |
-| Serialization, schema | `serde`, `serde_json`, `toml`, `schemars` | — |
+| Serialization, schema | `serde`, `serde_json` (`preserve_order` workspace-wide, so object key order survives a round trip), `toml`, `schemars` | — |
 | IDs, time | `ulid` | `time` or `jiff` when dates are needed |
 | Logging | `tracing`, `tracing-subscriber`, `tracing-appender` | — |
 | Storage | `rusqlite` (bundled SQLite) | `sqlite-vec` for memory search |
@@ -71,6 +71,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | HTTP, SSE | — | `reqwest` (rustls), `eventsource-stream` (R2) |
 | GitHub | — | `graphql_client` (R4) |
 | MCP | — | `rmcp` (R6) |
+| Runtime files | `tempfile` (atomic writes in the integrations Module) | — |
 | Tests | `tempfile`, `assert_cmd`, `predicates` | `wiremock`, `insta`, `proptest` |
 | Swift | AppKit, SwiftUI, Observation, ServiceManagement | `KeyboardShortcuts` (hotkey), a SwiftUI Markdown renderer, ScreenCaptureKit, Vision, CoreImage, UserNotifications (R2) |
 
