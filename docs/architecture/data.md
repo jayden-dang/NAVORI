@@ -30,7 +30,7 @@ Paths are shown for `release`; `dev` uses `Navori Dev` in place of `Navori`. Not
 | Entity / store | Notes |
 |---|---|
 | Keychain items, service `dev.navori` (R2, R4) | GitHub token, AI provider API keys. Never in the database, config or logs (ARCH-8). |
-| `awake_*` (R1) | Leases and their sources; what persists across a restart is decided in the R1 design. |
+| `awake_leases` (R1) | Process-owned (session and command) Leases: pid and process start time, plus session fields. Manual duration, until-off and display Leases are not stored; they end when the app closes. On reopen, if the process is still the same, the assertion returns. |
 | `inbox_*` (R2) | Needs you: Decisions, To-dos, Updates and their outcomes. |
 | `ai_session_*`, usage (R2) | Conversations in the canonical message format, tool calls, token usage and estimated cost per turn. |
 | `memory_*` (R2) | Facts and preferences, episodic summaries, embeddings. Written only after redaction. |
