@@ -129,8 +129,8 @@ final class StatusBarController: NSObject {
                 loop.duration = 1
                 loop.autoreverses = true
                 loop.repeatCount = .infinity
-                // Without a hint the render server redraws the menu bar at the display rate, which
-                // cost WindowServer about 29 points of CPU. 10 fps still reads as one smooth pulse.
+                // A frame-rate hint keeps the render server from redrawing at the display rate for
+                // the whole pulse; 10 fps still reads as one smooth pulse.
                 loop.preferredFrameRateRange = CAFrameRateRange(minimum: 8, maximum: 12, preferred: 10)
                 layer.add(loop, forKey: "icon.loop")
             }
