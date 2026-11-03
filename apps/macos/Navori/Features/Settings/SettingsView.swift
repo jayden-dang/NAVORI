@@ -3,7 +3,7 @@ import Observation
 import SwiftUI
 
 enum SettingsTab: Hashable {
-    case general, diagnostics, about
+    case general, diagnostics, integrations, about
 }
 
 @MainActor
@@ -24,6 +24,9 @@ struct SettingsView: View {
             DiagnosticsTab(store: store)
                 .tabItem { Label("Diagnostics", systemImage: "stethoscope") }
                 .tag(SettingsTab.diagnostics)
+            IntegrationsTab(store: store)
+                .tabItem { Label("Integrations", systemImage: "link") }
+                .tag(SettingsTab.integrations)
             AboutTab(store: store)
                 .tabItem { Label("About", systemImage: "info.circle") }
                 .tag(SettingsTab.about)
@@ -126,7 +129,7 @@ private struct DiagnosticsTab: View {
             }
             .overlay {
                 if store.checks.isEmpty {
-                    Text("Run the checks to verify config, database, IPC, modules, awake and logs.")
+                    Text("Run the checks to verify config, database, IPC, modules, awake, integrations and logs.")
                         .foregroundStyle(.secondary)
                 }
             }
