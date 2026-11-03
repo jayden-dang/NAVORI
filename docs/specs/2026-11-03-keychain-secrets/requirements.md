@@ -8,6 +8,7 @@ Date: 2026-11-03
 Roadmap item: ROAD-10 keychain-secrets (MILE-3). Claim: GitHub issue #10, assigned.
 Written in an unattended run. A value marked `agent-decided` was picked by an agent session
 (the interpreting peer), not by the operator; the operator confirms or reverses it on review.
+Persisted format: the account `<kind>/<name>` (SECRETS-1.1) and the services `dev.navori` and `dev.navori.dev` (SECRETS-5.1, 5.2) are written to the user's login Keychain and read back by every later build. No item exists until ROAD-11 or ROAD-19 ships, so nothing migrates today; once one exists, renaming either orphans the item (it stays in the Keychain under the old name, unread) and a migration would have to read with the old name first. The charter lists a persisted format as a hard stop; this run went past it knowingly because nothing is written by this change, and the report says so.
 Unmarked lines restate a Lock or a repo default (cited in the close package, auto/close-package.md).
 "THE SYSTEM" is the `navori-secrets` crate. A "consumer" is a Module, `ai/*` code or `navori-ffi`.
 Criteria 1-6 are checked against an in-memory fake by default; the same contract suite runs against
@@ -29,7 +30,7 @@ the real Keychain only on request (SECRETS-7.3), and that run is not part of `ca
 - **SECRETS-2.2** WHEN a consumer sets a value under a key that already holds one THE SYSTEM SHALL replace the value, leaving one item for that key.
 - **SECRETS-2.3** WHEN a consumer reads a key that holds a value THE SYSTEM SHALL return it as a Secret.
 - **SECRETS-2.4** WHEN a consumer reads a key that holds no item THE SYSTEM SHALL return an outcome that says nothing is stored, distinct from every error (`agent-decided`).
-- **SECRETS-2.5** IF the Keychain cannot complete set, get, exists or delete (it is locked, access is denied, the user cancels a prompt, more than one item matches, or the backend fails in any other way) THEN THE SYSTEM SHALL return an error that names the operation, the service, the kind and the name, and that is distinct from the "nothing stored" outcome of SECRETS-2.4.
+- **SECRETS-2.5** IF the Keychain cannot complete set, get, exists or delete (it is locked, access is denied, the user cancels a prompt, more than one item matches, or the backend fails in any other way) THEN THE SYSTEM SHALL return an error that names the operation, the service, the kind and the name, and that is distinct from the "nothing stored" outcome of SECRETS-2.4. (`agent-decided`: the error names the call, the service, the kind and the name; no backend text)
 - **SECRETS-2.6** THE SYSTEM SHALL use the regular Keychain only, with no keychain access group and no data-protection store (ADR 0004).
 
 ## 3. Check whether a secret is set
@@ -59,7 +60,7 @@ the real Keychain only on request (SECRETS-7.3), and that run is not part of `ca
 
 - **SECRETS-6.1** THE SYSTEM SHALL give the Secret type a `Debug` output that never contains the value, and neither `Display` nor `Serialize` (`agent-decided`).
 - **SECRETS-6.2** WHEN a consumer needs the text of a Secret THE SYSTEM SHALL provide it through one explicit accessor, so that every read of a value can be found by search (`agent-decided`).
-- **SECRETS-6.3** THE SYSTEM SHALL NOT put a secret value in any error it constructs; an error may name the operation, the service, the kind and the name. Text passed through from the real backend is covered only by the contract run of SECRETS-7.3.
+- **SECRETS-6.3** THE SYSTEM SHALL NOT put a secret value in any error it constructs; an error may name the operation, the service, the kind and the name. Text passed through from the real backend is covered only by the contract run of SECRETS-7.3. (`agent-decided`)
 - **SECRETS-6.4** THE SYSTEM SHALL emit no tracing event and no log line that carries a secret value. No automated test covers this; it is checked in the whole-branch review.
 
 ## 7. Test without the real Keychain
@@ -69,7 +70,7 @@ the real Keychain only on request (SECRETS-7.3), and that run is not part of `ca
 - **SECRETS-7.1** THE SYSTEM SHALL define one store interface that the Keychain-backed store and an in-memory fake both implement, the Keychain being a system boundary (`agent-decided`; docs/standards/testing.md lists boundaries without naming it).
 - **SECRETS-7.2** THE SYSTEM SHALL make the fake available to other crates' tests without linking it into the shipped app, and the fake SHALL behave as SECRETS-1 to SECRETS-6 describe; one shared contract suite runs against it in the default tests (`agent-decided`).
 - **SECRETS-7.3** WHERE the author sets the opt-in variable for the contract run THE SYSTEM SHALL run the same contract suite against the real Keychain; otherwise that test is ignored (`agent-decided`).
-- **SECRETS-7.4** WHEN `cargo test --workspace` or `cargo xtask ci` runs THE SYSTEM SHALL NOT read or write any real Keychain item; checked as: no test file outside the manual contract run opens the real Keychain.
+- **SECRETS-7.4** WHEN `cargo test --workspace` or `cargo xtask ci` runs THE SYSTEM SHALL NOT read or write any real Keychain item; checked as: no test file outside the manual contract run opens the real Keychain. (`agent-decided`)
 
 ## 8. Quality attributes
 
@@ -117,7 +118,10 @@ Files touched: `Cargo.toml`, `Cargo.lock`, `crates/secrets/` (new), `docs/codeba
 - Reading or writing secrets from the `navori` CLI, over IPC, as an Action, or by the AI (ARCH-4; docs/ARCHITECTURE.md:243).
 - The shape of a stored JSON blob for a refresh token or expiry: the value is opaque text here, ROAD-19 owns its content.
 - Caching "set / not set" in Settings (ROAD-11 must not call `exists` on every Settings open, because the backend reads the item to answer and may prompt).
-- Choosing the service from a Profile: the composition root (`navori-ffi`, ROAD-11 and ROAD-19 wiring) maps the Profile to the release or dev service, so this crate does not duplicate the Profile enum or depend on `navori-config` (`agent-decided`).
+- Choosing the service from a Profile: the composition root maps the Profile to the release or dev service, so this crate does not duplicate the Profile enum or depend on `navori-config` (`agent-decided`).
+- The call from Swift into Rust that saves a pasted key or token, opens `KeychainStore` and maps the Profile belongs to ROAD-11 (provider keys) and ROAD-19 (the GitHub token) through `crates/ffi/`, which their roadmap Surfaces now list (`agent-decided`, edit labelled in `docs/roadmap/INDEX.md`). Each must test its Profile-to-service mapping.
+- Showing a failure to the person: a `SecretError` (locked Keychain, denied prompt, any backend failure) must reach the person as a clear message and never as "no key set"; this crate keeps the two apart (SECRETS-2.4, 2.5) and ROAD-11 and ROAD-19 own the display (`agent-decided`).
+- Migrating Keychain items when the account format or a service name changes: none is planned, see the persisted-format note in the header (`agent-decided`).
 - Re-granting access after a later switch to a Developer ID signature (ADR 0004).
 
 ## Open Questions

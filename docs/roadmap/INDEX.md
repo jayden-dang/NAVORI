@@ -79,7 +79,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Goals:** GOAL-1, GOAL-5, GOAL-6
 **Members:**
 - **ROAD-10** keychain-secrets — After: none — Surfaces: `crates/secrets/`
-- **ROAD-11** providers-and-model-roles — After: ROAD-10 — Surfaces: `ai/llm/`, `ai/models/`, `apps/macos/Navori/Features/Settings/`
+- **ROAD-11** providers-and-model-roles — After: ROAD-10 — Surfaces: `ai/llm/`, `ai/models/`, `crates/ffi/`, `apps/macos/Navori/Features/Settings/` <!-- surfaces edited by an agent, agent-decided, 2026-11-03 (keychain-secrets run); not the operator's choice -->
 - **ROAD-12** shield-and-context-gateway — After: none — Surfaces: `crates/redact/`, `ai/context/`, `crates/ffi/`, `apps/macos/Navori/Platform/`
 - **ROAD-13** needs-you-inbox — After: none — Surfaces: `modules/inbox/`, `apps/macos/Navori/Features/Panel/`
 - **ROAD-14** agent-loop-and-approvals — After: ROAD-11, ROAD-12, ROAD-13 — Surfaces: `ai/agent/`, `crates/ffi/`
@@ -109,7 +109,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Outcome:** The user sees pull requests needing review, failing checks and conflicts counted in the menubar, and opens, approves or merges them from the submenu.
 **Goals:** GOAL-4
 **Members:**
-- **ROAD-19** github-device-auth — After: ROAD-10 — Surfaces: `modules/github/`, `crates/secrets/`, `apps/macos/Navori/Features/Settings/`
+- **ROAD-19** github-device-auth — After: ROAD-10 — Surfaces: `modules/github/`, `crates/secrets/`, `crates/ffi/`, `apps/macos/Navori/Features/Settings/` <!-- surfaces edited by an agent, agent-decided, 2026-11-03 (keychain-secrets run); ROAD-19 After: ROAD-10 also edited by an agent (F6); not the operator's choice -->
 - **ROAD-20** pull-request-inbox — After: ROAD-19 — Surfaces: `modules/github/`, `apps/macos/Navori/Features/`
 - **ROAD-21** pull-request-actions — After: ROAD-20 — Surfaces: `modules/github/`, `apps/macos/Navori/Features/`
 **Depends-on:** MILE-3
