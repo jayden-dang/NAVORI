@@ -59,7 +59,8 @@ The app icon is the folded-N logo, drawn by `xtask/assets/make-icon.swift` into 
 
 ## Measured
 
-- **Loop cost.** Navori's CPU is 0.0% (median of 5 windows of 12 s) during the Loop and with the static icon. WindowServer was about 6% with the static icon and 28-37% while the first Loop ran, because the render server redrew the menu bar at the display rate. The Loop now carries a 10 fps frame-rate hint (`preferredFrameRateRange` 8 to 12), and WindowServer reads 5.5% with the Loop against 5.9% static. Both tables are in `docs/specs/2026-11-02-status-icon-states/requirements.md` under ICON-11.2.
+- **Loop cost.** Navori's CPU is 0.0% (median of 5 windows of 12 s) during the Loop and with the static icon. WindowServer was about 6% with the static icon and 28-37% while the first Loop ran, a result consistent with the render server redrawing the menu bar at the display rate (only CPU was measured). The 5.5 against 5.9 pair is the final build; the 8.2 and 5.5 rows are the same hint on two runs, so noise is about 3 points. The Loop now carries a 10 fps frame-rate hint (`preferredFrameRateRange` 8 to 12), and WindowServer reads 5.5% with the Loop against 5.9% static, which supports "the Loop now costs no more than the static icon". Both tables are in `docs/specs/2026-11-02-status-icon-states/requirements.md` under ICON-11.2.
+- **After the 10 fps hint.** The Loop, a Beat during the Loop (the Loop carried on) and Reduce Motion toggled live (on: the icon stopped moving at constant brightness; off: the Loop resumed) were walked again by hand on 2026-11-03.
 - **Glyphs.** All ten Samples draw as designed in a dark menu bar; the AI Sample dims and recovers, `Play beat` dims once, and a Beat during the Loop leaves the Loop going.
 - **Reduce Motion.** With it on at launch the AI Sample stays at full opacity. Toggling it in System Settings while the Loop plays stops the Loop at once, and turning it off starts it again.
 - **Core states.** A bad `config.toml` keeps the normal glyph, names `log_level` without its value in the summary, and shows the banner and `Needs attention` on the Core row. An unreadable database shows the folded cross and reads "Core not running".
@@ -72,5 +73,7 @@ The app icon is the folded-N logo, drawn by `xtask/assets/make-icon.swift` into 
 - VoiceOver speech. VoiceOver ran, but its AppleScript interface returned no phrases here. What it reads is the status item's accessibility description, which was read directly for Normal, Problem with attention, AI with attention, Core not running and Starting.
 - The real Starting state at launch: it lasts less than one screenshot interval; its shape is verified through the Sample.
 - The 10 fps hint on a ProMotion display.
+- The Beat's own cost with the hint was not measured.
+- All measurements are from one 3440x1440 display at load about 2 to 6.
 
 `cargo xtask perf` stays inside budget with no metric, phase or signal added. Measured 2026-11-03 on b4e093a (no `--record`): cold_start 76.4 ms of 200, menu_open_after_launch 54.2 of 80, menu_reopen 12.1 of 50, footprint_menu_open 29.2 MB of 60, idle_cpu 0 %, idle_wakeups 0 /s, idle_footprint 20.2 MB of 30, app_size 9.2 MB of 25, submenu_open 4.3 ms of 16.
