@@ -188,10 +188,11 @@ impl KernelBuilder {
             let current = tray_rx.borrow().clone();
             // A panic in Module code must not take down a status read; the Module then
             // asks for nothing, and is not called again.
-            catch_unwind(AssertUnwindSafe(|| M::tray(&current))).unwrap_or_else(|_| {
+            catch_unwind(AssertUnwindSafe(|| M::tray(&current))).unwrap_or_else(|panic| {
                 tray_broken.store(true, Ordering::Relaxed);
                 tracing::warn!(
                     module = M::ID,
+                    panic = %panic_message(&*panic),
                     "module tray panicked; ignoring it from now on"
                 );
                 TrayContribution::default()
