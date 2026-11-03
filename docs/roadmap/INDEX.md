@@ -1,6 +1,6 @@
 # Roadmap: Navori
 
-Status: Approved
+Status: Draft
 Date: 2026-11-02
 
 <!--
@@ -109,7 +109,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Outcome:** The user sees pull requests needing review, failing checks and conflicts counted in the menubar, and opens, approves or merges them from the submenu.
 **Goals:** GOAL-4
 **Members:**
-- **ROAD-19** github-device-auth — After: none — Surfaces: `modules/github/`, `crates/secrets/`, `apps/macos/Navori/Features/Settings/`
+- **ROAD-19** github-device-auth — After: ROAD-10 — Surfaces: `modules/github/`, `crates/secrets/`, `apps/macos/Navori/Features/Settings/`
 - **ROAD-20** pull-request-inbox — After: ROAD-19 — Surfaces: `modules/github/`, `apps/macos/Navori/Features/`
 - **ROAD-21** pull-request-actions — After: ROAD-20 — Surfaces: `modules/github/`, `apps/macos/Navori/Features/`
 **Depends-on:** MILE-3
