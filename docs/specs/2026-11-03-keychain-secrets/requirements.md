@@ -1,8 +1,9 @@
 # Requirements: Keychain secrets
 
 Feature code: SECRETS
-Status: Draft
+Status: Approved
 Date: 2026-11-03
+Approved by the operator ("approve", 2026-11-03 21:01, on the review page at e3b886c, no card selected).
 
 <!--
 Roadmap item: ROAD-10 keychain-secrets (MILE-3). Claim: GitHub issue #10, assigned.
