@@ -19,12 +19,13 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | `navori-store` | `navori-protocol`, `navori-redact` | allowed — the Journal redacts on write |
 | `navori-kernel` | `navori-protocol`, `navori-redact`, `navori-store` | allowed |
 | `navori-ipc` | `navori-protocol` | allowed |
-| `navori-ffi` | every foundation crate (`config`, `ipc`, `kernel`, `protocol`, `redact`, `store`) and `navori-mod-awake` | allowed — the composition root; later also other `modules/*`, `ai/*` |
+| `navori-ffi` | every foundation crate (`config`, `ipc`, `kernel`, `protocol`, `redact`, `store`), `navori-mod-awake` and `navori-mod-integrations` | allowed — the composition root; later also other `modules/*`, `ai/*` |
 | `navori` CLI (`navori-cli`) | `navori-config`, `navori-ipc`, `navori-protocol` | allowed — thin client; `navori-ffi` only as a dev-dependency for end-to-end tests |
 | `xtask` | — | allowed: none (tooling only) |
 | `navori-macos` | — | allowed: none — leaf |
 | `navori-procs` | `navori-macos` | allowed — through the safe traits |
 | `navori-mod-awake` | `navori-kernel`, `navori-macos`, `navori-procs`, `navori-store` | allowed — feature Module; depends on no other Module |
+| `navori-mod-integrations` | `navori-kernel` | allowed — feature Module; depends on no other Module, and not on `navori-macos`, `navori-procs` or `navori-store` (the last only as a dev-dependency) |
 | Swift `Navori` target | `NavoriCore` (generated) → `NavoriCoreFFI` (xcframework) | allowed — only `CoreStore` imports `NavoriCore` (ARCH-2) |
 
 `modules/*` may name `navori-macos` for the traits `ProcessSource`, `ExitSource` and `PowerAssertions`. `navori-ffi` may too (composition root). No other crate may. `cargo xtask check-deps` enforces that edge.

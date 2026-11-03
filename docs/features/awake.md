@@ -1,12 +1,12 @@
 # Awake
 
-Keep this Mac awake from the terminal for a time, until turned off, or for a command's life. A session Lease Action is there for hook work; hook install is not.
+Keep this Mac awake from the terminal for a time, until turned off, or for a command's life. The session Lease Actions are driven by `navori hook`; installing it is on the Integrations tab (see `integrations.md`).
 
 Navori holds at most one `PreventUserIdleSystemSleep` assertion while any Lease exists, and one `PreventUserIdleDisplaySleep` when a Lease asks for the display. Process-owned (session and command) Leases are stored with pid and process start time. Manual duration, until-off and display Leases are not stored; they end when the app closes. On reopen, if the process is still the same, the assertion returns.
 
 Awake drives the menubar icon through its `tray()` contribution: the Lease glyph while held, the problem glyph when macOS refuses.
 
-There is no Settings tab and no `[awake]` section.
+Awake has no Settings tab of its own and no `[awake]` section; hooks are installed from the Integrations tab.
 
 ## Commands
 
@@ -31,7 +31,7 @@ Start events: `Keeping this Mac awake: <source>.` End events: reached its end ti
 
 ## What it does not do
 
-- Install hooks or `navori hook` — that is ROAD-9.
+- Install hooks itself; the Integrations Module does, and `navori hook` feeds the session Actions.
 - Scan for harness processes in the background.
 - Pause, a sleep-now command, or staying awake with the lid closed.
 - Read which other apps hold the Mac awake.
@@ -46,5 +46,5 @@ Results live in `.skills/AWAKE/measurements.md`, which is git-ignored. These Mus
 - The Display assertion alone stopping idle sleep — owed by the user; needs a real sleep.
 - A Lease sleeping through its deadline — owed by the user; needs a real sleep.
 - Timers during dark wake — owed by the user; needs a real sleep.
-- A real `Stop` trace through this flow, and `caffeinate` at `Stop` — owed by ROAD-9, which installs the hooks.
-- Background work after `Stop` — owed by ROAD-9.
+- A real `Stop` trace through this flow, and `caffeinate` at `Stop` — still owed: it needs a live Harness with the hooks installed.
+- Background work after `Stop` — still owed for the same reason.

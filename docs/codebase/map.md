@@ -27,6 +27,7 @@ Where things live in this repository and where new code belongs. Covers the top-
 | `crates/macos/` | `navori-macos` — platform FFI behind safe traits `ProcessSource`, `ExitSource` and `PowerAssertions`. The only hand-written `unsafe`. |
 | `crates/procs/` | `navori-procs` — process snapshot, project/worktree resolver, Harness table, child activity and exit watcher. No `unsafe`. |
 | `modules/awake/` | `navori-mod-awake` — feature Module: Leases and the power assertion. |
+| `modules/integrations/` | `navori-mod-integrations` — feature Module: Navori's hooks in each Harness's config. |
 | `docs/` | Product (`product/`), architecture (`architecture/`, `ARCHITECTURE.md`), codebase (`codebase/`), standards (`standards/`), UI briefs (`design/`), specs (`specs/`), ADRs (`adr/`), agent config (`agents/`). |
 | `docs/features/` | One short user-facing note per shipped feature. |
 | Root files | `Cargo.toml` (workspace, dependencies, lints), `rust-toolchain.toml`, `.cargo/config.toml` (xtask alias, deployment target), `clippy.toml`, `AGENTS.md`, `CONTEXT.md`, `README.md`. |
