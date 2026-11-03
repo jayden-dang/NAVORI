@@ -193,6 +193,7 @@ Events: kind `awake.lease_started` or `awake.lease_ended`, severity Info, Cap re
 | Ended by grace | `Stopped keeping this Mac awake: <source> stopped.` |
 | Ended by Cap | `Stopped keeping this Mac awake: <source> was still busy 2 hours after it stopped.` |
 | Release all | `Stopped keeping this Mac awake: Release all.` |
+| Session end, display off, or a replaced manual lease | `Stopped keeping this Mac awake: <source>.` |
 
 ### Fakes
 

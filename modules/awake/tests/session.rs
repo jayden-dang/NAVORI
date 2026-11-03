@@ -340,10 +340,9 @@ async fn end_session_ends_it_by_session_id_with_no_process_read() {
     assert!(rig.power.held().is_empty());
     assert_eq!(rig.power.releases(), 1);
     assert!(rig.exits.watched().is_empty());
-    assert!(
-        ended_summaries(&rig).is_empty(),
-        "ending a session has no locked end sentence: {:?}",
-        ended_summaries(&rig)
+    assert_eq!(
+        ended_summaries(&rig),
+        vec!["Stopped keeping this Mac awake: Claude Code.".to_owned()]
     );
     rig.shutdown().await;
 }

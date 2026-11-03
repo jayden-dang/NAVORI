@@ -8,7 +8,8 @@ use serde_json::{Value, json};
 
 use crate::action::AwakeAction;
 use crate::domain::{
-    self, EndReason, Ended, Held, Lease, LeaseKey, LeaseSource, LeaseTable, Reconciler, Timing,
+    self, DisplayChange, EndReason, Ended, Held, Lease, LeaseKey, LeaseSource, LeaseTable,
+    Reconciler, Timing,
 };
 use crate::event::{self, LEASE_ENDED, LEASE_STARTED};
 use crate::infra::stored::{self, StoredKind, StoredLease};
@@ -140,14 +141,22 @@ impl Awake {
         let now = wait.now();
         let started = match &req.action {
             AwakeAction::Status => Ok(None),
-            AwakeAction::HoldFor { seconds } => self
-                .hold_for(now, *seconds)
-                .map(|()| Some(Started::Duration(*seconds))),
+            AwakeAction::HoldFor { seconds } => match self.hold_for(now, *seconds) {
+                Ok(replaced) => {
+                    if let Some(ended) = replaced {
+                        self.emit_ended(ctx, std::slice::from_ref(&ended));
+                    }
+                    Ok(Some(Started::Duration(*seconds)))
+                }
+                Err(err) => Err(err),
+            },
             AwakeAction::HoldUntilOff => {
-                self.hold_until_off(now);
+                if let Some(ended) = self.hold_until_off(now) {
+                    self.emit_ended(ctx, std::slice::from_ref(&ended));
+                }
                 Ok(Some(Started::UntilOff))
             }
-            AwakeAction::Display { on } => Ok(self.display(*on, now)),
+            AwakeAction::Display { on } => Ok(self.display(ctx, *on, now)),
             AwakeAction::HoldCommand { pid } => self.hold_command(ctx, now, *pid),
             AwakeAction::HoldSession {
                 session_id,
@@ -175,20 +184,24 @@ impl Awake {
         }
     }
 
-    fn hold_until_off(&mut self, now: SystemTime) {
+    fn hold_until_off(&mut self, now: SystemTime) -> Option<Ended> {
         let started = truncate_us(now);
-        // Replacement keeps the assertion; no locked end sentence is true.
-        let _replaced = self.table.hold_until_off(started);
+        self.table.hold_until_off(started)
     }
 
-    fn display(&mut self, on: bool, now: SystemTime) -> Option<Started> {
+    fn display(&mut self, ctx: &ModuleCtx<Self>, on: bool, now: SystemTime) -> Option<Started> {
         let started = truncate_us(now);
-        self.table
-            .set_display(on, started)
-            .then_some(Started::Display)
+        match self.table.set_display(on, started) {
+            DisplayChange::Created => Some(Started::Display),
+            DisplayChange::Ended(ended) => {
+                self.emit_ended(ctx, std::slice::from_ref(&ended));
+                None
+            }
+            DisplayChange::Unchanged => None,
+        }
     }
 
-    fn hold_for(&mut self, now: SystemTime, seconds: u64) -> Result<(), ActionError> {
+    fn hold_for(&mut self, now: SystemTime, seconds: u64) -> Result<Option<Ended>, ActionError> {
         if seconds == 0 || seconds > MAX_SECONDS {
             return Err(ActionError::Invalid(format!(
                 "duration must be from 1 second through 7 days, not {seconds} seconds"
@@ -201,9 +214,7 @@ impl Awake {
             )));
         };
         let deadline = truncate_us(deadline);
-        // Replacement keeps the assertion; no locked end sentence is true.
-        let _replaced = self.table.hold_for(started, deadline);
-        Ok(())
+        Ok(self.table.hold_for(started, deadline))
     }
 
     fn hold_command(
@@ -344,7 +355,6 @@ impl Awake {
                 self.unwatch_if_idle(id);
             }
             self.forget_ended(ctx, now, std::slice::from_ref(&ended));
-            // No locked end sentence is true for EndSession.
             self.emit_ended(ctx, &[ended]);
         }
         Ok(None)
@@ -613,7 +623,13 @@ impl Awake {
                         payload(&end.lease.key.text(), kind_of(&end.lease)),
                     );
                 }
-                EndReason::EndSession | EndReason::ReleaseAll | EndReason::Replaced => {}
+                EndReason::ReleaseAll => {}
+                EndReason::EndSession | EndReason::Replaced => ctx.emit(
+                    LEASE_ENDED,
+                    Severity::Info,
+                    event::ended_stopped(&source_text(&end.lease)),
+                    payload(&end.lease.key.text(), kind_of(&end.lease)),
+                ),
             }
         }
     }

@@ -67,6 +67,13 @@ pub struct Lease {
     pub label: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DisplayChange {
+    Created,
+    Ended(Ended),
+    Unchanged,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EndReason {
     Deadline,
@@ -180,17 +187,23 @@ impl LeaseTable {
         self.replace_manual(Manual::UntilOff { started })
     }
 
-    /// Separate from a duration or until-off lease. Returns whether this call created it.
-    pub(crate) fn set_display(&mut self, on: bool, started: SystemTime) -> bool {
+    /// Separate from a duration or until-off lease.
+    pub(crate) fn set_display(&mut self, on: bool, started: SystemTime) -> DisplayChange {
         if on {
             if self.display.is_some() {
-                return false;
+                return DisplayChange::Unchanged;
             }
             self.display = Some(started);
-            return true;
+            return DisplayChange::Created;
         }
-        self.display = None;
-        false
+        match self.display.take() {
+            Some(_) => DisplayChange::Ended(Ended {
+                lease: display_as_lease(),
+                // Same plain stop sentence as a replaced manual lease.
+                reason: EndReason::Replaced,
+            }),
+            None => DisplayChange::Unchanged,
+        }
     }
 
     /// One command key per process. A later session lease may share the process

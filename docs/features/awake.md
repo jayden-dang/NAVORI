@@ -25,7 +25,7 @@ The Awake row sits above Core. It shows `Off`, `On` with the sources holding, `N
 
 Open it for `Keep awake for 1 hour` (always 3600 seconds), `Keep awake until I turn it off`, the status block, `Display on` (it reads `Display off` once that Lease exists), and `Release all`. `Release all` stays visible and does nothing while no Lease exists. Holding lists each current Lease: `1 hour` or `Until off`, `Display`, a command's executable, or a session. The menu does not offer a per-Lease release, and opening it does not read the process table or the system's assertions.
 
-Start events: `Keeping this Mac awake: <source>.` End events: reached its end time, exited, stopped, still busy 2 hours after it stopped, Release all. Replacing a manual hold, turning display off, and ending a session emit no end event. `<source>` is a harness name, a duration (`1 hour` or another true length), `until off`, `display`, or the executable name — never a project or branch.
+Start events: `Keeping this Mac awake: <source>.` End events: reached its end time, exited, stopped, still busy 2 hours after it stopped, Release all, or `Stopped keeping this Mac awake: <source>.` for a replaced manual hold, display off, and a session end. `<source>` is a harness name, a duration (`1 hour` or another true length), `until off`, `display`, or the executable name — never a project or branch.
 
 ## What it does not do
 

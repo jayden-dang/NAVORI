@@ -469,7 +469,8 @@ async fn a_started_lease_emits_one_sentence() {
             "Keeping this Mac awake: 2 hours.".to_owned(),
         ]
     );
-    assert!(ended.is_empty(), "{ended:?}");
+    assert_eq!(ended.len(), 1, "{ended:?}");
+    assert_eq!(ended[0].summary, "Stopped keeping this Mac awake: 1 hour.");
     rig.shutdown().await;
 }
 
@@ -540,8 +541,14 @@ async fn an_ended_lease_emits_one_sentence() {
             "Stopped keeping this Mac awake: Release all.".to_owned()
         )
     );
-    assert!(display_off_ends().await.is_empty());
-    assert!(end_session_ends().await.is_empty());
+    assert_eq!(
+        display_off_ends().await,
+        vec!["Stopped keeping this Mac awake: display.".to_owned()]
+    );
+    assert_eq!(
+        end_session_ends().await,
+        vec!["Stopped keeping this Mac awake: Claude Code.".to_owned()]
+    );
 }
 
 #[tokio::test(start_paused = true)]

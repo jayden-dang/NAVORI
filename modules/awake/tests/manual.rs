@@ -122,7 +122,8 @@ async fn until_off_replaces_a_duration_lease() {
     assert_eq!(started.len(), 2);
     assert_eq!(started[0].summary, "Keeping this Mac awake: until off.");
     assert_eq!(started[1].summary, "Keeping this Mac awake: 1 hour.");
-    assert!(ended.is_empty());
+    assert_eq!(ended.len(), 1);
+    assert_eq!(ended[0].summary, "Stopped keeping this Mac awake: 1 hour.");
     rig.shutdown().await;
 }
 
@@ -166,7 +167,11 @@ async fn a_duration_request_replaces_an_until_off_lease() {
     assert_eq!(started.len(), 2);
     assert_eq!(started[0].summary, "Keeping this Mac awake: 1 hour.");
     assert_eq!(started[1].summary, "Keeping this Mac awake: until off.");
-    assert!(ended.is_empty());
+    assert_eq!(ended.len(), 1);
+    assert_eq!(
+        ended[0].summary,
+        "Stopped keeping this Mac awake: until off."
+    );
     rig.shutdown().await;
 }
 

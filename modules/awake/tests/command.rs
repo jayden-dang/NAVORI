@@ -283,7 +283,10 @@ async fn an_unreadable_live_pid_is_not_an_empty_hold() {
         .unwrap()
         .into_iter()
         .any(|event| event.kind == "awake.lease_started");
-    assert!(!started, "awake run must not treat this answer as a held lease");
+    assert!(
+        !started,
+        "awake run must not treat this answer as a held lease"
+    );
     rig.shutdown().await;
 }
 

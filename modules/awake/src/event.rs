@@ -41,6 +41,10 @@ fn counted(n: u64, unit: &str) -> String {
     }
 }
 
+pub(crate) fn ended_stopped(source: &str) -> String {
+    format!("Stopped keeping this Mac awake: {source}.")
+}
+
 pub(crate) fn ended_deadline(source: &str) -> String {
     format!("Stopped keeping this Mac awake: {source} reached its end time.")
 }

@@ -154,7 +154,7 @@ async fn two_duration_requests_keep_one_lease_and_restart_the_hour() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn replacing_a_duration_lease_emits_another_start_and_no_end() {
+async fn replacing_a_duration_lease_emits_a_stop_and_another_start() {
     let rig = Rig::new();
     rig.dispatch(hold(3600)).await.unwrap();
     rig.advance(Duration::from_secs(10 * 60)).await;
@@ -172,7 +172,8 @@ async fn replacing_a_duration_lease_emits_another_start_and_no_end() {
     assert_eq!(started.len(), 2);
     assert_eq!(started[0].summary, "Keeping this Mac awake: 1 hour.");
     assert_eq!(started[1].summary, "Keeping this Mac awake: 1 hour.");
-    assert!(ended.is_empty());
+    assert_eq!(ended.len(), 1);
+    assert_eq!(ended[0].summary, "Stopped keeping this Mac awake: 1 hour.");
     rig.shutdown().await;
 }
 

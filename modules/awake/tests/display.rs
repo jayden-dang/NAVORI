@@ -123,7 +123,10 @@ async fn display_off_with_another_lease_keeps_system_with_no_gap() {
     assert_eq!(state["system_held"], true);
     assert_eq!(state["display_held"], false);
     assert_eq!(state["since_ms"], ORIGIN_MS as i64);
-    assert!(ended_summaries(&rig).is_empty());
+    assert_eq!(
+        ended_summaries(&rig),
+        vec!["Stopped keeping this Mac awake: display.".to_owned()]
+    );
     rig.shutdown().await;
 }
 
@@ -178,7 +181,10 @@ async fn display_off_with_no_other_lease_releases_both() {
     assert_eq!(state["system_held"], false);
     assert_eq!(state["display_held"], false);
     assert_eq!(state["since_ms"], Value::Null);
-    assert!(ended_summaries(&rig).is_empty());
+    assert_eq!(
+        ended_summaries(&rig),
+        vec!["Stopped keeping this Mac awake: display.".to_owned()]
+    );
     rig.shutdown().await;
 }
 
