@@ -179,7 +179,7 @@ pub(crate) fn apply(
     if existed {
         copy_beside(&target.path, target.mode, unix_seconds())?;
     }
-    write_atomically(&target, &dir, &doc)?;
+    write_atomically(&target, &dir, &doc, existed)?;
     Ok(Outcome::Written)
 }
 
@@ -224,7 +224,12 @@ fn copy_beside(path: &Path, mode: u32, seconds: u64) -> Result<PathBuf, ApplyErr
     }
 }
 
-fn write_atomically(target: &Target, dir: &Path, doc: &Value) -> Result<(), ApplyError> {
+fn write_atomically(
+    target: &Target,
+    dir: &Path,
+    doc: &Value,
+    replace: bool,
+) -> Result<(), ApplyError> {
     let mut text = serde_json::to_vec_pretty(doc).map_err(|e| ApplyError::Io {
         step: "serialize",
         path: target.path.clone(),
@@ -238,14 +243,19 @@ fn write_atomically(target: &Target, dir: &Path, doc: &Value) -> Result<(), Appl
         .set_permissions(std::fs::Permissions::from_mode(target.mode))
         .map_err(io("set the mode of", temp.path()))?;
     temp.as_file().sync_all().map_err(io("sync", temp.path()))?;
-    temp.persist(&target.path)
-        .map_err(|e| io("replace", &target.path)(e.error))?;
+    // A file that was absent when read and has appeared since has no Backup, so it is never replaced.
+    let persisted = if replace {
+        temp.persist(&target.path)
+    } else {
+        temp.persist_noclobber(&target.path)
+    };
+    persisted.map_err(|e| io("replace", &target.path)(e.error))?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::copy_beside;
+    use super::{Target, copy_beside, write_atomically};
 
     #[test]
     fn a_backup_name_taken_in_the_same_second_gets_a_numeric_suffix() {
@@ -275,5 +285,22 @@ mod tests {
                 "original"
             );
         }
+    }
+
+    #[test]
+    fn a_file_that_appeared_after_the_read_is_not_replaced_without_a_backup() {
+        let dir = tempfile::Builder::new().tempdir_in("/tmp").unwrap();
+        let file = dir.path().join("navori.json");
+        std::fs::write(&file, "someone else's").unwrap();
+        let target = Target {
+            path: file.clone(),
+            mode: 0o600,
+        };
+
+        let result = write_atomically(&target, dir.path(), &serde_json::json!({}), false);
+
+        assert!(result.is_err());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "someone else's");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
     }
 }

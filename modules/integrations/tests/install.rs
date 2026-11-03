@@ -187,7 +187,7 @@ impl Drop for Restore {
 }
 
 #[tokio::test]
-async fn a_failed_write_leaves_the_original_and_a_complete_backup() {
+async fn a_blocked_backup_leaves_the_original_alone() {
     let rig = Rig::release();
     rig.write(CLAUDE_FILE, FOREIGN);
     let dir = rig.path(".claude");
@@ -205,9 +205,47 @@ async fn a_failed_write_leaves_the_original_and_a_complete_backup() {
         std::fs::read_to_string(rig.path(CLAUDE_FILE)).unwrap(),
         FOREIGN
     );
-    for backup in backups(&dir) {
-        assert_eq!(std::fs::read_to_string(backup).unwrap(), FOREIGN);
+    assert!(backups(&dir).is_empty());
+}
+
+struct Unlock(PathBuf);
+
+impl Drop for Unlock {
+    fn drop(&mut self) {
+        let _ = std::process::Command::new("chflags")
+            .arg("nouchg")
+            .arg(&self.0)
+            .status();
     }
+}
+
+#[tokio::test]
+async fn a_write_that_fails_after_the_backup_leaves_the_original_and_a_complete_backup() {
+    let rig = Rig::release();
+    rig.write(CLAUDE_FILE, FOREIGN);
+    let file = rig.path(CLAUDE_FILE);
+    let _unlock = Unlock(file.clone());
+    let locked = std::process::Command::new("chflags")
+        .arg("uchg")
+        .arg(&file)
+        .status()
+        .unwrap();
+    assert!(locked.success());
+
+    let error = install(&rig, "claude").await;
+
+    assert!(error.is_err());
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), FOREIGN);
+    let dir = rig.path(".claude");
+    let found = backups(&dir);
+    assert_eq!(found.len(), 1);
+    assert_eq!(std::fs::read_to_string(&found[0]).unwrap(), FOREIGN);
+    let mut names: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(names.len(), 2, "stray files: {names:?}");
 }
 
 #[tokio::test]

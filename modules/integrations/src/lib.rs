@@ -52,13 +52,27 @@ impl Integrations {
         harness: Harness,
     ) -> Result<IntegrationsState, ActionError> {
         let env = self.env.clone();
+        let payload = json!({ "harness": harness });
         let done = tokio::task::spawn_blocking(move || {
             let outcome = infra::files::apply(&env, harness, infra::files::Plan::Install);
             (outcome, inspect(&env))
         })
-        .await
-        .map_err(|e| ActionError::Failed(format!("the install did not finish: {e}")))?;
-        let payload = json!({ "harness": harness });
+        .await;
+        let done = match done {
+            Ok(done) => done,
+            Err(error) => {
+                tracing::warn!(?harness, %error, "the install did not finish");
+                ctx.emit(
+                    HOOK_FAILED,
+                    Severity::Error,
+                    event::install_failed(harness),
+                    payload,
+                );
+                return Err(ActionError::Failed(format!(
+                    "the install did not finish: {error}"
+                )));
+            }
+        };
         match done {
             (Ok(outcome), state) => {
                 let summary = match outcome {
