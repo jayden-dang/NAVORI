@@ -144,6 +144,7 @@ fn main() -> ExitCode {
         Command::Awake {
             command: AwakeCommand::Run { command },
         } => runtime.block_on(awake_run(&profile, command)),
+        // `hook_profile` takes every hook invocation first; this arm only keeps the match total and fail-open.
         Command::Hook => hook::run("release", start),
         command => match runtime.block_on(run(Cli { profile, command })) {
             Ok(()) => ExitCode::SUCCESS,
