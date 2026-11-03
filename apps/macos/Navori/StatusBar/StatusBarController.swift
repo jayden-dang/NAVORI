@@ -35,10 +35,14 @@ final class StatusBarController: NSObject {
     }()
     #if DEBUG
     private var previewPanel: StatusPanel?
+    private var iconSample: StatusIconState?
     #endif
     private var didScheduleStatusMark = false
     private var didReplaceCoreTree = false
     private var awakeHadSubmenu = false
+    private var motion = StatusIconMotion()
+    private var drawn: (state: StatusIconState, loop: Bool)?
+    private var accessibilityObserver: NSObjectProtocol?
 
     init(store: CoreStore, openSettings: @escaping (SettingsTab) -> Void) {
         self.store = store
@@ -54,30 +58,53 @@ final class StatusBarController: NSObject {
         }
         item.behavior = .terminationOnRemoval
         awakeHadSubmenu = AwakeRowState(status: store.awakeStatus).hasSubmenu
-        observeHealth()
+        accessibilityObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: NSWorkspace.shared,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.render(self.store.statusIcon)
+            }
+        }
+        observeStatusIcon()
         observeSnapshot()
     }
 
-    /// Re-renders the icon whenever `store.health` changes.
-    private func observeHealth() {
-        withObservationTracking {
-            render(health: store.health)
-        } onChange: { [weak self] in
-            Task { @MainActor in self?.observeHealth() }
+    isolated deinit {
+        if let accessibilityObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(accessibilityObserver)
         }
     }
 
-    private func render(health: CoreStore.Health) {
-        let (symbol, description): (String, String) = switch health {
-        case .starting: ("circle.dotted", "Starting")
-        case .ok: ("sparkle", "Navori")
-        case .degraded(let sentence): ("exclamationmark.triangle", sentence)
-        case .down: ("xmark.octagon", "Core not running")
+    /// Re-renders the icon whenever `store.statusIcon` changes.
+    private func observeStatusIcon() {
+        withObservationTracking {
+            render(store.statusIcon)
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeStatusIcon() }
         }
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: description)
-        image?.isTemplate = true
-        item.button?.image = image
-        item.button?.appearsDisabled = health == .starting
+    }
+
+    private func render(_ real: StatusIconState, allowBeat: Bool = true) {
+        #if DEBUG
+        let state = iconSample ?? real
+        let beatAllowed = allowBeat && iconSample == nil
+        #else
+        let state = real
+        let beatAllowed = allowBeat
+        #endif
+        let plan = motion.next(
+            state,
+            reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+            allowBeat: beatAllowed
+        )
+        if let drawn, drawn.state == state, drawn.loop == plan.loop { return }
+        drawn = (state, plan.loop)
+        item.button?.image = StatusIconImage.image(state)
+        item.button?.appearsDisabled = state.glyph == .starting
+        applyMotion(plan)
         guard AppEnvironment.perfMode, !didScheduleStatusMark else { return }
         didScheduleStatusMark = true
         CATransaction.begin()
@@ -87,6 +114,36 @@ final class StatusBarController: NSObject {
             }
         }
         CATransaction.commit()
+    }
+
+    /// Opacity motion runs in Core Animation, off the main thread, with no timer.
+    private func applyMotion(_ plan: StatusIconMotion.Plan) {
+        guard let button = item.button else { return }
+        if (plan.loop || plan.beat) && !button.wantsLayer { button.wantsLayer = true }
+        guard let layer = button.layer else { return }
+        if plan.loop {
+            if layer.animation(forKey: "icon.loop") == nil {
+                let loop = CABasicAnimation(keyPath: "opacity")
+                loop.fromValue = 1.0
+                loop.toValue = 0.35
+                loop.duration = 1
+                loop.autoreverses = true
+                loop.repeatCount = .infinity
+                layer.add(loop, forKey: "icon.loop")
+            }
+        } else {
+            layer.removeAnimation(forKey: "icon.loop")
+        }
+        if plan.beat { addBeat(to: layer) }
+    }
+
+    private func addBeat(to layer: CALayer) {
+        let beat = CABasicAnimation(keyPath: "opacity")
+        beat.fromValue = 1.0
+        beat.toValue = 0.2
+        beat.duration = 0.25
+        beat.autoreverses = true
+        layer.add(beat, forKey: "icon.beat")
     }
 
     @objc private func clicked(_ sender: NSStatusBarButton) {
@@ -240,13 +297,31 @@ final class StatusBarController: NSObject {
     }
 
     #if DEBUG
+    /// Holds a Sample on the Icon until cleared; the real snapshot returns with no Beat.
+    func setIconSample(_ sample: StatusIconState?) {
+        iconSample = sample
+        render(store.statusIcon, allowBeat: false)
+    }
+
+    /// Plays one Beat on whatever the Icon shows.
+    func playIconBeat() {
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+              let button = item.button else { return }
+        if !button.wantsLayer { button.wantsLayer = true }
+        if let layer = button.layer { addBeat(to: layer) }
+    }
+
     @objc private func openPreview() {
         panel.close()
         if previewPanel == nil {
             let created = StatusPanel(
-                content: PreviewMenu.content(setTint: { [weak self] tint in
-                    self?.previewPanel?.setTint(tint)
-                }),
+                content: PreviewMenu.content(
+                    setTint: { [weak self] tint in
+                        self?.previewPanel?.setTint(tint)
+                    },
+                    setIconSample: { [weak self] sample in self?.setIconSample(sample) },
+                    playBeat: { [weak self] in self?.playIconBeat() }
+                ),
                 onVisibility: { _ in }
             )
             previewPanel = created

@@ -80,6 +80,10 @@ pub trait Module: Send + Sized + 'static {
 
     fn initial_state(&self) -> Self::State;
 
+    /// What this Module asks of the status icon, read from its published State.
+    /// Pure and cheap; the default asks for nothing.
+    fn tray(_state: &Self::State) -> TrayContribution { TrayContribution::default() }
+
     fn run(&mut self, ctx: &mut ModuleCtx<Self>) -> impl Future<Output = anyhow::Result<()>> + Send;
 }
 
@@ -104,7 +108,7 @@ Three obligations for every module — these turn a "feature" into a "capability
 | `context()` → `ContextFragment` | **Context Engine** (the AI knows your "now") |
 | Domain `Event` with `summary()` | Journal, **Triggers**, **Memory** (the AI knows "what happened") |
 
-For MILE-3, `context()` and `tray()` stay obligations — `tray()` is a badge or icon hint for the menubar. They are not on the trait yet.
+`tray()` is on the trait (ICON): a Module says which glyph and whether attention it wants, and the Kernel composes one status icon state when the status is read (`docs/features/status-icon.md`). For MILE-3, `context()` stays an obligation. It is not on the trait yet.
 
 - **Typed inside, erased at the edge**: the kernel wraps a module into `ModuleHandle { id, actions: Vec<ActionSpec>, dispatch, state_json, context }`. The Swift UI uses typed values (via UniFFI); AI/IPC/MCP use JSON `Envelope`s.
 - **Supervisor**: a failing module is restarted with backoff, without crashing the app.

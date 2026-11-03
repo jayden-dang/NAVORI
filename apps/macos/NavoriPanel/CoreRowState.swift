@@ -6,6 +6,21 @@ public enum CoreHealth: Sendable {
     case starting, ok, degraded, down
 }
 
+extension CoreHealth {
+    /// Only `failed` and `restarting` Modules, or a config notice, make the Core degraded.
+    public init(coreFailed: Bool, hasSnapshot: Bool, moduleStates: [String], hasConfigNotice: Bool) {
+        if coreFailed {
+            self = .down
+        } else if !hasSnapshot {
+            self = .starting
+        } else if hasConfigNotice || moduleStates.contains(where: { $0 == "failed" || $0 == "restarting" }) {
+            self = .degraded
+        } else {
+            self = .ok
+        }
+    }
+}
+
 public enum CoreStatus: Equatable, Sendable {
     case starting, running, needsAttention, notRunning
 

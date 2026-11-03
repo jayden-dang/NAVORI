@@ -56,7 +56,7 @@ fields, not on aligned text columns.
 
 | Command | What it does |
 |---|---|
-| `"$CLI" --profile dev status [--json]` | version, uptime, module health |
+| `"$CLI" --profile dev status [--json]` | version, uptime, module health, the composed icon state (`tray`) |
 | `"$CLI" --profile dev events [--limit N] [--json]` | journal, newest first |
 | `"$CLI" --profile dev actions [--json]` | every action modules accept, with risk level |
 | `"$CLI" --profile dev dispatch <module> '<action-json>'` | send an action, prints the reply JSON |

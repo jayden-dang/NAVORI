@@ -11,14 +11,17 @@ mod module;
 mod runtime;
 mod scheduler;
 mod system;
+mod tray;
 
 pub use bus::EventBus;
 pub use module::{
     ActionDoc, ActionError, Module, ModuleAction, ModuleConfig, ModuleCtx, NoConfig, Request,
 };
 pub use navori_protocol::{
-    ActionSpec, CoreStatus, Envelope, Event, ModuleInfo, ModuleState, Risk, Severity,
+    ActionSpec, CoreStatus, Envelope, Event, ModuleInfo, ModuleState, Risk, Severity, TrayGlyph,
+    TrayState,
 };
 pub use runtime::{DispatchError, Kernel, KernelBuilder, RestartPolicy};
 pub use scheduler::{Scheduler, SystemClock, WaitHandle, Wake, WallClock};
 pub use system::{System, SystemAction, SystemState};
+pub use tray::{TrayContribution, compose_tray};

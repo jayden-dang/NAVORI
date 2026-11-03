@@ -86,6 +86,28 @@ pub struct ModuleInfo {
     pub restarts: u32,
 }
 
+/// Which mark the status icon shows. The Kernel chooses it; the Shell only draws it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TrayGlyph {
+    Normal,
+    /// A Lease holds the Mac awake.
+    Lease,
+    /// Navori AI is working.
+    AiRunning,
+    Problem,
+}
+
+/// The composed status icon state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrayState {
+    pub glyph: TrayGlyph,
+    /// Something waits for the user.
+    pub attention: bool,
+    /// One line for the status item's text and accessibility description.
+    pub summary: String,
+}
+
 /// Snapshot of the running core, served to the UI, CLI and `doctor`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CoreStatus {
@@ -97,6 +119,8 @@ pub struct CoreStatus {
     pub data_dir: String,
     pub socket_path: String,
     pub modules: Vec<ModuleInfo>,
+    /// The composed status icon state.
+    pub tray: TrayState,
 }
 
 /// One diagnostic check reported by `doctor`.

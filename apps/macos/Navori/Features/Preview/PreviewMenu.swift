@@ -5,11 +5,15 @@ import SwiftUI
 
 @MainActor
 enum PreviewMenu {
-    static func content(setTint: @escaping (NSColor) -> Void) -> CascadeContent {
+    static func content(
+        setTint: @escaping (NSColor) -> Void,
+        setIconSample: @escaping (StatusIconState?) -> Void,
+        playBeat: @escaping () -> Void
+    ) -> CascadeContent {
         let marker = PreviewSampleRows.marker
         return CascadeContent(
             tree: { tree },
-            root: AnyView(PreviewRootView(setTint: setTint).accessibilityIdentifier(marker)),
+            root: AnyView(PreviewRootView(setTint: setTint, setIconSample: setIconSample, playBeat: playBeat).accessibilityIdentifier(marker)),
             submenu: { id in AnyView(PreviewSubmenuView(id: id)) },
             activate: { _ in }
         )
@@ -58,6 +62,8 @@ enum PreviewMenu {
 
 private struct PreviewRootView: View {
     let setTint: (NSColor) -> Void
+    let setIconSample: (StatusIconState?) -> Void
+    let playBeat: () -> Void
     @Environment(CascadeController.self) private var cascade
     @State private var ask = ""
 
@@ -72,6 +78,8 @@ private struct PreviewRootView: View {
             MenuRowView(row: prsRow, cascade: cascade)
             Divider()
             PreviewTintRow(setTint: setTint)
+            Divider()
+            PreviewIconSampleList(setIconSample: setIconSample, playBeat: playBeat)
         }
         .padding(5)
         .frame(width: 360, alignment: .topLeading)

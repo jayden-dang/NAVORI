@@ -55,7 +55,7 @@ Terms used below:
 **Story:** As the user, I want to open the Core row and read each module's state and the recent activity, so that I can tell what Navori is doing without opening a terminal.
 
 - **MENU-3.1** THE SYSTEM SHALL draw the Core row on one line: icon, `Core`, the state in words, and a chevron when it has a Submenu.
-- **MENU-3.2** THE SYSTEM SHALL name the state as `Starting`, `Running`, `Needs attention` or `Not running`, following the same order `CoreStore.health` uses, with a green dot for `Running`, an orange dot for `Needs attention`, a red dot for `Not running` and no dot for `Starting`.
+- **MENU-3.2** THE SYSTEM SHALL name the state as `Starting`, `Running`, `Needs attention` or `Not running`, following the order the Core row's initializer in `NavoriPanel` applies (`CoreStore.health` was deleted by ICON, `docs/specs/2026-11-02-status-icon-states/design.md` decision 5), with a green dot for `Running`, an orange dot for `Needs attention`, a red dot for `Not running` and no dot for `Starting`.
 - **MENU-3.3** WHEN the Core row's Submenu opens THE SYSTEM SHALL list every module in the snapshot with its state, its restart count when above 0, and its detail when it has one.
 - **MENU-3.4** WHEN the Core row's Submenu opens THE SYSTEM SHALL list at most 8 recent Events in the snapshot's order, each with its summary, a severity icon and its relative age in today's narrow numeric form.
 - **MENU-3.5** IF the snapshot holds no Events THEN THE SYSTEM SHALL show `Nothing yet.` in place of the Event list.
@@ -162,10 +162,10 @@ Every file this change touches, with the existing behavior at risk.
 | File | Existing behavior | Guarded by |
 |---|---|---|
 | `apps/macos/Navori/StatusBar/StatusPanel.swift` | Anchors under the button, clamps to the screen, fallback when the button is off screen; outside click, second click, Esc and loss of key close it; first-frame callback; non-activating, above other windows, on every Space; reports visibility. Today `close()` reports `false` even when already closed, which MENU-4.15 changes on purpose | MENU-G1, MENU-G2, MENU-G3, MENU-G5, MENU-G6, MENU-G14, MENU-4.14, MENU-4.15 |
-| `apps/macos/Navori/StatusBar/StatusBarController.swift` | Left click toggles; right click shows the native menu; icon follows health; `openMenuFresh` closes with no animation and starts the clock after closing; dims the icon while starting; tooltip; `statusItemDrawn` mark | MENU-G3, MENU-G4, MENU-G5, MENU-G7, MENU-G11, MENU-G12 |
+| `apps/macos/Navori/StatusBar/StatusBarController.swift` | Left click toggles; right click shows the native menu; `openMenuFresh` closes with no animation and starts the clock after closing; dims the icon while starting; tooltip; `statusItemDrawn` mark | MENU-G3, ~~MENU-G4~~ (replaced by ICON), MENU-G5, MENU-G7, MENU-G11, MENU-G12 |
 | `apps/macos/Navori/Features/Panel/PanelView.swift` | Banners, module and activity lists, footer. Its header is removed on purpose (MENU-1.3); KCONTRACT changes its config banner first | MENU-2.1, MENU-2.2, MENU-2.3, MENU-3.3, MENU-3.4, MENU-3.5 |
 | `apps/macos/Navori/Features/Settings/SettingsView.swift`, `SettingsWindowController.swift` | General, Diagnostics and About tabs. Opening on a chosen tab is new (MENU-1.8) | MENU-G8 |
-| `apps/macos/Navori/Core/CoreStore.swift` | `health` order, `setPanelVisible`, `moduleCount`; KCONTRACT edits these members, so their names stay | MENU-3.2, MENU-G5, MENU-G6 |
+| `apps/macos/Navori/Core/CoreStore.swift` | ~~`health` order~~ (deleted by ICON; the Core row reads facts through a `NavoriPanel` initializer), `setPanelVisible`, `moduleCount`; KCONTRACT edits these members, so their names stay | MENU-3.2, MENU-G5, MENU-G6 |
 | `apps/macos/Navori/Platform/PerfProbe.swift` | `SIGUSR1` opens the menu in perf mode; `SIGTERM` handling; marks only in perf mode | MENU-G5, MENU-G12, MENU-G13, MENU-8.4 |
 | `apps/macos/NavoriPanel/StatusPanelClickPolicy.swift` and its test | A click on the status button does not dismiss; a click elsewhere does | MENU-G3 |
 | `apps/macos/Package.swift` | Targets and dependencies stay; tools version and platform change on purpose (MENU-10.1) | MENU-G9 |
@@ -180,7 +180,7 @@ Guards named above:
 - **MENU-G1** (guard) WHEN level 0 opens from a click THE SYSTEM SHALL CONTINUE TO anchor it under the status button, clamped 8 pt inside the screen's visible frame.
 - **MENU-G2** (guard) IF the status button has no real on-screen frame THEN THE SYSTEM SHALL CONTINUE TO place level 0 at the top of the main screen's visible frame.
 - **MENU-G3** (guard) WHEN the user clicks the status button with the panel open THE SYSTEM SHALL CONTINUE TO have the toggle handle that click, not the outside-click monitor.
-- **MENU-G4** (guard) WHEN `store.health` changes THE SYSTEM SHALL CONTINUE TO update the status icon with the same four symbols.
+- ~~**MENU-G4** (guard) WHEN `store.health` changes THE SYSTEM SHALL CONTINUE TO update the status icon with the same four symbols.~~ Replaced by ICON (`docs/specs/2026-11-02-status-icon-states/`): the icon now follows the Core's composed `tray`, drawn as the fold glyphs, not four SF Symbols.
 - **MENU-G5** (guard) WHEN `cargo xtask perf` sends `SIGUSR1` THE SYSTEM SHALL CONTINUE TO close any open menu with no animation, start the clock after that close, and log `menuOpened ms=.. first=.. modules=..` in today's format at the first presented frame, with `modules` from `CoreStore.moduleCount`.
 - **MENU-G6** (guard) WHEN the Shell reports menu visibility THE SYSTEM SHALL CONTINUE TO go through `CoreStore.setPanelVisible`.
 - **MENU-G7** (guard) WHEN the user right-clicks the status item THE SYSTEM SHALL CONTINUE TO show the native `NSMenu` with `Open`, `Settings…`, `Open Logs Folder` and `Quit`.

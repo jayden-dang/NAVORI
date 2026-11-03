@@ -43,6 +43,8 @@ fn write_config(home: &tempfile::TempDir, body: &str) {
 fn surface(core: &NavoriCore) -> String {
     let snapshot = core.status();
     let mut text = String::new();
+    text.push_str(&snapshot.tray.summary);
+    text.push('\n');
     if let Some(notice) = snapshot.config_notice {
         text.push_str(&notice.title);
         text.push('\n');

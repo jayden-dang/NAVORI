@@ -18,7 +18,7 @@ use crate::state::AwakeState;
 
 const MAX_SECONDS: u64 = 7 * 24 * 60 * 60;
 const RETRY: Duration = Duration::from_secs(60);
-const SYSTEM_PROBLEM: &str = "macOS refused the request. Navori keeps trying.";
+pub(crate) const SYSTEM_PROBLEM: &str = "macOS refused the request. Navori keeps trying.";
 const DISPLAY_PROBLEM: &str = "macOS refused to keep the display on. Navori keeps trying.";
 const RELEASE_PROBLEM: &str = "Releasing a power assertion failed.";
 const EXITS_PROBLEM: &str =

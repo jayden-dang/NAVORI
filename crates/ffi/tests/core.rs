@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use navori_config::{ConfigReport, JournalSweep, Paths, Profile, WholeFileReason};
 use navori_ffi::{
     CheckView, ConfigNotice, CoreConfig, CoreError, CoreSnapshot, NavoriCore, SnapshotListener,
+    TrayGlyphView,
 };
 use navori_protocol::rpc::method;
 use navori_protocol::{CoreStatus, Event, Severity};
@@ -855,4 +856,63 @@ fn a_lease_in_the_dev_profile_is_absent_from_the_release_profile() {
     assert!(!release_awake.system_held);
     dev.shutdown();
     release.shutdown();
+}
+
+#[test]
+fn the_snapshot_and_the_status_carry_the_same_icon_state() {
+    let home = home();
+    let (core, _) = start(&home);
+    let snapshot = core.status();
+    assert_eq!(snapshot.tray.glyph, TrayGlyphView::Normal);
+    assert!(!snapshot.tray.attention);
+    assert_eq!(snapshot.tray.summary, "Navori");
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let rpc_status: CoreStatus = rt.block_on(async {
+        let mut client = navori_ipc::Client::connect(std::path::Path::new(&snapshot.socket_path))
+            .await
+            .unwrap();
+        serde_json::from_value(
+            client
+                .call(method::STATUS, serde_json::Value::Null)
+                .await
+                .unwrap(),
+        )
+        .unwrap()
+    });
+    assert_eq!(rpc_status.tray.glyph, navori_protocol::TrayGlyph::Normal);
+    assert_eq!(rpc_status.tray.summary, snapshot.tray.summary);
+    core.shutdown();
+}
+
+#[test]
+fn a_bad_value_is_named_in_the_icon_summary() {
+    let home = home();
+    write_config(&home, "log_level = \"loud\"\n");
+    let (core, _) = start(&home);
+    let tray = core.status().tray;
+    assert!(
+        tray.summary.contains("config.toml has bad values"),
+        "{}",
+        tray.summary
+    );
+    assert!(tray.summary.contains("log_level"), "{}", tray.summary);
+    core.shutdown();
+}
+
+#[test]
+fn a_whole_file_fallback_says_so_in_the_icon_summary() {
+    let home = home();
+    write_config(&home, "log_level = \n");
+    let (core, _) = start(&home);
+    let tray = core.status().tray;
+    assert!(
+        tray.summary.contains("config.toml is on defaults"),
+        "{}",
+        tray.summary
+    );
+    core.shutdown();
 }
