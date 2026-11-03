@@ -25,7 +25,7 @@ the real Keychain only on request (SECRETS-7.3), and that run is not part of `ca
 
 **Story:** As a consumer author, I want to store a secret and read it back, so that a token survives a restart without sitting in the database, the config or the logs.
 
-- **SECRETS-2.1** WHEN a consumer sets a value under a secret key THE SYSTEM SHALL store it as a generic password item in the user's regular macOS Keychain, with the Profile's service (SECRETS-5.1, 5.2) and the key's account (SECRETS-1.1), the value being UTF-8 text (`agent-decided`).
+- **SECRETS-2.1** WHEN a consumer sets a value under a secret key THE SYSTEM SHALL store it as a generic password item in the user's regular macOS Keychain, with the service the store was built with (SECRETS-5.1, 5.2) and the key's account (SECRETS-1.1), the value being UTF-8 text (`agent-decided`).
 - **SECRETS-2.2** WHEN a consumer sets a value under a key that already holds one THE SYSTEM SHALL replace the value, leaving one item for that key.
 - **SECRETS-2.3** WHEN a consumer reads a key that holds a value THE SYSTEM SHALL return it as a Secret.
 - **SECRETS-2.4** WHEN a consumer reads a key that holds no item THE SYSTEM SHALL return an outcome that says nothing is stored, distinct from every error (`agent-decided`).
@@ -34,7 +34,7 @@ the real Keychain only on request (SECRETS-7.3), and that run is not part of `ca
 
 ## 3. Check whether a secret is set
 
-**Story:** As a consumer author (the Settings screen of ROAD-11), I want to ask whether a secret is set, so that the UI can show "set / not set" without ever reading the value.
+**Story:** As a consumer author (the Settings screen of ROAD-11), I want to ask whether a secret is set, so that the UI can show "set / not set" without the value ever being returned to the caller.
 
 - **SECRETS-3.1** WHEN a consumer asks whether a key holds a secret THE SYSTEM SHALL answer yes or no without returning the value (`agent-decided`).
 
@@ -47,11 +47,11 @@ the real Keychain only on request (SECRETS-7.3), and that run is not part of `ca
 
 ## 5. Keep the release and dev Profiles apart
 
-**Story:** As the author running Navori and Navori Dev side by side, I want each Profile to use its own Keychain service, so that a dev build never reads or overwrites the release token.
+**Story:** As the author running Navori and Navori Dev side by side, I want each Profile to use its own Keychain service, so that a dev build that is wired to the dev service never reads or overwrites the release token.
 
-- **SECRETS-5.1** WHERE the Profile is `release` THE SYSTEM SHALL use the Keychain service `dev.navori`.
-- **SECRETS-5.2** WHERE the Profile is `dev` THE SYSTEM SHALL use the Keychain service `dev.navori.dev` (`agent-decided`).
-- **SECRETS-5.3** WHEN a value is set through a `release` store THE SYSTEM SHALL report nothing stored for the same key read through a `dev` store, and the reverse. This proves the naming against the fake, not the real Keychain.
+- **SECRETS-5.1** THE SYSTEM SHALL offer a release Keychain service named `dev.navori`, and a store SHALL use exactly the service it was built with.
+- **SECRETS-5.2** THE SYSTEM SHALL offer a dev Keychain service named `dev.navori.dev` (`agent-decided`), distinct from the release service.
+- **SECRETS-5.3** WHEN a value is set through a store built with the release service THE SYSTEM SHALL report nothing stored for the same key read through a store built with the dev service over the same backend, and the reverse. This proves the service mapping against an in-memory backend, not the real Keychain.
 
 ## 6. Never reveal a secret
 
@@ -69,7 +69,7 @@ the real Keychain only on request (SECRETS-7.3), and that run is not part of `ca
 - **SECRETS-7.1** THE SYSTEM SHALL define one store interface that the Keychain-backed store and an in-memory fake both implement, the Keychain being a system boundary (`agent-decided`; docs/standards/testing.md lists boundaries without naming it).
 - **SECRETS-7.2** THE SYSTEM SHALL make the fake available to other crates' tests without linking it into the shipped app, and the fake SHALL behave as SECRETS-1 to SECRETS-6 describe; one shared contract suite runs against it in the default tests (`agent-decided`).
 - **SECRETS-7.3** WHERE the author sets the opt-in variable for the contract run THE SYSTEM SHALL run the same contract suite against the real Keychain; otherwise that test is ignored (`agent-decided`).
-- **SECRETS-7.4** WHEN `cargo test --workspace` or `cargo xtask ci` runs THE SYSTEM SHALL NOT read or write any real Keychain item.
+- **SECRETS-7.4** WHEN `cargo test --workspace` or `cargo xtask ci` runs THE SYSTEM SHALL NOT read or write any real Keychain item; checked as: no test file outside the manual contract run opens the real Keychain.
 
 ## 8. Quality attributes
 
@@ -116,11 +116,14 @@ Files touched: `Cargo.toml`, `Cargo.lock`, `crates/secrets/` (new), `docs/codeba
 - The data-protection store, iCloud sync, biometrics and keychain access groups (ADR 0004).
 - Reading or writing secrets from the `navori` CLI, over IPC, as an Action, or by the AI (ARCH-4; docs/ARCHITECTURE.md:243).
 - The shape of a stored JSON blob for a refresh token or expiry: the value is opaque text here, ROAD-19 owns its content.
+- Caching "set / not set" in Settings (ROAD-11 must not call `exists` on every Settings open, because the backend reads the item to answer and may prompt).
+- Choosing the service from a Profile: the composition root (`navori-ffi`, ROAD-11 and ROAD-19 wiring) maps the Profile to the release or dev service, so this crate does not duplicate the Profile enum or depend on `navori-config` (`agent-decided`).
 - Re-granting access after a later switch to a Developer ID signature (ADR 0004).
 
 ## Open Questions
 
-- Versions and API of `keyring-core` 1.0.1 and `apple-native-keyring-store` 1.0.2 — design-solution — 2026-11-03 — forbid-guess: assume neither a method nor a version until the first build resolves them.
-- Whether asking "is it set" can avoid a Keychain prompt — design-solution — 2026-11-03 — forbid-guess: no requirement or test may say it never prompts.
-- Whether the backend crates force a newer version of an already locked dependency — design-solution — 2026-11-03 — forbid-guess: assume neither that the locked set stays unchanged nor that it moves; if a bump happens, record it (SECRETS-10.2).
-- Whether the contract run can target a temporary keychain file instead of the login Keychain — design-solution — 2026-11-03 — forbid-guess: no criterion or expected value until verified; until then the contract run is manual and an unattended session never runs it against the login Keychain.
+- Whether the first build resolves `keyring-core` 1.0.1 and `apple-native-keyring-store` 1.0.2 with the locked `log`, `bitflags` and `libc` — plan-tasks, first build task — 2026-11-03 — forbid-guess: the API was read from the crate sources (design.md decisions 1 and 2) but never built; assume no more than that.
+- Whether asking "is it set" can avoid a Keychain prompt — design-solution — 2026-11-03 — forbid-guess: no requirement or test may say it never prompts. The design reads the item through `get_credential` and discards it (design.md decision 6), so it may prompt like a read.
+- Whether the backend crates force a newer version of an already locked dependency — plan-tasks, first build task — 2026-11-03 — forbid-guess: assume neither that the locked set stays unchanged nor that it moves; if a bump happens, record it (SECRETS-10.2).
+
+Resolved: the contract run cannot target a temporary keychain file, because the Apple store accepts only the User, System, Common and Dynamic keychains (keychain.rs:336-347); the run is manual, writes to the login Keychain under the `dev.navori.dev` service and kind `contract-test`, and an unattended session never runs it (design.md decision 10).
