@@ -278,12 +278,12 @@ _Requirements: HOOKS-5.1, HOOKS-5.2, HOOKS-5.3, HOOKS-5.4, HOOKS-5.5_
 
 **Depends-on:** Task 7
 
-- [ ] **Step 1: Write failing tests** in `tests/remove.rs`: `removing_from_claude_drops_only_navoris_entries_and_keeps_every_foreign_hook_and_key_order` (with a foreign key between two of Navori's keys); `an_event_array_emptied_by_removal_is_dropped_and_a_foreign_one_stays`; `a_hooks_object_emptied_by_removal_is_dropped_but_the_file_stays`; `removing_from_grok_deletes_navori_json_after_a_backup_when_it_holds_only_navori_entries`; `removing_from_grok_keeps_the_file_when_it_holds_anything_else`; `removing_when_nothing_of_the_profile_is_there_changes_nothing_and_writes_no_backup`; `remove_refuses_an_unparseable_file`; `remove_writes_through_a_symlink`; `dev_remove_leaves_a_release_entry_alone`; `a_removal_emits_one_event`.
+- [x] **Step 1: Write failing tests** in `tests/remove.rs`: `removing_from_claude_drops_only_navoris_entries_and_keeps_every_foreign_hook_and_key_order` (with a foreign key between two of Navori's keys); `an_event_array_emptied_by_removal_is_dropped_and_a_foreign_one_stays`; `a_hooks_object_emptied_by_removal_is_dropped_but_the_file_stays`; `removing_from_grok_deletes_navori_json_after_a_backup_when_it_holds_only_navori_entries`; `removing_from_grok_keeps_the_file_when_it_holds_anything_else`; `removing_when_nothing_of_the_profile_is_there_changes_nothing_and_writes_no_backup`; `remove_refuses_an_unparseable_file`; `remove_writes_through_a_symlink`; `dev_remove_leaves_a_release_entry_alone`; `a_removal_emits_one_event`.
 Run: `cargo nextest run -p navori-mod-integrations --test remove` — expect: the Action replies `Invalid`.
-- [ ] **Step 2: Implement** `strip` and the `Remove` branch; a Grok document that is empty after `strip` becomes `Plan::Delete` (backup first), Claude and Codex files are never deleted.
+- [x] **Step 2: Implement** `strip` and the `Remove` branch; a Grok document that is empty after `strip` becomes `Plan::Delete` (backup first), Claude and Codex files are never deleted.
 Run: same command — expect: pass.
-- [ ] **Step 3: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 4: Commit** `git commit -m "feat(integrations): remove Navori's hooks and nothing else"`
+- [x] **Step 3: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 4: Commit** `git commit -m "feat(integrations): remove Navori's hooks and nothing else"`
 
 _Requirements: HOOKS-6.1, HOOKS-6.2, HOOKS-6.3, HOOKS-6.4, HOOKS-6.5_
 
