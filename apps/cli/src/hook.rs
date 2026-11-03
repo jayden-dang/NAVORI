@@ -81,17 +81,17 @@ struct Payload {
 pub fn plan(stdin: &[u8], own_pid: u32, parent_pid: u32) -> Option<Plan> {
     let payload: Payload = serde_json::from_slice(stdin).ok()?;
     let session_id = payload.session_id?;
-    let action = match payload.hook_event_name?.as_str() {
+    let event = payload.hook_event_name?;
+    let action = match event.as_str() {
         "UserPromptSubmit" => {
             let pid = i32::try_from(own_pid).ok()?;
             let ppid = i32::try_from(parent_pid).ok()?;
             json!({ "hold_session": { "session_id": session_id, "pid": pid, "ppid": ppid } })
         }
         // Provisional for Claude Code and Codex: only Grok's `reason` rule is verified.
-        "Stop" if matches!(payload.reason.as_deref(), None | Some("end_turn")) => {
-            json!({ "stop_session": { "session_id": session_id } })
-        }
-        "StopCancelled" | "StopFailure" => {
+        name @ ("Stop" | "StopCancelled" | "StopFailure")
+            if name != "Stop" || matches!(payload.reason.as_deref(), None | Some("end_turn")) =>
+        {
             json!({ "stop_session": { "session_id": session_id } })
         }
         "SessionEnd" => {
