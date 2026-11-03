@@ -185,7 +185,7 @@ Locality: extend — `Cargo.toml`, `modules/integrations/Cargo.toml`, `docs/`.
 
 ## Coverage check
 
-Every ID of HOOKS-1.1 to 10.7, and HOOKS-4.16, appears in exactly one `Satisfies:` line above, except the two deliberately unmapped:
+Every ID of HOOKS-1.1 to 10.7 appears in exactly one `Satisfies:` line above, except the two deliberately unmapped:
 - HOOKS-9.3 and HOOKS-9.7 guard the Awake Actions, Lease model and timing constants. `modules/awake/` is not edited, so no section satisfies them; they are discharged by the existing Awake test suite staying green and by a diff check that `modules/awake/` is untouched.
 
 HOOKS-7.4 is satisfied by *no code*, as noted in Core wiring.

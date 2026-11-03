@@ -456,7 +456,7 @@ _Requirements: HOOKS-1.1, HOOKS-2.2, HOOKS-10.7_
 ### Task 16: Install `StopFailure` for Claude Code (operator amendment, 2026-11-03)
 
 **Files:**
-- Modify: `modules/integrations/src/domain/hookfile.rs`, `modules/integrations/tests/fixtures/claude_installed.json`, `modules/integrations/tests/common/mod.rs`, `modules/integrations/tests/status.rs`, `modules/integrations/tests/install.rs`, `modules/integrations/tests/repair.rs`, `modules/integrations/tests/remove.rs`, `crates/ffi/tests/integrations.rs`, `apps/cli/tests/cli.rs`, `docs/features/integrations.md`, `docs/architecture/integrations.md`
+- Modify: `modules/integrations/src/domain/hookfile.rs`, `modules/integrations/tests/fixtures/claude_installed.json`, `modules/integrations/tests/common/mod.rs`, `modules/integrations/tests/status.rs`, `modules/integrations/tests/install.rs`, `modules/integrations/tests/repair.rs`, `modules/integrations/tests/remove.rs`, `docs/features/integrations.md`, `docs/architecture/integrations.md`
 - Already amended with this task: `docs/ARCHITECTURE.md`, `docs/standards/errors-logging.md`
 
 **Reuse:** rung 2 — `required_events`, `desired`, `converge`, `classify` (`modules/integrations/src/domain/hookfile.rs`); `navori hook` already maps `StopFailure` to `stop_session`.
