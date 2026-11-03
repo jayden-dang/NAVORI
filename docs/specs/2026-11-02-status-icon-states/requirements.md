@@ -180,6 +180,12 @@ Files this feature touches, with what they guard:
 
 - **Performance:** **ICON-11.1** WHEN `cargo xtask perf` runs THE SYSTEM SHALL stay inside the GOAL-11 budget in `docs/standards/performance.md`, with no signal, phase or metric added by this feature — verified by `cargo xtask perf`.
 - **Performance:** **ICON-11.2** WHEN this feature is delivered THE SYSTEM SHALL have Navori's CPU during the Loop recorded in this file, measured by hand as the median of 5 windows of 12 seconds on a debug Sample with the panel closed, against the static Icon, using the rule that 0.05% rounds to 0.1 and fails. Delivery needs the number recorded, not a passing number. A result above 0.0 after rounding reopens the Loop (see Comes back if).
+  - **Loop cost: not yet measured.** Owed by the user; it needs a live GUI. On a debug build with the AI Sample on and the panel closed, and again with the static normal Sample, run `/usr/bin/top -l 6 -s 12 -stats cpu -pid <Navori Dev pid>`, drop the first sample (cumulative), and take the median of the other 5 windows. Do the same for WindowServer. Record both below with the machine and its load. If Navori rounds above 0.0, the Loop reopens.
+
+    | Case | Navori CPU % | WindowServer CPU % | Machine and load |
+    |---|---|---|---|
+    | AI Sample, panel closed | Not yet measured | Not yet measured | Not yet measured |
+    | Normal Sample (static) | Not yet measured | Not yet measured | Not yet measured |
 - **Performance:** **ICON-11.3** WHEN that measurement is taken THE SYSTEM SHALL have WindowServer's CPU recorded beside it, with no budget, and no wake-up count offered as evidence, because the counter read 0 for a 10 fps timer in the spike — verified by reading the recorded numbers.
 - **Performance:** **ICON-11.4** WHILE the menu is closed THE SYSTEM SHALL fire no timer more often than every 30 seconds for the Icon (ARCH-16) — verified by searching the Icon's drawing code for `Timer`, `DispatchSourceTimer` and `CADisplayLink`. This is not recorded as met until the Loop's drawing method is chosen.
 - **Security:** **ICON-11.5** THE SYSTEM SHALL NOT put the raw text of a bad config value, or a TOML source snippet, in `tray`, which crosses the local IPC socket (TB-2) — verified by a test in `crates/ffi/tests/config_privacy.rs` reading `tray` with a bad value in `config.toml`.

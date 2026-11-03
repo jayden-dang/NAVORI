@@ -180,7 +180,7 @@ Guards named above:
 - **MENU-G1** (guard) WHEN level 0 opens from a click THE SYSTEM SHALL CONTINUE TO anchor it under the status button, clamped 8 pt inside the screen's visible frame.
 - **MENU-G2** (guard) IF the status button has no real on-screen frame THEN THE SYSTEM SHALL CONTINUE TO place level 0 at the top of the main screen's visible frame.
 - **MENU-G3** (guard) WHEN the user clicks the status button with the panel open THE SYSTEM SHALL CONTINUE TO have the toggle handle that click, not the outside-click monitor.
-- **MENU-G4** (guard) WHEN `store.health` changes THE SYSTEM SHALL CONTINUE TO update the status icon with the same four symbols.
+- ~~**MENU-G4** (guard) WHEN `store.health` changes THE SYSTEM SHALL CONTINUE TO update the status icon with the same four symbols.~~ Replaced by ICON (`docs/specs/2026-11-02-status-icon-states/`): the icon now follows the Core's composed `tray`, drawn as the fold glyphs, not four SF Symbols.
 - **MENU-G5** (guard) WHEN `cargo xtask perf` sends `SIGUSR1` THE SYSTEM SHALL CONTINUE TO close any open menu with no animation, start the clock after that close, and log `menuOpened ms=.. first=.. modules=..` in today's format at the first presented frame, with `modules` from `CoreStore.moduleCount`.
 - **MENU-G6** (guard) WHEN the Shell reports menu visibility THE SYSTEM SHALL CONTINUE TO go through `CoreStore.setPanelVisible`.
 - **MENU-G7** (guard) WHEN the user right-clicks the status item THE SYSTEM SHALL CONTINUE TO show the native `NSMenu` with `Open`, `Settings…`, `Open Logs Folder` and `Quit`.
