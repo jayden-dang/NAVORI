@@ -11,7 +11,8 @@ struct AwakeSubmenuView: View {
             status: store.awakeBlockStatus,
             leases: store.awakeLeases,
             displayHeld: store.displayHeld,
-            displayWanted: store.displayWanted
+            displayWanted: store.displayWanted,
+            actionFailure: store.awakeActionMessage
         )
     }
 

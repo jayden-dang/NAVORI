@@ -63,28 +63,34 @@ public struct AwakeSubmenuState: Equatable, Sendable {
         status: AwakeBlockStatus,
         leases: [AwakeLeaseInput],
         displayHeld: Bool,
-        displayWanted: Bool
+        displayWanted: Bool,
+        actionFailure: String? = nil
     ) {
         let counted = Self.leaseDetail(leases.count)
+        var detail: String
         switch status {
         case .off:
             statusTitle = "Awake off"
-            statusDetail = "No Leases"
+            detail = "No Leases"
         case .on(let since):
             if displayWanted, displayHeld == false {
                 statusTitle = "Display not held"
-                statusDetail = counted
+                detail = counted
             } else {
                 statusTitle = since.isEmpty ? "Awake" : "Awake · since \(since)"
-                statusDetail = displayWanted && displayHeld ? "\(counted) · display kept on" : counted
+                detail = displayWanted && displayHeld ? "\(counted) · display kept on" : counted
             }
         case .notHeld:
             statusTitle = "Can't hold this Mac awake"
-            statusDetail = "macOS refused the request. Navori keeps trying."
+            detail = "macOS refused the request. Navori keeps trying."
         case .unavailable:
             statusTitle = "Unavailable"
-            statusDetail = ""
+            detail = ""
         }
+        if let actionFailure, actionFailure.isEmpty == false {
+            detail = actionFailure
+        }
+        statusDetail = detail
         releaseAllEnabled = leases.isEmpty == false
         displayLabel = displayWanted ? "Display off" : "Display on"
         holdingRows = leases.map(Self.holdingRow)

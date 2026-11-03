@@ -36,7 +36,7 @@ struct PanelView: View {
     }
 
     private var awakeRow: MenuRow {
-        let state = AwakeRowState(status: store.awakeStatus)
+        let state = AwakeRowState(status: store.awakeStatus, actionFailure: store.awakeActionMessage)
         return MenuRow(
             id: "awake",
             icon: "cup.and.saucer",

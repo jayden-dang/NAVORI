@@ -26,6 +26,7 @@ final class CoreStore {
 
     @ObservationIgnored private var core: NavoriCore?
     @ObservationIgnored private let log = Logger(subsystem: "dev.navori", category: "core")
+    private var awakeActionFailure: AwakeActionFailure?
 
     func start() {
         guard core == nil else { return }
@@ -117,13 +118,32 @@ final class CoreStore {
     /// Missing record, or the module stopped, is `Unavailable`. A lease with no system assertion is `Not held`.
     var awakeStatus: AwakeStatus {
         guard let awake = snapshot?.awake else { return .unavailable }
-        if awake.problem == Self.moduleStopped { return .unavailable }
-        if awake.leases.isEmpty { return .off }
-        guard awake.systemHeld else { return .notHeld }
-        return .on(sources: awake.leases.compactMap(awakeSourceName))
+        return AwakeLevel0.row(
+            problem: awake.problem,
+            systemHeld: awake.systemHeld,
+            hasLease: awake.leases.isEmpty == false,
+            sources: awake.leases.compactMap(awakeSourceName)
+        )
     }
 
-    private static let moduleStopped = "The Awake module stopped."
+    /// The failed menu action still on screen, if a later snapshot has not achieved it.
+    var awakeActionMessage: String? {
+        awakeActionFailure?.visible(against: awakeMarks)
+    }
+
+    private var awakeMarks: AwakeHeldMarks {
+        Self.marks(of: snapshot?.awake)
+    }
+
+    private static func marks(of awake: AwakeView?) -> AwakeHeldMarks {
+        let leases = awake?.leases ?? []
+        return AwakeHeldMarks(
+            durationEndsAtMs: leases.first { $0.kind == "duration" }?.endsAtMs,
+            hasUntilOff: leases.contains { $0.kind == "until_off" },
+            hasDisplay: leases.contains { $0.kind == "display" },
+            hasLease: leases.isEmpty == false
+        )
+    }
 
     /// Session rows name the harness only. Other leases use the label the module already published.
     private func awakeSourceName(_ lease: LeaseView) -> String? {
@@ -139,6 +159,12 @@ final class CoreStore {
         case .unavailable: .unavailable
         case .on:
             .on(since: snapshot?.awake?.sinceMs.map(Self.clockText) ?? "")
+        case .problem:
+            if snapshot?.awake?.systemHeld == true {
+                .on(since: snapshot?.awake?.sinceMs.map(Self.clockText) ?? "")
+            } else {
+                .off
+            }
         }
     }
 
@@ -154,26 +180,33 @@ final class CoreStore {
 
     func holdOneHour() async {
         let seconds = AwakeSubmenuState.menuHoldSeconds
-        await performAwake("{\"hold_for\":{\"seconds\":\(seconds)}}")
+        await performAwake("{\"hold_for\":{\"seconds\":\(seconds)}}", request: .duration)
     }
 
     func holdUntilOff() async {
-        await performAwake("\"hold_until_off\"")
+        await performAwake("\"hold_until_off\"", request: .untilOff)
     }
 
     func setDisplay(on: Bool) async {
-        await performAwake("{\"display\":{\"on\":\(on)}}")
+        await performAwake("{\"display\":{\"on\":\(on)}}", request: .display(on))
     }
 
     func releaseAll() async {
-        await performAwake("\"release_all\"")
+        await performAwake("\"release_all\"", request: .releaseAll)
     }
 
-    private func performAwake(_ actionJSON: String) async {
+    private func performAwake(_ actionJSON: String, request: AwakeActionFailure.Request) async {
         do {
             _ = try await dispatch(module: "awake", actionJSON: actionJSON)
+            awakeActionFailure = nil
         } catch {
-            log.error("awake command failed: \(error.localizedDescription, privacy: .public)")
+            let message = error.localizedDescription
+            log.error("awake command failed: \(message, privacy: .public)")
+            awakeActionFailure = AwakeActionFailure(
+                request: request,
+                message: message,
+                marks: awakeMarks
+            )
         }
     }
 
@@ -229,6 +262,9 @@ final class CoreStore {
 
     fileprivate func apply(_ snapshot: CoreSnapshot) {
         self.snapshot = snapshot
+        if let failure = awakeActionFailure, failure.visible(against: Self.marks(of: snapshot.awake)) == nil {
+            awakeActionFailure = nil
+        }
     }
 
     enum StoreError: LocalizedError {

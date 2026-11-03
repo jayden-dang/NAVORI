@@ -43,6 +43,17 @@ struct AwakeSubmenuStateTests {
         ])
     }
 
+    @Test func a_failed_menu_action_is_written_on_the_status_the_user_is_looking_at() {
+        let state = AwakeSubmenuState(
+            status: .off,
+            leases: [],
+            displayHeld: false,
+            displayWanted: false,
+            actionFailure: "The Navori core is not running."
+        )
+        #expect(state.statusDetail == "The Navori core is not running.")
+    }
+
     @Test func release_all_is_disabled_with_no_lease() {
         let state = AwakeSubmenuState(
             status: .off,
