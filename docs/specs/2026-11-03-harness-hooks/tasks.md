@@ -32,7 +32,7 @@ Source of truth (referenced, not copied — read before every task):
 |---|---|
 | `docs/standards/INDEX.md` | `f83e09733ee4` |
 | `docs/standards/testing.md` | `b1a9b42fc1d3` |
-| `docs/standards/errors-logging.md` | `f84b3ceeea11` |
+| `docs/standards/errors-logging.md` | `8696a9b77e1f` |
 | `docs/standards/performance.md` | `ebf1670ff150` |
 | `docs/architecture/INDEX.md` (ARCH-N) | `2e318bd23ff5` |
 
@@ -446,7 +446,31 @@ _Requirements: HOOKS-3.11, HOOKS-7.1, HOOKS-9.3, HOOKS-9.7, HOOKS-10.1_
 
 - [ ] **Step 1: Operator, with real Claude Code, Codex and Grok sessions and a signed dev build:** Install each Harness's hook from Settings → Integrations; confirm a session Lease appears on a prompt and ends after the turn; confirm Remove restores the config; confirm a dev install leaves a release entry alone.
 - [ ] **Step 2: Operator records:** whether macOS asks for permission to write `~/.claude`, `~/.codex` and `~/.grok`; whether Claude Code or Codex show a hook's standard error on exit 0; whether Grok's daemon route leaves a live Harness ancestor; how long after process start a `UserPromptSubmit` payload reaches stdin (a payload later than 0.7 s starts no Lease); Claude Code and Codex payload keys and `Stop` `reason`.
-- [ ] **Step 3: Operator checks the two documented gaps** (see the Known risks in `design.md`): whether Esc or an API error in a real Claude Code session leaves the Lease open until the next turn, `SessionEnd`, exit or the TTL; and whether a freshly installed Codex hook waits for trust in `/hooks` before it runs. Neither result is decided by this plan.
+- [ ] **Step 3: Operator checks the two documented gaps** (see the Known risks in `design.md`): whether Esc in a real Claude Code session leaves the Lease open until the next turn, `SessionEnd`, exit or the TTL, and whether an API error now ends it; and whether a freshly installed Codex hook waits for trust in `/hooks` before it runs. Neither result is decided by this plan.
 - [ ] **Step 4: Operator runs the keyboard and VoiceOver walk** of the Integrations tab and confirms its rows fit the 560×420 window.
 
 _Requirements: HOOKS-1.1, HOOKS-2.2, HOOKS-10.7_
+
+---
+
+### Task 16: Install `StopFailure` for Claude Code (operator amendment, 2026-11-03)
+
+**Files:**
+- Modify: `modules/integrations/src/domain/hookfile.rs`, `modules/integrations/tests/fixtures/claude_installed.json`, `modules/integrations/tests/common/mod.rs`, `modules/integrations/tests/status.rs`, `modules/integrations/tests/install.rs`, `modules/integrations/tests/repair.rs`, `modules/integrations/tests/remove.rs`, `crates/ffi/tests/integrations.rs`, `apps/cli/tests/cli.rs`, `docs/features/integrations.md`, `docs/architecture/integrations.md`
+- Already amended with this task: `docs/ARCHITECTURE.md`, `docs/standards/errors-logging.md`
+
+**Reuse:** rung 2 — `required_events`, `desired`, `converge`, `classify` (`modules/integrations/src/domain/hookfile.rs`); `navori hook` already maps `StopFailure` to `stop_session`.
+
+**Interfaces:**
+- Consumes: `required_events`
+- Produces: Claude Code's required set is `UserPromptSubmit`, `Stop`, `StopFailure`, `SessionEnd`; Codex keeps three events; Grok keeps five
+
+**Depends-on:** Task 14
+
+- [ ] **Step 1: Write failing tests.** Installing for Claude adds four entries, with `StopFailure` at timeout 2. A Claude set with the three old events reads Needs repair, and Repair adds the fourth and changes nothing else. Remove drops all four. Codex's required set stays three. Rename `installing_into_a_claude_file_adds_three_entries_and_keeps_foreign_hooks_and_key_order` to say four.
+- [ ] **Step 2: Implement** one separate event list for Claude in `required_events`. Update the fixtures and helpers that spell Claude's complete set. The repair and status tests that use `StopFailure` on Claude as an event Install would not write move to `StopCancelled`, which Claude does not install.
+- [ ] **Step 3: Update docs.** `docs/features/integrations.md`: the Install line, and the Not verified line about interrupts. `docs/architecture/integrations.md`: the event list, if it names Claude's events.
+- [ ] **Step 4: Run** `cargo xtask ci` — expect: pass.
+- [ ] **Step 5: Commit** `git commit -m "feat(integrations): install StopFailure for Claude Code"`
+
+_Requirements: HOOKS-4.16_

@@ -47,7 +47,7 @@ Retrieval (`load-subgraph`, schema 1.1, recipe `fsubr-1.2`, derived again at thi
 
 Both come from `research-hooks-claude-codex.md`. Neither is built around, and neither is run or measured.
 
-- **Interrupts and API errors leave a Lease open (audit item A1).** Claude Code's `Stop` "does not run if the stoppage occurred due to a user interrupt. API errors fire StopFailure instead" (code.claude.com/docs/en/hooks). With only `UserPromptSubmit`, `Stop` and `SessionEnd` installed (HOOKS-4.1), the Lease then ends at the next turn's `Stop`, at `SessionEnd`, when the Harness process exits, or at the 8 h TTL (AWAKE close-package.md:15), not when the work stopped. Grok installs `StopCancelled` and `StopFailure` (a Lock, ARCHITECTURE.md:305); Claude Code does not. Installing `StopFailure` for Claude Code would change HOOKS-4.1; that choice is the operator's (card D1, open), so the design leaves it. Codex is unchecked: an `Interrupt` event exists and whether `Stop` runs on an interrupt is not stated.
+- **An interrupt leaves a Lease open (audit item A1).** Claude Code's `Stop` "does not run if the stoppage occurred due to a user interrupt" (code.claude.com/docs/en/hooks), and no other event fires then. The Lease then ends at the next turn's `Stop`, at `SessionEnd`, when the Harness process exits, or at the 8 h TTL (AWAKE close-package.md:15), not when the work stopped. API errors fire `StopFailure`, which Claude Code now installs (HOOKS-4.16). Codex is unchecked: an `Interrupt` event exists and whether `Stop` runs on an interrupt is not stated.
 - **Codex runs a hook only after the user trusts it.** "New or changed hooks are marked for review and skipped until trusted" (learn.chatgpt.com/docs/hooks, raw). After Install or Repair a Codex row can read Installed while the hook is skipped, and each Repair changes the hash. Grok has only a folder trust before its global hooks load (`~/.grok/docs/user-guide/10-hooks.md:68-69`, verified locally); no per-hook trust step was seen for Claude Code or Grok, and that is unrun. What Settings and `navori doctor` say about it is the operator's choice; the design adds no code for it.
 
 ## Architecture
@@ -86,7 +86,7 @@ The Module is stateless between calls: `initial_state` is empty, so nothing is r
 
 ### Hook-file model (domain)
 
-Satisfies: HOOKS-3.3, HOOKS-3.4, HOOKS-3.5, HOOKS-3.6, HOOKS-3.7, HOOKS-3.8, HOOKS-4.1, HOOKS-4.2, HOOKS-4.3, HOOKS-4.4, HOOKS-4.5, HOOKS-4.8, HOOKS-4.10, HOOKS-5.1, HOOKS-5.2, HOOKS-5.3, HOOKS-5.5, HOOKS-6.1, HOOKS-6.2, HOOKS-6.3, HOOKS-6.5, HOOKS-8.1, HOOKS-8.2, HOOKS-8.3, HOOKS-9.6
+Satisfies: HOOKS-3.3, HOOKS-3.4, HOOKS-3.5, HOOKS-3.6, HOOKS-3.7, HOOKS-3.8, HOOKS-4.1, HOOKS-4.2, HOOKS-4.3, HOOKS-4.4, HOOKS-4.5, HOOKS-4.8, HOOKS-4.10, HOOKS-4.16, HOOKS-5.1, HOOKS-5.2, HOOKS-5.3, HOOKS-5.5, HOOKS-6.1, HOOKS-6.2, HOOKS-6.3, HOOKS-6.5, HOOKS-8.1, HOOKS-8.2, HOOKS-8.3, HOOKS-9.6
 Reuse: rung 5 — `serde_json::Value` with the `preserve_order` feature (decision 7); rung 3 — std only for the shell-string parse. New code (rung 7).
 Respects: ARCH-14
 Security: THR-9, TB-7
@@ -96,7 +96,7 @@ Locality: new — `modules/integrations/src/domain/`.
 
 Shape (verified read-only against the real `~/.codex/hooks.json` and `~/.grok/hooks/orca-status.json`; Claude Code's file is the documented same shape): `{"hooks": {"<Event>": [ {"hooks": [ {"type":"command","command":"…","timeout":N} ]} ]}}`. Navori's group is `{"hooks":[handler]}` with no `matcher`.
 
-- **Events.** Claude and Codex: `UserPromptSubmit`, `Stop`, `SessionEnd`. Grok: those plus `StopCancelled`, `StopFailure`. [Lock, ARCHITECTURE.md:304-306]
+- **Events.** Codex: `UserPromptSubmit`, `Stop`, `SessionEnd`. Claude: those plus `StopFailure` (operator's choice, HOOKS-4.16). Grok: those plus `StopCancelled`, `StopFailure`. [Lock, ARCHITECTURE.md:304-306]
 - **Command.** `'<helper>' hook` (release) or `'<helper>' --profile dev hook` (dev), the path in POSIX single quotes with `'` written `'\''`, so spaces in `Navori Dev.app` and any metacharacter are inert. [Weigh, picks-r1 F4; the quoting style is agent-decided]
 - **Timeout.** 2 for every event but `SessionEnd`, 1 for `SessionEnd`, as integers, for Claude and Grok; Codex follows C2. [agent-decided]
 - **Identity.** A handler is the running profile's if its `command` parses to one quoted program whose last three components are `Contents/Helpers/navori`, then exactly `hook` (release) or `--profile dev hook` (dev). A handler of the other profile, or any foreign command, is never touched. Only the single-quoted form is recognised: an older or hand-edited entry with double quotes or none counts as foreign, so Install may then add a second entry beside it; this is documented, not guarded. [agent-decided]
@@ -177,7 +177,7 @@ Locality: extend — `Cargo.toml`, `modules/integrations/Cargo.toml`, `docs/`.
 |---|---|---|
 | `hook::plan` (pure bytes → `Option<Plan>`) | unit | HOOKS-1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.3 |
 | `navori hook` binary against a real in-process Core (`running_core`, `apps/cli/tests/cli.rs`, existing), including `awake run -- echo hook` still running its command and returning its exit code, and runs with `NAVORI_PROFILE=bogus` (must exit 0, no output) and `NAVORI_PROFILE=dev` against a release Core (must reach the release Core) | integration | HOOKS-1.9, 1.10, 2.1, 2.2, 2.4, 2.5, 2.6, 8.4, 9.1, 10.2, 10.3 |
-| `domain::{classify, converge, strip}` over fixture trees (new, pure) | unit | HOOKS-3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 4.1, 4.2, 4.3, 4.4, 4.5, 4.8, 4.10, 5.1, 5.2, 5.3, 5.5, 6.1, 6.2, 6.3, 6.5, 8.1, 8.2, 8.3, 9.6 |
+| `domain::{classify, converge, strip}` over fixture trees (new, pure) | unit | HOOKS-3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 4.1, 4.2, 4.3, 4.4, 4.5, 4.8, 4.10, 4.16, 5.1, 5.2, 5.3, 5.5, 6.1, 6.2, 6.3, 6.5, 8.1, 8.2, 8.3, 9.6 |
 | `Integrations` Actions through the Kernel over a temp home (new; the one new public seam, same shape as the Awake tests in `modules/awake/tests/`) | integration | HOOKS-3.11, 3.12, 4.7, 4.9, 4.11, 4.12, 4.13, 4.14, 4.15, 5.4, 6.4, 10.4, 10.5, 10.6 |
 | `Inner::doctor` through the Core (`crates/ffi/tests/core.rs`, existing) | integration | HOOKS-4.6, 7.1, 7.2, 7.3, 7.4, 7.5, 9.2, 9.5 |
 | `cargo xtask perf` (existing) | e2e | HOOKS-10.1 |
@@ -185,7 +185,7 @@ Locality: extend — `Cargo.toml`, `modules/integrations/Cargo.toml`, `docs/`.
 
 ## Coverage check
 
-Every ID of HOOKS-1.1 to 10.7 appears in exactly one `Satisfies:` line above, except the two deliberately unmapped:
+Every ID of HOOKS-1.1 to 10.7, and HOOKS-4.16, appears in exactly one `Satisfies:` line above, except the two deliberately unmapped:
 - HOOKS-9.3 and HOOKS-9.7 guard the Awake Actions, Lease model and timing constants. `modules/awake/` is not edited, so no section satisfies them; they are discharged by the existing Awake test suite staying green and by a diff check that `modules/awake/` is untouched.
 
 HOOKS-7.4 is satisfied by *no code*, as noted in Core wiring.
