@@ -737,13 +737,85 @@ fn a_session_end_gives_up_within_one_second_when_the_core_never_answers() {
     assert!(took < start_cost + Duration::from_secs(1), "took {took:?}");
 }
 
+struct Relay {
+    home: tempfile::TempDir,
+    requests: Arc<std::sync::Mutex<Vec<Value>>>,
+    replies: Arc<std::sync::Mutex<Vec<Value>>>,
+}
+
+fn relay_to(core_home: &std::path::Path) -> Relay {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::{UnixListener, UnixStream};
+
+    let paths = |home: &std::path::Path| {
+        let uid = std::fs::metadata(home).unwrap().uid();
+        navori_config::Paths::new(navori_config::Profile::Dev, home, uid).socket
+    };
+    let upstream = paths(core_home);
+    let home = short_home();
+    let socket = paths(home.path());
+    std::fs::create_dir_all(socket.parent().unwrap()).unwrap();
+    let listener = UnixListener::bind(&socket).unwrap();
+    let requests = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let replies = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let (seen_requests, seen_replies) = (Arc::clone(&requests), Arc::clone(&replies));
+    std::thread::spawn(move || {
+        for client in listener.incoming() {
+            let Ok(client) = client else { break };
+            let core = UnixStream::connect(&upstream).unwrap();
+            let (mut to_client, mut to_core) =
+                (client.try_clone().unwrap(), core.try_clone().unwrap());
+            let seen = Arc::clone(&seen_replies);
+            std::thread::spawn(move || {
+                for line in BufReader::new(core).lines() {
+                    let Ok(line) = line else { break };
+                    seen.lock()
+                        .unwrap()
+                        .push(serde_json::from_str(&line).unwrap());
+                    if writeln!(to_client, "{line}").is_err() {
+                        break;
+                    }
+                }
+            });
+            let seen = Arc::clone(&seen_requests);
+            std::thread::spawn(move || {
+                for line in BufReader::new(client).lines() {
+                    let Ok(line) = line else { break };
+                    seen.lock()
+                        .unwrap()
+                        .push(serde_json::from_str(&line).unwrap());
+                    if writeln!(to_core, "{line}").is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+    });
+    Relay {
+        home,
+        requests,
+        replies,
+    }
+}
+
 #[test]
 fn a_stop_against_a_running_core_finishes_inside_its_deadline() {
     let start_cost = process_start_cost();
     let running = start_core(None);
-    let (output, took) = run_hook_with(hook_cmd(&running.home), STOP);
+    let relay = relay_to(running.home.path());
+    let (output, took) = run_hook_with(hook_cmd(&relay.home), STOP);
     println!("hook round trip against a running core: {took:?}");
     assert_silent_success(&output);
+    let requests = relay.requests.lock().unwrap();
+    assert_eq!(requests.len(), 1, "{requests:?}");
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"stop_session": {"session_id": "s-1"}})
+    );
+    let replies = relay.replies.lock().unwrap();
+    assert_eq!(replies.len(), 1, "{replies:?}");
+    assert_eq!(replies[0]["id"], requests[0]["id"]);
+    assert!(replies[0].get("result").is_some(), "{replies:?}");
     assert!(
         took < start_cost + Duration::from_millis(1500),
         "took {took:?}"
