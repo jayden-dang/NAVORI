@@ -72,6 +72,67 @@ pub(crate) fn identity_problem(env: Option<&str>, find_identity_stdout: &str) ->
     })
 }
 
+const COMPAT_LINE: &str = "- **Compat obligation:** External";
+
+/// Every reason a release must not be cut yet, from the outputs of the git queries and project.md.
+pub(crate) fn preflight(
+    version: &str,
+    local_tags: &str,
+    remote_tags: &str,
+    dirty: &str,
+    project_md: &str,
+) -> Result<(), String> {
+    let tag = format!("v{version}");
+    if !local_tags.trim().is_empty() {
+        return Err(format!("tag {tag} already exists locally"));
+    }
+    if !remote_tags.trim().is_empty() {
+        return Err(format!("tag {tag} already exists on origin"));
+    }
+    if !dirty.trim().is_empty() {
+        return Err(format!(
+            "uncommitted changes; commit or stash them first:\n{}",
+            dirty.trim_end()
+        ));
+    }
+    if !is_prerelease(version) && !project_md.lines().any(|l| l.starts_with(COMPAT_LINE)) {
+        return Err(format!(
+            "a final version needs a line starting `{COMPAT_LINE}` in docs/agents/project.md"
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn check(root: &Path) -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+    let tag = format!("v{version}");
+    let local_tags = output(
+        Command::new("git")
+            .args(["tag", "-l", &tag])
+            .current_dir(root),
+    )?;
+    let remote_tags = output(
+        Command::new("git")
+            .args(["ls-remote", "--tags", "origin", &tag])
+            .current_dir(root),
+    )?;
+    let dirty = output(
+        Command::new("git")
+            .args(["status", "--porcelain", "--untracked-files=no"])
+            .current_dir(root),
+    )?;
+    let path = root.join("docs/agents/project.md");
+    let project_md =
+        std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    preflight(version, &local_tags, &remote_tags, &dirty, &project_md)
+        .map_err(|problem| anyhow::anyhow!(problem))?;
+    super::ci(root)?;
+    ensure!(super::perf::run(root, false)?, "perf gate failed");
+    println!("{tag}");
+    println!("git tag {tag} && git push origin {tag}");
+    Ok(())
+}
+
 pub(crate) fn run(root: &Path, tag: &str, out: Option<&Path>, check: bool) -> Result<()> {
     let version = tag_version(tag, env!("CARGO_PKG_VERSION"))?;
     if check {
@@ -167,9 +228,11 @@ fn build_zip(root: &Path, out: &Path, zip_name: &str, sha_path: &Path) -> Result
 #[cfg(test)]
 mod tests {
     use super::{
-        cask_text, designated_lines, identity_problem, is_prerelease, requirement_mismatch,
-        tag_version,
+        cask_text, designated_lines, identity_problem, is_prerelease, preflight,
+        requirement_mismatch, tag_version,
     };
+
+    const COMPAT: &str = "# Project\n- **Compat obligation:** External\n";
 
     const LEAF: &str = "8c56e155bdd4ed3c038035509193fb7d33d302c1";
     const IDENTITIES: &str = "  1) 8C56E155BDD4ED3C038035509193FB7D33D302C1 \"Navori Local Signing\"\n     1 valid identities found\n";
@@ -183,6 +246,51 @@ mod tests {
             "designated => identifier \"dev.navori.app\" and certificate leaf = H\"{leaf}\"\n\
              designated => identifier \"dev.navori.app.cli\" and certificate leaf = H\"{leaf}\"\n"
         ))
+    }
+
+    #[test]
+    fn a_free_tag_on_a_clean_tree_passes() {
+        assert_eq!(preflight("0.1.0-rc.1", "", "", "", ""), Ok(()));
+    }
+
+    #[test]
+    fn a_tag_that_already_exists_locally_fails_naming_it() {
+        let err = preflight("0.1.0-rc.1", "v0.1.0-rc.1\n", "", "", "").unwrap_err();
+        assert!(
+            err.contains("v0.1.0-rc.1") && err.contains("locally"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_tag_that_already_exists_on_origin_fails_naming_it() {
+        let remote = "0123456789abcdef0123456789abcdef01234567\trefs/tags/v0.1.0\n";
+        let err = preflight("0.1.0", "", remote, "", COMPAT).unwrap_err();
+        assert!(err.contains("v0.1.0") && err.contains("origin"), "{err}");
+    }
+
+    #[test]
+    fn uncommitted_changes_fail_listing_the_files() {
+        let err = preflight("0.1.0-rc.1", "", "", " M Cargo.toml\n", "").unwrap_err();
+        assert!(err.contains("Cargo.toml"), "{err}");
+    }
+
+    #[test]
+    fn a_final_version_needs_the_external_compat_line() {
+        let err = preflight("0.1.0", "", "", "", "# Project\n").unwrap_err();
+        assert!(err.contains("- **Compat obligation:** External"), "{err}");
+        assert_eq!(preflight("0.1.0", "", "", "", COMPAT), Ok(()));
+    }
+
+    #[test]
+    fn a_compat_line_quoted_in_prose_does_not_count() {
+        let prose = "Add a `- **Compat obligation:** External` line when ready.\n";
+        assert!(preflight("0.1.0", "", "", "", prose).is_err());
+    }
+
+    #[test]
+    fn a_pre_release_does_not_need_the_compat_line() {
+        assert_eq!(preflight("0.1.0-rc.1", "", "", "", "# Project\n"), Ok(()));
     }
 
     #[test]

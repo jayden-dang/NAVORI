@@ -70,6 +70,8 @@ enum Cmd {
         #[arg(long)]
         check: bool,
     },
+    /// Gate a release locally (tag free, tree clean, ci, perf), then print the tag to push.
+    ReleaseCheck,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,6 +159,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         Cmd::Release { tag, out, check } => release::run(&root, &tag, out.as_deref(), check),
+        Cmd::ReleaseCheck => release::check(&root),
     }
 }
 
