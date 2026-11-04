@@ -15,5 +15,9 @@ futures.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
+[dev-dependencies]
+navori-secrets = { workspace = true, features = ["fake"] }
+tracing-subscriber.workspace = true
+
 [lints]
 workspace = true
