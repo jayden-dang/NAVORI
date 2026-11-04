@@ -7,11 +7,12 @@
 > for tracking.
 
 Feature code: SECRETS
-Status: In-progress
+Status: Implemented
 Date: 2026-11-03
 Approved by the operator ("approve", 2026-11-03 21:01, on the review page at e3b886c, no card selected).
 Execution-mode: continuous
 Delivered-by: PR #12
+Post-delivery note: review changed the final code from the code blocks below. The error wording lists the possible causes instead of "unlock the Keychain" (Task 3 and `OpenError` in Task 5), `entry()` in Task 5 became the single `call` helper with a `fail` constructor, and `FakeKeychain::item_count()` was added in Task 5. The blocks are the plan as approved, not the shipped code.
 Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
