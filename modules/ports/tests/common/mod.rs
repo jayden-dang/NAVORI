@@ -55,6 +55,7 @@ pub struct Gate {
     env_denied: AtomicBool,
     panic_once: AtomicBool,
     hold: Mutex<()>,
+    attempts: AtomicUsize,
 }
 
 impl Gate {
@@ -65,7 +66,13 @@ impl Gate {
             env_denied: AtomicBool::new(false),
             panic_once: AtomicBool::new(false),
             hold: Mutex::new(()),
+            attempts: AtomicUsize::new(0),
         }
+    }
+
+    /// How many times the process list was asked for, whether or not it was refused.
+    pub fn attempts(&self) -> usize {
+        self.attempts.load(Ordering::SeqCst)
     }
 
     pub fn deny(&self, denied: bool) {
@@ -93,6 +100,7 @@ impl ProcessSource for Gate {
     }
 
     fn list(&self) -> Result<Vec<ProcEntry>, PlatformError> {
+        self.attempts.fetch_add(1, Ordering::SeqCst);
         drop(self.hold.lock().unwrap_or_else(PoisonError::into_inner));
         assert!(
             !self.panic_once.swap(false, Ordering::SeqCst),
@@ -187,6 +195,15 @@ pub struct Rig {
 
 impl Rig {
     pub fn new() -> Self {
+        Self::opening(false)
+    }
+
+    /// A Module whose process source can never be opened.
+    pub fn unopenable() -> Self {
+        Self::opening(true)
+    }
+
+    fn opening(refused: bool) -> Self {
         let processes = Arc::new(FakeProcesses::new(501));
         let gate = Arc::new(Gate::new(Arc::clone(&processes) as Arc<dyn ProcessSource>));
         let (guard, home) = canonical_temp_home();
@@ -195,7 +212,13 @@ impl Rig {
         let containers = Arc::new(FakeContainers::new());
         let env = PortsEnv {
             home: home.clone(),
-            processes: Box::new(move || Ok(Arc::clone(&source))),
+            processes: Box::new(move || {
+                if refused {
+                    Err(PlatformError::Sysctl { errno: 1 })
+                } else {
+                    Ok(Arc::clone(&source))
+                }
+            }),
             containers: Arc::clone(&containers) as Arc<dyn Containers>,
         };
         let kernel =
@@ -246,6 +269,20 @@ impl Rig {
             std::thread::sleep(Duration::from_millis(5));
         }
         panic!("no scan finished: {}", self.state());
+    }
+
+    /// Waits until a scan that began after the gate's attempt count was `mark` has published.
+    pub async fn settle_scan_after(&self, mark: usize) {
+        for _ in 0..200 {
+            self.idle().await;
+            if self.gate.attempts() > mark {
+                std::thread::sleep(Duration::from_millis(20));
+                self.idle().await;
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        panic!("no scan began: {}", self.state());
     }
 
     /// Waits until a failed scan has published its problem.

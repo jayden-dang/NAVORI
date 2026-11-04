@@ -16,6 +16,9 @@ use crate::{Ports, PortsEnv};
 
 const FIRST_SCAN: Duration = Duration::from_secs(5);
 const OPEN_PROBLEM: &str = "Ports could not read the process list.";
+const SCAN_FAILED: &str = "a port scan could not read the process list";
+const OPEN_FAILED: &str = "the process source could not be opened";
+const RECOVERED: &str = "port scans work again";
 const OPEN_CADENCE: Duration = Duration::from_secs(3);
 const CLOSED_CADENCE: Duration = Duration::from_secs(30);
 
@@ -27,6 +30,21 @@ struct Finished {
 struct InFlight {
     started: SystemTime,
     task: tokio::task::JoinHandle<Result<Finished, tokio::task::JoinError>>,
+}
+
+impl Drop for InFlight {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
+}
+
+fn note(failing: &mut bool, failure: Option<&'static str>) {
+    match (failure, *failing) {
+        (Some(text), false) => tracing::warn!("{text}"),
+        (None, true) => tracing::info!("{RECOVERED}"),
+        _ => {}
+    }
+    *failing = failure.is_some();
 }
 
 async fn finished(in_flight: &mut Option<InFlight>) -> anyhow::Result<(SystemTime, Finished)> {
@@ -78,6 +96,7 @@ impl Ports {
         let mut wait = ctx.wait_handle();
         let mut deadline = Some(wait.now() + FIRST_SCAN);
         let mut in_flight: Option<InFlight> = None;
+        let mut failing = false;
         loop {
             tokio::select! {
                 biased;
@@ -85,6 +104,7 @@ impl Ports {
                     in_flight = None;
                     let (started, outcome) = done?;
                     self.memo = outcome.memo;
+                    note(&mut failing, outcome.result.as_ref().err().map(|_| SCAN_FAILED));
                     publish(ctx, started, outcome.result);
                     deadline = Some(wait.now() + cadence(wait.panel_visible()));
                 }
@@ -102,6 +122,7 @@ impl Ports {
                             match self.start_scan(now) {
                                 Ok(task) => in_flight = Some(task),
                                 Err(problem) => {
+                                    note(&mut failing, Some(OPEN_FAILED));
                                     publish(ctx, now, Err(problem));
                                     deadline = Some(now + cadence(wait.panel_visible()));
                                 }
@@ -144,13 +165,10 @@ impl Ports {
                     memo,
                     result: Ok(with_docker(containers, home, scan).await),
                 }),
-                Ok((Err(err), memo)) => {
-                    tracing::warn!(error = %err, "a port scan could not read the process list");
-                    Ok(Finished {
-                        memo,
-                        result: Err(err.to_string()),
-                    })
-                }
+                Ok((Err(err), memo)) => Ok(Finished {
+                    memo,
+                    result: Err(err.to_string()),
+                }),
                 Err(err) => Err(err),
             }
         });
@@ -163,10 +181,7 @@ impl Ports {
         }
         match (self.env.processes)() {
             Ok(source) => Ok(Arc::clone(self.source.insert(source))),
-            Err(err) => {
-                tracing::warn!(error = %err, "the process source could not be opened");
-                Err(OPEN_PROBLEM.to_owned())
-            }
+            Err(_) => Err(OPEN_PROBLEM.to_owned()),
         }
     }
 }

@@ -4,7 +4,7 @@ mod common;
 
 use std::time::Duration;
 
-use common::{ORIGIN_MS, Rig};
+use common::{LogCapture, ORIGIN_MS, Rig};
 use navori_kernel::{Module, TrayGlyph};
 use navori_macos::fake::FakeProcess;
 use navori_mod_ports::{DockerError, Ports, PortsState};
@@ -102,4 +102,65 @@ async fn port_counts_never_turn_on_attention() {
     let unscanned = Ports::tray(&PortsState::default());
     assert_eq!(unscanned.attention, None);
     assert_eq!(unscanned.glyph, None);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_scan_that_keeps_failing_is_logged_once_and_its_recovery_once() {
+    let logs = LogCapture::start();
+    let rig = Rig::new();
+    rig.processes.add(
+        FakeProcess::new(100, 1, 501, 10_100, "/usr/local/bin/node").listen("127.0.0.1", 3000),
+    );
+    first_scan(&rig).await;
+    rig.gate.deny(true);
+    for _ in 0..2 {
+        let mark = rig.gate.attempts();
+        rig.advance(Duration::from_secs(30)).await;
+        rig.settle_scan_after(mark).await;
+    }
+    assert_eq!(logs.text().matches("WARN").count(), 1, "{}", logs.text());
+
+    rig.gate.deny(false);
+    let mark = rig.gate.attempts();
+    rig.advance(Duration::from_secs(30)).await;
+    rig.settle_scan_after(mark).await;
+    rig.advance(Duration::from_secs(30)).await;
+    rig.settle_at(ORIGIN_MS + 125_000).await;
+    assert_eq!(logs.text().matches("WARN").count(), 1, "{}", logs.text());
+    assert_eq!(
+        logs.text().matches("work again").count(),
+        1,
+        "{}",
+        logs.text()
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_process_source_that_cannot_be_opened_is_logged_once_per_outage() {
+    let logs = LogCapture::start();
+    let rig = Rig::unopenable();
+    for _ in 0..3 {
+        rig.advance(Duration::from_secs(30)).await;
+        rig.idle().await;
+    }
+    assert!(rig.state()["problem"].is_string());
+    assert_eq!(logs.text().matches("WARN").count(), 1, "{}", logs.text());
+}
+
+#[allow(clippy::await_holding_lock)]
+#[tokio::test(start_paused = true)]
+async fn a_scan_in_flight_when_the_module_stops_does_not_carry_on() {
+    let rig = Rig::new();
+    rig.processes
+        .add(FakeProcess::new(100, 1, 501, 10_100, BACKEND).listen("127.0.0.1", 5432));
+    let hold = rig.gate.block();
+    rig.advance(Duration::from_secs(5)).await;
+    assert_eq!(rig.gate.attempts(), 1);
+
+    rig.kernel.shutdown().await;
+    drop(hold);
+    std::thread::sleep(Duration::from_millis(100));
+    rig.idle().await;
+
+    assert_eq!(rig.containers.calls(), 0);
 }
