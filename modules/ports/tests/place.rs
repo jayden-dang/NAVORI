@@ -5,9 +5,11 @@ mod common;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
 
 use common::canonical_temp_home;
-use navori_mod_ports::{BranchName, Placement, place_listener};
+use navori_macos::fake::{FakeProcess, FakeProcesses};
+use navori_mod_ports::{BranchName, Placement, Scanner, place_listener};
 use navori_procs::Unavailable;
 
 fn git(dir: &Path, args: &[&str]) {
@@ -179,4 +181,110 @@ fn a_repo_that_is_the_home_directory_itself_places_nothing() {
 
     let found = placed(Ok(&sub), Err(Unavailable::Exited), &fx.home);
     assert_eq!(found, Placement::default());
+}
+
+fn scanned_placement(home: &Path, process: FakeProcess) -> Placement {
+    let source = Arc::new(FakeProcesses::new(501));
+    source.add(process.listen("127.0.0.1", 3000));
+    let scan = Scanner::new(source, home.to_path_buf()).scan().unwrap();
+    assert_eq!(scan.entries.len(), 1);
+    scan.entries[0].place.clone()
+}
+
+fn server(exe: &str) -> FakeProcess {
+    FakeProcess::new(100, 1, 501, 10_000, exe)
+}
+
+#[test]
+fn a_scanned_listener_is_placed_by_its_working_directory() {
+    let fx = fixture();
+    let app = fx.home.join("work").join("app");
+    init_repo(&app);
+    git(&app, &["worktree", "add", ".worktrees/lane", "-b", "lane"]);
+    let lane = app.join(".worktrees").join("lane");
+
+    let in_repo = scanned_placement(&fx.home, server("/usr/local/bin/node").cwd(&app));
+    assert_eq!(
+        in_repo,
+        Placement {
+            branch: Some(BranchName::Named("main".to_owned())),
+            ..project_only("app")
+        }
+    );
+
+    let in_worktree = scanned_placement(&fx.home, server("/usr/local/bin/node").cwd(&lane));
+    assert_eq!(
+        in_worktree,
+        Placement {
+            project: Some("app".to_owned()),
+            worktree: Some("lane".to_owned()),
+            branch: Some(BranchName::Named("lane".to_owned())),
+            missing_path: None,
+        }
+    );
+}
+
+#[test]
+fn a_scanned_listener_without_a_repo_by_directory_is_placed_by_its_executable() {
+    let fx = fixture();
+    let tool = fx.home.join("tools").join("cli");
+    init_repo(&tool);
+    fs::create_dir_all(tool.join("bin")).unwrap();
+    let plain = fx.home.join("plain");
+    fs::create_dir_all(&plain).unwrap();
+    let exe = tool.join("bin").join("serve");
+
+    let placement = scanned_placement(&fx.home, server(exe.to_str().unwrap()).cwd(&plain));
+    assert_eq!(
+        placement,
+        Placement {
+            branch: Some(BranchName::Named("main".to_owned())),
+            ..project_only("cli")
+        }
+    );
+}
+
+#[test]
+fn a_scanned_listener_with_neither_directory_nor_executable_in_a_repo_has_no_project() {
+    let fx = fixture();
+    let plain = fx.home.join("plain");
+    fs::create_dir_all(&plain).unwrap();
+
+    let placement = scanned_placement(&fx.home, server("/usr/local/bin/node").cwd(&plain));
+    assert_eq!(placement, Placement::default());
+}
+
+#[test]
+fn a_removed_directory_without_a_counted_repo_above_it_falls_through_to_the_executable() {
+    let fx = fixture();
+    let tool = fx.home.join("tools").join("cli");
+    init_repo(&tool);
+    fs::create_dir_all(tool.join("bin")).unwrap();
+    let plain = fx.home.join("plain");
+    let gone = plain.join("deleted");
+    fs::create_dir_all(&plain).unwrap();
+
+    let by_exe = placed(Ok(&gone), Ok(&tool.join("bin").join("serve")), &fx.home);
+    assert_eq!(by_exe.project.as_deref(), Some("cli"));
+    assert_eq!(by_exe.missing_path, None);
+
+    let nowhere = placed(Ok(&gone), Ok(Path::new("/usr/local/bin/node")), &fx.home);
+    assert_eq!(nowhere, Placement::default());
+}
+
+#[test]
+fn a_removed_executable_directory_is_placed_by_its_nearest_existing_ancestor_and_keeps_no_missing_path()
+ {
+    let fx = fixture();
+    let tool = fx.home.join("tools").join("cli");
+    init_repo(&tool);
+    let plain = fx.home.join("plain");
+    fs::create_dir_all(&plain).unwrap();
+    let exe = tool.join("gone").join("serve");
+
+    let placement = placed(Ok(&plain), Ok(&exe), &fx.home);
+    assert_eq!(placement.project.as_deref(), Some("cli"));
+    assert_eq!(placement.worktree, None);
+    assert_eq!(placement.branch, None);
+    assert_eq!(placement.missing_path, None);
 }

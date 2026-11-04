@@ -1,15 +1,11 @@
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 
 use navori_procs::{Branch, Field, Repo, find_repo};
 
 use crate::state::{BranchName, Placement};
 
 /// Places a listener by its working directory, then by the directory of its executable.
-pub fn place_listener(
-    cwd: Field<std::path::PathBuf>,
-    exe: Field<std::path::PathBuf>,
-    home: &Path,
-) -> Placement {
+pub fn place_listener(cwd: Field<PathBuf>, exe: Field<PathBuf>, home: &Path) -> Placement {
     if let Ok(cwd) = cwd {
         let placed = place(&cwd, home);
         if placed.project.is_some() {
