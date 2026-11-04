@@ -91,6 +91,26 @@ async fn a_sized_reply_is_read_and_only_four_fields_are_kept() {
 }
 
 #[tokio::test]
+async fn only_tcp_publishes_are_kept() {
+    let body = r#"[{"Id":"a","Names":["/dns"],"Ports":[{"IP":"127.0.0.1","PrivatePort":53,"PublicPort":5353,"Type":"udp"}]},{"Id":"b","Names":["/both"],"Ports":[{"IP":"127.0.0.1","PrivatePort":80,"PublicPort":8080,"Type":"tcp"},{"IP":"127.0.0.1","PrivatePort":80,"PublicPort":8080,"Type":"udp"}]}]"#;
+    let served = serve(say(sized(body)));
+    let ports: Vec<_> = read(&served)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|container| (container.id, container.ports))
+        .collect();
+    let loopback = "127.0.0.1".parse::<IpAddr>().unwrap();
+    assert_eq!(
+        ports,
+        vec![
+            ("a".to_owned(), vec![]),
+            ("b".to_owned(), vec![(loopback, 8080)]),
+        ]
+    );
+}
+
+#[tokio::test]
 async fn a_chunked_reply_with_trailers_is_read() {
     let (first, second) = BODY.split_at(40);
     let reply = format!(

@@ -355,6 +355,8 @@ struct Published {
     ip: Option<String>,
     #[serde(rename = "PublicPort")]
     public: Option<u16>,
+    #[serde(rename = "Type")]
+    protocol: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -377,6 +379,7 @@ fn container(listed: Listed) -> Container {
     let ports = listed
         .ports
         .into_iter()
+        .filter(|port| port.protocol.as_deref() == Some("tcp"))
         .filter_map(|port| Some((port.ip?.parse().ok()?, port.public?)))
         .collect();
     let working_dir = listed
