@@ -364,6 +364,7 @@ async fn a_failing_audit_write_stops_the_send() {
 
 #[tokio::test]
 async fn a_panicking_audit_sink_stops_the_send() {
+    keep_callsites_interested();
     let mut harness = Harness::with_key();
     harness.audit_mode = AuditMode::Panic;
 
@@ -493,7 +494,24 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Capture {
     }
 }
 
+/// A test thread with no subscriber can register a callsite as "never interested" while another
+/// test thread is installing its capture, and the capture then misses that thread's event. One
+/// process-wide subscriber that accepts every level and discards the output keeps every callsite
+/// interested; each test's own `set_default` still takes precedence on its thread.
+fn keep_callsites_interested() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        let _ = tracing::subscriber::set_global_default(
+            tracing_subscriber::fmt()
+                .with_max_level(tracing::Level::TRACE)
+                .with_writer(io::sink)
+                .finish(),
+        );
+    });
+}
+
 fn capture_logs() -> (Capture, tracing::subscriber::DefaultGuard) {
+    keep_callsites_interested();
     let capture = Capture::default();
     let guard = tracing::subscriber::set_default(
         tracing_subscriber::fmt()
