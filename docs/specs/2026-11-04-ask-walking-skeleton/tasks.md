@@ -291,11 +291,11 @@ _Requirements: ASK-8.1, ASK-8.2, ASK-8.3_
 
 **Depends-on:** Task 5b, Task 6, Task 7, Task 8
 
-- [ ] **Step 1: Edit the docs** — `dependencies.md`: `navori-llm`/`navori-context` in the crate table with allowed edges (`ai/context` → `redact`, `secrets`; `ai/llm` → `secrets`; `ffi` → both), `reqwest` row marked in use with its version; `map.md` and `modules.md`: `ai/llm/` and `ai/context/` landed, `navori-llm`/`navori-context` named; `data.md`: Owner `context`, table `context_audit` (columns as in design Decision 7) and the Keychain account `llm-provider/deepseek`; `errors-logging.md:12`: name `CoreError::Secrets`; catalog card `ASK` status stays `Draft` (the execute skill moves it).
-- [ ] **Step 2: Whole gate** — `cargo xtask ci` — expect: fmt, clippy, tests, `check-deps`, `build-core` and the Swift build all pass; report the scope run.
+- [x] **Step 1: Edit the docs** — `dependencies.md`: `navori-llm`/`navori-context` in the crate table with allowed edges (`ai/context` → `redact`, `secrets`; `ai/llm` → `secrets`; `ffi` → both), `reqwest` row marked in use with its version; `map.md` and `modules.md`: `ai/llm/` and `ai/context/` landed, `navori-llm`/`navori-context` named; `data.md`: Owner `context`, table `context_audit` (columns as in design Decision 7) and the Keychain account `llm-provider/deepseek`; `errors-logging.md:12`: name `CoreError::Secrets`; catalog card `ASK` status stays `Draft` (the execute skill moves it).
+- [x] **Step 2: Whole gate** — `cargo xtask ci` — expect: fmt, clippy, tests, `check-deps`, `build-core` and the Swift build all pass; report the scope run.
 - [ ] **Step 3: Perf comparison, one session on an idle machine** — create a temporary worktree at `git merge-base HEAD main`, run `cargo xtask perf` there and then on this branch, without `--record`; compare idle CPU, wakeups, footprint, cold start and menu open (no regression against the base measured in the same session), and record the release `.app` size and idle footprint added by `reqwest`. If a budget breaks, the fallbacks are trimming reqwest's default features, then `native-tls`; neither is decided here. Remove the temporary worktree afterwards.
-- [ ] **Step 4: Trace check** — `audit-trace` over `docs/specs/2026-11-04-ask-walking-skeleton/`: every ASK ID is defined once and cited by a task footer.
-- [ ] **Step 5: Commit** — `git commit -m "docs(ask): record the AI crates, the audit table and the Keychain slot"`.
+- [x] **Step 4: Trace check** — `audit-trace` over `docs/specs/2026-11-04-ask-walking-skeleton/`: every ASK ID is defined once and cited by a task footer.
+- [x] **Step 5: Commit** — `git commit -m "docs(ask): record the AI crates, the audit table and the Keychain slot"`.
 
 _Requirements: ASK-10.1_
 
