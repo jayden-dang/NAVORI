@@ -388,6 +388,7 @@ _Requirements: PSTOP-1.17, PSTOP-1.11, PSTOP-1.12, PSTOP-1.13, PSTOP-1.14, PSTOP
   - stoppable: `a_database_and_a_system_port_are_left_out_of_the_group_requests_but_have_their_own_pid_request`, `a_container_is_in_the_group_request_and_a_database_image_container_is_not`, `an_unclaimed_docker_entry_has_no_stop_request`
   - `stop_all_holds_each_idle_named_project_with_a_stoppable_port_and_never_other`, `the_counts_equal_the_ports_in_the_requests_sent`, `other_ports_left_counts_the_ports_in_other`
   - `the_view_carries_the_project_path_and_the_oldest_listeners_start`
+  - `a_port_row_carries_its_worktree_and_harness_and_a_docker_port_carries_no_harness`
   - `two_ports_of_one_process_are_one_target_and_count_as_two_ports`
   - `a_repo_literally_named_other_stays_a_named_project_not_the_no_project_group`
   - `a_row_stop_request_exists_only_for_an_idle_project_and_a_child_stop_request_for_every_known_project`
@@ -399,7 +400,7 @@ _Requirements: PSTOP-1.17, PSTOP-1.11, PSTOP-1.12, PSTOP-1.13, PSTOP-1.14, PSTOP
 - [ ] **Step 4: Wire** `snapshot()` and rebase onto `main` first (shared ffi files). Run `cargo test -p navori-ffi && cargo xtask ci` — expect: pass (it also builds the Swift shell, which must still compile with the new field unused).
 - [ ] **Step 5: Commit** `git commit -m "feat(ffi): join ports and awake into one running view"`
 
-_Requirements: PSTOP-4.1, PSTOP-4.2, PSTOP-4.3, PSTOP-4.4, PSTOP-4.5, PSTOP-4.6, PSTOP-4.7, PSTOP-4.12, PSTOP-4.20, PSTOP-4.21, PSTOP-7.3_
+_Requirements: PSTOP-4.1, PSTOP-4.2, PSTOP-4.3, PSTOP-4.4, PSTOP-4.5, PSTOP-4.6, PSTOP-4.7, PSTOP-4.12, PSTOP-4.20, PSTOP-4.21, PSTOP-6.9, PSTOP-7.3_
 
 ---
 
@@ -507,13 +508,13 @@ _Requirements: PSTOP-5.2, PSTOP-5.3, PSTOP-5.4, PSTOP-5.5, PSTOP-5.6, PSTOP-5.7,
 
 **Depends-on:** Task 10, Task 11
 
-- [ ] **Step 1: Write the failing tests** in `RunningStateTests.swift`: `the_header_shows_up_only_for_a_project_with_no_working_session`, `a_section_with_no_rows_is_left_out`, `a_working_project_still_has_stop_n_ports_in_its_child` (from `child_stop_request`), `other_says_how_many_system_ports_are_hidden`, `every_row_reads_as_one_sentence_with_its_state_word`, `a_port_stop_uses_the_pid_request_for_a_process_and_the_project_request_for_a_container`.
+- [ ] **Step 1: Write the failing tests** in `RunningStateTests.swift`: `the_header_shows_up_only_for_a_project_with_no_working_session`, `a_section_with_no_rows_is_left_out`, `a_working_project_still_has_stop_n_ports_in_its_child` (from `child_stop_request`), `other_says_how_many_system_ports_are_hidden`, `every_row_reads_as_one_sentence_with_its_state_word`, `a_port_stop_uses_the_pid_request_for_a_process_and_the_project_request_for_a_container`, `a_port_rows_tooltip_and_spoken_sentence_name_its_worktree_and_harness_and_none_for_docker`.
 - [ ] **Step 2: Run** the Swift test command — expect: failures.
 - [ ] **Step 3: Implement** `ProjectChildState` and `ProjectChildView`; register the child in the factory and `menuTree()`.
 - [ ] **Step 4: Verify** in the dev app on the throwaway listener of Task 11: open the child, press a port's `Stop`, confirm; a protected database port shows its own `Stop`; read `Stop` failed with the reason on a refused target.
 - [ ] **Step 5: Run** `cargo xtask ci` — expect: pass. Commit `git commit -m "feat(shell): add the project child menu and a single-port stop"`
 
-_Requirements: PSTOP-6.1, PSTOP-6.2, PSTOP-6.3, PSTOP-6.4, PSTOP-6.5, PSTOP-6.6, PSTOP-6.7, PSTOP-6.8_
+_Requirements: PSTOP-6.1, PSTOP-6.2, PSTOP-6.3, PSTOP-6.4, PSTOP-6.5, PSTOP-6.6, PSTOP-6.7, PSTOP-6.8, PSTOP-6.9_
 
 ---
 
