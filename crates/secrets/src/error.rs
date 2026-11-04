@@ -50,6 +50,7 @@ impl SecretError {
         }
     }
 }
+
 /// The Keychain store could not be built. The cause is not told apart, and no backend text
 /// is carried.
 #[derive(Debug, thiserror::Error)]

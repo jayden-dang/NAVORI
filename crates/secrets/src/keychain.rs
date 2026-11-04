@@ -32,10 +32,27 @@ impl KeychainStore {
         Self { service, backend }
     }
 
-    fn entry(&self, operation: Operation, key: &SecretKey) -> Result<Entry, SecretError> {
-        self.backend
+    fn fail(&self, operation: Operation, key: &SecretKey) -> SecretError {
+        SecretError::new(operation, self.service, key)
+    }
+
+    /// The one place a backend error is mapped: `NoEntry` is `Ok(None)`, every other error is
+    /// dropped unformatted and becomes our `SecretError`.
+    fn call<T>(
+        &self,
+        operation: Operation,
+        key: &SecretKey,
+        run: impl FnOnce(&Entry) -> Result<T, Error>,
+    ) -> Result<Option<T>, SecretError> {
+        let entry = self
+            .backend
             .build(self.service.as_str(), &key.account(), None)
-            .map_err(|_| SecretError::new(operation, self.service, key))
+            .map_err(|_| self.fail(operation, key))?;
+        match run(&entry) {
+            Ok(value) => Ok(Some(value)),
+            Err(Error::NoEntry) => Ok(None),
+            Err(_) => Err(self.fail(operation, key)),
+        }
     }
 }
 
@@ -49,32 +66,31 @@ impl fmt::Debug for KeychainStore {
 
 impl SecretStore for KeychainStore {
     fn set(&self, key: &SecretKey, value: &Secret) -> Result<(), SecretError> {
-        self.entry(Operation::Set, key)?
-            .set_password(value.expose())
-            .map_err(|_| SecretError::new(Operation::Set, self.service, key))
+        self.call(Operation::Set, key, |entry| {
+            entry.set_password(value.expose())
+        })?
+        .map(drop)
+        .ok_or_else(|| self.fail(Operation::Set, key))
     }
 
     fn get(&self, key: &SecretKey) -> Result<Option<Secret>, SecretError> {
-        match self.entry(Operation::Get, key)?.get_password() {
-            Ok(text) => Ok(Some(Secret::new(text))),
-            Err(Error::NoEntry) => Ok(None),
-            Err(_) => Err(SecretError::new(Operation::Get, self.service, key)),
-        }
+        Ok(self
+            .call(Operation::Get, key, Entry::get_password)?
+            .map(Secret::new))
     }
 
     fn exists(&self, key: &SecretKey) -> Result<bool, SecretError> {
-        match self.entry(Operation::Exists, key)?.get_credential() {
-            Ok(_) => Ok(true),
-            Err(Error::NoEntry) => Ok(false),
-            Err(_) => Err(SecretError::new(Operation::Exists, self.service, key)),
-        }
+        Ok(self
+            .call(Operation::Exists, key, Entry::get_credential)?
+            .is_some())
     }
 
     fn delete(&self, key: &SecretKey) -> Result<Deleted, SecretError> {
-        match self.entry(Operation::Delete, key)?.delete_credential() {
-            Ok(()) => Ok(Deleted::Removed),
-            Err(Error::NoEntry) => Ok(Deleted::WasAbsent),
-            Err(_) => Err(SecretError::new(Operation::Delete, self.service, key)),
-        }
+        Ok(
+            match self.call(Operation::Delete, key, Entry::delete_credential)? {
+                Some(()) => Deleted::Removed,
+                None => Deleted::WasAbsent,
+            },
+        )
     }
 }
