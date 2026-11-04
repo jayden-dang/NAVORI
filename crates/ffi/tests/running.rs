@@ -234,38 +234,53 @@ fn an_unknown_state_carries_its_reason_sentence_per_case_and_none_while_known() 
 }
 
 #[test]
-fn awake_not_registered() {
-    let view = view_of(None, Some(&dev_servers()));
-    assert_stop_is_off(&view);
-}
-
-#[test]
-fn awake_state_that_did_not_deserialize() {
+fn every_way_awake_can_be_unknown_turns_stop_off_and_says_why() {
+    let with_problem = |problem: &str| {
+        let mut broken = awake(vec![]);
+        broken.problem = Some(problem.into());
+        broken
+    };
+    let mut untracked = awake(vec![]);
+    untracked.tracking = false;
+    let ports_with_other = state(vec![in_project(port(3000, 10), "klynt"), port(3001, 11)]);
+    let cases: Vec<(&str, Option<AwakeView>, PortsState, &str)> = vec![
+        ("not registered", None, dev_servers(), AWAKE_UNREADABLE),
+        (
+            "state that did not deserialize",
+            None,
+            ports_with_other,
+            AWAKE_UNREADABLE,
+        ),
+        (
+            "problem set",
+            Some(with_problem("Awake cannot reach the power service.")),
+            dev_servers(),
+            "Awake cannot reach the power service.",
+        ),
+        (
+            "module down",
+            Some(with_problem("The Awake module stopped.")),
+            dev_servers(),
+            "The Awake module stopped.",
+        ),
+        ("tracking off", Some(untracked), dev_servers(), TRACKING_OFF),
+        (
+            "a live session without a label",
+            Some(awake(vec![
+                session(Some("klynt/main"), false),
+                session(None, false),
+            ])),
+            dev_servers(),
+            NO_LABEL,
+        ),
+    ];
+    for (case, awake_view, ports, reason) in cases {
+        let view = view_of(awake_view.as_ref(), Some(&ports));
+        assert_eq!(view.unknown_reason.as_deref(), Some(reason), "{case}");
+        assert_stop_is_off(&view);
+    }
     let ports = state(vec![in_project(port(3000, 10), "klynt"), port(3001, 11)]);
-    let view = view_of(None, Some(&ports));
-    assert_eq!(names(&view), ["klynt", "Other"]);
-    assert_eq!(view.unknown_reason.as_deref(), Some(AWAKE_UNREADABLE));
-    assert_stop_is_off(&view);
-}
-
-#[test]
-fn awake_with_a_problem_set() {
-    let mut broken = awake(vec![]);
-    broken.problem = Some("Awake cannot reach the power service.".into());
-    let view = view_of(Some(&broken), Some(&dev_servers()));
-    assert_eq!(
-        view.unknown_reason.as_deref(),
-        Some("Awake cannot reach the power service.")
-    );
-    assert_stop_is_off(&view);
-}
-
-#[test]
-fn awake_module_down() {
-    let mut down = awake(vec![]);
-    down.problem = Some("The Awake module stopped.".into());
-    let view = view_of(Some(&down), Some(&dev_servers()));
-    assert_stop_is_off(&view);
+    assert_eq!(names(&view_of(None, Some(&ports))), ["klynt", "Other"]);
 }
 
 #[test]
@@ -285,22 +300,6 @@ fn awake_down_with_ports_up_and_ports_down_with_awake_up_still_give_a_view() {
     let mut broken = awake(vec![]);
     broken.problem = Some("Awake cannot reach the power service.".into());
     assert!(build(Some(&broken), None, own()).is_some());
-}
-
-#[test]
-fn tracking_agents_off() {
-    let mut untracked = awake(vec![]);
-    untracked.tracking = false;
-    let view = view_of(Some(&untracked), Some(&dev_servers()));
-    assert_stop_is_off(&view);
-}
-
-#[test]
-fn any_live_session_lease_without_a_label() {
-    let leases = vec![session(Some("klynt/main"), false), session(None, false)];
-    let view = view_of(Some(&awake(leases)), Some(&dev_servers()));
-    assert_eq!(view.unknown_reason.as_deref(), Some(NO_LABEL));
-    assert_stop_is_off(&view);
 }
 
 #[test]
