@@ -509,11 +509,11 @@ _Requirements: PSTOP-5.2, PSTOP-5.3, PSTOP-5.4, PSTOP-5.5, PSTOP-5.6, PSTOP-5.7,
 
 **Depends-on:** Task 10, Task 11
 
-- [ ] **Step 1: Write the failing tests** in `RunningStateTests.swift`: `the_header_shows_up_only_for_a_project_with_no_working_session`, `a_section_with_no_rows_is_left_out`, `a_working_project_still_has_stop_n_ports_in_its_child` (from `child_stop_request`), `other_says_how_many_system_ports_are_hidden`, `every_row_reads_as_one_sentence_with_its_state_word`, `a_port_stop_uses_the_pid_request_for_a_process_and_the_project_request_for_a_container`, `a_port_rows_tooltip_and_spoken_sentence_name_its_worktree_and_harness_and_none_for_docker`.
-- [ ] **Step 2: Run** the Swift test command — expect: failures.
-- [ ] **Step 3: Implement** `ProjectChildState` and `ProjectChildView`; register the child in the factory and `menuTree()`.
-- [ ] **Step 4: Verify** in the dev app on the throwaway listener of Task 11: open the child, press a port's `Stop`, confirm; a protected database port shows its own `Stop`; read `Stop` failed with the reason on a refused target.
-- [ ] **Step 5: Run** `cargo xtask ci` — expect: pass. Commit `git commit -m "feat(shell): add the project child menu and a single-port stop"`
+- [x] **Step 1: Write the failing tests** in `RunningStateTests.swift`: `the_header_shows_up_only_for_a_project_with_no_working_session`, `a_section_with_no_rows_is_left_out`, `a_working_project_still_has_stop_n_ports_in_its_child` (from `child_stop_request`), `other_says_how_many_system_ports_are_hidden`, `every_row_reads_as_one_sentence_with_its_state_word`, `a_port_stop_uses_the_pid_request_for_a_process_and_the_project_request_for_a_container`, `a_port_rows_tooltip_and_spoken_sentence_name_its_worktree_and_harness_and_none_for_docker`.
+- [x] **Step 2: Run** the Swift test command — expect: failures.
+- [x] **Step 3: Implement** `ProjectChildState` and `ProjectChildView`; register the child in the factory and `menuTree()`.
+- [x] **Step 4: Verify** in the dev app on the throwaway listener of Task 11: open the child, press a port's `Stop`, confirm; a protected database port shows its own `Stop`; read `Stop` failed with the reason on a refused target.
+- [x] **Step 5: Run** `cargo xtask ci` — expect: pass. Commit `git commit -m "feat(shell): add the project child menu and a single-port stop"`
 
 _Requirements: PSTOP-6.1, PSTOP-6.2, PSTOP-6.3, PSTOP-6.4, PSTOP-6.5, PSTOP-6.6, PSTOP-6.7, PSTOP-6.8, PSTOP-6.9_
 
