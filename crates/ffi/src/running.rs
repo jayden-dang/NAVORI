@@ -250,7 +250,10 @@ fn project_of(key: Key, mut draft: Draft<'_>, known: bool) -> RunningProject {
 
 fn port_of(entry: &PortEntry, class: StopClass, known: bool) -> RunningPort {
     let target = target_of(entry);
-    let stop_request = if !known || class == StopClass::Never {
+    let stop_request = if !known
+        || class == StopClass::Never
+        || (class == StopClass::GroupProtected && entry.container.is_some())
+    {
         String::new()
     } else {
         let selector = match &entry.container {

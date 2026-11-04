@@ -378,13 +378,16 @@ fn a_container_is_in_the_group_request_and_a_database_image_container_is_not() {
         database.target,
         StopTargetView::Container { id: "cd34".into() }
     );
+    assert_eq!(database.stop_request, "");
+    let plain = klynt.ports.iter().find(|p| p.port == 8080).unwrap();
     assert_eq!(
-        serde_json::from_str::<Value>(&database.stop_request).unwrap(),
+        serde_json::from_str::<Value>(&plain.stop_request).unwrap(),
         kill(
             json!({"project": "klynt"}),
-            json!([{"container": {"id": "cd34"}}])
+            json!([{"container": {"id": "ab12"}}])
         )
     );
+    assert_eq!(view.hidden_system_ports, 1);
 }
 
 #[test]
@@ -608,4 +611,12 @@ fn openable_is_true_for_a_listed_port_that_is_not_a_database_or_system_port() {
 #[test]
 fn nothing_to_build_from_gives_no_view() {
     assert!(build(None, None, own()).is_none());
+}
+
+#[test]
+fn the_oldest_listeners_start_is_read_as_microseconds_since_the_epoch() {
+    let started = with(port(3000, 10), "start_us", json!(1_730_000_000_123_456_u64));
+    let ports = state(vec![in_project(started, "klynt")]);
+    let view = view_of(Some(&awake(vec![])), Some(&ports));
+    assert_eq!(project(&view, "klynt").up_since_ms, Some(1_730_000_000_123));
 }
