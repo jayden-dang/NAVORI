@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 
 use navori_procs::{Field, Repo, find_repo};
@@ -6,8 +7,24 @@ use crate::state::{BranchName, Placement};
 
 /// Places a listener by its working directory, then by the directory of its executable.
 pub fn place_listener(cwd: Field<PathBuf>, exe: Field<PathBuf>, home: &Path) -> Placement {
+    place_listener_cached(cwd, exe, home, &mut HashMap::new())
+}
+
+/// [`place_listener`] that places each path once per `cache`, which a scan keeps for itself.
+pub(crate) fn place_listener_cached(
+    cwd: Field<PathBuf>,
+    exe: Field<PathBuf>,
+    home: &Path,
+    cache: &mut HashMap<PathBuf, Placement>,
+) -> Placement {
+    let mut placed_at = |path: &Path| {
+        cache
+            .entry(path.to_path_buf())
+            .or_insert_with(|| place(path, home))
+            .clone()
+    };
     if let Ok(cwd) = cwd {
-        let placed = place(&cwd, home);
+        let placed = placed_at(&cwd);
         if placed.project.is_some() {
             return placed;
         }
@@ -17,7 +34,7 @@ pub fn place_listener(cwd: Field<PathBuf>, exe: Field<PathBuf>, home: &Path) -> 
     };
     Placement {
         missing_path: None,
-        ..place(dir, home)
+        ..placed_at(dir)
     }
 }
 

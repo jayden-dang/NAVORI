@@ -7,8 +7,8 @@ use navori_macos::{Listener, ProcessSource};
 use navori_procs::{Harness, ProcId, Process, ProcsError, Snapshot, Unavailable, started_by};
 
 use crate::kind::{is_docker_backend, kind};
-use crate::place::place_listener;
-use crate::state::{HarnessName, PortEntry};
+use crate::place::place_listener_cached;
+use crate::state::{HarnessName, Placement, PortEntry};
 
 /// A listener of the Docker backend, which a later stage attributes to a container.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,6 +68,7 @@ impl Scanner {
         let (found, unread) = read_listeners(&snapshot);
         let same = snapshot.still_same()?;
         let skipped = unread.iter().filter(|id| same.contains(id)).count();
+        let mut placed = HashMap::new();
         let mut scan = Scan {
             skipped: u32::try_from(skipped).unwrap_or(u32::MAX),
             ..Scan::default()
@@ -78,8 +79,7 @@ impl Scanner {
                     &snapshot,
                     process,
                     by_port(&listeners),
-                    memo,
-                    kept,
+                    (memo, &mut *kept, &mut placed),
                     &mut scan,
                 );
             }
@@ -92,8 +92,11 @@ impl Scanner {
         snapshot: &Snapshot,
         process: &Process,
         ports: BTreeMap<u16, BTreeSet<IpAddr>>,
-        memo: &HarnessMemo,
-        kept: &mut HarnessMemo,
+        (memo, kept, placed): (
+            &HarnessMemo,
+            &mut HarnessMemo,
+            &mut HashMap<PathBuf, Placement>,
+        ),
         scan: &mut Scan,
     ) {
         let exe = process.exe.clone().ok();
@@ -110,7 +113,12 @@ impl Scanner {
         }
         let name = name_of(snapshot, process.id, exe.as_deref());
         let harness = harness_for(snapshot, process.id, memo, kept);
-        let place = place_listener(snapshot.cwd(process.id), process.exe.clone(), &self.home);
+        let place = place_listener_cached(
+            snapshot.cwd(process.id),
+            process.exe.clone(),
+            &self.home,
+            placed,
+        );
         let kind = kind(exe.as_deref(), place.project.is_some());
         scan.entries
             .extend(ports.into_iter().map(|(port, addresses)| PortEntry {
