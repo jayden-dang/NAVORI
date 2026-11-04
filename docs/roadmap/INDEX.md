@@ -1,7 +1,7 @@
 # Roadmap: Navori
 
 Status: Approved
-Date: 2026-11-02
+Date: 2026-11-04
 
 <!--
 The program layer: milestone INTENT, above any single feature and below the product
@@ -79,12 +79,15 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Goals:** GOAL-1, GOAL-5, GOAL-6
 **Members:**
 - **ROAD-10** keychain-secrets — After: none — Surfaces: `crates/secrets/`
-- **ROAD-11** providers-and-model-roles — After: ROAD-10 — Surfaces: `ai/llm/`, `ai/models/`, `crates/ffi/`, `apps/macos/Navori/Features/Settings/` <!-- surfaces edited by an agent (keychain-secrets run, 2026-11-03); approved by the operator 2026-11-04 -->
-- **ROAD-12** shield-and-context-gateway — After: none — Surfaces: `crates/redact/`, `ai/context/`, `crates/ffi/`, `apps/macos/Navori/Platform/`
+- **ROAD-36** ask-walking-skeleton — After: ROAD-10 — Surfaces: `ai/llm/`, `ai/context/`, `crates/ipc/`, `crates/protocol/`, `crates/ffi/`, `apps/cli/`, `apps/macos/Navori/Features/Settings/` — Delivers text-only `navori ask` end to end: one adapter, one key saved from Settings, and a minimal Context Gateway (Shield on text, audit log, fail-closed). First consumer of `crates/secrets/`, so it takes the handoffs the SECRETS spec wrote for ROAD-11.
+- **ROAD-11** providers-and-model-roles — After: ROAD-36 — Surfaces: `ai/llm/`, `ai/models/`, `crates/ffi/`, `apps/macos/Navori/Features/Settings/` <!-- surfaces edited by an agent (keychain-secrets run, 2026-11-03); approved by the operator 2026-11-04 -->
+- **ROAD-12** shield-and-context-gateway — After: ROAD-36 — Surfaces: `crates/redact/`, `ai/context/`, `crates/ffi/`, `apps/macos/Navori/Platform/`
 - **ROAD-13** needs-you-inbox — After: none — Surfaces: `modules/inbox/`, `apps/macos/Navori/Features/Panel/`
-- **ROAD-14** agent-loop-and-approvals — After: ROAD-11, ROAD-12, ROAD-13 — Surfaces: `ai/agent/`, `crates/ffi/`
-- **ROAD-15** chat-and-quick-ask — After: ROAD-14 — Surfaces: `apps/macos/Navori/Features/`, `apps/cli/`
-- **ROAD-16** memory — After: ROAD-14 — Surfaces: `ai/memory/`, `crates/store/`
+- **ROAD-14** agent-loop-and-session — After: ROAD-11, ROAD-12 — Surfaces: `ai/agent/`, `crates/store/`, `crates/ffi/` — Records what started each turn (THR-11) and usage from the first model call, and sends every tool call through one dispatch point. Runs only `Read` Actions until ROAD-37.
+- **ROAD-37** policy-and-approvals — After: ROAD-13, ROAD-14 — Surfaces: `ai/agent/`, `crates/protocol/`, `crates/ffi/`, `apps/macos/Navori/Features/Panel/`
+- **ROAD-38** ai-eval-harness — After: ROAD-14 — Surfaces: `xtask/`, `ai/agent/` — Delivers `cargo xtask eval` (`docs/standards/testing.md`).
+- **ROAD-15** chat-and-quick-ask — After: ROAD-37 — Surfaces: `apps/macos/Navori/Features/`, `apps/cli/` — Also moves `navori ask` onto the agent loop.
+- **ROAD-16** memory — After: ROAD-37 — Surfaces: `ai/memory/`, `crates/store/`
 **Depends-on:** MILE-2
 **Commitment:** Planned
 **Closed:** None
@@ -166,4 +169,4 @@ Every live `GOAL-N` in `docs/product/vision.md` that no milestone cites belongs 
 
 | Goal | Disposition | Date | Reason |
 |---|---|---|---|
-| GOAL-12 | Deferred | 2026-11-02 | Returns when Navori AI, Needs you and the MCP client (ROAD-14, ROAD-13, ROAD-25) exist and the user picks the first service beyond GitHub (ADR 0005). |
+| GOAL-12 | Deferred | 2026-11-02 | Returns when Navori AI, its approvals, Needs you and the MCP client (ROAD-14, ROAD-37, ROAD-13, ROAD-25) exist and the user picks the first service beyond GitHub (ADR 0005). |
