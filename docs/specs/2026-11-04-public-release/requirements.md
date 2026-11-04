@@ -73,13 +73,15 @@ Files this change touches, and what in them is guarded:
 
 **Story:** As a developer on an Apple Silicon Mac with macOS 26, I want `brew install --cask navori` from the Navori tap to give me a Navori that opens without a Gatekeeper prompt, so that I can use it without building it.
 
-- **RELEASE-3.1** WHEN a GitHub Release is published and `TAP_REPOSITORY` is set THE SYSTEM SHALL write `Casks/navori.rb` in the tap with the release's version, the release zip's download URL and its SHA-256, in one commit.
+- **RELEASE-3.1** WHEN a GitHub Release is published and `TAP_REPOSITORY` is set THE SYSTEM SHALL write the cask file RELEASE-3.9 names in the tap with the release's version, the release zip's download URL and its SHA-256, in one commit. *(Amended 2026-11-04: the file name depends on the tag.)*
 - **RELEASE-3.2** THE SYSTEM SHALL declare in the cask that Navori needs an arm64 Mac and macOS 26 or later.
 - **RELEASE-3.3** WHEN the cask is installed THE SYSTEM SHALL place `Navori.app` in the Homebrew app directory and link `Contents/Helpers/navori` onto the Homebrew `bin` path as `navori`.
 - **RELEASE-3.4** WHEN the cask is installed or upgraded THE SYSTEM SHALL remove the `com.apple.quarantine` attribute from the installed `Navori.app` and everything inside it.
 - **RELEASE-3.5** WHEN the cask is installed THE SYSTEM SHALL print caveats saying that Navori is self-signed and not notarized, that the cask removed the quarantine flag, and that hooks are removed from Settings → Integrations before uninstalling.
 - **RELEASE-3.6** IF `brew style` or `brew audit --cask` reports an error for the written cask THEN THE SYSTEM SHALL push nothing to the tap and fail the workflow.
 - **RELEASE-3.7** WHEN a person on a macOS 26 account that has never run Navori runs `brew tap`, `brew trust --cask` and `brew install --cask` for the tap's `navori` and opens Navori THE SYSTEM SHALL show the menubar icon with no Gatekeeper dialog — checked by hand on a clean account.
+- **RELEASE-3.9** WHEN the release tag is a pre-release tag THE SYSTEM SHALL write the cask as the cask `navori-rc` in `Casks/navori-rc.rb` and SHALL leave `Casks/navori.rb` unchanged, and WHEN it is any other release tag THE SYSTEM SHALL write the cask `navori` in `Casks/navori.rb` and SHALL leave `Casks/navori-rc.rb` unchanged. *(Added 2026-11-04, so that a release candidate never replaces the stable cask.)*
+- **RELEASE-3.10** THE SYSTEM SHALL declare in each of the casks `navori` and `navori-rc` that it conflicts with the other, so that only one of them installs `Navori.app` and the `navori` command. *(Added 2026-11-04.)*
 - **RELEASE-3.8** WHEN that person installs the Claude Code hooks from Settings → Integrations and works in a Claude Code session THE SYSTEM SHALL list the assertion `Navori: keeping this Mac awake` in `pmset -g assertions` — checked by hand on the same account.
 
 ## 4. Upgrade without losing anything

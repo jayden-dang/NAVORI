@@ -53,11 +53,11 @@ Flow:
 
 ### Cask template
 
-Satisfies: RELEASE-3.2, RELEASE-3.3, RELEASE-3.4, RELEASE-3.5, RELEASE-5.5
+Satisfies: RELEASE-3.2, RELEASE-3.3, RELEASE-3.4, RELEASE-3.5, RELEASE-3.9, RELEASE-3.10, RELEASE-5.5
 Reuse: rung 3 — `str::replace` over `include_str!("../assets/navori.rb.in")`; no templating crate
 Respects: ARCH-14 (zap names only the release profile's directories)
-Interface: `cask_text(version: &str, sha256: &str) -> String`
-Depth: n/a — a two-field fill of a reviewable Ruby template; the cask knowledge lives in the template, not in code.
+Interface: `cask_text(version: &str, sha256: &str, prerelease: bool) -> String` and `cask_file(prerelease: bool) -> &'static str` (`navori.rb` or `navori-rc.rb`). *(Amended 2026-11-04.)*
+Depth: n/a — a small fill of a reviewable Ruby template (version, hash, cask name, description suffix, the name of the cask it conflicts with); the cask knowledge lives in the template, not in code.
 Locality: new `xtask/assets/navori.rb.in`; `release.rs` — extend.
 
 Template shape (placeholders `@VERSION@`, `@SHA256@`):
@@ -127,7 +127,7 @@ One job, `runs-on: macos-26`, `environment: release`, `permissions: contents: wr
 6. `cargo xtask release --tag "$GITHUB_REF_NAME" --out dist` (1.5–1.8; with downloaded assets it only writes the cask).
 7. If no Release exists, `gh release create --draft --verify-tag`, with `--prerelease` when step 2 printed `prerelease=true` (1.10); then `gh release upload --clobber` the zip and `.sha256` (1.9). The Release always starts as a draft, so nobody can download a half-uploaded one.
 8. While `vars.PUBLISH_RELEASE` is not `true`, the Release stays a draft and nothing is pushed (6.1). When `vars.TAP_REPOSITORY` is set the tap checkout, local cask commit and `brew style` / `brew audit` still run (6.4) and then the job stops; when it is empty the job stops here. (Amended 2026-11-04.)
-9. When `vars.TAP_REPOSITORY` is set: check out the tap with `TAP_TOKEN`, copy `dist/navori.rb` to `Casks/navori.rb`, commit it in the local checkout, `brew tap` the checkout, run `brew trust --cask`, `brew style` and `brew audit --cask` — any error stops before anything is published (3.6, 6.4). Then, only when `vars.PUBLISH_RELEASE` is `true`: `gh release edit --draft=false` (6.2), and push the commit when it is ahead of the tap (3.1). The cask is pushed only after its Release is public, so it never points at a draft. When `PUBLISH_RELEASE` is `true` and `TAP_REPOSITORY` is empty, the Release is published and no tap is touched. (Amended 2026-11-04.)
+9. When `vars.TAP_REPOSITORY` is set: check out the tap with `TAP_TOKEN`, copy the cask file `cargo xtask release` wrote (`dist/navori.rb` for a final tag, `dist/navori-rc.rb` for a pre-release tag) to the same name under `Casks/`, commit it in the local checkout, `brew tap` the checkout, run `brew trust --cask`, `brew style` and `brew audit --cask` — any error stops before anything is published (3.6, 6.4). Then, only when `vars.PUBLISH_RELEASE` is `true`: `gh release edit --draft=false` (6.2), and push the commit when it is ahead of the tap (3.1). The cask is pushed only after its Release is public, so it never points at a draft. When `PUBLISH_RELEASE` is `true` and `TAP_REPOSITORY` is empty, the Release is published and no tap is touched. (Amended 2026-11-04.)
 10. `if: always()`: delete the temporary keychain and restore the default search list (7.5).
 
 Partial failure (7.7): a failure before step 9's publish leaves at most a draft Release and an unchanged tap; a failure between publish and push leaves a public Release while the tap still names the previous version, which installs fine. Rerunning the job reaches step 4, reuses the assets, and finishes the remaining steps; a second rerun finds the cask unchanged and pushes nothing. Setting `TAP_REPOSITORY` later and rerunning the job for a draft tag publishes it the same way.
@@ -202,6 +202,6 @@ One-time setup, written into `docs/agents/project.md`: export `Navori Local Sign
 
 ## Coverage check
 
-Every ID in requirements.md (58) appears in exactly one `Satisfies:` line: 1.1–1.15, 2.1–2.8, 3.1–3.8, 4.1–4.5, 5.1–5.11, 6.1–6.4, 7.1–7.7. None is deliberately unmapped.
+Every ID in requirements.md (60) appears in exactly one `Satisfies:` line: 1.1–1.15, 2.1–2.8, 3.1–3.10, 4.1–4.5, 5.1–5.11, 6.1–6.4, 7.1–7.7. None is deliberately unmapped.
 
 Risks to check on the first pre-release run, not decisions (each is caught by a workflow step failing, never by a broken user install): the `macos-26` runner label and its Rust toolchain; Homebrew Tap Trust in CI (`brew trust --cask` on the local tap before `brew style` / `brew audit`); the `depends_on macos:` value `brew style` accepts for macOS 26; fish ≥ 3 running the guarded hook (verified locally only for sh, bash 3.2 and zsh); whether `codesign` on the runner accepts the imported self-signed identity after `add-trusted-cert` (if not, sign by the certificate's SHA-1 instead of its name); whether `brew audit --cask` without `--online` passes for a draft Release URL (the cask is only pushed after the Release is published in step 6, so audit can run after `gh release edit --draft=false` if it needs the URL).
