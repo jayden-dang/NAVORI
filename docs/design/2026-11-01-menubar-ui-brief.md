@@ -75,6 +75,8 @@ The inbox is **the shared decision place between the user and Navori AI** — it
 
 ## Surface 3 — Awake submenu
 
+> The commands stay. The Holding list and the row name are replaced by [`2026-11-04-running-menu-ui-brief.md`](2026-11-04-running-menu-ui-brief.md) when ROAD-18 ships.
+
 Locked 2026-11-04 as variant C1. The brief of record is [`docs/specs/2026-11-02-awake-leases/ui-brief.md`](../specs/2026-11-02-awake-leases/ui-brief.md).
 
 - **Layout:** `Keep awake`, opening a third level of `Indefinitely` and lengths from `5 minutes` to `5 hours`, then `Tracking agents`; a problem line only when something is wrong; then Holding, grouped by `Held by you`, `Commands` and project, with each session named by its title or else its branch. No per-Lease release. No Agent sessions row and no Integrations row.
@@ -83,6 +85,8 @@ Locked 2026-11-04 as variant C1. The brief of record is [`docs/specs/2026-11-02-
 - **Type & color / A11y:** as Surface 1, with monochrome Harness marks. ↑ and ↓ reach the commands, → opens `Keep awake`. VoiceOver reads each command, the problem line and each Holding row as one sentence. The problem line and Holding rows take no keyboard stop.
 
 ## Surface 4 — Ports submenu (+ Project)
+
+> Superseded 2026-11-04 by [`2026-11-04-running-menu-ui-brief.md`](2026-11-04-running-menu-ui-brief.md): no separate Ports row or submenu.
 
 - **Layout:** `Open all web servers [5]`, `Stop all ports…` → header **Projects** (each project on 2 lines: name + port-count badge; secondary line `⑂ main · by Claude · :5173 :3101 :3100` or `2 worktrees`) → note "4 macOS system ports hidden · refreshed 3 s ago".
   - Level 3 **Project:** header with name + path (mono); a worktree filter segmented control when > 1 (`All · dev · feat-lmedia`); each process on 2 lines (`postgres` / `docker · klynt-postgres`, port in mono right-aligned; hover → `Open` (if web) · `Copy` · `Stop`); a final inline row `Terminal · Finder · Stop N`.
@@ -104,7 +108,7 @@ Locked 2026-11-04 as variant C1. The brief of record is [`docs/specs/2026-11-02-
 2. Tidy & modern: one-line rows where possible, actions shown only on hover, SF Symbols-style icons.
 3. **Monochrome icons** — no color tiles, no gradients; semantic color is only the 7pt dot; switches use the system accent.
 4. RepoBar patterns: multi-level submenus (≤ 3), status block with inline buttons, gray count capsules, dot + text states, real avatars, 14pt text.
-5. Level 0: Awake / Ports / Pull Requests are **one line, one important piece of info** each; drop the account & Switch account everywhere.
+5. Level 0: Awake / Ports / Pull Requests are **one line, one important piece of info** each (2026-11-04: Awake and Ports become one `Running` row, showing only a dot, per [`2026-11-04-running-menu-ui-brief.md`](2026-11-04-running-menu-ui-brief.md)); drop the account & Switch account everywhere.
 6. Handles heavy load: level 0 has at most 3 inbox items + `Show all N`; PRs are grouped and shown **By repository** (top 6 + All); each PR shows only 1 status.
 7. Drop the caption row "Navori · N need you · time" — the menu opens with the Ask field.
 8. **Needs you = the decision inbox between the user and the AI** (Decision / To-do / Update), containing no PRs.
