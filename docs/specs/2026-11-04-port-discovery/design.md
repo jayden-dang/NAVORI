@@ -181,7 +181,7 @@ pub struct Scan { pub entries: Vec<PortEntry>, pub skipped: u32, pub backend: Ve
 pub struct PortEntry { port: u16, addresses: Vec<IpAddr>, pid: i32, start_us: u64, name: String, exe: Option<PathBuf>,
     place: Placement, harness: Option<HarnessName>, kind: PortKind, container: Option<ContainerRef> }
 pub struct Placement { project: Option<String>, worktree: Option<String>, branch: Option<BranchName>, missing_path: Option<PathBuf> }
-pub struct BackendPort { pid: i32, start_us: u64, port: u16, addresses: Vec<IpAddr> }
+pub struct BackendPort { pid: i32, start_us: u64, port: u16, addresses: Vec<IpAddr>, exe: Option<PathBuf> }
 enum PortKind { DevServer, Database, Docker, System, Other }     // serde snake_case
 enum HarnessName { ClaudeCode, Codex, Grok }                    // serde; mapped from procs' Harness, which has no serde
 enum BranchName { Named(String), Detached(String) }             // serde; mapped from procs' Branch
@@ -197,20 +197,28 @@ listener process the scan then reads `cwd` and takes the exe from the snapshot. 
 unread, since the name otherwise comes from the exe path's last part (PORTS-1.6).
 
 Entries are per (pid, port), with a sorted set of addresses (PORTS-1.4). Backend ports (exe name
-`com.docker.backend`) are not finished here. They are handed to the Docker stage as `BackendPort`.
+`com.docker.backend`) are not finished here. They are handed to the Docker stage as `BackendPort`, which carries the exe so a Docker entry
+shows the backend's exe like any other entry (`agent-decided`).
 
-Placement (place.rs), in order:
+Placement (place.rs), in order. `place()` first returns the default placement when the path is outside the counted area
+(not strictly under `home`, or inside a dot-directory directly below it), and only then walks:
 1. `find_repo(cwd)`, kept only if its `root` is strictly under `home` and not inside a dot-directory directly below
    `home` (PORTS-2.4). If cwd no longer exists, walk up to the first existing ancestor, take only the project, and
    put the removed path in `missing_path` (PORTS-2.5).
 2. Otherwise `find_repo(exe.parent())` with the same guard (PORTS-2.2). An unread exe gives no join (PORTS-2.6).
 3. Otherwise no project, no worktree and no branch (PORTS-2.3).
 
-The project text is `Location.project`, the same text Awake's labels use (PORTS-2.1).
+The project text is `Location.project`, the same text Awake's labels use (PORTS-2.1). A removed exe directory is placed
+by its nearest existing ancestor and keeps no `missing_path` (`agent-decided`: the path is the exe's, not the process's).
+
+`find_repo` stats each `.git` entry once per level and branches on the result. `Scanner` places each directory once per
+scan, through the crate-private `place_listener_cached` with a cache that lives for that scan. `place_listener` keeps
+its 3-argument public form and uses a fresh cache. Many processes in one directory cost one walk (`agent-decided`:
+the placement walk is the main cost of a scan under a real home).
 
 Harness: `HarnessMemo` is a `HashMap<ProcId, Option<Harness>>` owned by the actor. It is moved into the blocking scan
 and returned with the result. It is filled only by a completed `started_by`, and pruned to the current listeners after
-each scan (PORTS-3.5, PORTS-3.6). A scan that panics loses the memo, which only costs re-reads. Backend entries get none
+each scan (PORTS-3.5, PORTS-3.6). A scan that panics loses the memo, which only costs re-reads (see the panic rule below). Backend entries get none
 (PORTS-3.8).
 
 Kind (kind.rs) is a pure function of the exe and the placement, in PORTS-5.1's order, with PORTS-5.2's prefixes.
@@ -250,7 +258,8 @@ trailers are read and dropped. With neither, read to EOF. Every path counts agai
 `TooLarge`.
 
 The body is deserialized into a private struct whose `Labels` holds only `com.docker.compose.project.working_dir`
-(PORTS-4.4). The name is the first entry of `Names` without its leading `/`.
+(PORTS-4.4). The name is the first entry of `Names` without its leading `/`. Only publishes whose `Type` is `tcp` are
+kept, so a UDP-only publish never claims a TCP backend listener (`agent-decided`: the scan reads TCP listeners only).
 
 `attribute` keys a Docker entry by (pid, port, container). It matches a published `(IP, PublicPort)` to a backend
 bound address, treating `0.0.0.0` and `::` as matching either wildcard (PORTS-4.5). It places a container through the
@@ -282,6 +291,7 @@ State (Serialize + Deserialize): PortsState { scanned_at_ms: Option<u64>, groups
                     docker: DockerStatus, problem: Option<String> }
 ProjectGroup { project: Option<String>, worktrees: Vec<WorktreeGroup> }   WorktreeGroup { worktree: Option<String>, processes: Vec<ProcessGroup> }
 ProcessGroup { pid, start_us, name, exe, harness, entries: Vec<PortEntry> }
+impl PortsState { pub fn entries(&self) -> impl Iterator<Item = &PortEntry> }   // every entry in group order; open_url and ports_check use it
 enum DockerStatus { NotSeen, Read, Unreadable(String) }   // the String is DockerError's fixed text
 ```
 Depth: n/a for the trait (rung 2). The crate's own deletion test: a caller would still need to know two Actions and
@@ -305,10 +315,20 @@ wake = wait.wait_until(deadline) }`.
 - `Open` finds the port in the published state and builds its URL (PORTS-6.1, PORTS-6.3, PORTS-6.4). It opens
   nothing and connects to nothing (PORTS-6.2).
 
+A scan that panics ends its task with a join error. `done` returns that error, so the run ends and the supervisor
+restarts the Module. The restart publishes `PortsState::default()` first, so the not-scanned state comes back. The bound
+is the kernel's restart policy: five restarts, then `Failed` (a run stable for 60 s gets its budget back).
+
+Logging is once per outage, with fixed text. A failing scan, a failing process-source open and an unreadable Docker each
+log one `warn` when the outage starts and one `info` line when it ends. The scan and open failures share one flag. No
+line carries the error text, a path or a reply. An in-flight scan is aborted when the actor loop stops (the in-flight
+handle aborts its task on drop). The blocking thread itself cannot be cancelled, so it runs on until its read returns and
+its result is discarded.
+
 The first deadline is start + 5 s (PORTS-7.5). Both Actions are in `catalog()` with `Risk::Read`, a schema and a
 description (PORTS-1.11, PORTS-6.5).
 
-`tray` asks for `TrayGlyph::Problem` only while `problem` is `Some`. A Docker failure lives in `docker`, not in
+`tray` asks for `TrayGlyph::Problem` only while `problem` is `Some`, with the tooltip `Can't scan ports. <outcome>`. A Docker failure lives in `docker`, not in
 `problem`, and the Module never sets `attention` (PORTS-8.6, PORTS-9.6).
 
 Ordering is total: projects by case-insensitive name, then exact name, with the no-project group last; worktrees
@@ -350,10 +370,10 @@ Surface:
 - judge.rs `METRICS` and its fixtures (`within_budget` :255-267, names list :291-305, table test :495-545): replace — a `port_scan_ms` row and fixture values.
 - docs/standards/performance.md :21, :30, :34: replace — a budget row, the method line and the floor.
 - `perf-baseline.json`: absent today; when recorded later it gains the metric, so no reader breaks.
-- `prepare_home` and the run in xtask/src/perf/mod.rs:77,301-306: replace — the app runs with `NAVORI_PERF_HOME` as its home (AppEnvironment.swift:15-27), so the Docker socket under that home is absent. When `~/.docker/run/docker.sock` exists, `prepare_home` links `<perf home>/.docker/run/docker.sock` to it, inside the temporary perf home, and the run reports whether the `ports` state's `docker` was `Read` (`agent-decided`).
+- `PerfHome::fresh_run` (xtask/src/perf/home.rs) and the run in xtask/src/perf/mod.rs: replace — the app runs with `NAVORI_PERF_HOME` as its home (AppEnvironment.swift:15-27), so the Docker socket under that home is absent. When `~/.docker/run/docker.sock` exists, each run copy links `<run copy>/.docker/run/docker.sock` to it, inside the temporary perf home (`agent-decided`). After the idle windows the run asks `ports.list` and prints `docker=<status>`. The query is best-effort: any failure prints `docker=unavailable`. `--record` is refused only when the socket link exists and the status is `unreadable` or `unavailable`. With `not_seen` it prints a note that the baseline excludes the Docker read, and records. The logic lives in xtask/src/perf/docker.rs (`agent-decided`: a run with Docker down must not become the baseline).
 Interface: `cargo test -p navori-mod-ports --test real_os -- --ignored --exact port_scan_cost_for_the_perf_gate` prints `median <N> µs`
 Depth: n/a — extends the perf gate.
-Locality: extend — xtask/src/perf/{mod.rs (metric and home link), judge.rs}, docs/standards/performance.md; new modules/ports/tests/real_os.rs.
+Locality: extend — xtask/src/perf/{mod.rs (metric and status line), home.rs (socket link), docker.rs (status and record rule), judge.rs}, docs/standards/performance.md; new modules/ports/tests/real_os.rs.
 
 The test runs `Scanner::scan` 5 times with no Docker read and prints the median (PORTS-10.2). PORTS-10.1 is the gate
 run before and after, with `com.docker.backend` listening and the socket linked into the perf home, both reported, with
@@ -379,9 +399,9 @@ Infrastructure, no Satisfies line.
 | navori-procs public API: `find_repo`, `Snapshot::{listeners, env_marker, name}`, `started_by` over `FakeProcesses`; existing location, snapshot and no_leaks tests | unit | PORTS-1.2, PORTS-1.9, PORTS-3.1, PORTS-3.2, PORTS-3.3, PORTS-3.7, PORTS-9.1, PORTS-9.2, PORTS-10.3, PORTS-10.5 |
 | `Scanner::scan` over `FakeProcesses` and a temp home with repos, linked worktrees, a removed dir, `/opt`-style roots | unit | PORTS-1.1, PORTS-1.4, PORTS-1.5, PORTS-1.6, PORTS-1.10, PORTS-2.1–2.6, PORTS-3.5, PORTS-3.6, PORTS-3.8, PORTS-5.1–5.4, PORTS-10.4 |
 | `attribute` (pure) and the Docker client against a test `UnixListener` serving canned chunked, sized, slow and oversized replies | unit + integration | PORTS-4.1–4.9 |
-| The Module through `Kernel::dispatch` with a `Rig` copied from modules/awake/tests/common (FakeClock, paused tokio, fake source, fake containers) | integration | PORTS-1.3, PORTS-1.7, PORTS-1.8, PORTS-1.11, PORTS-6.1–6.5, PORTS-7.1–7.7, PORTS-8.1, PORTS-8.2, PORTS-8.6, PORTS-9.6, PORTS-10.6 |
+| The Module through `Kernel::dispatch` with a `Rig` in modules/ports/tests/common, copied from modules/awake/tests/common (FakeClock, paused tokio, fake source, fake containers) | integration | PORTS-1.3, PORTS-1.7, PORTS-1.8, PORTS-1.11, PORTS-6.1–6.5, PORTS-7.1–7.7, PORTS-8.1, PORTS-8.2, PORTS-8.6, PORTS-9.6, PORTS-10.6 |
 | `doctor()` and `ports_check` in crates/ffi/tests, `cargo xtask check-deps`, existing MENU tests | integration | PORTS-8.3, PORTS-8.4, PORTS-8.5, PORTS-9.4, PORTS-9.5, PORTS-9.7 |
-| Real-OS `ports` tests and `cargo xtask perf` (judge unit tests plus a run before and after) | integration (ignored) + manual | PORTS-9.3, PORTS-9.8, PORTS-10.1, PORTS-10.2 |
+| Real-OS `ports` tests and `cargo xtask perf` (judge unit tests, the status table in xtask/src/perf/docker.rs, plus a run before and after) | integration (ignored) + manual | PORTS-9.3, PORTS-9.8, PORTS-10.1, PORTS-10.2 |
 | Manual on this Mac: a listener started by Claude Code, Codex and Grok Build, then detached | manual | PORTS-3.9 |
 
 New seams: `Containers` (one), plus three methods on the existing `ProcessSource`.
@@ -411,3 +431,7 @@ Requirements changed by this design (upstream sync-back, re-surfaced for approva
 this feature. `read_procargs` returns an unwiped copy of the scratch that still holds the environment bytes
 (procargs.rs:110, scan-design.md section 1). PROCS-1.8 holds, because the environment is never returned. The copy
 itself is not wiped. Reported for the operator, not fixed here.
+
+## Realigned after build
+
+Realigned on 2026-11-04 to the shipped code. Changed: `BackendPort` carries the exe. Docker keeps only `tcp` publishes. Placement returns early outside the counted area, `find_repo` stats each `.git` entry once, and the scan places each directory once. A scan panic restarts the Module under the kernel's restart limit. Logging is once per outage, and an in-flight scan is aborted on stop. `PortsState::entries()` is listed. The perf run prints `docker=<status>` and refuses `--record` per the rule above, with its logic in xtask/src/perf/docker.rs and the link in home.rs (`prepare_home` no longer exists). The tray sentence is named, and the test table names the Ports rig and the Docker status table. Already matching: `ports_check`, `module_is_down` and the doctor row after `logs`.
