@@ -833,7 +833,7 @@ _Requirements: SECRETS-2.2, SECRETS-2.3, SECRETS-2.4, SECRETS-2.5, SECRETS-3.1, 
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `crates/secrets/tests/keychain_mock.rs`:
 
@@ -963,7 +963,7 @@ fn the_debug_output_of_the_store_names_the_service_and_no_value() {
 
 Run: `cargo nextest run -p navori-secrets --test keychain_mock` — expect: compile error, `KeychainStore` not found.
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 Append to `error.rs`:
 
@@ -1068,11 +1068,11 @@ pub use keychain::*;
 
 The crate declares no `log` or `tracing` dependency, so nothing here emits a log line.
 
-- [ ] **Step 3: Run and gate**
+- [x] **Step 3: Run and gate**
 
 Run: `cargo fmt --all`, then `cargo nextest run -p navori-secrets` — expect: all pass. Run: `cargo clippy -p navori-secrets --all-targets -- -D warnings` — expect: clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 `git add crates/secrets && git commit -m "feat(secrets): store secrets through keyring-core and map its errors without payloads"`
 
