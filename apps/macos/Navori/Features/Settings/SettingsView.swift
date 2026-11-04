@@ -3,7 +3,7 @@ import Observation
 import SwiftUI
 
 enum SettingsTab: Hashable {
-    case general, diagnostics, integrations, about
+    case general, diagnostics, integrations, ai, about
 }
 
 @MainActor
@@ -27,6 +27,9 @@ struct SettingsView: View {
             IntegrationsTab(store: store)
                 .tabItem { Label("Integrations", systemImage: "link") }
                 .tag(SettingsTab.integrations)
+            AITab(store: store)
+                .tabItem { Label("AI", systemImage: "sparkles") }
+                .tag(SettingsTab.ai)
             AboutTab(store: store)
                 .tabItem { Label("About", systemImage: "info.circle") }
                 .tag(SettingsTab.about)
