@@ -6,7 +6,6 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use navori_config::{ConfigReport, JournalSweep, Paths, Profile, WholeFileReason};
-use navori_ffi::running::ProjectState;
 use navori_ffi::{
     CheckView, ConfigNotice, CoreConfig, CoreError, CoreSnapshot, NavoriCore, SnapshotListener,
     TrayGlyphView, ports_check,
