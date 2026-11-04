@@ -113,12 +113,15 @@ impl Ports {
                         RECOVERED,
                     );
                     if let Ok((_, docker)) = &outcome.result {
-                        let unreadable = matches!(docker, DockerStatus::Unreadable(_));
-                        note(
-                            &mut docker_failing,
-                            unreadable.then_some(DOCKER_FAILED),
-                            DOCKER_RECOVERED,
-                        );
+                        match docker {
+                            DockerStatus::Unreadable(_) => {
+                                note(&mut docker_failing, Some(DOCKER_FAILED), DOCKER_RECOVERED);
+                            }
+                            DockerStatus::Read => {
+                                note(&mut docker_failing, None, DOCKER_RECOVERED);
+                            }
+                            DockerStatus::NotSeen => {}
+                        }
                     }
                     publish(ctx, started, outcome.result);
                     deadline = Some(wait.now() + cadence(wait.panel_visible()));

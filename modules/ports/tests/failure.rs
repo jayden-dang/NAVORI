@@ -185,3 +185,32 @@ async fn docker_that_stays_unreadable_is_logged_once_and_its_recovery_once() {
     assert_eq!(logs.text().matches("WARN").count(), 1, "{}", logs.text());
     assert_eq!(logs.text().matches("Docker reads work again").count(), 1);
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_missing_docker_backend_is_not_logged_as_docker_working_again() {
+    let logs = LogCapture::start();
+    let rig = Rig::new();
+    rig.processes
+        .add(FakeProcess::new(100, 1, 501, 10_100, BACKEND).listen("127.0.0.1", 5432));
+    rig.containers.reply(Err(DockerError::Timeout));
+    first_scan(&rig).await;
+
+    rig.processes.exit(100);
+    let mark = rig.gate.attempts();
+    rig.advance(Duration::from_secs(30)).await;
+    rig.settle_scan_after(mark).await;
+    assert_eq!(
+        logs.text().matches("Docker reads work again").count(),
+        0,
+        "{}",
+        logs.text()
+    );
+
+    rig.processes
+        .add(FakeProcess::new(101, 1, 501, 10_101, BACKEND).listen("127.0.0.1", 5432));
+    rig.containers.reply(Ok(Vec::new()));
+    let mark = rig.gate.attempts();
+    rig.advance(Duration::from_secs(30)).await;
+    rig.settle_scan_after(mark).await;
+    assert_eq!(logs.text().matches("Docker reads work again").count(), 1);
+}
