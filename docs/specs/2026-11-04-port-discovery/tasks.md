@@ -458,7 +458,7 @@ _Requirements: PORTS-4.1, PORTS-4.2, PORTS-4.3, PORTS-4.4, PORTS-4.5, PORTS-4.6,
 
 **Depends-on:** Task 6
 
-- [ ] **Step 1: Write the failing table test** `open_returns_the_url_for_a_listed_port`:
+- [x] **Step 1: Write the failing table test** `open_returns_the_url_for_a_listed_port`:
 
   | Bound address | URL |
   |---|---|
@@ -476,10 +476,10 @@ _Requirements: PORTS-4.1, PORTS-4.2, PORTS-4.3, PORTS-4.4, PORTS-4.5, PORTS-4.6,
     - Bind a real `std::net::TcpListener` on `127.0.0.1:0` and list its port in the fake.
     - Dispatch `open`.
     - Then `set_nonblocking(true)`. `accept()` returns `WouldBlock`.
-- [ ] **Step 2: Run** `cargo test -p navori-mod-ports --test open` — expect: unknown variant `open`.
-- [ ] **Step 3: Implement** `Open` in `action.rs` (risk, catalog) and its reply in the actor.
-- [ ] **Step 4: Run** `cargo test -p navori-mod-ports` — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(ports): answer ports.open with the port's URL"`
+- [x] **Step 2: Run** `cargo test -p navori-mod-ports --test open` — expect: unknown variant `open`.
+- [x] **Step 3: Implement** `Open` in `action.rs` (risk, catalog) and its reply in the actor.
+- [x] **Step 4: Run** `cargo test -p navori-mod-ports` — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "feat(ports): answer ports.open with the port's URL"`
 
 _Requirements: PORTS-6.1, PORTS-6.2, PORTS-6.3, PORTS-6.4, PORTS-6.5_
 
