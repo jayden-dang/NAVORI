@@ -114,6 +114,7 @@ pub fn complete(command: &str, events: &[&str]) -> Value {
 }
 
 pub const THREE: [&str; 3] = ["UserPromptSubmit", "Stop", "SessionEnd"];
+pub const CODEX: [&str; 4] = ["UserPromptSubmit", "Stop", "Interrupt", "SessionEnd"];
 pub const CLAUDE: [&str; 6] = [
     "UserPromptSubmit",
     "Stop",

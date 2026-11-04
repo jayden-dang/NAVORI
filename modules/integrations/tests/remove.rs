@@ -350,17 +350,6 @@ async fn a_removal_that_finds_nothing_to_do_still_emits_one_event_with_its_own_s
     assert!(removed[0].summary.contains("no hooks of Navori"));
 }
 
-#[tokio::test]
-async fn removing_codex_replies_with_an_error_and_changes_nothing() {
-    let rig = Rig::release();
-    rig.write(".codex/hooks.json", "{}");
-    let before = tree(rig.home.path());
-
-    assert!(remove(&rig, "codex").await.is_err());
-
-    assert_eq!(tree(rig.home.path()), before);
-}
-
 struct Unlock(PathBuf);
 
 impl Drop for Unlock {

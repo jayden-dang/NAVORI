@@ -181,7 +181,7 @@ pub fn plan(stdin: &[u8], own_pid: u32, parent_pid: u32) -> Option<Plan> {
             json!({ "hold_session": fields })
         }
         // Provisional for Claude Code and Codex: only Grok's `reason` rule is verified.
-        name @ ("Stop" | "StopCancelled" | "StopFailure")
+        name @ ("Stop" | "StopCancelled" | "StopFailure" | "Interrupt")
             if name != "Stop" || matches!(payload.reason.as_deref(), None | Some("end_turn")) =>
         {
             let mut fields = json!({ "session_id": session_id });

@@ -5,11 +5,13 @@ mod common;
 use std::path::{Path, PathBuf};
 
 use common::{
-    CLAUDE, DEV_HELPER, FIVE, RELEASE_HELPER, Rig, THREE, command, complete, group, handler, tree,
+    CLAUDE, CODEX, DEV_HELPER, FIVE, RELEASE_HELPER, Rig, THREE, command, complete, group, handler,
+    tree,
 };
 use serde_json::{Value, json};
 
 const CLAUDE_FILE: &str = ".claude/settings.json";
+const CODEX_FILE: &str = ".codex/hooks.json";
 const GROK_FILE: &str = ".grok/hooks/navori.json";
 
 const BOTH_PROFILES: &str = include_str!("fixtures/claude_both_profiles.json");
@@ -330,12 +332,55 @@ async fn repair_leaves_a_double_quoted_hand_edited_entry_alone_as_foreign() {
 }
 
 #[tokio::test]
-async fn repairing_codex_replies_with_an_error_and_changes_nothing() {
+async fn repairing_a_codex_file_from_before_interrupt_adds_only_interrupt() {
     let rig = Rig::release();
-    rig.write(".codex/hooks.json", "{}");
-    let before = tree(rig.home.path());
+    let old = complete(&release_command(), &THREE);
+    rig.write_json(CODEX_FILE, &old);
+    assert_eq!(rig.row("codex").await["state"], "needs_repair");
 
-    assert!(repair(&rig, "codex").await.is_err());
+    repair(&rig, "codex").await.unwrap();
 
-    assert_eq!(tree(rig.home.path()), before);
+    let doc = read_json(&rig.path(CODEX_FILE));
+    for event in THREE {
+        assert_eq!(doc["hooks"][event], old["hooks"][event], "{event}");
+    }
+    assert_eq!(
+        doc["hooks"]["Interrupt"],
+        json!([group(vec![handler(&release_command(), 2)])])
+    );
+    assert_eq!(rig.row("codex").await["state"], "installed");
+}
+
+#[tokio::test]
+async fn codex_repair_and_remove_behave_like_claude() {
+    let rig = Rig::release();
+    let foreign = handler("echo foreign", 1);
+    rig.write_json(
+        CODEX_FILE,
+        &json!({ "hooks": {
+            "Stop": [group(vec![foreign.clone()])],
+            "UserPromptSubmit": [group(vec![handler(&release_command(), 9)])],
+        } }),
+    );
+
+    repair(&rig, "codex").await.unwrap();
+
+    let doc = read_json(&rig.path(CODEX_FILE));
+    let expected = complete(&release_command(), &CODEX);
+    for event in CODEX {
+        let ours = expected["hooks"][event][0].clone();
+        assert!(
+            doc["hooks"][event].as_array().unwrap().contains(&ours),
+            "{event}"
+        );
+    }
+    assert_eq!(rig.row("codex").await["state"], "installed");
+
+    rig.dispatch(json!({ "remove": { "harness": "codex" } }))
+        .await
+        .unwrap();
+
+    let doc = read_json(&rig.path(CODEX_FILE));
+    assert_eq!(doc["hooks"], json!({ "Stop": [group(vec![foreign])] }));
+    assert_eq!(rig.row("codex").await["state"], "not_installed");
 }

@@ -831,6 +831,21 @@ fn a_stop_cancelled_sends_stop_session() {
 }
 
 #[test]
+fn a_codex_interrupt_sends_stop_session() {
+    let server = recording_server();
+
+    let requests = server.hook(
+        r#"{"hook_event_name":"Interrupt","session_id":"s-1","turn_id":"t-1","transcript_path":null,"cwd":"/x","model":"m","permission_mode":"default"}"#,
+    );
+
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"stop_session": {"session_id": "s-1"}})
+    );
+}
+
+#[test]
 fn a_stop_failure_sends_stop_session() {
     let server = recording_server();
 

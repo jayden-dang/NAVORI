@@ -16,7 +16,7 @@ const CLAUDE_EVENTS: [Event; 6] = [
     "SubagentStop",
     "SessionEnd",
 ];
-const CODEX_EVENTS: [Event; 3] = ["UserPromptSubmit", "Stop", "SessionEnd"];
+const CODEX_EVENTS: [Event; 4] = ["UserPromptSubmit", "Stop", "Interrupt", "SessionEnd"];
 const GROK_EVENTS: [Event; 5] = [
     "UserPromptSubmit",
     "Stop",

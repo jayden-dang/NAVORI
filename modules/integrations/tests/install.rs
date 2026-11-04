@@ -5,10 +5,13 @@ mod common;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
-use common::{CLAUDE, DEV_HELPER, FIVE, RELEASE_HELPER, Rig, command, complete, tree};
+use common::{
+    CLAUDE, DEV_HELPER, FIVE, RELEASE_HELPER, Rig, command, complete, group, handler, tree,
+};
 use serde_json::{Value, json};
 
 const CLAUDE_FILE: &str = ".claude/settings.json";
+const CODEX_FILE: &str = ".codex/hooks.json";
 const GROK_FILE: &str = ".grok/hooks/navori.json";
 
 const FOREIGN: &str = include_str!("fixtures/claude_foreign.json");
@@ -88,6 +91,44 @@ async fn installing_into_a_claude_file_adds_six_entries_and_keeps_foreign_hooks_
     let claude = reply["harnesses"][0].clone();
     assert_eq!(claude["harness"], "claude");
     assert_eq!(claude["state"], "installed");
+}
+
+#[tokio::test]
+async fn installing_for_codex_adds_four_entries_with_the_verified_timeout() {
+    let rig = Rig::release();
+    let foreign = group(vec![handler("echo foreign", 30)]);
+    rig.write_json(
+        CODEX_FILE,
+        &json!({ "hooks": { "PreToolUse": [foreign.clone()], "Stop": [foreign.clone()] } }),
+    );
+
+    let reply = install(&rig, "codex").await.unwrap();
+
+    let doc = read_json(&rig.path(CODEX_FILE));
+    assert_eq!(
+        keys(&doc["hooks"]),
+        [
+            "PreToolUse",
+            "Stop",
+            "UserPromptSubmit",
+            "Interrupt",
+            "SessionEnd"
+        ]
+    );
+    assert_eq!(doc["hooks"]["PreToolUse"], json!([foreign]));
+    assert_eq!(doc["hooks"]["Stop"][0], foreign);
+    let ours =
+        |event: &str| doc["hooks"][event].as_array().unwrap().last().unwrap()["hooks"][0].clone();
+    let command = command(RELEASE_HELPER, false);
+    // Codex 0.166 reads `timeout` as whole seconds and clamps `SessionEnd` and `Interrupt` to 1..=3.
+    assert_eq!(ours("UserPromptSubmit"), handler(&command, 2));
+    assert_eq!(ours("Stop"), handler(&command, 2));
+    assert_eq!(ours("Interrupt"), handler(&command, 2));
+    assert_eq!(ours("SessionEnd"), handler(&command, 1));
+    assert_eq!(backups(&rig.path(".codex")).len(), 1);
+    assert_eq!(reply["harnesses"][1]["harness"], "codex");
+    assert_eq!(reply["harnesses"][1]["state"], "installed");
+    assert_eq!(rig.row("codex").await["state"], "installed");
 }
 
 #[tokio::test]
@@ -442,7 +483,7 @@ async fn only_the_three_hook_file_paths_and_their_backups_are_written() {
 
     install(&rig, "claude").await.unwrap();
     install(&rig, "grok").await.unwrap();
-    install(&rig, "codex").await.unwrap_err();
+    install(&rig, "codex").await.unwrap();
 
     let after = tree(rig.home.path());
     let changed: Vec<&String> = after.iter().filter(|line| !before.contains(line)).collect();
@@ -451,15 +492,12 @@ async fn only_the_three_hook_file_paths_and_their_backups_are_written() {
         let path = line.split(' ').next().unwrap();
         let allowed = [
             ".claude/settings.json",
+            ".codex/hooks.json",
             ".grok/hooks/navori.json",
             ".grok/hooks/",
         ];
         assert!(allowed.iter().any(|a| path.starts_with(a)), "{path}");
     }
-    assert_eq!(
-        std::fs::read_to_string(rig.path(".codex/hooks.json")).unwrap(),
-        "{}"
-    );
 }
 
 #[tokio::test]
@@ -471,18 +509,4 @@ async fn an_empty_helper_path_writes_nothing_and_returns_an_error() {
     assert!(install(&rig, "claude").await.is_err());
 
     assert_eq!(tree(rig.home.path()), before);
-}
-
-#[tokio::test]
-async fn installing_for_codex_changes_nothing_and_keeps_the_interim_reason() {
-    let rig = Rig::release();
-    rig.write(".codex/hooks.json", "{}");
-    let before = tree(rig.home.path());
-
-    assert!(install(&rig, "codex").await.is_err());
-
-    assert_eq!(tree(rig.home.path()), before);
-    let row = rig.row("codex").await;
-    assert_eq!(row["reason"], "The Codex timeout unit is not verified yet.");
-    assert_eq!(row["offers"], json!([]));
 }

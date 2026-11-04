@@ -26,8 +26,8 @@ pub(crate) fn unreadable(failure: &str) -> String {
     format!("The hook file cannot be read: {failure}.")
 }
 
-pub(crate) fn codex_unverified() -> String {
-    "The Codex timeout unit is not verified yet.".to_owned()
+pub(crate) fn codex_needs_trust() -> String {
+    "Codex runs these hooks only after you trust them: open Codex and run /hooks.".to_owned()
 }
 
 pub(crate) fn installed(harness: Harness) -> String {
