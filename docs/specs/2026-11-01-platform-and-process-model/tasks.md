@@ -86,7 +86,7 @@ Retrieval (`load-subgraph`, schema 1.1, run once on the File Structure below): `
 | `crates/procs/tests/activity.rs` | new | Story 5 |
 | `crates/procs/tests/watcher.rs` | new | Story 4 `ProcWatcher` over fakes |
 | `crates/procs/tests/no_threads.rs` | new | PROCS-8.1 (one test) |
-| `crates/procs/tests/real_os.rs` | new | PROCS-8.4 timing; `#[ignore]` real-OS session listing |
+| `crates/procs/tests/real_os.rs` | new | PROCS-8.8 timing guard; PROCS-8.4 timing, `#[ignore]`, run by `cargo xtask perf`; `#[ignore]` real-OS session listing |
 | `crates/procs/tests/no_leaks.rs` | new | PROCS-8.5 |
 | `xtask/src/main.rs` | changed | `fn check_deps` rules (a)–(e); `Cmd::LintProbe`, `fn lint_probe`; `fn ci` calls it |
 | `docs/architecture/system.md` | changed | Platform FFI / Process model rows built |
@@ -408,10 +408,11 @@ _Requirements: PROCS-8.1_
 **Depends-on:** Task 7
 
 - [x] **Step 1:** Write `tests/real_os.rs`: `a_snapshot_with_session_resolution_takes_under_ten_milliseconds` (5 runs of `Snapshot::take` + `sessions` on `MacProcesses`; median < 10 ms; print the median and the process count); `#[ignore]` `the_running_agent_sessions_on_this_mac_are_listed` (prints each session as `<harness> · <project>/<worktree or branch> · pid <pid> · <terminal or unknown>`; asserts at least one session). Run `cargo nextest run -p navori-procs --test real_os` — expect: pass (debug). Run `cargo test --release -p navori-procs --test real_os -- --nocapture` and `cargo test -p navori-procs --test real_os -- --ignored --nocapture` with Claude Code, Codex and Grok open; paste the release median and the session lines into the task report.
+  Changed 2026-11-04: this test is now `a_snapshot_stays_under_a_hundred_milliseconds_even_on_a_busy_machine` (PROCS-8.8) and `snapshot_cost_for_the_perf_gate` (PROCS-8.4, `snapshot_ms` in `cargo xtask perf`).
 - [x] **Step 2:** If the debug median is ≥ 10 ms, profile `take` (the exe pass dominates per spike Q1) and fix. Run — expect: pass.
 - [x] **Step 3:** `cargo xtask ci` — expect: pass. Commit `test(procs): bound snapshot cost and list real sessions on this Mac`.
 
-_Requirements: PROCS-8.4_
+_Requirements: PROCS-8.4, PROCS-8.8_
 
 ---
 

@@ -95,6 +95,12 @@ pub const METRICS: &[MetricSpec] = &[
         kind: Kind::Gated { budget: 16.0 },
         floor: 5.0,
     },
+    MetricSpec {
+        name: "snapshot_ms",
+        unit: "ms",
+        kind: Kind::Gated { budget: 10.0 },
+        floor: 2.0,
+    },
 ];
 
 pub type Measurements = BTreeMap<String, f64>;
@@ -257,6 +263,7 @@ mod tests {
             ("menu_open_cpu_ms".to_owned(), 5.0),
             ("thread_count".to_owned(), 2.0),
             ("submenu_open_ms".to_owned(), 16.0),
+            ("snapshot_ms".to_owned(), 10.0),
         ])
     }
 
@@ -289,6 +296,7 @@ mod tests {
             "menu_open_cpu_ms",
             "thread_count",
             "submenu_open_ms",
+            "snapshot_ms",
         ];
         assert_eq!(verdict.lines.len(), names.len(), "{:?}", verdict.lines);
         for (line, name) in verdict.lines.iter().zip(names) {
@@ -528,6 +536,7 @@ mod tests {
             ),
             ("thread_count", 2.0, None, "2 threads `thread_count`"),
             ("submenu_open_ms", 5.0, Some(16.0), "≤ 16 ms"),
+            ("snapshot_ms", 2.0, Some(10.0), "≤ 10 ms"),
         ];
         assert_eq!(METRICS.len(), expected.len());
         for (spec, (name, floor, budget, phrase)) in METRICS.iter().zip(expected) {
