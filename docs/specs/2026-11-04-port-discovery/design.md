@@ -168,8 +168,8 @@ here.
 Satisfies: PORTS-1.1, PORTS-1.4, PORTS-1.5, PORTS-1.6, PORTS-1.10, PORTS-2.1, PORTS-2.2, PORTS-2.3, PORTS-2.4,
 PORTS-2.5, PORTS-2.6, PORTS-3.5, PORTS-3.6, PORTS-3.8, PORTS-5.1, PORTS-5.2, PORTS-5.3, PORTS-5.4, PORTS-10.4,
 PORTS-10.5
-Reuse: none — new code (rung 7). Nothing composes sockets, placement and kind today. It is built only from the procs
-items above.
+Reuse: none — new code (rung 7). Nothing composes sockets, placement and kind today. It is built only from the navori-procs
+items in this design.
 Respects: ARCH-3, ARCH-6
 Security: THR-3, THR-5
 Interface:
@@ -331,7 +331,7 @@ Surface:
 - The Core submenu's `ModulesSection` (apps/macos/Navori/Features/Panel/CoreSubmenuView.swift:23-35) lists modules generically: no edit. It shows a `ports` module row. That is a module status row, not the Ports menu row of PORTS-9.7.
 - SettingsView.swift:132 names the doctor rows in a placeholder sentence: compat — the sentence misses `ports` until ROAD-18, which owns Swift in MILE-4, edits it.
 - docs/agents/verify.md:46-49, :96-101 and :160-165, README.md:27, docs/codebase/{modules,map,dependencies}.md name rows, modules or crates: replace — add `ports` / `navori-mod-ports`.
-Interface: `fn ports_check(down: bool, state: Option<&PortsState>) -> Check` · `build_kernel(.., ports: PortsEnv)`
+Interface: `fn ports_check(down: bool, state: Option<&PortsState>) -> Check` · `build_kernel(.., ports: PortsEnv)` · `fn module_is_down(kernel: &Kernel, id: &str) -> bool`, generalized from `awake_is_down` (app.rs:330), whose one call site (app.rs:322) is replaced
 Depth: n/a — extends `build_kernel` and `doctor`.
 Locality: extend — crates/ffi/src/app.rs, crates/ffi/Cargo.toml, Cargo.toml workspace members and dependencies.
 
