@@ -11,6 +11,7 @@ The user's words (the Vietnamese quotes are kept as-is, with an English translat
 - "tôi muốn đi theo hướng C - nhưng di chuyển 4 button lên đầu, và xóa đi thông tin '3 sessions working, 5 in background / Awake since 08:10 · Claude Code' chúng ta ko cần nó" (EN: "I want to go with direction C, but move the 4 buttons to the top, and remove that information, we don't need it")
 - "tôi muốn show thêm icons của session đó là claude, codex, grok etc" (EN: "I want to also show the icon of each session: claude, codex, grok etc")
 - "C1 ok - chốt version này" (EN: "C1 ok, lock this version")
+- "tôi muốn nó chỉ hiển thị circle màu xanh, hoặc không - không ghi gì khác ... nếu ko thì không có dot" (EN: "I want it to show only a green circle, or nothing, no other text ... otherwise no dot")
 
 ## Grounding
 
@@ -18,11 +19,11 @@ AppKit semantic colors, as in MENU's design; `docs/standards/design-tokens.md` i
 
 ## Surface: Awake row (level 0)
 
-- **Layout:** unchanged: icon, `Awake`, dot, one value, chevron.
+- **Layout:** icon, `Awake`, a dot when held, chevron. No text value.
 - **Components:** rung 2 — `MenuRow`, `AwakeRowState`.
-- **States:** `Off` · `On · Claude Code ×8, 1 hour` · `Not held` · `Needs attention` · `Unavailable`.
-- **Type & color:** as the Core row; color only in the dot.
-- **A11y:** title then value as one sentence.
+- **States:** green dot while a Lease has the system assertion · no dot otherwise · no chevron when unavailable.
+- **Type & color:** as the Core row; the dot is the row's only state.
+- **A11y:** VoiceOver still reads the state in words: `Awake, On · Claude Code ×8`.
 
 ## Surface: Awake Submenu (level 1)
 
@@ -49,4 +50,4 @@ The Harness mark leads each one-line row under its project: which agent, where, 
 3. `stopped` replaces `stopped · background work`. A session reads as stopped from `Stop` onward, including the 120 seconds before Navori checks for child processes, so "background" would claim work that may not exist.
 4. Harness marks are monochrome, per amendment 3 of the menubar brief.
 5. A command shows a check while its Lease exists, and `Display on` keeps its name rather than flipping to `Display off`.
-6. A long problem no longer sits on the level-0 row: it reads `Needs attention`, with the text in the Submenu.
+6. The level-0 row shows a green dot or nothing, with no text and no orange dot (user, 2026-11-04, after the first build). A problem is stated in the Submenu and by the tray icon.

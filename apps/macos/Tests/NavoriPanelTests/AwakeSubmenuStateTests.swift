@@ -62,7 +62,7 @@ struct AwakeSubmenuStateTests {
 
     @Test func a_recorded_problem_is_written_in_the_submenu() {
         let text = "Awake could not save a lease. Navori retries in 60 seconds."
-        let state = Self.state(status: .problem(text), leases: [Self.hour])
+        let state = Self.state(status: .problem(text, held: true), leases: [Self.hour])
         #expect(state.problem == AwakeProblem(title: text, detail: nil))
     }
 

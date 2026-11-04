@@ -612,3 +612,28 @@ Amendment after delivery, from `ui-brief.md`.
 - [x] **Step 6: Commit** `git commit -m "feat(menu): group Awake's Holding list by project with Harness marks"`
 
 _Requirements: AWAKE-11.5, AWAKE-11.11, AWAKE-11.12, AWAKE-11.13, AWAKE-11.14, AWAKE-11.15, AWAKE-11.16, AWAKE-11.17, AWAKE-11.18, AWAKE-11.19, AWAKE-11.20_
+
+### Task 21: Show the Awake row as a dot
+
+Amendment after delivery, from `ui-brief.md` amendment 6.
+
+**Files:**
+- Modify: `apps/macos/NavoriPanel/AwakeRowState.swift`, `apps/macos/NavoriPanel/AwakeSubmenuState.swift`, `apps/macos/Navori/Features/Panel/MenuRowView.swift`, `apps/macos/Navori/Features/Panel/PanelView.swift`, `docs/design/2026-11-01-menubar-ui-brief.md`, `docs/features/awake.md`
+- Test: `apps/macos/Tests/NavoriPanelTests/AwakeRowStateTests.swift`, `apps/macos/Tests/NavoriPanelTests/AwakeSubmenuStateTests.swift`
+
+**Reuse:** rung 2 — `MenuRow`, `AwakeRowState`.
+
+**Interfaces:**
+- Consumes: `CoreStore.awakeStatus`, `awakeActionMessage`
+- Produces: `MenuRow.spokenValue: String?`; `AwakeStatus.problem(String, held: Bool)`. `AwakeRowState.label` is now read only by VoiceOver.
+
+**Depends-on:** Task 20
+
+- [x] **Step 1: Write failing tests** for the dot in each status, including a problem with and without a held Lease, and a failed action. Run: `swift build --package-path apps/macos --build-tests` — expect: `held` does not exist yet.
+- [x] **Step 2: Implement** the dot rule and `spokenValue`; the Awake row passes no `value`.
+- [x] **Step 3: Update** the design, both briefs and `docs/features/awake.md`.
+- [x] **Step 4: Verify** `cargo xtask ci` — expect: pass.
+- [ ] **Step 5: Verify by hand** on `cargo xtask run`: the row shows a green dot with a Lease and nothing after `Release all`; VoiceOver reads the state in words.
+- [x] **Step 6: Commit** `git commit -m "feat(menu): show the Awake row as a dot"`
+
+_Requirements: AWAKE-11.2, AWAKE-11.3, AWAKE-11.4, AWAKE-11.17, AWAKE-11.18, AWAKE-11.21_

@@ -113,7 +113,7 @@ public struct AwakeSubmenuState: Equatable, Sendable {
                 title: "Can't hold this Mac awake",
                 detail: "macOS refused the request. Navori keeps trying."
             )
-        case .problem(let text):
+        case .problem(let text, _):
             return AwakeProblem(title: text, detail: nil)
         case .unavailable:
             return AwakeProblem(title: "Unavailable", detail: nil)

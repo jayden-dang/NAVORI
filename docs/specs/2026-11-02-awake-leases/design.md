@@ -251,7 +251,7 @@ Locality: `apps/cli/src/main.rs`. extend. Deps stay `config`, `ipc`, `protocol`.
 Grounding: the user's locks, then `docs/design/2026-11-01-menubar-ui-brief.md` Surfaces 1 and 3, then `feat/menu`'s glass and `MenuRow` system. Story 11 is a native surface, not a browser one; the section is filled because MENU's design set that precedent. Tokens are the AppKit semantic colors MENU uses. The Awake sample in `Features/Preview/PreviewMenu.swift`, which the user judged in the Preview, sets the row's icon and the Submenu's shape.
 
 Respects: ARCH-1, ARCH-2
-Satisfies: AWAKE-1.8, AWAKE-11.1, AWAKE-11.2, AWAKE-11.3, AWAKE-11.4, AWAKE-11.5, AWAKE-11.6, AWAKE-11.7, AWAKE-11.8, AWAKE-11.9, AWAKE-11.10, AWAKE-11.11, AWAKE-11.12, AWAKE-11.13, AWAKE-11.14, AWAKE-11.15, AWAKE-11.16, AWAKE-11.17, AWAKE-11.18, AWAKE-11.19, AWAKE-11.20, AWAKE-12.7, AWAKE-12.8, AWAKE-12.9, AWAKE-13.10
+Satisfies: AWAKE-1.8, AWAKE-11.1, AWAKE-11.2, AWAKE-11.3, AWAKE-11.4, AWAKE-11.5, AWAKE-11.6, AWAKE-11.7, AWAKE-11.8, AWAKE-11.9, AWAKE-11.10, AWAKE-11.11, AWAKE-11.12, AWAKE-11.13, AWAKE-11.14, AWAKE-11.15, AWAKE-11.16, AWAKE-11.17, AWAKE-11.18, AWAKE-11.19, AWAKE-11.20, AWAKE-11.21, AWAKE-12.7, AWAKE-12.8, AWAKE-12.9, AWAKE-13.10
 Reuse: rung 2 — `MenuRow`, `CascadeNode`, `CascadeContent`, `CoreRowState` pattern, `CoreStore.dispatch`; new (rung 7): `AwakeRowState` in `NavoriPanel`, `AwakeSubmenuView`, `HoldingList`, `HarnessMarkImage`.
 Surface:
 - MENU-1.2 and MENU-1.4 in MENU's `requirements.md`, and MENU's "Comes back if" line — `replace`: amended as story 11 states.
@@ -267,11 +267,11 @@ Locality: wave 2 only. new: `NavoriPanel/AwakeRowState.swift`, `NavoriPanel/Awak
 
 ### Awake row (level 0)
 
-Layout: one `MenuRow` directly above the Core row, with icon `cup.and.saucer`, title `Awake` and a chevron.
-Components: rung 2 — `MenuRow`; new — `AwakeRowState`, tested like `CoreRowState`.
-States: no Lease → `Off`, no dot · held → green dot, `On · <sources>`, each source once with a count when it holds several (`On · Claude Code ×8, 1 hour`) · a Lease with System not held → orange dot, `Not held` · a failed menu action or another recorded problem → orange dot, `Needs attention`, with the text in the Submenu · Awake record missing or Module failed → `Unavailable`, no Submenu.
-Type & color: as the Core row; color only in the dot.
-A11y: `MenuRowView` reads title then value as one sentence, for example `Awake, On · Claude Code ×8`.
+Layout: one `MenuRow` directly above the Core row, with icon `cup.and.saucer`, title `Awake`, a dot when held, and a chevron. No text value.
+Components: rung 2 — `MenuRow`, gaining `spokenValue`; new — `AwakeRowState`, tested like `CoreRowState`.
+States: a Lease has the System assertion → green dot · anything else (no Lease, not held, or no Lease with a recorded problem) → no dot · a failed menu action leaves the dot as the assertion has it · Awake record missing or Module failed → no dot, no chevron, no Submenu. A problem is stated in the Submenu and by the tray icon, per ICON-4.3.
+Type & color: as the Core row; the dot is the row's only state.
+A11y: `MenuRowView` reads title then `spokenValue` as one sentence: `Awake, On · Claude Code ×8`, `Awake, Off`, `Awake, Not held`, `Awake, Needs attention` or `Awake, Unavailable`.
 
 ### Awake Submenu (level 1)
 
@@ -301,7 +301,7 @@ New seams: one, the `Platform` test constructor.
 | `cargo xtask perf` | gate | AWAKE-13.1 |
 | Diff review | manual | AWAKE-2.6, 2.7, 10.5, 13.11 |
 | `AwakeRowState`, `AwakeSubmenuState` in `NavoriPanelTests` | unit | AWAKE-1.8, 11.2, 11.3, 11.4, 11.7, 11.8, 11.9, 11.11, 11.12, 11.13, 11.14, 11.15, 11.16, 11.17, 11.18 |
-| Hand walk with VoiceOver, per `docs/agents/verify.md` | manual | AWAKE-11.1, 11.5, 11.6, 11.10, 11.19, 11.20, 12.7–12.9, 13.10 |
+| Hand walk with VoiceOver, per `docs/agents/verify.md` | manual | AWAKE-11.1, 11.5, 11.6, 11.10, 11.19, 11.20, 11.21, 12.7–12.9, 13.10 |
 
 ## Coverage check
 

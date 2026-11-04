@@ -3,8 +3,8 @@ public enum AwakeStatus: Equatable, Sendable {
     case on(sources: [String])
     case notHeld
     case unavailable
-    /// A problem other than a stopped module, while the system assertion is held.
-    case problem(String)
+    /// A problem other than a stopped module or a refused assertion. `held` says a Lease has the system assertion.
+    case problem(String, held: Bool)
 }
 
 /// Level-0 Awake row from the snapshot's problem text and whether the system assertion is held.
@@ -24,7 +24,7 @@ public enum AwakeLevel0 {
             return .notHeld
         }
         if let problem, problem.isEmpty == false {
-            return .problem(problem)
+            return .problem(problem, held: hasLease)
         }
         if hasLease == false {
             return .off
@@ -95,36 +95,35 @@ public struct AwakeRowState: Equatable, Sendable {
 
     private static let needsAttention = "Needs attention"
 
+    /// `dot` is green only while a Lease has the system assertion. `label` is what VoiceOver reads; the row draws no text.
     public init(status: AwakeStatus, actionFailure: String? = nil) {
-        if let actionFailure, actionFailure.isEmpty == false {
-            label = Self.needsAttention
-            dot = .orange
-            hasSubmenu = true
-            return
-        }
+        var text: String
+        var submenu = true
         switch status {
         case .off:
-            label = "Off"
+            text = "Off"
             dot = nil
-            hasSubmenu = true
         case .on(let sources):
             let names = Self.counted(sources)
-            label = names.isEmpty ? "On" : "On · \(names.joined(separator: ", "))"
+            text = names.isEmpty ? "On" : "On · \(names.joined(separator: ", "))"
             dot = .green
-            hasSubmenu = true
         case .notHeld:
-            label = "Not held"
-            dot = .orange
-            hasSubmenu = true
-        case .unavailable:
-            label = "Unavailable"
+            text = "Not held"
             dot = nil
-            hasSubmenu = false
-        case .problem:
-            label = Self.needsAttention
-            dot = .orange
-            hasSubmenu = true
+        case .unavailable:
+            text = "Unavailable"
+            dot = nil
+            submenu = false
+        case .problem(_, let held):
+            text = Self.needsAttention
+            dot = held ? .green : nil
         }
+        if let actionFailure, actionFailure.isEmpty == false {
+            text = Self.needsAttention
+            submenu = true
+        }
+        label = text
+        hasSubmenu = submenu
     }
 
     /// Each source once, in first-seen order, with a count when it holds more than one Lease.

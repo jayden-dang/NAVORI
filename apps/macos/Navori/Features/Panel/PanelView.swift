@@ -41,10 +41,11 @@ struct PanelView: View {
             id: "awake",
             icon: "cup.and.saucer",
             title: "Awake",
-            value: state.label,
+            value: nil,
             dot: state.dot,
             opensSubmenu: state.hasSubmenu,
-            shortcut: nil
+            shortcut: nil,
+            spokenValue: state.label
         )
     }
 

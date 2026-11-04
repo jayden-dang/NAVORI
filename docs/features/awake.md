@@ -23,7 +23,7 @@ No `--for` flag means until turned off. `awake run` still runs the command when 
 
 ## Menu
 
-The Awake row sits above Core. It shows `Off`, `On` with the sources holding (each once, with a count: `On · Claude Code ×8`), `Not held`, `Needs attention`, or `Unavailable`.
+The Awake row sits above Core. It shows a green dot while a Lease has the system assertion and nothing otherwise, with no text. VoiceOver reads the state in words. A problem is stated in the Submenu and by the tray icon.
 
 Open it for `Keep awake for 1 hour` (always 3600 seconds), `Keep awake until I turn it off`, `Display on`, and `Release all`. A command shows a check while its Lease exists. `Release all` stays visible and does nothing while no Lease exists. Status text appears only when something is wrong: a refused assertion, a failed command, or a recorded problem. Holding lists each current Lease under `Held by you`, `Commands`, or its project, with the Harness mark for a session and `working` or `stopped`. A session reads `stopped` from `Stop` onward, including the grace period before Navori checks for child processes. The Harness and pid are in the tooltip and VoiceOver. The menu does not offer a per-Lease release, and opening it does not read the process table or the system's assertions.
 

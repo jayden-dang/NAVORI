@@ -12,6 +12,8 @@ struct MenuRow {
     let shortcut: KeyEquivalent?
     var isDimmed: Bool = false
     var isChecked: Bool = false
+    /// Read by VoiceOver in place of `value`, for a row that shows its state without text.
+    var spokenValue: String?
 }
 
 struct MenuRowView: View {
@@ -100,7 +102,7 @@ struct MenuRowView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(row.title)
-        .accessibilityValue(row.value ?? "")
+        .accessibilityValue(row.spokenValue ?? row.value ?? "")
         .accessibilityHint(row.opensSubmenu ? "Opens a submenu" : "")
         .accessibilityAddTraits(row.isChecked ? [.isButton, .isSelected] : .isButton)
     }

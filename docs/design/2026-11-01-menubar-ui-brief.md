@@ -36,7 +36,7 @@ The user's words (verbatim, in order; the Vietnamese quotes are kept as-is, with
 
 - **Layout:** 360pt wide, 5pt padding. Shipped order:
   1. Any banners (the core did not start, an unexpected quit, a config problem).
-  2. **Awake** — one line: icon `cup.and.saucer` · name · one value · chevron. `Off` with no dot; green dot `On · <sources>` while a Lease holds the system assertion, each source once with its count (`On · Claude Code ×8`); orange dot `Not held` when a Lease exists and that assertion does not; orange dot `Needs attention` for a failed action or another problem; `Unavailable` with no submenu when the record is missing or the module has stopped.
+  2. **Awake** — one line: icon `cup.and.saucer` · name · a green dot while a Lease holds the system assertion, otherwise no dot · chevron. No text value (user, 2026-11-04). No submenu when the record is missing or the module has stopped.
   3. **Core** — one line, with the dev chip on the dev profile. Its submenu is unchanged.
   4. Separator → `Settings… ⌘,` · `About Navori` · `Quit Navori ⌘Q`.
   - Ask, Needs you, Ports and Pull Requests are not on level 0. They stay in the dev-only preview until those features ship.
@@ -49,7 +49,7 @@ The user's words (verbatim, in order; the Vietnamese quotes are kept as-is, with
   - Inbox row: `new (rung 7) — InboxRowView` (see Surface 2).
   - Status dot: `rung 2 — status dot`.
   - Icons: `rung 1 — SF Symbols` (monochrome rendering): `sparkle`, `cup.and.saucer`, `point.3.connected.trianglepath.dotted`, `arrow.triangle.pull`, `gearshape`, `bell`, `square`.
-- **States:** default · hover/selected (accent background with 8pt corners, white text + icon) · empty inbox (`✓ You're all caught up`, the menu gets shorter) · core not running (`rung 2 — Banner` error style in the inbox position: "Navori core isn't running" + `Restart`) · GitHub offline (`Pull Requests  offline · 5 min ago`) · Awake off (`Off`, no dot) · Awake on (green dot, `On · <sources>`) · Awake not held (orange dot, `Not held`) · Awake unavailable (`Unavailable`, no submenu).
+- **States:** default · hover/selected (accent background with 8pt corners, white text + icon) · empty inbox (`✓ You're all caught up`, the menu gets shorter) · core not running (`rung 2 — Banner` error style in the inbox position: "Navori core isn't running" + `Restart`) · GitHub offline (`Pull Requests  offline · 5 min ago`) · Awake on (green dot) · Awake off or not held (no dot) · Awake unavailable (no dot, no submenu).
 - **Type & color:** SF Pro 14pt title/item, 13pt right-aligned value (`secondaryLabelColor`), 12pt secondary line. SF Mono 11.5pt for port numbers, `#PR`, pid. Monochrome icons in `secondaryLabelColor` (white when selected). Semantic color is **only** the 7pt dot (`systemGreen` on/pass, `systemRed` fail, `systemOrange` conflict, `systemBlue` review/decision). No color tiles, gradients, or multicolor icons.
 - **A11y:** NSMenu-style keyboard navigation, built by the panel cascade (↑↓, → opens a submenu, ← closes, Return, Esc); VoiceOver reads "title, secondary line, time" as one; state is never conveyed by color alone (always text: "2 failing", "On"); respects Reduce Transparency (opaque material) and Reduce Motion; inline button hit area ≥ 24pt tall.
 

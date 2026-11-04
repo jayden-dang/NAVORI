@@ -172,9 +172,9 @@ Terms used below:
 It changes three things in MENU's spec: MENU-1.2 gains the Awake row before the Core row; MENU-1.4 no longer lists the Awake row among what Release code hides; and MENU's "The Awake row ships: decide whether the Core row stays" is answered: it stays.
 
 - **AWAKE-11.1** THE SYSTEM SHALL lay out level 0 in this order: any banners, the Awake row, the Core row, a separator, `Settings…`, `About Navori`, `Quit Navori`.
-- **AWAKE-11.2** WHILE no Lease exists THE SYSTEM SHALL show `Off` on the Awake row.
-- **AWAKE-11.3** WHILE a Lease exists with the System assertion held THE SYSTEM SHALL show `On` and the names of the sources holding on the Awake row.
-- **AWAKE-11.4** WHILE a Lease exists with no System assertion THE SYSTEM SHALL NOT show `On` on the Awake row.
+- **AWAKE-11.2** WHILE no Lease exists THE SYSTEM SHALL show no dot on the Awake row. *(Amended 2026-11-04: the row shows a dot and no text.)*
+- **AWAKE-11.3** WHILE a Lease exists with the System assertion held THE SYSTEM SHALL show a green dot on the Awake row, with VoiceOver reading `On` and the names of the sources holding. *(Amended 2026-11-04: the row shows a dot and no text.)*
+- **AWAKE-11.4** WHILE a Lease exists with no System assertion THE SYSTEM SHALL NOT show a green dot on the Awake row. *(Amended 2026-11-04: the row shows a dot and no text.)*
 - **AWAKE-11.5** WHEN the Awake row opens THE SYSTEM SHALL show `Keep awake for 1 hour`, `Keep awake until I turn it off`, `Display on` and `Release all`, in that order, above a Holding row for each current Lease. *(Amended 2026-11-04 by the locked Awake menu, `ui-brief.md`: the status block left this list; see AWAKE-11.11 and AWAKE-11.12.)*
 - **AWAKE-11.6** THE SYSTEM SHALL NOT show `Pause 15m`, `Let my Mac sleep now`, an Agent sessions row, an Integrations row or a per-Lease release button in the Awake Submenu.
 - **AWAKE-11.7** THE SYSTEM SHALL write menu text about Navori's own Leases only.
@@ -187,10 +187,11 @@ It changes three things in MENU's spec: MENU-1.2 gains the Awake row before the 
 - **AWAKE-11.14** THE SYSTEM SHALL lead a session's Holding row with the monochrome mark of its Harness, for Claude Code, Codex and Grok, and with a terminal symbol for any other Harness.
 - **AWAKE-11.15** THE SYSTEM SHALL show a working session with a green dot and the word `working`, and a stopped session dimmed with the word `stopped`.
 - **AWAKE-11.16** WHILE the Lease a command made exists THE SYSTEM SHALL show a check on `Keep awake for 1 hour`, `Keep awake until I turn it off` or `Display on`, with `until <time>` on the first of these.
-- **AWAKE-11.17** WHEN one source holds more than one Lease THE SYSTEM SHALL name it once on the Awake row with its count, as `Claude Code ×8`.
-- **AWAKE-11.18** IF a menu action fails or Awake records a problem other than a refused System assertion or a stopped Module THEN THE SYSTEM SHALL show an orange dot and `Needs attention` on the Awake row.
+- **AWAKE-11.17** WHEN one source holds more than one Lease THE SYSTEM SHALL have VoiceOver name it once on the Awake row with its count, as `Claude Code ×8`. *(Amended 2026-11-04: the row shows a dot and no text.)*
+- **AWAKE-11.18** IF a menu action fails or Awake records a problem other than a refused System assertion or a stopped Module THEN THE SYSTEM SHALL have VoiceOver read `Needs attention` on the Awake row. *(Amended 2026-11-04: the row shows a dot and no text.)*
 - **AWAKE-11.19** (guard) WHEN the Awake Submenu is open THE SYSTEM SHALL CONTINUE TO move ↑ and ↓ through the four commands and to give Holding rows no keyboard stop.
 - **AWAKE-11.20** (guard) WHEN `Display on` is pressed while a display Lease exists THE SYSTEM SHALL CONTINUE TO end that Lease.
+- **AWAKE-11.21** THE SYSTEM SHALL show no text value on the Awake row, in any state.
 
 ## 12. Keep what exists working
 
