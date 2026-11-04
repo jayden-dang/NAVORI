@@ -1154,7 +1154,7 @@ _Requirements: SECRETS-7.3, SECRETS-7.4_
 
 **Depends-on:** Task 6
 
-- [ ] **Step 1: Write the tests**
+- [x] **Step 1: Write the tests**
 
 `crates/secrets/tests/crate_rules.rs`:
 
@@ -1266,7 +1266,7 @@ fn only_the_manual_run_opens_the_real_keychain_and_it_is_ignored_by_default() {
 }
 ```
 
-- [ ] **Step 2: Run, then prove each test can fail**
+- [x] **Step 2: Run, then prove each test can fail**
 
 Run: `cargo fmt --all`, then `cargo nextest run -p navori-secrets --test crate_rules` — expect: 3 passed. Then apply each mutation, expect the named test to fail, and revert it:
 1. add `navori-store = { workspace = true }` under `[dependencies]` of `crates/secrets/Cargo.toml` — test 1 fails;
@@ -1276,7 +1276,7 @@ Run: `cargo fmt --all`, then `cargo nextest run -p navori-secrets --test crate_r
 5. create `crates/secrets/tests/probe.rs` holding the single comment line `// KeychainStore::open(x)` — test 3 fails; delete the file.
 Run `git status --short` — expect: nothing but this task's file.
 
-- [ ] **Step 3: Gate and commit**
+- [x] **Step 3: Gate and commit**
 
 Run: `cargo clippy -p navori-secrets --all-targets -- -D warnings` — expect: clean.
 `git add crates/secrets && git commit -m "test(secrets): pin the crate's dependency and test-layout rules"`
