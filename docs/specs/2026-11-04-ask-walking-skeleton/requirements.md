@@ -1,8 +1,9 @@
 # Requirements: Ask walking skeleton
 
 Feature code: ASK
-Status: Draft
+Status: Approved
 Date: 2026-11-04
+Approved by the operator ("approve", 2026-11-04 14:14, on the review page at c59c1d5, no card selected).
 
 <!--
 Roadmap item: ROAD-36 ask-walking-skeleton (MILE-3). Claim: GitHub issue #18 (open, unassigned, label status:shaping). This unattended run did not assign it: the charter allows no GitHub writes beyond using that ticket.
