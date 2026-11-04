@@ -270,10 +270,10 @@ _Requirements: ASK-1.3, ASK-1.4, ASK-1.7, ASK-9.5_
 
 **Depends-on:** Task 3
 
-- [ ] **Step 1: Failing test** — write `every_default_test_uses_fakes` in `ai/llm/tests/default_tests_use_fakes.rs`: it reads whichever of the test sources exist (`ai/llm/tests/*.rs` other than itself and `live_deepseek.rs`, `ai/context/tests/*.rs`, `crates/ffi/tests/ask.rs`) and fails if one calls `KeychainStore::open` or `Command::new("pass")` (the patterns are assembled with `concat!` so this file does not contain them whole), or if `live_deepseek.rs` is missing or lacks `#[ignore`. Run `cargo test -p navori-llm --test default_tests_use_fakes` — expect: fails because `live_deepseek.rs` does not exist yet.
-- [ ] **Step 2: Implement** the live test: skip with a printed note unless `NAVORI_LIVE_LLM == "1"`; run `Command::new("pass").arg("show").arg(&entry)` with stdout captured (the entry is an argument, not a shell string); hold the output in a `Secret`; call `OpenAiCompat::new(DEEPSEEK_BASE_URL).complete(..)` with a short prompt; assert the reply is non-empty; never print the key or the prompt reply on failure, only the `LlmError` Display. No task step sets the variables or runs `pass`; only the operator does.
-- [ ] **Step 3: Verify the default run skips it** — `cargo test -p navori-llm` — expect: the live test is reported `ignored`, everything else passes; `cargo test --workspace` likewise (ASK-8.3).
-- [ ] **Step 4: Commit** — `git commit -m "test(llm): add the gated live DeepSeek test"`.
+- [x] **Step 1: Failing test** — write `every_default_test_uses_fakes` in `ai/llm/tests/default_tests_use_fakes.rs`: it reads whichever of the test sources exist (`ai/llm/tests/*.rs` other than itself and `live_deepseek.rs`, `ai/context/tests/*.rs`, `crates/ffi/tests/ask.rs`) and fails if one calls `KeychainStore::open` or `Command::new("pass")` (the patterns are assembled with `concat!` so this file does not contain them whole), or if `live_deepseek.rs` is missing or lacks `#[ignore`. Run `cargo test -p navori-llm --test default_tests_use_fakes` — expect: fails because `live_deepseek.rs` does not exist yet.
+- [x] **Step 2: Implement** the live test: skip with a printed note unless `NAVORI_LIVE_LLM == "1"`; run `Command::new("pass").arg("show").arg(&entry)` with stdout captured (the entry is an argument, not a shell string); hold the output in a `Secret`; call `OpenAiCompat::new(DEEPSEEK_BASE_URL).complete(..)` with a short prompt; assert the reply is non-empty; never print the key or the prompt reply on failure, only the `LlmError` Display. No task step sets the variables or runs `pass`; only the operator does.
+- [x] **Step 3: Verify the default run skips it** — `cargo test -p navori-llm` — expect: the live test is reported `ignored`, everything else passes; `cargo test --workspace` likewise (ASK-8.3).
+- [x] **Step 4: Commit** — `git commit -m "test(llm): add the gated live DeepSeek test"`.
 
 _Requirements: ASK-8.1, ASK-8.2, ASK-8.3_
 
