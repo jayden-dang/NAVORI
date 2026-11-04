@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex, PoisonError};
 
-use navori_procs::{Branch, Location, resolve_location};
+use navori_procs::{Branch, Location, find_repo, resolve_location};
 
 fn git(dir: &Path, args: &[&str]) -> Result<String, String> {
     let mut cmd = Command::new("git");
@@ -83,6 +83,39 @@ fn a_linked_worktree_reports_the_main_project_and_the_worktree_name() -> Result<
 
     assert_eq!(
         resolve_location(&root.path().join("navori-feat")),
+        Location {
+            project: "navori".to_owned(),
+            worktree: Some("navori-feat".to_owned()),
+            branch: Some(Branch::Named("feat".to_owned())),
+        }
+    );
+    Ok(())
+}
+
+#[test]
+fn a_directory_with_no_repository_above_it_has_no_repo() -> Result<(), String> {
+    let root = temp_root()?;
+    let dir = root.path().join("plain").join("deeper");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+
+    assert_eq!(find_repo(&dir), None);
+    Ok(())
+}
+
+#[test]
+fn a_linked_worktree_reports_its_checkout_as_the_root() -> Result<(), String> {
+    let root = temp_root()?;
+    let base = fs::canonicalize(root.path()).map_err(|e| e.to_string())?;
+    let repo = base.join("navori");
+    init_repo(&repo)?;
+    git(&repo, &["worktree", "add", "../navori-feat", "-b", "feat"])?;
+    let inside = base.join("navori-feat");
+    fs::create_dir(inside.join("src")).map_err(|e| e.to_string())?;
+
+    let found = find_repo(&inside.join("src")).ok_or("no repo found")?;
+    assert_eq!(found.root, inside);
+    assert_eq!(
+        found.location,
         Location {
             project: "navori".to_owned(),
             worktree: Some("navori-feat".to_owned()),

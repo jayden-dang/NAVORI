@@ -17,29 +17,55 @@ pub enum Branch {
     Detached { abbrev: String },
 }
 
+/// A repository checkout found above a path, and what it says about the path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Repo {
+    pub root: PathBuf,
+    pub location: Location,
+}
+
 /// Resolves the project, worktree and branch that contain `cwd`.
 pub fn resolve_location(cwd: &Path) -> Location {
-    let mut dir = Some(cwd);
+    find_repo(cwd).map_or_else(
+        || Location {
+            project: dir_name(cwd),
+            worktree: None,
+            branch: None,
+        },
+        |repo| repo.location,
+    )
+}
+
+/// Walks up from `path` to the nearest checkout. A linked worktree is its own root.
+pub fn find_repo(path: &Path) -> Option<Repo> {
+    let mut dir = Some(path);
     while let Some(current) = dir {
         let git = current.join(".git");
-        if git.is_dir() {
-            return Location {
-                project: dir_name(current),
-                worktree: None,
-                branch: read_branch(&git.join("HEAD")),
-            };
+        match std::fs::metadata(&git) {
+            Ok(meta) if meta.is_dir() => {
+                return Some(Repo {
+                    root: current.to_path_buf(),
+                    location: Location {
+                        project: dir_name(current),
+                        worktree: None,
+                        branch: read_branch(&git.join("HEAD")),
+                    },
+                });
+            }
+            Ok(meta) if meta.is_file() => {
+                return Some(Repo {
+                    root: current.to_path_buf(),
+                    location: from_git_file(current, &git),
+                });
+            }
+            Err(err) if err.kind() != std::io::ErrorKind::NotFound => {
+                tracing::debug!("unreadable git metadata");
+            }
+            _ => {}
         }
-        if git.is_file() {
-            return from_git_file(current, &git);
-        }
-        note_unreadable(&git);
         dir = current.parent();
     }
-    Location {
-        project: dir_name(cwd),
-        worktree: None,
-        branch: None,
-    }
+    None
 }
 
 fn from_git_file(work_tree: &Path, git_file: &Path) -> Location {
@@ -109,14 +135,6 @@ fn read_branch(head: &Path) -> Option<Branch> {
         });
     }
     None
-}
-
-fn note_unreadable(path: &Path) {
-    if let Err(err) = std::fs::metadata(path)
-        && err.kind() != std::io::ErrorKind::NotFound
-    {
-        tracing::debug!("unreadable git metadata");
-    }
 }
 
 fn first_line(path: &Path) -> Option<String> {

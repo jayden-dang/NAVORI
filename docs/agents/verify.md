@@ -45,7 +45,7 @@ One read-only check: is this instance worth driving?
 ```
 
 Pass: exit 0, every line ✓ (app reachable at the dev socket, config, database, IPC,
-modules, logs, awake, integrations). The `integrations` row fails, and doctor exits 1, when a
+modules, logs, awake, integrations, ports). The `integrations` row fails, and doctor exits 1, when a
 Harness hook needs repair or its file is unreadable. A dev build run from another worktree can
 cause this, because the hook entry names that build's path; that is not a defect of this
 instance. Exit 3 = app not running → Launch first. Any other failure: do not Drive;
@@ -99,6 +99,7 @@ Index:
 | Dispatch | `dispatch system '"ping"'` | prints `"pong"` |
 | Awake | `awake status`, `hold`, `release-all`, `run -- <cmd>` | a lease is listed while held; gone after `release-all` or when the command exits |
 | Integrations | `dispatch integrations ...`, `doctor` | Install writes the Harness hook entries into the Hook file under the temp home; Remove takes them out |
+| Ports | `dispatch ports '"list"'`, `doctor` | the listening ports of the user's processes, grouped by project; the `ports` row passes (`not scanned yet` before the first scan) and fails with the outcome after a failed scan |
 | Menubar panel | click the Navori Dev menu bar icon | manual drive only for now (see below) |
 
 ### Health
@@ -154,6 +155,13 @@ Index:
   3. `"$CLI" --profile dev awake run -- sleep 5` — the command's exit code, even 3; with the Core off the command still runs.
 - **Gotchas:** no flag on `hold` means until turned off. `Display on` has no CLI verb; dispatch `{"display":{"on":true}}`. Session hold is `dispatch`, not a CLI verb. Tracking agents is `dispatch` too: `{"tracking":{"on":false}}`. While it is off, `status` lists no session, though Navori still follows them.
 - **Persist check:** a command or session lease is still listed after quit and relaunch if the process is still the same; a duration or until-off lease is not. Tracking agents reads the same after relaunch.
+
+### Ports
+
+- **Sub-features:** `list` and `open` of the ports the user's own processes listen on; the `ports` doctor row; the problem glyph on the status icon after a failed scan
+- **How to get to it (user POV):** no screen yet; the CLI and the `ports.list` reply only.
+- **Driving it with the CLI:** `"$CLI" --profile dev dispatch ports '"list"'`, then `'{"open":{"port":3000}}'`; `"$CLI" --profile dev doctor` for the row.
+- **Gotchas:** the first scan runs 5 s after launch, so an early `list` answers with no entries and no scan time. A failed scan keeps the last good list and sets `problem`. A Docker read failure shows in `docker`, never in `problem`.
 
 ### Integrations
 

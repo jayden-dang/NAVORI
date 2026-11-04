@@ -62,7 +62,7 @@ Status: **Built** = in the tree at R0 · **Built (Rn)** = in the tree since that
 | Process model | Built (R1) | Snapshot, project/worktree location, Harness table, child activity and process-exit watcher. No `unsafe`. Uses `ProcessSource` and `ExitSource`. | `crates/procs` |
 | Secrets | Built (R2) — consumed by `navori-llm`, `navori-context` and `navori-ffi`; ROAD-11 and ROAD-19 still to come | Keychain storage for tokens and API keys (ARCH-8). | `crates/secrets` |
 | Awake module | Built (R1) | Leases → at most one power assertion per kind; harness-session tracking. | `modules/awake` |
-| Ports module | Planned (R3) | Listening ports by project/worktree/harness; stop with approval. | `modules/ports` |
+| Ports module | In progress (R3) | Listening ports by project/worktree/harness; `ports.list` replies with the last scan. Stop with approval is planned. | `modules/ports` |
 | GitHub module | Planned (R4) | PR inbox, checks, approve/merge; OAuth device flow (ADR 0002). | `modules/github` |
 | Needs you inbox | Planned (R2) | Decisions, To-dos and Updates between the user and Navori AI; approvals for Destructive Actions. | proposed `modules/inbox` |
 | PlatformServices | Planned (R2) | Swift-implemented services the Core calls: notifications, frontmost app/AX, screen capture + OCR + blur, permissions. | `apps/macos/Navori/Platform/` |

@@ -8,8 +8,9 @@ use std::time::{Duration, Instant};
 use navori_config::{ConfigReport, JournalSweep, Paths, Profile, WholeFileReason};
 use navori_ffi::{
     CheckView, ConfigNotice, CoreConfig, CoreError, CoreSnapshot, NavoriCore, SnapshotListener,
-    TrayGlyphView,
+    TrayGlyphView, ports_check,
 };
+use navori_mod_ports::{DockerStatus, PortsState};
 use navori_protocol::rpc::method;
 use navori_protocol::{CoreStatus, Event, Severity};
 use navori_store::Store;
@@ -782,7 +783,8 @@ fn an_idle_core_reports_a_passing_awake_row_and_keeps_the_other_rows() {
             "modules",
             "awake",
             "integrations",
-            "logs"
+            "logs",
+            "ports"
         ]
     );
     let awake = checks.iter().find(|check| check.name == "awake").unwrap();
@@ -964,5 +966,134 @@ fn a_whole_file_fallback_says_so_in_the_icon_summary() {
         "{}",
         tray.summary
     );
+    core.shutdown();
+}
+
+fn ports_state(value: serde_json::Value) -> PortsState {
+    serde_json::from_value(value).unwrap()
+}
+
+fn one_port(port: u16) -> serde_json::Value {
+    serde_json::json!({
+        "port": port,
+        "addresses": ["127.0.0.1"],
+        "pid": 100,
+        "start_us": 1,
+        "name": "node",
+        "exe": null,
+        "project": null,
+        "worktree": null,
+        "branch": null,
+        "missing_path": null,
+        "harness": null,
+        "kind": "other",
+        "container": null
+    })
+}
+
+fn scanned_with_ports(ports: &[u16]) -> PortsState {
+    let entries: Vec<_> = ports.iter().map(|port| one_port(*port)).collect();
+    ports_state(serde_json::json!({
+        "scanned_at_ms": 1_700_000_000_000_u64,
+        "skipped": 0,
+        "docker": "not_seen",
+        "problem": null,
+        "groups": [{
+            "project": null,
+            "worktrees": [{
+                "worktree": null,
+                "processes": [{
+                    "pid": 100,
+                    "start_us": 1,
+                    "name": "node",
+                    "exe": null,
+                    "harness": null,
+                    "entries": entries
+                }]
+            }]
+        }]
+    }))
+}
+
+#[test]
+fn the_ports_row_follows_the_module_and_its_last_scan() {
+    let failed = PortsState {
+        scanned_at_ms: Some(1_700_000_000_000),
+        problem: Some("reading the process list failed".to_owned()),
+        ..PortsState::default()
+    };
+    let docker_unreadable = PortsState {
+        scanned_at_ms: Some(1_700_000_000_000),
+        docker: DockerStatus::Unreadable("Docker did not answer in time.".to_owned()),
+        ..PortsState::default()
+    };
+    let table = [
+        (
+            "the module is down",
+            ports_check(true, Some(&PortsState::default())),
+            false,
+            "The Ports module stopped.",
+        ),
+        (
+            "the state is unreadable",
+            ports_check(false, None),
+            false,
+            "Ports' state could not be read.",
+        ),
+        (
+            "the last scan failed",
+            ports_check(false, Some(&failed)),
+            false,
+            "reading the process list failed",
+        ),
+        (
+            "nothing is scanned yet",
+            ports_check(false, Some(&PortsState::default())),
+            true,
+            "not scanned yet",
+        ),
+        (
+            "no port is listening",
+            ports_check(false, Some(&scanned_with_ports(&[]))),
+            true,
+            "0 ports",
+        ),
+        (
+            "one port is listening",
+            ports_check(false, Some(&scanned_with_ports(&[3000]))),
+            true,
+            "1 port",
+        ),
+        (
+            "three ports are listening",
+            ports_check(false, Some(&scanned_with_ports(&[3000, 3001, 3002]))),
+            true,
+            "3 ports",
+        ),
+        (
+            "docker could not be read",
+            ports_check(false, Some(&docker_unreadable)),
+            true,
+            "0 ports",
+        ),
+    ];
+    for (when, row, ok, detail) in table {
+        assert_eq!(row.name, "ports", "{when}");
+        assert_eq!(row.ok, ok, "{when}");
+        assert_eq!(row.detail, detail, "{when}");
+    }
+}
+
+#[test]
+fn the_ports_row_passes_before_the_first_scan() {
+    let home = home();
+    let (core, _) = start(&home);
+    let row = core
+        .doctor()
+        .into_iter()
+        .find(|check| check.name == "ports")
+        .unwrap();
+    assert!(row.ok);
+    assert_eq!(row.detail, "not scanned yet");
     core.shutdown();
 }

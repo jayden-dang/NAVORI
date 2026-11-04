@@ -1,11 +1,11 @@
 //! One user's processes at one moment.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use navori_macos::{PlatformError, ProcessSource, ReadError, StartTime};
+use navori_macos::{Listener, Marker, PlatformError, ProcessSource, ReadError, StartTime};
 
 use crate::error::{Field, ProcsError, Unavailable};
 
@@ -152,6 +152,51 @@ impl Snapshot {
     /// Working directory of this identity, read only after the live process still matches it.
     pub fn cwd(&self, id: ProcId) -> Field<PathBuf> {
         self.read_verified(id, |source, pid| source.cwd(pid))
+    }
+
+    /// TCP sockets in the LISTEN state of this identity. Only a process the snapshot kept, which is
+    /// one of the caller's, is read. The read is not verified: call [`Snapshot::still_same`] after
+    /// the last one and drop every identity it leaves out.
+    pub fn listeners(&self, id: ProcId) -> Field<Vec<Listener>> {
+        if self.index_of(id).is_none() {
+            return Err(Unavailable::Exited);
+        }
+        self.source.listeners(id.pid).map_err(unavailable_from)
+    }
+
+    /// Which of `names` this identity carries in its environment, read only after the live process
+    /// still matches it. The environment itself never leaves the reader.
+    pub fn env_marker(&self, id: ProcId, names: &[&str]) -> Field<Marker> {
+        self.read_verified(id, |source, pid| source.env_marker(pid, names))
+    }
+
+    /// Short kernel name of this identity, read only after the live process still matches it.
+    pub fn name(&self, id: ProcId) -> Field<String> {
+        self.read_verified(id, |source, pid| source.name(pid))
+    }
+
+    /// The identities of this snapshot whose pid still has the same start time and the caller's real
+    /// uid in one new process list.
+    ///
+    /// # Errors
+    ///
+    /// [`ProcsError::Platform`] when the process list cannot be read.
+    pub fn still_same(&self) -> Result<HashSet<ProcId>, ProcsError> {
+        let uid = self.source.current_uid();
+        let live: HashMap<i32, StartTime> = self
+            .source
+            .list()
+            .map_err(platform)?
+            .into_iter()
+            .filter(|entry| entry.ruid == uid && !entry.zombie)
+            .map(|entry| (entry.pid, entry.start))
+            .collect();
+        Ok(self
+            .processes
+            .iter()
+            .map(|process| process.id)
+            .filter(|id| live.get(&id.pid) == Some(&id.start))
+            .collect())
     }
 
     /// Live entry has this start time and the caller's real uid, then `read`, then the live

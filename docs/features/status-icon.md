@@ -15,7 +15,7 @@ Each Module may implement `Module::tray(&State) -> TrayContribution` (default: n
 3. `attention` is on when any running Module gives an attention clause. It adds a clause to the summary.
 4. The config notice adds `<title>. <message>` to the summary and never changes the glyph.
 
-Awake is the one Module that contributes today: `lease` ("Keeping this Mac awake") while a Lease exists and macOS holds the assertion, `problem` when a Lease exists and the system will not hold it. It never asks for attention. Nothing contributes `ai_running` yet.
+Awake and Ports contribute today. Awake gives `lease` ("Keeping this Mac awake") while a Lease exists and macOS holds the assertion, `problem` when a Lease exists and the system will not hold it. It never asks for attention. Ports gives `problem` ("Can't scan ports. <outcome>") while its last scan failed, and nothing else. Nothing contributes `ai_running` yet.
 
 ## State and glyphs
 

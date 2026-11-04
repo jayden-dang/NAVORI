@@ -7,6 +7,8 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use crate::error::{PlatformError, ReadError, StartTime};
+use crate::procargs::Marker;
+use crate::sockets::Listener;
 
 /// One `kinfo_proc` record, in bytes, measured on this OS.
 const RECORD_LEN: usize = 648;
@@ -52,6 +54,16 @@ pub trait ProcessSource: Send + Sync {
 
     /// User plus system CPU time accumulated by this process, not by its children.
     fn cpu_time(&self, pid: i32) -> Result<Duration, ReadError>;
+
+    /// TCP sockets in the LISTEN state held by this process.
+    fn listeners(&self, pid: i32) -> Result<Vec<Listener>, ReadError>;
+
+    /// Which of `names` this process carries as an environment name, matched exactly and only in the
+    /// environment part of the argument buffer. The environment itself is never returned.
+    fn env_marker(&self, pid: i32, names: &[&str]) -> Result<Marker, ReadError>;
+
+    /// The short name the kernel keeps for this process.
+    fn name(&self, pid: i32) -> Result<String, ReadError>;
 }
 
 /// macOS [`ProcessSource`]. [`MacProcesses::new`] refuses a `kinfo_proc` layout it does not recognize.
@@ -98,6 +110,18 @@ impl ProcessSource for MacProcesses {
 
     fn cpu_time(&self, pid: i32) -> Result<Duration, ReadError> {
         read_cpu_time(pid)
+    }
+
+    fn listeners(&self, pid: i32) -> Result<Vec<Listener>, ReadError> {
+        crate::sockets::read_listeners(pid)
+    }
+
+    fn env_marker(&self, pid: i32, names: &[&str]) -> Result<Marker, ReadError> {
+        crate::procargs::read_marker(pid, names, || read_entry(pid).is_err())
+    }
+
+    fn name(&self, pid: i32) -> Result<String, ReadError> {
+        crate::sockets::read_name(pid)
     }
 }
 

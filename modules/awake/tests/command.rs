@@ -8,7 +8,9 @@ use std::time::Duration;
 use common::{ASSERTION_NAME, ORIGIN_MS, Rig};
 use navori_kernel::{ActionError, DispatchError, Severity};
 use navori_macos::fake::{FakeProcess, FakeProcesses};
-use navori_macos::{AssertionKind, PlatformError, ProcEntry, ProcessSource, ReadError, WatchError};
+use navori_macos::{
+    AssertionKind, Listener, Marker, PlatformError, ProcEntry, ProcessSource, ReadError, WatchError,
+};
 use serde_json::{Value, json};
 
 const START_US: u64 = 5_000;
@@ -228,6 +230,18 @@ impl ProcessSource for FirstRuid {
 
     fn cpu_time(&self, pid: i32) -> Result<Duration, ReadError> {
         self.inner.cpu_time(pid)
+    }
+
+    fn listeners(&self, pid: i32) -> Result<Vec<Listener>, ReadError> {
+        self.inner.listeners(pid)
+    }
+
+    fn env_marker(&self, pid: i32, names: &[&str]) -> Result<Marker, ReadError> {
+        self.inner.env_marker(pid, names)
+    }
+
+    fn name(&self, pid: i32) -> Result<String, ReadError> {
+        self.inner.name(pid)
     }
 }
 

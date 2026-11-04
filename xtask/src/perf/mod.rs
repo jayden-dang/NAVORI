@@ -1,4 +1,5 @@
 mod baseline;
+mod docker;
 mod home;
 mod judge;
 mod launch;
@@ -15,6 +16,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result, bail, ensure};
 
 use baseline::{Baseline, Machine, finish};
+use docker::{DockerReport, report as docker_report};
 use home::{PerfHome, check_socket_len, current_uid};
 use judge::{Measurements, judge, median};
 use launch::Launched;
@@ -33,6 +35,7 @@ pub fn run(root: &Path, record: bool) -> Result<bool> {
     let (app, probe, build_elapsed) = build_bundle(root)?;
     emit(&format!("build {}", format_elapsed(build_elapsed)))?;
     let snapshot_ms = measure_snapshot_ms(root)?;
+    let port_scan_ms = measure_port_scan_ms(root)?;
 
     let exe = app.join("Contents/MacOS/Navori");
     let home = prepare_home(&exe)?;
@@ -53,13 +56,24 @@ pub fn run(root: &Path, record: bool) -> Result<bool> {
     let app_size_mb = mib(bundle_bytes(&app)?);
     let mut measured = measurements(&phase_a, &phase_b, app_size_mb)?;
     measured.insert("snapshot_ms".to_owned(), snapshot_ms);
+    measured.insert("port_scan_ms".to_owned(), port_scan_ms);
     let machine = Machine::current()?;
     let baseline_path = root.join("perf-baseline.json");
     let loaded = Baseline::load(&baseline_path)?;
     let verdict = judge(&measured, loaded.as_ref(), &machine);
     report(&verdict, phase_a_elapsed, phase_b_elapsed)?;
+    emit(&format!("docker={}", phase_b.docker.status))?;
+    if let Some(note) = &phase_b.docker.note {
+        emit(note)?;
+    }
+    if let Some(warning) = &phase_b.docker.warning {
+        emit(&format!("WARNING {warning}"))?;
+        if record {
+            emit("not recording a baseline from this run")?;
+        }
+    }
 
-    if record && verdict.passed {
+    if phase_b.docker.records(record, verdict.passed) {
         let baseline = Baseline::from_run(&measured, machine, git_revision(root)?, record_date()?);
         finish(&baseline_path, &verdict, record, &baseline)?;
     }
@@ -172,11 +186,35 @@ fn measure_phase_b(
         before = after;
     }
     let peak_bytes = before.peak;
+    let docker = docker_report(PerfHome::docker_linked(&run_dir), ports_list(exe, &run_dir));
     finish_measured(&mut launched)?;
     Ok(PhaseBProcess {
         windows,
         peak_bytes,
+        docker,
     })
+}
+
+fn ports_list(exe: &Path, run_dir: &Path) -> Result<String> {
+    let helper = exe
+        .parent()
+        .and_then(Path::parent)
+        .context("the app executable has no bundle")?
+        .join("Helpers/navori");
+    let home = format!("HOME={}", path_str(run_dir)?);
+    command_stdout(
+        "/usr/bin/env",
+        &[
+            &home,
+            path_str(&helper)?,
+            "--profile",
+            "dev",
+            "dispatch",
+            "ports",
+            "\"list\"",
+        ],
+        None,
+    )
 }
 
 fn measurements(
@@ -289,6 +327,7 @@ struct PhaseBWindow {
 struct PhaseBProcess {
     windows: Vec<PhaseBWindow>,
     peak_bytes: u64,
+    docker: DockerReport,
 }
 
 struct MenuOpen {
@@ -604,30 +643,48 @@ fn join_pipe(handle: thread::JoinHandle<std::io::Result<Vec<u8>>>, which: &str) 
         .with_context(|| format!("read {which}"))
 }
 
-/// PROCS-8.4 runs as an ignored test in the process crate: its code has no place in the app bundle.
+/// Runs as an ignored test in the process crate: its code has no place in the app bundle.
 fn measure_snapshot_ms(root: &Path) -> Result<f64> {
-    let output = super::cargo(root)
-        .args(["test", "-p", "navori-procs", "--test", "real_os", "--"])
-        .args(["--ignored", "--exact", "--nocapture"])
-        .arg("snapshot_cost_for_the_perf_gate")
-        .output()
-        .context("cannot run the snapshot timing test")?;
-    ensure!(
-        output.status.success(),
-        "the snapshot timing test failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    snapshot_median_ms(&String::from_utf8_lossy(&output.stdout))
+    measure_real_os_ms(
+        root,
+        "navori-procs",
+        "snapshot_cost_for_the_perf_gate",
+        "snapshot",
+    )
 }
 
-fn snapshot_median_ms(output: &str) -> Result<f64> {
+fn measure_port_scan_ms(root: &Path) -> Result<f64> {
+    measure_real_os_ms(
+        root,
+        "navori-mod-ports",
+        "port_scan_cost_for_the_perf_gate",
+        "port scan",
+    )
+}
+
+fn measure_real_os_ms(root: &Path, package: &str, test: &str, what: &str) -> Result<f64> {
+    let output = super::cargo(root)
+        .args(["test", "-p", package, "--test", "real_os", "--"])
+        .args(["--ignored", "--exact", "--nocapture"])
+        .arg(test)
+        .output()
+        .with_context(|| format!("cannot run the {what} timing test"))?;
+    ensure!(
+        output.status.success(),
+        "the {what} timing test failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    median_ms(&String::from_utf8_lossy(&output.stdout))
+}
+
+fn median_ms(output: &str) -> Result<f64> {
     let micros: u32 = output
         .lines()
         .find_map(|line| line.split_once("median ")?.1.split_once(" µs"))
-        .context("the snapshot timing test printed no median")?
+        .context("the timing test printed no median")?
         .0
         .parse()
-        .context("the snapshot timing test printed an unreadable median")?;
+        .context("the timing test printed an unreadable median")?;
     Ok(f64::from(micros) / 1000.0)
 }
 
@@ -639,22 +696,23 @@ mod tests {
     use super::probe::Sample;
     use super::{
         PhaseAProcess, PhaseBProcess, PhaseBWindow, finish_measured, idle_window, measurements,
-        snapshot_median_ms,
+        median_ms,
     };
     use crate::perf::launch::Launched;
 
     #[test]
     fn the_snapshot_median_is_read_in_milliseconds_from_the_test_output() {
         let output = "running 1 test\nmedian 4308 µs (4.308333ms); processes 854\ntest ok\n";
-        assert_eq!(snapshot_median_ms(output).unwrap(), 4.308);
+        assert_eq!(median_ms(output).unwrap(), 4.308);
         let same_line =
             "test snapshot_cost_for_the_perf_gate ... median 4308 µs (4.3ms); processes 854\n";
-        assert_eq!(snapshot_median_ms(same_line).unwrap(), 4.308);
+        assert_eq!(median_ms(same_line).unwrap(), 4.308);
+        assert_eq!(median_ms("median 4308 µs; listeners 20").unwrap(), 4.308);
     }
 
     #[test]
     fn a_test_run_that_printed_no_median_is_an_error_and_not_a_zero() {
-        let err = snapshot_median_ms("running 0 tests\n").unwrap_err();
+        let err = median_ms("running 0 tests\n").unwrap_err();
         assert!(err.to_string().contains("median"), "{err}");
     }
 
@@ -681,6 +739,11 @@ mod tests {
                 threads: 4.0,
             }],
             peak_bytes: 1_048_576,
+            docker: super::docker::DockerReport {
+                status: "read".to_owned(),
+                note: None,
+                warning: None,
+            },
         }
     }
 

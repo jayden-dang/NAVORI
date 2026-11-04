@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::time::Duration;
 
-use navori_macos::{MacProcesses, ProcessSource, ReadError, StartTime};
+use navori_macos::{MacProcesses, Marker, ProcessSource, ReadError, StartTime};
 
 /// A child in its own process group, killed with that group on drop.
 struct ChildTree {
@@ -18,10 +18,15 @@ struct ChildTree {
 impl ChildTree {
     fn spawn(program: &str, args: &[&str], dir: Option<&Path>) -> Self {
         let mut cmd = Command::new(program);
-        cmd.args(args).process_group(0);
+        cmd.args(args);
         if let Some(dir) = dir {
             cmd.current_dir(dir);
         }
+        Self::spawn_command(cmd)
+    }
+
+    fn spawn_command(mut cmd: Command) -> Self {
+        cmd.process_group(0);
         Self {
             child: cmd.spawn().unwrap(),
         }
@@ -142,6 +147,18 @@ fn a_spawned_child_has_its_executable_and_working_directory() {
 }
 
 #[test]
+#[ignore = "reads a real process's removed working directory"]
+fn a_removed_working_directory_is_still_read_as_its_old_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let expected = dir.path().canonicalize().unwrap();
+    let child = ChildTree::spawn("sleep", &["5"], Some(&expected));
+    let procs = source();
+    assert_eq!(procs.cwd(child.id()).unwrap(), expected);
+    std::fs::remove_dir(&expected).unwrap();
+    assert_eq!(procs.cwd(child.id()).unwrap(), expected);
+}
+
+#[test]
 fn cpu_time_of_a_busy_child_is_close_to_its_wall_time() {
     let shell = ChildTree::spawn("sh", &["-c", "yes > /dev/null"], None);
     let procs = source();
@@ -211,5 +228,51 @@ fn the_test_process_own_arguments_exclude_its_environment() {
     assert_eq!(
         procs.argv(std::process::id() as i32).unwrap(),
         std::env::args().collect::<Vec<_>>()
+    );
+}
+
+const MARKER_NAMES: [&str; 3] = ["CLAUDE_CODE_CHILD_SESSION", "CODEX_THREAD_ID", "GROK_AGENT"];
+
+/// The kernel withholds the environment of a platform binary, so the child is an ad-hoc signed copy.
+fn unrestricted_copy(dir: &Path, tool: &str) -> PathBuf {
+    let copy = dir.join(tool);
+    std::fs::copy(Path::new("/bin").join(tool), &copy).unwrap();
+    let signed = Command::new("/usr/bin/codesign")
+        .args(["-s", "-", "--force"])
+        .arg(&copy)
+        .output()
+        .unwrap();
+    assert!(signed.status.success(), "codesign refused the copy");
+    copy
+}
+
+#[test]
+#[ignore = "reads the environment of a real child"]
+fn an_environment_marker_is_found_in_a_real_process() {
+    let dir = tempfile::tempdir().unwrap();
+    let sleep = unrestricted_copy(dir.path(), "sleep");
+    let mut cmd = Command::new(sleep);
+    cmd.env_clear().env("GROK_AGENT", "1").args(["5"]);
+    let child = ChildTree::spawn_command(cmd);
+    let procs = source();
+    assert_eq!(
+        procs.env_marker(child.id(), &MARKER_NAMES).unwrap(),
+        Marker::One(2)
+    );
+}
+
+#[test]
+#[ignore = "reads the environment of a real child"]
+fn a_marker_given_only_as_an_argument_is_not_found() {
+    let dir = tempfile::tempdir().unwrap();
+    let sh = unrestricted_copy(dir.path(), "sh");
+    let mut cmd = Command::new(sh);
+    cmd.env_clear()
+        .args(["-c", "sleep 5; :", "sh", "GROK_AGENT=1"]);
+    let child = ChildTree::spawn_command(cmd);
+    let procs = source();
+    assert_eq!(
+        procs.env_marker(child.id(), &MARKER_NAMES).unwrap(),
+        Marker::None
     );
 }

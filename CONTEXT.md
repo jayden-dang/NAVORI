@@ -134,6 +134,20 @@ The user's own account on an external service (GitHub, Gmail, Slack…) that Nav
 with the user's authorization and that the user can revoke.
 _Avoid_: connector, connection, integration, linked account
 
+**Port**:
+A TCP port that one of the user's own processes listens on, shown with the process, its
+project, worktree and branch.
+_Avoid_: socket, endpoint
+
+**Listener**:
+One process holding one or more **Ports**; the unit that Ports lists and groups.
+_Avoid_: server, service
+
+**Placement**:
+Where a **Listener** runs: its project, worktree and branch, or the missing directory it was
+started in. It is the Ports Module's form of `Location` in `navori-procs`, adding the missing path.
+_Avoid_: location (that is the `navori-procs` type)
+
 ### Privacy
 
 **Sensitive Data Shield**:
