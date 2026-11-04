@@ -1,7 +1,7 @@
 # Requirements: Keychain secrets
 
 Feature code: SECRETS
-Status: Approved
+Status: In-progress
 Date: 2026-11-03
 Approved by the operator ("approve", 2026-11-03 21:01, on the review page at e3b886c, no card selected).
 
