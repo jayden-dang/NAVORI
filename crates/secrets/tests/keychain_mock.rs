@@ -1,12 +1,15 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 mod common;
+use std::collections::HashMap;
 use std::sync::Arc;
 
-use common::{FIXTURE, call, contract_errors, contract_exists_delete, contract_set_get, key};
+use common::{
+    FIXTURE, SECOND, call, contract_errors, contract_exists_delete, contract_set_get, key,
+};
 use keyring_core::Error;
 use keyring_core::api::CredentialStoreApi;
 use keyring_core::mock::{Cred, Store};
-use navori_secrets::{KeychainService, KeychainStore, Operation, Secret, SecretStore};
+use navori_secrets::{Deleted, KeychainService, KeychainStore, Operation, Secret, SecretStore};
 
 fn mock_store(service: KeychainService) -> (Arc<Store>, KeychainStore) {
     let mock = Store::new().expect("mock store");
@@ -26,8 +29,20 @@ fn inject(mock: &Arc<Store>, service: &str, account: &str, err: Error) {
 
 #[test]
 fn the_keychain_store_keeps_replaces_checks_and_removes_a_secret() {
-    let (_mock, store) = mock_store(KeychainService::RELEASE);
+    let (mock, store) = mock_store(KeychainService::RELEASE);
     contract_set_get(&store, &key("provider", "anthropic"));
+    // SECRETS-2.2: after the replace exactly one credential matches the service and account,
+    // and it holds the second value. This only shows we address the same credential on a
+    // replace; the real Keychain updating the item in place stays a manual-run item
+    // (design decision 9, SECRETS-7.3). The mock does not prove it.
+    let found = mock
+        .search(&HashMap::from([
+            ("service", "dev.navori"),
+            ("user", "provider/anthropic"),
+        ]))
+        .expect("search");
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].get_password().expect("read back"), SECOND);
     contract_exists_delete(&store, &key("provider", "openai"));
 }
 
@@ -82,14 +97,21 @@ fn a_backend_failure_of_each_call_is_an_error_naming_the_key_and_never_the_value
 }
 
 #[test]
-fn every_kind_of_backend_error_is_an_error_never_an_absent_or_false_outcome() {
+fn every_backend_error_except_no_entry_is_an_error_never_an_absent_or_false_outcome() {
     let (mock, store) = mock_store(KeychainService::RELEASE);
     let k = key("provider", "anthropic");
     store.set(&k, &Secret::new(FIXTURE)).expect("set");
-    let kinds: [fn() -> Error; 3] = [
+    let kinds: [fn() -> Error; 10] = [
         || Error::PlatformFailure("boom".into()),
         || Error::NoStorageAccess("denied".into()),
+        || Error::BadEncoding(vec![0xff]),
+        || Error::BadDataFormat(vec![0xff], "odd".into()),
+        || Error::BadStoreFormat("odd".into()),
+        || Error::TooLong("service".into(), 8),
+        || Error::Invalid("service".into(), "odd".into()),
         || Error::Ambiguous(Vec::new()),
+        || Error::NoDefaultStore,
+        || Error::NotSupportedByStore("odd".into()),
     ];
     for make in kinds {
         for op in [
@@ -103,6 +125,34 @@ fn every_kind_of_backend_error_is_an_error_never_an_absent_or_false_outcome() {
             assert_eq!(err.operation(), op);
         }
     }
+}
+
+// SECRETS-2.5. Not covered: a failure of `build()` itself; the mock store cannot be made to
+// fail it.
+#[test]
+fn a_backend_no_entry_is_absent_on_get_exists_and_delete_but_an_error_on_set() {
+    let (mock, store) = mock_store(KeychainService::RELEASE);
+    let k = key("provider", "anthropic");
+    store.set(&k, &Secret::new(FIXTURE)).expect("set");
+    let no_entry = || inject(&mock, "dev.navori", "provider/anthropic", Error::NoEntry);
+
+    no_entry();
+    let err = store
+        .set(&k, &Secret::new(SECOND))
+        .expect_err("NoEntry on set is a failure");
+    assert_eq!(err.operation(), Operation::Set);
+    // the failed set wrote nothing
+    let read = store.get(&k).expect("get").expect("present");
+    assert_eq!(read.expose(), FIXTURE);
+
+    no_entry();
+    assert!(store.get(&k).expect("get").is_none());
+    no_entry();
+    assert!(!store.exists(&k).expect("exists"));
+    no_entry();
+    assert_eq!(store.delete(&k).expect("delete"), Deleted::WasAbsent);
+    // each injected error was consumed by its call and nothing was removed
+    assert!(store.exists(&k).expect("exists after"));
 }
 
 #[test]

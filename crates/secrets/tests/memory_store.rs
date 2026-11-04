@@ -8,6 +8,8 @@ fn a_value_set_through_the_fake_reads_back_and_a_second_set_replaces_it() {
     let vault = FakeKeychain::new();
     let store = MemoryStore::new(KeychainService::RELEASE, &vault);
     contract_set_get(&store, &key("provider", "anthropic"));
+    // SECRETS-2.2: the replace left one item for the key
+    assert_eq!(vault.item_count(), 1);
 }
 
 #[test]

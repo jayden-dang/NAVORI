@@ -2,6 +2,9 @@
 use navori_secrets::{Deleted, Operation, Secret, SecretError, SecretKey, SecretStore};
 
 pub const FIXTURE: &str = concat!("ghp_", "FAKEFAKEFAKEFAKE0123456789");
+pub const SECOND: &str = concat!("ghp_", "SECONDSECOND9876543210");
+/// A value that only a (wrongly) written failing `set` could leave behind.
+pub const NEVER_STORED: &str = concat!("ghp_", "FAKENEVERSTORED5555");
 
 pub fn key(kind: &str, name: &str) -> SecretKey {
     SecretKey::new(kind, name).expect("valid key")
@@ -9,15 +12,26 @@ pub fn key(kind: &str, name: &str) -> SecretKey {
 
 /// Run one store operation and keep only its error.
 pub fn call(store: &dyn SecretStore, op: Operation, key: &SecretKey) -> Result<(), SecretError> {
+    call_with(store, op, key, FIXTURE)
+}
+
+/// Like [`call`], but a `set` carries `value`.
+pub fn call_with(
+    store: &dyn SecretStore,
+    op: Operation,
+    key: &SecretKey,
+    value: &str,
+) -> Result<(), SecretError> {
     match op {
-        Operation::Set => store.set(key, &Secret::new(FIXTURE)),
+        Operation::Set => store.set(key, &Secret::new(value)),
         Operation::Get => store.get(key).map(|_| ()),
         Operation::Exists => store.exists(key).map(|_| ()),
         Operation::Delete => store.delete(key).map(|_| ()),
     }
 }
 
-/// SECRETS-2.2 to 2.4.
+/// SECRETS-2.2 to 2.4. "Leaving one item" cannot be seen through `SecretStore`; each caller
+/// counts items on its own backend after this returns.
 pub fn contract_set_get(store: &dyn SecretStore, key: &SecretKey) {
     assert!(store.get(key).expect("get never set").is_none());
     store.set(key, &Secret::new(FIXTURE)).expect("set");
@@ -25,11 +39,10 @@ pub fn contract_set_get(store: &dyn SecretStore, key: &SecretKey) {
         store.get(key).expect("get").expect("present").expose(),
         FIXTURE
     );
-    let second = concat!("ghp_", "SECONDSECOND9876543210");
-    store.set(key, &Secret::new(second)).expect("replace");
+    store.set(key, &Secret::new(SECOND)).expect("replace");
     assert_eq!(
         store.get(key).expect("get").expect("present").expose(),
-        second
+        SECOND
     );
 }
 
@@ -64,11 +77,14 @@ pub fn contract_errors(
         Operation::Delete,
     ] {
         inject(op);
-        let err = call(store, op, key).expect_err("an injected failure must be an error");
+        let err = call_with(store, op, key, NEVER_STORED)
+            .expect_err("an injected failure must be an error");
         assert_eq!(err.operation(), op);
         for shown in [format!("{err}"), format!("{err:?}")] {
             assert!(
-                !shown.contains(FIXTURE) && !shown.contains("FAKEFAKE"),
+                !shown.contains(FIXTURE)
+                    && !shown.contains(NEVER_STORED)
+                    && !shown.contains("FAKEFAKE"),
                 "{shown}"
             );
             for part in shown_parts {
@@ -76,9 +92,17 @@ pub fn contract_errors(
             }
         }
     }
-    // a failed delete removed nothing
+    // Nothing a failed call did is visible: the old value is still stored (so the failed set
+    // wrote nothing and the failed delete removed nothing), and each of the four calls now
+    // succeeds, so no injected failure is left pending.
     assert_eq!(
         store.get(key).expect("recovers").expect("present").expose(),
         FIXTURE
+    );
+    assert!(store.exists(key).expect("exists recovers"));
+    store.set(key, &Secret::new(SECOND)).expect("set recovers");
+    assert_eq!(
+        store.delete(key).expect("delete recovers"),
+        Deleted::Removed
     );
 }

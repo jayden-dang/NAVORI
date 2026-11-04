@@ -27,6 +27,11 @@ impl FakeKeychain {
         self.lock().failures.push(operation);
     }
 
+    /// How many items the vault holds, across every service.
+    pub fn item_count(&self) -> usize {
+        self.lock().items.len()
+    }
+
     fn lock(&self) -> MutexGuard<'_, State> {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
