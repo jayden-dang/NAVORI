@@ -1,5 +1,11 @@
 import Foundation
 
+private func plural(_ n: Int, _ noun: String) -> String { n == 1 ? noun : noun + "s" }
+
+private func counted(_ n: Int, _ noun: String) -> String { "\(n) \(plural(n, noun))" }
+
+private func systemPortsHidden(_ n: Int) -> String { "\(n) system \(plural(n, "port")) hidden" }
+
 public enum RunningProjectState: Equatable, Sendable {
     case working, idle, unknown
 }
@@ -157,9 +163,9 @@ public struct StopOffer: Equatable, Sendable {
         self.request = request
     }
 
-    public var spoken: String { "Stop \(count) \(count == 1 ? "port" : "ports")" }
+    public var spoken: String { "Stop \(counted(count, "port"))" }
 
-    public var confirmation: String { "Stop \(count) \(count == 1 ? "port" : "ports")?" }
+    public var confirmation: String { "Stop \(counted(count, "port"))?" }
 
     init?(count: Int, request: String?) {
         guard let request, request.isEmpty == false else { return nil }
@@ -209,7 +215,7 @@ public struct ProjectRowState: Equatable, Sendable {
             let ports = project.ports.count
             spoken = ports == 0
                 ? "\(project.name), idle"
-                : "\(project.name), \(ports) idle \(ports == 1 ? "port" : "ports")"
+                : "\(project.name), \(ports) idle \(plural(ports, "port"))"
         case .unknown:
             dot = .none
             spoken = "\(project.name), working state unknown"
@@ -242,19 +248,19 @@ public struct StopAllOffer: Equatable, Sendable {
 }
 
 extension StopAllOffer {
-    public var spoken: String { "Stop \(ports) \(ports == 1 ? "port" : "ports")" }
+    public var spoken: String { "Stop \(counted(ports, "port"))" }
 
     public var confirmation: String {
-        var text = "Stop \(ports) \(ports == 1 ? "port" : "ports") in \(projects) \(projects == 1 ? "project" : "projects")?"
+        var text = "Stop \(counted(ports, "port")) in \(counted(projects, "project"))?"
         var left: [String] = []
-        if inUse > 0 { left.append("\(inUse) \(inUse == 1 ? "port" : "ports") in use") }
-        if otherLeft > 0 { left.append("\(otherLeft) \(otherLeft == 1 ? "port" : "ports") in Other") }
+        if inUse > 0 { left.append("\(counted(inUse, "port")) in use") }
+        if otherLeft > 0 { left.append("\(counted(otherLeft, "port")) in Other") }
         if left.isEmpty == false { text += " \(left.joined(separator: " and ")) stay running." }
         return text
     }
 
     public var systemNote: String? {
-        systemHidden > 0 ? "\(systemHidden) system \(systemHidden == 1 ? "port" : "ports") hidden" : nil
+        systemHidden > 0 ? systemPortsHidden(systemHidden) : nil
     }
 }
 
@@ -488,7 +494,7 @@ public struct ProjectChildState: Equatable, Sendable {
         stop = StopOffer(count: project.stoppablePorts, request: project.childStopRequest)
         let hidden = project.ports.filter(\.protectedInGroup).count
         systemNote = project.isOther && hidden > 0
-            ? "\(hidden) system \(hidden == 1 ? "port" : "ports") hidden"
+            ? systemPortsHidden(hidden)
             : nil
     }
 
