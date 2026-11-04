@@ -10,7 +10,7 @@ Feature code: PSTOP
 Status: Approved
 Approved by the operator ("approve", 2026-11-04 21:17 +07, typed in the conductor session after reading RUN/sheet.html for 775cb62; relayed in .skills/_pending-ports-panel/auto/operator-reply.md).
 Date: 2026-11-04
-Execution-mode: unset
+Execution-mode: continuous
 Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
