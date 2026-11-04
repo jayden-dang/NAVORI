@@ -40,3 +40,7 @@ navori dispatch ports '"list"'   # TCP ports your processes listen on, from the 
 | App | `/Applications/Navori.app` | `build/dev/Navori Dev.app` |
 | Data, DB, config, backups | `~/Library/Application Support/Navori/` | `…/Navori Dev/` |
 | Logs | `~/Library/Logs/Navori/` | `~/Library/Logs/Navori Dev/` |
+
+## License
+
+[MIT](LICENSE)
