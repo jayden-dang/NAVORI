@@ -79,7 +79,7 @@ the real Keychain only on request (SECRETS-7.3), and that run is not part of `ca
 
 **Story:** As a stakeholder, I want measurable quality targets for this feature, so that how-well is not left implicit.
 
-- **Performance:** None — no latency or throughput surface (docs/product/metrics.md and docs/ops/reliability.md are absent, so there is no standing target). The calls are synchronous; keeping them off the actor thread and reading lazily (ARCH-17) is the consumers' rule, not this crate's feature.
+- **Performance:** None — no latency or throughput surface (docs/product/metrics.md and docs/ops/reliability.md are absent, so there is no standing target). The calls are synchronous; keeping them off the actor thread (ARCH-10) is the consumers' rule, not this crate's feature.
 - **Security:**
   - **SECRETS-8.1** THE SYSTEM SHALL contain no `unsafe` code (ARCH-9) — verified by the workspace `unsafe_code = "forbid"` lint compiling clean and by a search of `crates/secrets/` finding none.
   - **SECRETS-8.2** THE SYSTEM SHALL define no ActionSpec, IPC route or CLI command and depend on no other `navori-*` crate (ARCH-4, THR-7; `agent-decided`: the close package forbids only `navori-macos` and `navori-config`) — verified by a test that reads the crate manifest. A consumer wrapping the crate in an Action is out of scope and is checked by review.
