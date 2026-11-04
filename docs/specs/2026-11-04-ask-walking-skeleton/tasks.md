@@ -7,10 +7,10 @@
 > for tracking.
 
 Feature code: ASK
-Status: Approved
+Status: In-progress
 Date: 2026-11-04
 Approved by the operator ("approve", 2026-11-04 14:14, on the review page at c59c1d5, no card selected).
-Execution-mode: unset
+Execution-mode: continuous
 Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
