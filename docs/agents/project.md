@@ -144,9 +144,12 @@ Run in order; `cut-release` executes exactly these and does not improvise.
    (the previous install is kept as `/Applications/Navori.app.previous`) and launches it.
 3. Smoke: `/Applications/Navori.app/Contents/Helpers/navori doctor` — every check ✓, exit 0.
 4. Tag: `git tag v<version> && git push origin v<version>` — pushing a `v*` tag runs
-   `.github/workflows/release.yml`, which builds and signs the zip. The GitHub Release is
-   published and the cask updated only when the repository variable `TAP_REPOSITORY` is
-   set; while it is unset the Release is a draft and the tap is untouched. Pre-release tags
+   `.github/workflows/release.yml`, which builds and signs the zip and always creates the
+   Release as a draft first. While the repository variable `TAP_REPOSITORY` is set, the
+   workflow also audits the cask in that tap (`brew style`, `brew audit`) and stops before
+   publishing if the audit fails. The Release is published and the cask pushed to the tap
+   only when the repository variable `PUBLISH_RELEASE` is exactly `true`; otherwise the
+   Release stays a draft and nothing is pushed. Pre-release tags
    behave the same way. Build the artifacts by hand with
    `cargo xtask release --tag v<version> --out <dir>` (`--check` only validates the tag).
 5. Clean-account checks (RELEASE-6.3), once the Release is published and the cask updated.
@@ -192,9 +195,15 @@ nothing secret.
    `SIGNING_P12` (`base64 < navori.p12`), `SIGNING_P12_PASSWORD` and `TAP_TOKEN` (the token
    from step 2; it must be non-empty before `TAP_REPOSITORY` is set).
 4. Add a repository ruleset so only the owner can create `v*` tags.
-5. Leave the repository variable `TAP_REPOSITORY` UNSET until the first public release. While
-   it is unset, tags produce draft Releases only and the tap is not touched. To go public,
-   set it to `jayden-dang/homebrew-navori`.
+5. Set two repository variables, which are separate switches:
+   - `TAP_REPOSITORY` names the tap (`jayden-dang/homebrew-navori`). While it is set, every
+     tag audits the cask in that tap; while `PUBLISH_RELEASE` is off this is audit-only and
+     nothing is published or pushed.
+   - `PUBLISH_RELEASE` publishes. Leave it UNSET until the first public release; tags then
+     produce draft Releases only. To go public, set it to `true` (any other value is off).
+     From then on a tag publishes the Release and, when `TAP_REPOSITORY` is set, pushes the
+     updated cask to the tap. With `PUBLISH_RELEASE` true and `TAP_REPOSITORY` empty, the
+     Release is published and no tap is touched.
 6. Right before the first FINAL tag (not a pre-release), add `- **Compat obligation:**
    External` as a line of its own in the `## Project posture` bullet list (it must start
    the line); `cargo xtask release-check` enforces it.
