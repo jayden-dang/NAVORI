@@ -61,7 +61,7 @@ struct RunningSubmenuView: View {
                 AwakeProblemView(problem: problem)
             }
         case .separator:
-            RunningSeparator()
+            MenuDivider()
         case .nothingRunning:
             Text("Nothing running")
                 .font(.system(size: 14))
@@ -99,14 +99,6 @@ struct RunningSubmenuView: View {
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityLabel(text)
-    }
-}
-
-private struct RunningSeparator: View {
-    var body: some View {
-        Divider()
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
     }
 }
 

@@ -137,7 +137,7 @@ struct CappedScroll<Content: View>: View {
     }
 }
 
-private struct MenuDivider: View {
+struct MenuDivider: View {
     var body: some View {
         Divider()
             .padding(.horizontal, 8)
