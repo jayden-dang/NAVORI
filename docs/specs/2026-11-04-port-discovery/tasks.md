@@ -499,17 +499,17 @@ _Requirements: PORTS-6.1, PORTS-6.2, PORTS-6.3, PORTS-6.4, PORTS-6.5_
 
 **Depends-on:** Task 7
 
-- [ ] **Step 1: Write the failing tests**, `#[tokio::test(start_paused = true)]` with `Rig::advance(..).await`:
+- [x] **Step 1: Write the failing tests**, `#[tokio::test(start_paused = true)]` with `Rig::advance(..).await`:
   - `with_the_panel_closed_scans_come_every_thirty_seconds`. Today there is no second scan, so it fails.
   - `with_the_panel_open_scans_come_every_three_seconds`.
   - `opening_the_panel_brings_the_next_scan_within_three_seconds_but_not_at_once`: `list_calls()` at +0 s and at +3 s.
   - `a_scan_that_comes_due_during_a_slow_scan_is_skipped`: `Gate` blocks one `listeners` call.
   - `list_answers_while_a_scan_is_running`: same `Gate`.
   - `after_a_crash_the_module_says_nothing_was_scanned_and_scans_again`: `Gate` panics once.
-- [ ] **Step 2: Run** `cargo test -p navori-mod-ports --test timing` — expect: the cadence and in-flight tests fail.
-- [ ] **Step 3: Implement** the deadline rules of the design's Decision 10. `run` publishes `PortsState::default()` first.
-- [ ] **Step 4: Run** `cargo test -p navori-mod-ports` — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(ports): rescan every 3 s with the panel open and 30 s closed"`
+- [x] **Step 2: Run** `cargo test -p navori-mod-ports --test timing` — expect: the cadence and in-flight tests fail.
+- [x] **Step 3: Implement** the deadline rules of the design's Decision 10. `run` publishes `PortsState::default()` first.
+- [x] **Step 4: Run** `cargo test -p navori-mod-ports` — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "feat(ports): rescan every 3 s with the panel open and 30 s closed"`
 
 _Requirements: PORTS-7.1, PORTS-7.2, PORTS-7.3, PORTS-7.4, PORTS-7.6, PORTS-7.7, PORTS-10.6_
 
