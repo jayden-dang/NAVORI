@@ -300,7 +300,7 @@ _Requirements: PSTOP-1.7, PSTOP-1.8, PSTOP-1.9, PSTOP-1.10, PSTOP-10.4_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Write the failing tests** in `modules/ports/tests/stop_docker.rs` against the Unix-socket fake server:
+- [x] **Step 1: Write the failing tests** in `modules/ports/tests/stop_docker.rs` against the Unix-socket fake server:
   - `a_stop_sends_exactly_the_post_with_no_t_value`
   - `a_204_reply_means_stopped`, `a_304_reply_means_already_gone`, `a_404_reply_means_already_gone`
   - `a_500_reply_fails_with_the_fixed_text_and_never_the_daemons_body`
@@ -308,9 +308,9 @@ _Requirements: PSTOP-1.7, PSTOP-1.8, PSTOP-1.9, PSTOP-1.10, PSTOP-10.4_
   - `the_list_request_bytes_the_two_second_limit_and_the_one_mebibyte_cap_are_unchanged` (guard)
   - `the_stop_writes_no_container_working_directory_or_environment_to_a_log` (guard: `LogCapture`)
   - `docker_is_sent_no_request_other_than_list_and_stop`
-- [ ] **Step 2: Run** `cargo test -p navori-mod-ports --test stop_docker` — expect: compile errors for `stop`.
-- [ ] **Step 3: Factor** `parse_head`'s status check to take accepted statuses (the list call passes `&[200]`); implement `DockerSocket::stop` with no client limit of its own (the request deadline of Task 7 is its limit), and the `FakeContainers` members.
-- [ ] **Step 4: Run** `cargo test -p navori-mod-ports` — expect: pass. Commit `git commit -m "feat(ports): stop a container through the Docker Engine"`
+- [x] **Step 2: Run** `cargo test -p navori-mod-ports --test stop_docker` — expect: compile errors for `stop`.
+- [x] **Step 3: Factor** `parse_head`'s status check to take accepted statuses (the list call passes `&[200]`); implement `DockerSocket::stop` with no client limit of its own (the request deadline of Task 7 is its limit), and the `FakeContainers` members.
+- [x] **Step 4: Run** `cargo test -p navori-mod-ports` — expect: pass. Commit `git commit -m "feat(ports): stop a container through the Docker Engine"`
 
 _Requirements: PSTOP-3.3, PSTOP-3.4, PSTOP-3.7, PSTOP-3.8, PSTOP-3.9_
 
