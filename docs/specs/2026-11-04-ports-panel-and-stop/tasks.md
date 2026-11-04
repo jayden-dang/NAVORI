@@ -260,7 +260,7 @@ _Requirements: PSTOP-1.3, PSTOP-1.5, PSTOP-1.6, PSTOP-2.1, PSTOP-2.2, PSTOP-2.3,
 
 **Depends-on:** Task 1, Task 4
 
-- [ ] **Step 1: Write the failing tests** in `modules/ports/tests/stop_process.rs` with `FakeProcesses`, `FakeSignals` and a paused tokio clock:
+- [x] **Step 1: Write the failing tests** in `modules/ports/tests/stop_process.rs` with `FakeProcesses`, `FakeSignals` and a paused tokio clock:
   - `a_process_that_obeys_term_is_gone_after_the_wait_and_gets_no_kill`
   - `a_process_that_ignores_term_gets_kill_after_three_seconds` (asserts the recorded sequence and that `Kill` follows `Term` by exactly 3 s of paused time)
   - `a_process_still_running_one_second_after_kill_fails_with_a_fixed_sentence`
@@ -273,9 +273,9 @@ _Requirements: PSTOP-1.3, PSTOP-1.5, PSTOP-1.6, PSTOP-2.1, PSTOP-2.2, PSTOP-2.3,
   - `a_pid_replaced_between_term_and_the_wait_end_is_reported_gone_and_gets_no_kill`
   - `a_zombie_after_term_counts_as_gone`
   - `a_first_term_that_finds_no_such_process_is_already_gone`
-- [ ] **Step 2: Run** `cargo test -p navori-mod-ports --test stop_process` — expect: compile errors.
-- [ ] **Step 3: Implement** `reach_for` and `stop_process` (both `pub use`d from `lib.rs` here; `reach_for` returns the `Reach` that Task 7 stores in `ProcessPlan.reach`; `stop_process` reads `plan.reach` and never recomputes it) and the sequence of design section D: `Term`, 3 s, `entry`, `Kill`, 1 s, `entry`; no await between the second `entry` and `send(Kill)`.
-- [ ] **Step 4: Run** `cargo test -p navori-mod-ports` — expect: pass. Commit `git commit -m "feat(ports): stop a process with term, a wait and kill"`
+- [x] **Step 2: Run** `cargo test -p navori-mod-ports --test stop_process` — expect: compile errors.
+- [x] **Step 3: Implement** `reach_for` and `stop_process` (both `pub use`d from `lib.rs` here; `reach_for` returns the `Reach` that Task 7 stores in `ProcessPlan.reach`; `stop_process` reads `plan.reach` and never recomputes it) and the sequence of design section D: `Term`, 3 s, `entry`, `Kill`, 1 s, `entry`; no await between the second `entry` and `send(Kill)`.
+- [x] **Step 4: Run** `cargo test -p navori-mod-ports` — expect: pass. Commit `git commit -m "feat(ports): stop a process with term, a wait and kill"`
 
 _Requirements: PSTOP-1.7, PSTOP-1.8, PSTOP-1.9, PSTOP-1.10, PSTOP-10.4_
 
