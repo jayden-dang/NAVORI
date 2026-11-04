@@ -41,23 +41,28 @@ pub fn find_repo(path: &Path) -> Option<Repo> {
     let mut dir = Some(path);
     while let Some(current) = dir {
         let git = current.join(".git");
-        if git.is_dir() {
-            return Some(Repo {
-                root: current.to_path_buf(),
-                location: Location {
-                    project: dir_name(current),
-                    worktree: None,
-                    branch: read_branch(&git.join("HEAD")),
-                },
-            });
+        match std::fs::metadata(&git) {
+            Ok(meta) if meta.is_dir() => {
+                return Some(Repo {
+                    root: current.to_path_buf(),
+                    location: Location {
+                        project: dir_name(current),
+                        worktree: None,
+                        branch: read_branch(&git.join("HEAD")),
+                    },
+                });
+            }
+            Ok(meta) if meta.is_file() => {
+                return Some(Repo {
+                    root: current.to_path_buf(),
+                    location: from_git_file(current, &git),
+                });
+            }
+            Err(err) if err.kind() != std::io::ErrorKind::NotFound => {
+                tracing::debug!("unreadable git metadata");
+            }
+            _ => {}
         }
-        if git.is_file() {
-            return Some(Repo {
-                root: current.to_path_buf(),
-                location: from_git_file(current, &git),
-            });
-        }
-        note_unreadable(&git);
         dir = current.parent();
     }
     None
@@ -130,14 +135,6 @@ fn read_branch(head: &Path) -> Option<Branch> {
         });
     }
     None
-}
-
-fn note_unreadable(path: &Path) {
-    if let Err(err) = std::fs::metadata(path)
-        && err.kind() != std::io::ErrorKind::NotFound
-    {
-        tracing::debug!("unreadable git metadata");
-    }
 }
 
 fn first_line(path: &Path) -> Option<String> {
