@@ -309,14 +309,14 @@ _Requirements: PORTS-2.1, PORTS-2.2, PORTS-2.3, PORTS-2.4, PORTS-2.5, PORTS-2.6,
 
 **Depends-on:** Task 3
 
-- [ ] **Step 1: Write the failing `procargs` unit tests**, beside `parse_procargs`, on hand-built blocks:
+- [x] **Step 1: Write the failing `procargs` unit tests**, beside `parse_procargs`, on hand-built blocks:
   - `GROK_AGENT=1` as an argument, not an environment entry, gives `Marker::None`.
   - Two marker names give `Several`.
   - A block truncated mid-environment is `Malformed`.
   - The scratch holds no environment byte afterwards.
   - `argv` of the same block still returns the arguments only.
   - `the_argument_scratch_does_not_keep_a_previous_environment_byte` stays unchanged.
-- [ ] **Step 2: Write the failing tests at the other seams.**
+- [x] **Step 2: Write the failing tests at the other seams.**
   - Two `#[ignore]` tests in `crates/macos/tests/process_source.rs`. Both spawn their child with `.env_clear()` first, since a cargo run started by a Harness passes its own marker to children.
     - `an_environment_marker_is_found_in_a_real_process`: `.env_clear().env("GROK_AGENT", "1")`, args `["5"]`. Expect `MacProcesses::env_marker(pid, &["CLAUDE_CODE_CHILD_SESSION","CODEX_THREAD_ID","GROK_AGENT"])` to be `One(2)`.
     - `a_marker_given_only_as_an_argument_is_not_found`: `Command::new("/bin/sh").env_clear().args(["-c", "sleep 5; :", "sh", "GROK_AGENT=1"])`. The `; :` keeps `sh` from replacing itself with `sleep`, so `GROK_AGENT=1` stays in `sh`'s arguments. Read the `sh` pid and expect `Marker::None`.
@@ -330,13 +330,13 @@ _Requirements: PORTS-2.1, PORTS-2.2, PORTS-2.3, PORTS-2.4, PORTS-2.5, PORTS-2.6,
     - `Gate` denies one env read; the next scan reads again.
     - A completed read is not repeated (`reads()` has one `"env"` per `ProcId`).
     - Backend ports have no Harness.
-- [ ] **Step 3: Run** `cargo test -p navori-macos && cargo test -p navori-procs --test markers` — expect: compile errors for `env_marker`, `Marker`.
-- [ ] **Step 4: Implement** the marker read.
+- [x] **Step 3: Run** `cargo test -p navori-macos && cargo test -p navori-procs --test markers` — expect: compile errors for `env_marker`, `Marker`.
+- [x] **Step 4: Implement** the marker read.
   - `with_procargs` runs under the scratch lock and `ClearOnDrop`, then the matcher, then the trait method on all three implementers.
   - Add `started_by` and the memo, moved into and back out of the blocking scan.
   - Update `docs/architecture/integrations.md:28` and the THR-1 and THR-3 mitigation lines.
-- [ ] **Step 5: Run** `cargo test -p navori-macos && cargo test -p navori-procs && cargo test -p navori-mod-ports && cargo test -p navori-mod-awake && cargo test -p navori-macos --test process_source -- --ignored` — expect: pass.
-- [ ] **Step 6: Commit** `git commit -m "feat(ports): name the Harness that started a listener"`
+- [x] **Step 5: Run** `cargo test -p navori-macos && cargo test -p navori-procs && cargo test -p navori-mod-ports && cargo test -p navori-mod-awake && cargo test -p navori-macos --test process_source -- --ignored` — expect: pass.
+- [x] **Step 6: Commit** `git commit -m "feat(ports): name the Harness that started a listener"`
 
 _Requirements: PORTS-3.1, PORTS-3.2, PORTS-3.3, PORTS-3.4, PORTS-3.5, PORTS-3.6, PORTS-3.7, PORTS-3.8, PORTS-9.2, PORTS-10.3_
 
