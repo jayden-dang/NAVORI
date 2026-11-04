@@ -145,8 +145,20 @@ _Avoid_: server, service
 
 **Placement**:
 Where a **Listener** runs: its project, worktree and branch, or the missing directory it was
-started in. It is the Ports Module's form of `Location` in `navori-procs`, adding the missing path.
+started in, and the `root` that holds them (the checkout directory a project row shows). It is the
+Ports Module's form of `Location` in `navori-procs`, adding the missing path.
 _Avoid_: location (that is the `navori-procs` type)
+
+**Running**:
+The menubar row, and the view behind it, that joins what is running: **Agent sessions** from Awake
+and **Ports** from the Ports Module, one row per project and one for ports with no project.
+_Avoid_: activity, dashboard
+
+**Stop**:
+Ending the **Listeners** (and Docker containers) behind named **Ports**: ask the process to exit,
+wait, then end it if it is still the same process. A stop acts only on the exact targets it is
+given, and never on Navori, its ancestors, its helper or Docker's backend.
+_Avoid_: kill (that is the Action's name), close
 
 ### Privacy
 
