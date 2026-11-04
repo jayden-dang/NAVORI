@@ -1,6 +1,6 @@
 # Roadmap: Navori
 
-Status: Draft
+Status: Approved
 Date: 2026-11-04
 
 <!--
