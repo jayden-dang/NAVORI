@@ -233,12 +233,19 @@ fn startup(context: &str, e: impl std::fmt::Display) -> CoreError {
 }
 
 impl NavoriCore {
-    /// Runs `work` on the core runtime. A UniFFI `async fn` is polled on Swift's executor, where
-    /// tokio's blocking pool has no runtime, so the work hops over a oneshot like `dispatch`.
-    async fn on_runtime<T: Send + 'static>(
-        &self,
-        work: impl Future<Output = Result<T, CoreError>> + Send + 'static,
-    ) -> Result<T, CoreError> {
+    /// Runs `work` on the core runtime, or fails with [`CoreError::ShutDown`] once the core has
+    /// shut down. A UniFFI `async fn` is polled on Swift's executor, where tokio's blocking pool
+    /// has no runtime, so the work hops over a oneshot like `dispatch`.
+    async fn on_runtime<T, F, Fut>(&self, work: F) -> Result<T, CoreError>
+    where
+        T: Send + 'static,
+        F: FnOnce(Arc<Inner>) -> Fut,
+        Fut: Future<Output = Result<T, CoreError>> + Send + 'static,
+    {
+        if self.shut_down.load(Ordering::SeqCst) {
+            return Err(CoreError::ShutDown);
+        }
+        let work = work(self.inner.clone());
         let (tx, rx) = futures::channel::oneshot::channel();
         self.handle.spawn(async move {
             let _ = tx.send(work.await);
@@ -428,21 +435,13 @@ impl NavoriCore {
 
     /// Stores the pasted provider key in the Keychain, replacing any earlier one.
     pub async fn save_provider_key(&self, key: String) -> Result<(), CoreError> {
-        if self.shut_down.load(Ordering::SeqCst) {
-            return Err(CoreError::ShutDown);
-        }
-        let inner = self.inner.clone();
-        self.on_runtime(async move { inner.ai.save_key(key).await })
+        self.on_runtime(|inner| async move { inner.ai.save_key(key).await })
             .await
     }
 
     /// Deletes the provider key. `true` when one was stored, `false` when none was.
     pub async fn remove_provider_key(&self) -> Result<bool, CoreError> {
-        if self.shut_down.load(Ordering::SeqCst) {
-            return Err(CoreError::ShutDown);
-        }
-        let inner = self.inner.clone();
-        self.on_runtime(async move { inner.ai.remove_key().await })
+        self.on_runtime(|inner| async move { inner.ai.remove_key().await })
             .await
     }
 
