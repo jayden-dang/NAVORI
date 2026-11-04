@@ -181,6 +181,7 @@ public struct CascadeState: Sendable {
     }
 
     private mutating func handleReplaceTree(_ tree: [CascadeNode]) -> [CascadeEffect] {
+        let focusedParents = selection.flatMap { ancestors(of: $0) }
         root = tree
         let keep = validOpenPrefix()
         var effects: [CascadeEffect] = []
@@ -189,7 +190,7 @@ public struct CascadeState: Sendable {
             openPath = keep
         }
         if let selection, node(id: selection) == nil {
-            self.selection = nil
+            self.selection = focusedParents?.last { node(id: $0) != nil }
         }
         return effects
     }

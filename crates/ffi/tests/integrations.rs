@@ -77,6 +77,31 @@ fn doctor_has_an_integrations_row_between_awake_and_logs() {
 }
 
 #[test]
+fn the_settings_empty_state_names_every_doctor_row() {
+    let home = home();
+    let core = start(&home);
+    let names: Vec<_> = core.doctor().into_iter().map(|check| check.name).collect();
+    core.shutdown();
+    let view = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../apps/macos/Navori/Features/Settings/SettingsView.swift");
+    let source = std::fs::read_to_string(&view)
+        .unwrap_or_else(|err| panic!("cannot read {}: {err}", view.display()));
+    let sentence = source
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("Text(\"Run the checks to verify "))
+        .and_then(|rest| rest.split('"').next())
+        .unwrap_or_else(|| panic!("SettingsView.swift has no `Run the checks to verify` text"))
+        .to_lowercase();
+    let mut from = 0;
+    for name in names {
+        let found = sentence[from..].find(&name).unwrap_or_else(|| {
+            panic!("the sentence misses `{name}` after offset {from}, in doctor order: {sentence}")
+        });
+        from += found + name.len();
+    }
+}
+
+#[test]
 fn the_existing_rows_keep_their_order() {
     let home = home();
     let core = start(&home);

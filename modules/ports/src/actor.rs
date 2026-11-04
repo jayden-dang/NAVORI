@@ -3,15 +3,17 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use navori_kernel::{ActionError, ModuleCtx, Request, Wake};
+use navori_kernel::{ActionError, ModuleCtx, Request, WaitHandle, Wake};
 use navori_macos::ProcessSource;
+use tokio::time::Instant;
 
-use crate::action::PortsAction;
+use crate::action::{KillReply, Outcome, PortsAction, TargetResult};
 use crate::docker::attribute;
 use crate::infra::docker::Containers;
 use crate::place::place;
 use crate::scan::{HarnessMemo, Scan, Scanner};
 use crate::state::{DockerStatus, PortsState, group};
+use crate::stop::{StopDone, StopEnv, StopTask, Stops, reason};
 use crate::{Ports, PortsEnv};
 
 const FIRST_SCAN: Duration = Duration::from_secs(5);
@@ -21,6 +23,7 @@ const OPEN_FAILED: &str = "the process source could not be opened";
 const RECOVERED: &str = "port scans work again";
 const DOCKER_FAILED: &str = "Docker could not be read";
 const DOCKER_RECOVERED: &str = "Docker reads work again";
+const STOPPED: &str = "ports.stopped";
 const OPEN_CADENCE: Duration = Duration::from_secs(3);
 const CLOSED_CADENCE: Duration = Duration::from_secs(30);
 
@@ -100,6 +103,8 @@ impl Ports {
         let mut in_flight: Option<InFlight> = None;
         let mut failing = false;
         let mut docker_failing = false;
+        let mut stops = Stops::default();
+        let mut rescan_after = false;
         loop {
             tokio::select! {
                 biased;
@@ -124,26 +129,58 @@ impl Ports {
                         }
                     }
                     publish(ctx, started, outcome.result);
-                    deadline = Some(wait.now() + cadence(wait.panel_visible()));
+                    let now = wait.now();
+                    deadline = Some(now + cadence(wait.panel_visible()));
+                    if std::mem::take(&mut rescan_after) {
+                        match self.begin_scan(ctx, now, &mut failing, wait.panel_visible()) {
+                            Ok(task) => {
+                                in_flight = Some(task);
+                                deadline = None;
+                            }
+                            Err(next) => deadline = Some(next),
+                        }
+                    }
+                }
+                Some(joined) = stops.next(), if !stops.is_empty() => {
+                    match joined {
+                        Ok(done) => {
+                            ctx.emit(STOPPED, done.severity(), done.summary(), done.payload());
+                        }
+                        Err(err) => tracing::warn!(error = %err, "a stop ended before it could answer"),
+                    }
+                    self.rescan_after_stop(
+                        ctx,
+                        &mut wait,
+                        &mut in_flight,
+                        &mut deadline,
+                        &mut failing,
+                        &mut rescan_after,
+                    );
                 }
                 req = ctx.recv() => {
                     let Some(req) = req else {
                         return Ok(());
                     };
-                    Self::on_request(ctx, req);
+                    if let Some(done) = self.on_request(ctx, req, &mut stops) {
+                        ctx.emit(STOPPED, done.severity(), done.summary(), done.payload());
+                        self.rescan_after_stop(
+                            ctx,
+                            &mut wait,
+                            &mut in_flight,
+                            &mut deadline,
+                            &mut failing,
+                            &mut rescan_after,
+                        );
+                    }
                 }
                 wake = wait.wait_until(deadline) => {
                     let now = wait.now();
                     match wake {
                         Wake::Due => {
                             deadline = None;
-                            match self.start_scan(now) {
+                            match self.begin_scan(ctx, now, &mut failing, wait.panel_visible()) {
                                 Ok(task) => in_flight = Some(task),
-                                Err(problem) => {
-                                    note(&mut failing, Some(OPEN_FAILED), RECOVERED);
-                                    publish(ctx, now, Err(problem));
-                                    deadline = Some(now + cadence(wait.panel_visible()));
-                                }
+                                Err(next) => deadline = Some(next),
                             }
                         }
                         Wake::PanelChanged => {
@@ -158,7 +195,52 @@ impl Ports {
         }
     }
 
-    fn on_request(ctx: &ModuleCtx<Self>, req: Request<PortsAction>) {
+    fn rescan_after_stop(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        wait: &mut WaitHandle,
+        in_flight: &mut Option<InFlight>,
+        deadline: &mut Option<SystemTime>,
+        failing: &mut bool,
+        rescan_after: &mut bool,
+    ) {
+        if in_flight.is_some() {
+            *rescan_after = true;
+            return;
+        }
+        match self.begin_scan(ctx, wait.now(), failing, wait.panel_visible()) {
+            Ok(task) => {
+                *in_flight = Some(task);
+                *deadline = None;
+            }
+            Err(next) => *deadline = Some(next),
+        }
+    }
+
+    fn begin_scan(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        now: SystemTime,
+        failing: &mut bool,
+        panel_visible: bool,
+    ) -> Result<InFlight, SystemTime> {
+        self.start_scan(now).map_err(|problem| {
+            note(failing, Some(OPEN_FAILED), RECOVERED);
+            publish(ctx, now, Err(problem));
+            now + cadence(panel_visible)
+        })
+    }
+
+    fn on_request(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        req: Request<PortsAction>,
+        stops: &mut Stops,
+    ) -> Option<StopDone> {
+        if let Err(message) = req.action.validate() {
+            req.respond::<()>(Err(ActionError::Invalid(message)));
+            return None;
+        }
         match req.action {
             PortsAction::List => {
                 let state = ctx.state();
@@ -168,7 +250,40 @@ impl Ports {
                 let reply = open_url(&ctx.state(), port, address);
                 req.respond(reply);
             }
+            PortsAction::Kill {
+                ref selector,
+                ref targets,
+            } => {
+                let (selector, targets) = (selector.clone(), targets.clone());
+                let arrival = Instant::now();
+                let source = match self.open() {
+                    Ok(source) => source,
+                    Err(err) => {
+                        tracing::warn!(error = %err, "a stop could not open the process source");
+                        let results = targets
+                            .into_iter()
+                            .map(|target| TargetResult {
+                                target,
+                                result: Outcome::Failed,
+                                reason: Some(reason::PROCESS_LIST_UNREADABLE.to_owned()),
+                            })
+                            .collect::<Vec<_>>();
+                        let done = StopDone::of(results.iter().map(|each| each.result));
+                        req.respond(Ok(KillReply { results }));
+                        return Some(done);
+                    }
+                };
+                let env = StopEnv {
+                    source,
+                    home: self.env.home.clone(),
+                    containers: Arc::clone(&self.env.containers),
+                    signals: Arc::clone(&self.env.signals),
+                    helper: self.env.helper.clone(),
+                };
+                stops.spawn(StopTask::new(req, env, selector, targets, arrival));
+            }
         }
+        None
     }
 
     fn start_scan(&mut self, started: SystemTime) -> Result<InFlight, String> {
@@ -204,7 +319,7 @@ impl Ports {
     }
 }
 
-async fn with_docker(
+pub(crate) async fn with_docker(
     containers: Arc<dyn Containers>,
     home: PathBuf,
     mut scan: Scan,

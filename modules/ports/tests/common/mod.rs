@@ -9,11 +9,14 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use futures::future::BoxFuture;
 use navori_kernel::{DispatchError, Envelope, Kernel, WallClock};
-use navori_macos::fake::FakeProcesses;
-use navori_macos::{Listener, Marker, PlatformError, ProcEntry, ProcessSource, ReadError};
-use navori_mod_ports::{Container, Containers, DockerError, Ports, PortsEnv};
+use navori_macos::fake::{FakeProcesses, FakeSignals};
+use navori_macos::{Listener, Marker, PlatformError, ProcEntry, ProcessSource, ReadError, Signals};
+use navori_mod_ports::{Container, Containers, DockerError, Ports, PortsEnv, Stopped};
 use navori_store::Store;
 use serde_json::Value;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::UnixListener;
+use tokio::task::JoinHandle;
 
 pub const ORIGIN_MS: u64 = 1_700_000_000_000;
 
@@ -165,10 +168,60 @@ impl ProcessSource for Gate {
     }
 }
 
+/// A Unix-socket server that records the request head, then lets `reply` answer.
+pub struct Served {
+    pub _dir: tempfile::TempDir,
+    pub path: PathBuf,
+    pub request: JoinHandle<String>,
+}
+
+pub fn serve(
+    reply: impl FnOnce(tokio::net::UnixStream) -> JoinHandle<()> + Send + 'static,
+) -> Served {
+    let guard = tempfile::Builder::new()
+        .prefix("nv")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let path = std::fs::canonicalize(guard.path()).unwrap().join("d.sock");
+    let listener = UnixListener::bind(&path).unwrap();
+    let request = tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut head = Vec::new();
+        let mut byte = [0u8; 1];
+        while !head.ends_with(b"\r\n\r\n") {
+            if stream.read(&mut byte).await.unwrap() == 0 {
+                break;
+            }
+            head.push(byte[0]);
+        }
+        let _ = reply(stream).await;
+        String::from_utf8(head).unwrap()
+    });
+    Served {
+        _dir: guard,
+        path,
+        request,
+    }
+}
+
+pub fn say(
+    bytes: Vec<u8>,
+) -> impl FnOnce(tokio::net::UnixStream) -> JoinHandle<()> + Send + 'static {
+    move |mut stream| {
+        tokio::spawn(async move {
+            let _ = stream.write_all(&bytes).await;
+            let _ = stream.shutdown().await;
+        })
+    }
+}
+
 /// A Docker engine that answers from a script and counts the reads.
 pub struct FakeContainers {
     reply: Mutex<Result<Vec<Container>, DockerError>>,
     calls: AtomicUsize,
+    stop_reply: Mutex<Result<Stopped, DockerError>>,
+    stop_delay: Mutex<Duration>,
+    stopped: Mutex<Vec<String>>,
 }
 
 impl FakeContainers {
@@ -176,7 +229,31 @@ impl FakeContainers {
         Self {
             reply: Mutex::new(Ok(Vec::new())),
             calls: AtomicUsize::new(0),
+            stop_reply: Mutex::new(Ok(Stopped::Stopped)),
+            stop_delay: Mutex::new(Duration::ZERO),
+            stopped: Mutex::new(Vec::new()),
         }
+    }
+
+    pub fn reply_stop(&self, reply: Result<Stopped, DockerError>) {
+        *self
+            .stop_reply
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = reply;
+    }
+
+    pub fn delay_stop(&self, delay: Duration) {
+        *self
+            .stop_delay
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = delay;
+    }
+
+    pub fn stops(&self) -> Vec<String> {
+        self.stopped
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 
     pub fn reply(&self, reply: Result<Vec<Container>, DockerError>) {
@@ -198,12 +275,36 @@ impl Containers for FakeContainers {
             .clone();
         Box::pin(async move { reply })
     }
+
+    fn stop(&self, id: &str) -> BoxFuture<'_, Result<Stopped, DockerError>> {
+        self.stopped
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(id.to_owned());
+        let reply = *self
+            .stop_reply
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let delay = *self
+            .stop_delay
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        Box::pin(async move {
+            if !delay.is_zero() {
+                tokio::time::sleep(delay).await;
+            }
+            reply
+        })
+    }
 }
+
+type EngineFor = Box<dyn FnOnce(&Arc<FakeContainers>) -> Arc<dyn Containers>>;
 
 pub struct Rig {
     pub kernel: Kernel,
     pub containers: Arc<FakeContainers>,
     pub processes: Arc<FakeProcesses>,
+    pub signals: Arc<FakeSignals>,
     pub gate: Arc<Gate>,
     pub clock: FakeClock,
     pub home: PathBuf,
@@ -212,21 +313,45 @@ pub struct Rig {
 
 impl Rig {
     pub fn new() -> Self {
-        Self::opening(false)
+        Self::opening(false, serde_json::Map::new())
+    }
+
+    /// A Module started with these config sections.
+    pub fn with_config(sections: serde_json::Map<String, Value>) -> Self {
+        Self::opening(false, sections)
     }
 
     /// A Module whose process source can never be opened.
     pub fn unopenable() -> Self {
-        Self::opening(true)
+        Self::opening(true, serde_json::Map::new())
     }
 
-    fn opening(refused: bool) -> Self {
+    pub fn with_engine(
+        engine: impl FnOnce(&Arc<FakeContainers>) -> Arc<dyn Containers> + 'static,
+    ) -> Self {
+        Self::build(false, serde_json::Map::new(), Some(Box::new(engine)))
+    }
+
+    fn opening(refused: bool, sections: serde_json::Map<String, Value>) -> Self {
+        Self::build(refused, sections, None)
+    }
+
+    fn build(
+        refused: bool,
+        sections: serde_json::Map<String, Value>,
+        engine: Option<EngineFor>,
+    ) -> Self {
         let processes = Arc::new(FakeProcesses::new(501));
         let gate = Arc::new(Gate::new(Arc::clone(&processes) as Arc<dyn ProcessSource>));
         let (guard, home) = canonical_temp_home();
         let clock = FakeClock::at(ORIGIN_MS);
         let source = Arc::clone(&gate) as Arc<dyn ProcessSource>;
         let containers = Arc::new(FakeContainers::new());
+        let signals = Arc::new(FakeSignals::new(4242, 4242));
+        let engine = engine.map_or_else(
+            || Arc::clone(&containers) as Arc<dyn Containers>,
+            |make| make(&containers),
+        );
         let env = PortsEnv {
             home: home.clone(),
             processes: Box::new(move || {
@@ -236,17 +361,21 @@ impl Rig {
                     Ok(Arc::clone(&source))
                 }
             }),
-            containers: Arc::clone(&containers) as Arc<dyn Containers>,
+            containers: engine,
+            signals: Arc::clone(&signals) as Arc<dyn Signals>,
+            helper: None,
         };
         let kernel =
             Kernel::builder_with_clock(Store::open_in_memory().unwrap(), Arc::new(clock.clone()))
                 .pause_journal_sweep()
+                .config_sections(sections)
                 .register(Ports::new(env))
                 .start();
         Self {
             kernel,
             containers,
             processes,
+            signals,
             gate,
             clock,
             home,
@@ -402,14 +531,38 @@ impl Write for Captured {
     }
 }
 
+/// Captures take turns, so one test's lines never reach another's.
+static ONE_CAPTURE_AT_A_TIME: Mutex<()> = Mutex::new(());
+
+/// A subscriber that is registered for the whole process and says yes to every callsite.
+///
+/// tracing decides a callsite's interest, the first time any thread hits it, from the hitting
+/// thread's own subscriber whenever at most one subscriber is registered. Captures that never
+/// overlap keep that true, so a test thread without a capture would cache "never" for a callsite
+/// that a capture on another thread then relies on. Two registered subscribers make tracing ask
+/// all of them.
+static WITNESS: std::sync::LazyLock<tracing::Dispatch> = std::sync::LazyLock::new(|| {
+    tracing::Dispatch::new(
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_writer(std::io::sink)
+            .finish(),
+    )
+});
+
 /// Collects this thread's log lines, at every level, until the guard is dropped.
 pub struct LogCapture {
     written: Arc<Mutex<Vec<u8>>>,
     _guard: tracing::subscriber::DefaultGuard,
+    _alone: MutexGuard<'static, ()>,
 }
 
 impl LogCapture {
     pub fn start() -> Self {
+        let alone = ONE_CAPTURE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        std::sync::LazyLock::force(&WITNESS);
         let written = Arc::new(Mutex::new(Vec::<u8>::new()));
         let sink = Arc::clone(&written);
         let subscriber = tracing_subscriber::fmt()
@@ -421,6 +574,7 @@ impl LogCapture {
         let capture = Self {
             written,
             _guard: guard,
+            _alone: alone,
         };
         capture.refresh();
         capture

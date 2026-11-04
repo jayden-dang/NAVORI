@@ -35,6 +35,7 @@ fn entry(pid: i32, port: u16, project: Option<&str>, worktree: Option<&str>) -> 
             worktree: worktree.map(str::to_owned),
             branch: None,
             missing_path: None,
+            root: None,
         },
         harness: None,
         kind: PortKind::Other,

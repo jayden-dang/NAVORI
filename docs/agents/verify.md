@@ -158,10 +158,10 @@ Index:
 
 ### Ports
 
-- **Sub-features:** `list` and `open` of the ports the user's own processes listen on; the `ports` doctor row; the problem glyph on the status icon after a failed scan
-- **How to get to it (user POV):** no screen yet; the CLI and the `ports.list` reply only.
+- **Sub-features:** `list`, `open` and `kill` of the ports the user's own processes listen on, shown in the Running menu; the `ports` doctor row; the problem glyph on the status icon after a failed scan
+- **How to get to it (user POV):** open the panel and the `Running` row. Its submenu lists a project row per project, with its ports in the child menu, and `Stop` buttons that ask for one inline confirmation. `ports.list` and the CLI show the same ports.
 - **Driving it with the CLI:** `"$CLI" --profile dev dispatch ports '"list"'`, then `'{"open":{"port":3000}}'`; `"$CLI" --profile dev doctor` for the row.
-- **Gotchas:** the first scan runs 5 s after launch, so an early `list` answers with no entries and no scan time. A failed scan keeps the last good list and sets `problem`. A Docker read failure shows in `docker`, never in `problem`.
+- **Gotchas:** never press `Stop` or dispatch `kill` on a listener you did not start yourself; spawn a throwaway listener (`python3 -m http.server`) and stop that one. A project's `Stop` is off while Tracking agents is off or Awake cannot be read. The first scan runs 5 s after launch, so an early `list` answers with no entries and no scan time. A failed scan keeps the last good list and sets `problem`. A Docker read failure shows in `docker`, never in `problem`.
 
 ### Integrations
 

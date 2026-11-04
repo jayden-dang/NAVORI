@@ -285,6 +285,43 @@ struct CascadeStateTests {
         #expect(state.openPath == [])
     }
 
+    @Test func a_row_that_vanishes_while_focused_moves_focus_to_its_parent() {
+        var state = CascadeState(root: Self.projectTree(["a", "b"]))
+        _ = state.handle(.click(row: "running"))
+        _ = state.handle(.click(row: "running.project.b"))
+        #expect(state.selection == "running.project.b")
+        let effects = state.handle(.replaceTree(Self.projectTree(["a"])))
+        #expect(effects.isEmpty)
+        #expect(state.selection == "running")
+        #expect(state.openPath == ["running"])
+    }
+
+    @Test func a_row_that_vanishes_with_its_parent_leaves_no_focus() {
+        var state = CascadeState(root: Self.projectTree(["a"]))
+        _ = state.handle(.click(row: "running"))
+        _ = state.handle(.click(row: "running.project.a"))
+        let gone: [CascadeNode] = [CascadeNode(id: "settings", isActionable: true)]
+        _ = state.handle(.replaceTree(gone))
+        #expect(state.selection == nil)
+        #expect(state.openPath == [])
+    }
+
+    @Test func a_tree_with_project_children_opens_three_levels_deep() {
+        let tree = [
+            CascadeNode(id: "running", isActionable: true, children: [
+                CascadeNode(id: "running.project.a", isActionable: true, children: [
+                    CascadeNode(id: "running.project.a.port", isActionable: true),
+                ]),
+            ]),
+        ]
+        var state = CascadeState(root: tree)
+        #expect(state.handle(.click(row: "running")).contains(.open(row: "running")))
+        #expect(state.handle(.click(row: "running.project.a")).contains(.open(row: "running.project.a")))
+        #expect(state.openPath == ["running", "running.project.a"])
+        #expect(state.handle(.click(row: "running.project.a.port")).contains(.activate(row: "running.project.a.port")))
+        #expect(state.openPath == ["running", "running.project.a"])
+    }
+
     @Test func down_and_up_wrap_through_rows_with_an_action() {
         var state = CascadeState(root: Self.tree)
         #expect(state.handle(.key(.down)).isEmpty)
@@ -497,6 +534,17 @@ struct CascadeStateTests {
         #expect(timed.isEmpty)
         #expect(state.selection == "settings")
         #expect(state.openPath == [])
+    }
+
+    private static func projectTree(_ names: [String]) -> [CascadeNode] {
+        [
+            CascadeNode(
+                id: "running",
+                isActionable: true,
+                children: names.map { CascadeNode(id: "running.project.\($0)", isActionable: true) }
+            ),
+            CascadeNode(id: "settings", isActionable: true),
+        ]
     }
 
     private static let submenu = CGRect(x: 400, y: 100, width: 200, height: 200)

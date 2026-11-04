@@ -103,6 +103,11 @@ public struct AwakeSubmenuState: Equatable, Sendable {
         holdingGroups = Self.groups(leases, systemHeld: status != .notHeld)
     }
 
+    /// The commands holding the Mac awake. They belong to no project, so the Running menu lists them on their own.
+    public var commandRows: [HoldingRow] {
+        holdingGroups.first { $0.title == "Commands" }?.rows ?? []
+    }
+
     public var trackingValue: String { trackingOn ? "On" : "Off" }
     public var trackingDot: StatusDot? { trackingOn ? .green : nil }
 
@@ -253,7 +258,7 @@ public struct AwakeSubmenuState: Equatable, Sendable {
         )
     }
 
-    private static func harnessMark(_ harness: String?) -> HoldingMark {
+    static func harnessMark(_ harness: String?) -> HoldingMark {
         switch harness {
         case "Claude Code": .claude
         case "Codex": .codex

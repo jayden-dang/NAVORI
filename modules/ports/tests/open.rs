@@ -101,12 +101,11 @@ async fn the_catalog_has_list_and_open_as_read_actions_and_the_schema_names_thei
         .kernel
         .actions()
         .into_iter()
-        .filter(|spec| spec.module == "ports")
+        .filter(|spec| spec.module == "ports" && spec.risk == Risk::Read)
         .collect();
     let mut names: Vec<_> = specs.iter().map(|spec| spec.name.as_str()).collect();
     names.sort_unstable();
     assert_eq!(names, ["list", "open"]);
-    assert!(specs.iter().all(|spec| spec.risk == Risk::Read));
     let open = specs.iter().find(|spec| spec.name == "open").unwrap();
     let mut inputs: Vec<String> = open
         .input_schema
@@ -128,4 +127,25 @@ async fn open_connects_to_nothing() {
     listener.set_nonblocking(true).unwrap();
     let error = listener.accept().unwrap_err();
     assert_eq!(error.kind(), std::io::ErrorKind::WouldBlock);
+}
+
+#[tokio::test(start_paused = true)]
+async fn identical_urls_need_no_choice_even_when_a_different_address_sits_between() {
+    let rig = Rig::new();
+    scanned_with(
+        &rig,
+        &[("127.0.0.1", 3000), ("192.168.1.5", 3000), ("::1", 3000)],
+    )
+    .await;
+    let message = invalid_message(rig.dispatch(json!({"open": {"port": 3000}})).await);
+    assert!(message.contains("192.168.1.5"), "{message}");
+
+    let rig = Rig::new();
+    scanned_with(
+        &rig,
+        &[("127.0.0.1", 3000), ("::1", 3000), ("0.0.0.0", 3000)],
+    )
+    .await;
+    let reply = rig.dispatch(json!({"open": {"port": 3000}})).await.unwrap();
+    assert_eq!(reply, json!({"url": "http://localhost:3000"}));
 }

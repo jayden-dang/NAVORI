@@ -5,6 +5,7 @@ mod exits;
 mod power;
 mod procargs;
 mod process;
+mod signals;
 mod sockets;
 
 pub use error::*;
@@ -12,6 +13,7 @@ pub use exits::*;
 pub use power::*;
 pub use procargs::*;
 pub use process::*;
+pub use signals::*;
 pub use sockets::*;
 
 #[cfg(feature = "fake")]

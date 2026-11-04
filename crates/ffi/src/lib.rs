@@ -10,6 +10,7 @@
 mod ai;
 mod app;
 mod logging;
+pub mod running;
 mod session;
 
 use std::future::Future;
@@ -32,7 +33,7 @@ use crate::ai::AiRuntime;
 use crate::app::{Inner, IpcBridge};
 
 pub use ai::{AiDeps, LlmSender, StoreAudit, ask_error_to_rpc, service_for};
-pub use app::{awake_check, awake_view, config_notice, ports_check};
+pub use app::{awake_check, awake_view, config_notice, ports_check, running_view};
 
 uniffi::setup_scaffolding!();
 
@@ -180,6 +181,9 @@ pub struct CoreSnapshot {
     pub recent_events: Vec<EventView>,
     /// Awake's published state. Absent when that state will not deserialize.
     pub awake: Option<AwakeView>,
+    /// Projects, sessions and ports joined for the Running menu. Absent when neither Awake nor
+    /// Ports has a state to read.
+    pub running: Option<running::RunningView>,
     /// The status icon state, composed once per snapshot.
     pub tray: TrayView,
 }
@@ -296,7 +300,8 @@ impl NavoriCore {
                 &loaded.sweep,
                 assertion_name(profile),
                 integrations.clone(),
-                PortsEnv::mac(PathBuf::from(&config.home_dir)),
+                PortsEnv::mac(PathBuf::from(&config.home_dir))
+                    .with_helper(PathBuf::from(&config.helper_path)),
             )
         });
         let config_notice = app::config_notice(
@@ -496,6 +501,15 @@ impl NavoriCore {
 
 fn snapshot(inner: &Inner) -> CoreSnapshot {
     let status = inner.status();
+    let awake = app::awake_view(&inner.kernel);
+    let running = app::running_view(
+        &inner.kernel,
+        awake.as_ref(),
+        running::Own {
+            pid: i32::try_from(inner.pid).unwrap_or(i32::MAX),
+            helper: Some(inner.integrations.helper.clone()),
+        },
+    );
     CoreSnapshot {
         version: status.version,
         profile: status.profile,
@@ -529,7 +543,8 @@ fn snapshot(inner: &Inner) -> CoreSnapshot {
                 summary: e.summary,
             })
             .collect(),
-        awake: app::awake_view(&inner.kernel),
+        awake,
+        running,
         tray: status.tray.into(),
     }
 }

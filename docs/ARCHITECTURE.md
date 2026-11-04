@@ -324,6 +324,7 @@ Out of scope (decided): staying awake with the lid closed.
 - **Actions**: open `localhost:port` · copy · reveal in Finder · kill one / by worktree / project / all. Kill = `SIGTERM` to the process group → 3s → `SIGKILL`. Never touches other UIDs; a `protected` list is excluded from "kill all".
 - Polling every 3s when the panel is open, 30s in the background.
 - AI tools: `ports.list` (Read), `ports.kill{pid|worktree|project}` (**Destructive**), `ports.open` (Read).
+  - *Amended 2026-11-04: the request shape is `ports.kill{selector, targets}`. The selector is `pid`, `worktree{project, worktree}` or `project` and only checks that the targets belong where the caller thinks; `targets` are the exact processes (pid and start time) and containers (id) to stop, and a stop never adds one. Navori re-reads the machine before it signals anything.*
 
 ### Seed: GitHub pull requests (R4)
 

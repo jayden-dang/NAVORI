@@ -8,11 +8,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use common::canonical_temp_home;
+use common::{Served, canonical_temp_home, say, serve};
 use navori_mod_ports::{Container, Containers, DockerError, DockerSocket};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use tokio::net::UnixListener;
-use tokio::task::JoinHandle;
 
 const REQUEST: &str = "GET /containers/json HTTP/1.1\r\nHost: docker\r\nConnection: close\r\n\r\n";
 const BODY: &str = r#"[{"Id":"abc123","Names":["/db"],"Image":"postgres","Command":"secret-command","Ports":[{"IP":"127.0.0.1","PrivatePort":5432,"PublicPort":5432,"Type":"tcp"},{"PrivatePort":9000,"Type":"tcp"}],"Labels":{"com.docker.compose.project.working_dir":"/work/app","other":"secret-label"},"Mounts":[{"Source":"/secret/mount"}]}]"#;
@@ -22,50 +21,9 @@ fn expected() -> Vec<Container> {
         id: "abc123".to_owned(),
         name: "db".to_owned(),
         working_dir: Some(PathBuf::from("/work/app")),
+        image: Some("postgres".to_owned()),
         ports: vec![("127.0.0.1".parse::<IpAddr>().unwrap(), 5432)],
     }]
-}
-
-struct Served {
-    _dir: tempfile::TempDir,
-    path: PathBuf,
-    request: JoinHandle<String>,
-}
-
-fn serve(reply: impl FnOnce(tokio::net::UnixStream) -> JoinHandle<()> + Send + 'static) -> Served {
-    let guard = tempfile::Builder::new()
-        .prefix("nv")
-        .tempdir_in("/tmp")
-        .unwrap();
-    let path = std::fs::canonicalize(guard.path()).unwrap().join("d.sock");
-    let listener = UnixListener::bind(&path).unwrap();
-    let request = tokio::spawn(async move {
-        let (mut stream, _) = listener.accept().await.unwrap();
-        let mut head = Vec::new();
-        let mut byte = [0u8; 1];
-        while !head.ends_with(b"\r\n\r\n") {
-            if stream.read(&mut byte).await.unwrap() == 0 {
-                break;
-            }
-            head.push(byte[0]);
-        }
-        let _ = reply(stream).await;
-        String::from_utf8(head).unwrap()
-    });
-    Served {
-        _dir: guard,
-        path,
-        request,
-    }
-}
-
-fn say(bytes: Vec<u8>) -> impl FnOnce(tokio::net::UnixStream) -> JoinHandle<()> + Send + 'static {
-    move |mut stream| {
-        tokio::spawn(async move {
-            let _ = stream.write_all(&bytes).await;
-            let _ = stream.shutdown().await;
-        })
-    }
 }
 
 fn sized(body: &str) -> Vec<u8> {
@@ -88,6 +46,40 @@ async fn a_sized_reply_is_read_and_only_four_fields_are_kept() {
     let shown = format!("{containers:?}");
     assert!(!shown.contains("secret"), "{shown}");
     assert_eq!(served.request.await.unwrap(), REQUEST);
+}
+
+async fn image_of(listed: &str) -> Option<String> {
+    let body = format!(r#"[{{"Id":"a","Names":["/x"],"Image":"{listed}"}}]"#);
+    let served = serve(say(sized(&body)));
+    read(&served).await.unwrap().remove(0).image
+}
+
+#[tokio::test]
+async fn a_container_image_is_reduced_to_its_last_path_segment_with_no_registry_host_or_path() {
+    assert_eq!(
+        image_of("postgres:16-alpine").await.as_deref(),
+        Some("postgres")
+    );
+    assert_eq!(
+        image_of("localhost:5000/team/db:1@sha256:abc")
+            .await
+            .as_deref(),
+        Some("db")
+    );
+    assert_eq!(
+        image_of("registry.corp.example:5443/secret-team/postgres:16")
+            .await
+            .as_deref(),
+        Some("postgres")
+    );
+    assert_eq!(image_of("sha256:abc123").await, None);
+}
+
+#[tokio::test]
+async fn a_container_listed_without_an_image_has_none() {
+    let body = r#"[{"Id":"a","Names":["/x"]}]"#;
+    let served = serve(say(sized(body)));
+    assert_eq!(read(&served).await.unwrap()[0].image, None);
 }
 
 #[tokio::test]

@@ -173,23 +173,23 @@ Terms used below:
 
 It changes three things in MENU's spec: MENU-1.2 gains the Awake row before the Core row; MENU-1.4 no longer lists the Awake row among what Release code hides; and MENU's "The Awake row ships: decide whether the Core row stays" is answered: it stays.
 
-- **AWAKE-11.1** THE SYSTEM SHALL lay out level 0 in this order: any banners, the Awake row, the Core row, a separator, `Settings…`, `About Navori`, `Quit Navori`.
+- **AWAKE-11.1** THE SYSTEM SHALL lay out level 0 in this order: any banners, the Awake row, the Core row, a separator, `Settings…`, `About Navori`, `Quit Navori`. *(Amended 2026-11-04 by PSTOP: the Awake row is now the `Running` row, with the same place in the order and a dot and a chevron but no text, PSTOP-4.8; the Awake Module, its Actions and the name `Awake` keep their names, PSTOP-4.18.)*
 - **AWAKE-11.2** WHILE no Lease exists THE SYSTEM SHALL show no dot on the Awake row. *(Amended 2026-11-04: the row shows a dot and no text.)*
 - **AWAKE-11.3** WHILE a Lease exists with the System assertion held THE SYSTEM SHALL show a green dot on the Awake row, with VoiceOver reading `On` and the names of the sources holding. *(Amended 2026-11-04: the row shows a dot and no text.)*
 - **AWAKE-11.4** WHILE a Lease exists with no System assertion THE SYSTEM SHALL NOT show a green dot on the Awake row. *(Amended 2026-11-04: the row shows a dot and no text.)*
 - ~~**AWAKE-11.5**~~ superseded by AWAKE-14.1 and AWAKE-15.2.
 - **AWAKE-11.6** THE SYSTEM SHALL NOT show `Pause 15m`, `Let my Mac sleep now`, an Agent sessions row, an Integrations row or a per-Lease release button in the Awake Submenu.
-- **AWAKE-11.7** THE SYSTEM SHALL write menu text about Navori's own Leases only.
+- **AWAKE-11.7** THE SYSTEM SHALL write menu text about Navori's own Leases only. *(Amended 2026-11-04 by PSTOP: the Running submenu also writes about the user's ports, containers and projects, and about whether `Stop` is on, PSTOP-4.11 and 4.21; a sentence about Leases still speaks of Navori's own Leases only.)*
 - **AWAKE-11.8** THE SYSTEM SHALL NOT say in the menu that the Mac will sleep.
 - **AWAKE-11.9** THE SYSTEM SHALL NOT say in the menu that another app is holding the Mac awake.
 - **AWAKE-11.10** WHEN the app opens the Awake Submenu THE SYSTEM SHALL NOT read the process table or the system's assertions.
 - **AWAKE-11.11** WHILE no problem exists THE SYSTEM SHALL show no status text in the Awake Submenu.
 - **AWAKE-11.12** IF the System assertion or the Display assertion is refused, a menu action fails, or Awake records a problem THEN THE SYSTEM SHALL state that problem between the commands and the Holding rows.
-- **AWAKE-11.13** THE SYSTEM SHALL group Holding rows in this order: `Held by you`, `Commands`, then one group per session project in case-insensitive name order, where the project is the Lease label before its first `/`.
+- **AWAKE-11.13** THE SYSTEM SHALL group Holding rows in this order: `Held by you`, `Commands`, then one group per session project in case-insensitive name order, where the project is the Lease label before its first `/`. *(Amended 2026-11-04 by PSTOP: the Running submenu replaces the Holding list. It shows one row per project, with the project's sessions and ports in its child menu, PSTOP-4.11 to 4.13; command Leases are listed as their own rows beside the project rows, and the `Keep awake` row's value shows the manual hold.)*
 - **AWAKE-11.14** THE SYSTEM SHALL lead a session's Holding row with the monochrome mark of its Harness, for Claude Code, Codex and Grok, and with a terminal symbol for any other Harness.
-- **AWAKE-11.15** THE SYSTEM SHALL show a working session with a green dot and the word `working`, and a stopped session dimmed with the word `stopped`. *(Amended 2026-11-04: AWAKE-16.5 says which sessions read as working.)*
+- **AWAKE-11.15** THE SYSTEM SHALL show a working session with a green dot and the word `working`, and a stopped session dimmed with the word `stopped`. *(Amended 2026-11-04: AWAKE-16.5 says which sessions read as working.)* *(Amended 2026-11-04 by PSTOP: a session row in a project's child menu keeps the dot and the words `working` and `stopped`; the project row itself shows only a dot, a green dot or an orange ring, PSTOP-4.13.)*
 - ~~**AWAKE-11.16**~~ superseded by AWAKE-14.4 and AWAKE-14.5.
-- **AWAKE-11.17** WHEN one source holds more than one Lease THE SYSTEM SHALL have VoiceOver name it once on the Awake row with its count, as `Claude Code ×8`. *(Amended 2026-11-04: the row shows a dot and no text.)*
+- **AWAKE-11.17** WHEN one source holds more than one Lease THE SYSTEM SHALL have VoiceOver name it once on the Awake row with its count, as `Claude Code ×8`. *(Amended 2026-11-04: the row shows a dot and no text.)* *(Amended 2026-11-04 by PSTOP: VoiceOver reads the `Running` row as `Running, active` or `Running, nothing running`, PSTOP-4.9; a source's count is no longer spoken on level 0.)*
 - **AWAKE-11.18** IF a menu action fails or Awake records a problem other than a refused System assertion or a stopped Module THEN THE SYSTEM SHALL have VoiceOver read `Needs attention` on the Awake row. *(Amended 2026-11-04: the row shows a dot and no text.)*
 - ~~**AWAKE-11.19**~~ superseded by AWAKE-14.7.
 - ~~**AWAKE-11.20**~~ superseded by AWAKE-14.6.
@@ -314,7 +314,7 @@ Files this story touches: `modules/awake/src/` and `crates/ffi/src/` (AWAKE-12.3
 - **AWAKE-17.4** WHILE a session has a title THE SYSTEM SHALL show the title as the name on its Holding row, and sort by that name within its project.
 - **AWAKE-17.5** WHILE a session has a title THE SYSTEM SHALL read the title, the Harness, the project and branch, and the pid in the row's tooltip and VoiceOver sentence.
 - **AWAKE-17.6** (guard) WHILE a session has no title THE SYSTEM SHALL CONTINUE TO show its branch as the name.
-- **AWAKE-17.7** (guard) WHEN a session has a title THE SYSTEM SHALL CONTINUE TO group its row by the project in its label, as AWAKE-11.13 does.
+- **AWAKE-17.7** (guard) WHEN a session has a title THE SYSTEM SHALL CONTINUE TO group its row by the project in its label, as AWAKE-11.13 does. *(Amended 2026-11-04 by PSTOP: the Core joins a session to a project by the label's text before the first `/`, or by the whole label, PSTOP-4.2; a live session without a label makes every project's state unknown, PSTOP-4.5.)*
 
 ## 18. Label a Codex session by its own directory
 

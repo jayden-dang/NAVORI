@@ -319,8 +319,6 @@ impl From<AwakeState> for crate::AwakeView {
     }
 }
 
-const STOPPED_PROBLEM: &str = "The Awake module stopped.";
-
 /// `None` when Awake is not registered or its published state will not deserialize.
 pub fn awake_view(kernel: &Kernel) -> Option<crate::AwakeView> {
     let value = kernel.state("awake")?;
@@ -334,9 +332,23 @@ pub fn awake_view(kernel: &Kernel) -> Option<crate::AwakeView> {
     if module_is_down(kernel, Awake::ID) {
         view.system_held = false;
         view.display_held = false;
-        view.problem = Some(STOPPED_PROBLEM.to_owned());
+        view.problem = Some(crate::running::AWAKE_STOPPED.to_owned());
     }
     Some(view)
+}
+
+/// The Running view; Ports counts as absent while its Module is down, so no stop is offered.
+pub fn running_view(
+    kernel: &Kernel,
+    awake: Option<&crate::AwakeView>,
+    own: crate::running::Own,
+) -> Option<crate::running::RunningView> {
+    let ports = if module_is_down(kernel, Ports::ID) {
+        None
+    } else {
+        ports_state(kernel)
+    };
+    crate::running::build(awake, ports.as_ref(), own)
 }
 
 fn module_is_down(kernel: &Kernel, id: &str) -> bool {

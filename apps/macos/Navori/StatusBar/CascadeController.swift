@@ -23,6 +23,7 @@ final class CascadeController {
     @ObservationIgnored private let submenu: (String) -> AnyView
     @ObservationIgnored private let activateRow: (String) -> Void
     @ObservationIgnored private let log = Logger(subsystem: "dev.navori", category: "cascade")
+    @ObservationIgnored var interceptKey: ((CascadeKey) -> Bool)?
     @ObservationIgnored weak var panel: StatusPanel?
     @ObservationIgnored private var surfaceTint: NSColor = GlassTint.standard
 
@@ -57,6 +58,7 @@ final class CascadeController {
     }
 
     func key(_ key: CascadeKey) {
+        if interceptKey?(key) == true { return }
         apply(state.handle(.key(key)))
     }
 

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import NavoriBanner
 import NavoriCore
@@ -18,8 +19,12 @@ final class CoreStore {
     private(set) var isRunningChecks = false
 
     @ObservationIgnored private var core: NavoriCore?
+    private(set) var openFailures: [String: String] = [:]
+    @ObservationIgnored private let desktop: Desktop = AppDesktop()
     @ObservationIgnored private let log = Logger(subsystem: "dev.navori", category: "core")
     private var awakeActionFailure: AwakeActionFailure?
+    private(set) var stopFlows: [String: StopFlow] = [:]
+    private(set) var stopProgress = StopProgress()
 
     func start() {
         guard core == nil else { return }
@@ -51,6 +56,7 @@ final class CoreStore {
     }
 
     func setPanelVisible(_ visible: Bool) {
+        if visible == false { dismissAskingStops() }
         core?.setPanelVisible(visible: visible)
     }
 
@@ -198,6 +204,222 @@ final class CoreStore {
         )
     }
 
+    var running: RunningInput? {
+        guard let view = snapshot?.running else { return nil }
+        return RunningInput(
+            unknownReason: view.unknownReason,
+            projects: view.projects.map(Self.input),
+            hiddenSystemPorts: Int(view.hiddenSystemPorts),
+            stopAll: view.stopAll,
+            stopAllPorts: Int(view.stopAllPorts),
+            inUsePorts: Int(view.inUsePorts),
+            otherPortsLeft: Int(view.otherPortsLeft)
+        )
+    }
+
+    var runningSubmenu: RunningSubmenuState? {
+        running.map {
+            RunningSubmenuState(running: $0, problem: awakeSubmenu.problem?.title, commands: awakeSubmenu.commandRows)
+        }
+    }
+
+    func projectChild(id: String) -> ProjectChildState? {
+        guard let project = running?.projects.first(where: { ProjectRowState.id(of: $0) == id }) else { return nil }
+        return ProjectChildState(
+            project: project,
+            nowMs: Int64(Date().timeIntervalSince1970 * 1000),
+            home: NSHomeDirectory()
+        )
+    }
+
+    /// What the menu tree nests under `Running`: each project with its child rows, then `Stop all ports`.
+    var runningTree: [CascadeNode] {
+        guard let state = runningSubmenu else { return [] }
+        let projects = state.rows.map { row in
+            CascadeNode(
+                id: row.id,
+                isActionable: true,
+                children: row.childRowIds.map { CascadeNode(id: $0, isActionable: true) }
+            )
+        }
+        return projects + (state.stopAll == nil ? [] : [CascadeNode(id: Self.stopAllId, isActionable: true)])
+    }
+
+    /// Asks for the confirmation of the Stop a child-menu row offers. Nothing is sent here.
+    func askChildStop(_ id: String) {
+        guard let offer = runningSubmenu?.rows.lazy.compactMap({ $0.childOffers[id] }).first else { return }
+        askStop(id, count: offer.count)
+    }
+
+    var runningRowIds: [String] {
+        guard let state = runningSubmenu else { return [] }
+        return state.rows.flatMap { [$0.id] + $0.childRowIds } + (state.stopAll == nil ? [] : [Self.stopAllId])
+    }
+
+    static let stopAllId = "running.stopAll"
+
+    func stopFlow(_ owner: String) -> StopFlow {
+        stopFlows[owner] ?? .idle
+    }
+
+    func askStop(_ owner: String, count: Int) {
+        var flow = stopFlow(owner)
+        flow.press(count: count)
+        stopFlows[owner] = flow
+    }
+
+    func dismissStop(_ owner: String) {
+        var flow = stopFlow(owner)
+        flow.dismiss()
+        stopFlows[owner] = flow
+    }
+
+    func dismissAskingStops() {
+        for (owner, flow) in stopFlows {
+            if case .asking = flow { dismissStop(owner) }
+        }
+    }
+
+    var isAskingToStop: Bool {
+        stopFlows.values.contains { if case .asking = $0 { true } else { false } }
+    }
+
+    /// Sends the Core's own request, only if the confirmation for `owner` still matches the offer shown now.
+    func confirmStop(_ owner: String, offer: StopOffer) {
+        var flow = stopFlow(owner)
+        run(owner, flow.confirm(offer), flow: flow)
+    }
+
+    func confirmStop(_ owner: String, offer: StopAllOffer) {
+        var flow = stopFlow(owner)
+        run(owner, flow.confirm(offer), flow: flow)
+    }
+
+    private func run(_ owner: String, _ toSend: [String], flow: StopFlow) {
+        stopFlows[owner] = flow
+        guard toSend.isEmpty == false else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let results = await stop(toSend)
+            var flow = stopFlow(owner)
+            flow.finish(results)
+            stopFlows[owner] = flow
+            stopProgress.record(results)
+            pruneStopState()
+        }
+    }
+
+    func openPort(row: String, port: Int, address: String? = nil) async {
+        openFailures[row] = nil
+        let failure = await PortActions.open(port: port, address: address, desktop: desktop) { request in
+            try await self.dispatch(module: "ports", actionJSON: request)
+        }
+        if let failure {
+            log.error("open port \(port) failed")
+            openFailures[row] = failure
+        }
+    }
+
+    func copyPort(_ port: Int) { PortActions.copy(port: port, desktop: desktop) }
+
+    func reveal(_ path: String) { PortActions.reveal(path, desktop: desktop) }
+
+    func dismissOpenFailure(_ row: String) { openFailures[row] = nil }
+
+    func stop(_ requests: [String]) async -> [StopResult] {
+        let sends = requests.map { request in Task { @MainActor in await self.send(request) } }
+        var all: [StopResult] = []
+        for send in sends { all += await send.value }
+        return all
+    }
+
+    private func send(_ request: String) async -> [StopResult] {
+        do {
+            let reply = try await dispatch(module: "ports", actionJSON: request)
+            let results = try JSONDecoder().decode(KillReply.self, from: Data(reply.utf8)).results
+            return results.isEmpty ? [.unanswered("Navori got no answer to the stop.")] : results
+        } catch {
+            let message = CoreStartupBanner.menuFailure(for: error)
+            log.error("stop failed: \(message, privacy: .public)")
+            return [.unanswered(message)]
+        }
+    }
+
+    private var listedTargets: Set<StopTarget> {
+        Set(running?.projects.flatMap { $0.ports.compactMap(\.target) } ?? [])
+    }
+
+    private func pruneStopState() {
+        stopProgress.prune(listed: listedTargets)
+        let live = Set(runningRowIds)
+        let offers = runningSubmenu.map(Self.offerCounts) ?? [:]
+        for (owner, flow) in stopFlows {
+            switch flow {
+            case .failed where live.contains(owner) == false:
+                stopFlows[owner] = .idle
+            case .asking(let count) where offers[owner] != count:
+                stopFlows[owner] = .idle
+            default:
+                break
+            }
+        }
+    }
+
+    private static func offerCounts(_ state: RunningSubmenuState) -> [String: Int] {
+        var counts: [String: Int] = [:]
+        for row in state.rows {
+            if let stop = row.stop { counts[row.id] = stop.count }
+            for (id, offer) in row.childOffers { counts[id] = offer.count }
+        }
+        if let all = state.stopAll { counts[stopAllId] = all.ports }
+        return counts
+    }
+
+    private static func input(_ state: ProjectState) -> RunningProjectState {
+        switch state {
+        case .working: .working
+        case .idle: .idle
+        case .unknown: .unknown
+        }
+    }
+
+    private static func input(_ target: StopTargetView) -> StopTarget {
+        switch target {
+        case let .process(pid, startUs): .process(pid: pid, startUs: startUs)
+        case let .container(id): .container(id: id)
+        }
+    }
+
+    private static func input(_ project: RunningProject) -> RunningProjectInput {
+        RunningProjectInput(
+            name: project.name,
+            isOther: project.isOther,
+            state: Self.input(project.state),
+            sessions: project.sessions.map {
+                RunningSessionInput(stopped: $0.stopped, harness: $0.harness, title: $0.title, branch: $0.branch)
+            },
+            ports: project.ports.map {
+                RunningPortInput(
+                    port: Int($0.port),
+                    name: $0.name,
+                    stopRequest: $0.stopRequest,
+                    target: Self.input($0.target),
+                    kind: $0.kind,
+                    worktree: $0.worktree,
+                    harness: $0.harness,
+                    container: $0.container,
+                    openable: $0.openable,
+                    protectedInGroup: $0.protectedInGroup
+                )
+            },
+            stoppablePorts: Int(project.stoppablePorts),
+            rowStopRequest: project.rowStopRequest,
+            childStopRequest: project.childStopRequest,
+            path: project.path,
+            upSinceMs: project.upSinceMs
+        )
+    }
+
     func perform(_ command: AwakeCommand) async {
         do {
             _ = try await dispatch(module: "awake", actionJSON: command.actionJSON)
@@ -215,6 +437,7 @@ final class CoreStore {
 
     fileprivate func apply(_ snapshot: CoreSnapshot) {
         self.snapshot = snapshot
+        pruneStopState()
         if let failure = awakeActionFailure, failure.visible(against: Self.marks(of: snapshot.awake)) == nil {
             awakeActionFailure = nil
         }
@@ -263,5 +486,19 @@ final class SnapshotRelay: SnapshotListener, @unchecked Sendable {
         Task { @MainActor [weak store] in
             store?.apply(snapshot)
         }
+    }
+}
+
+@MainActor
+private final class AppDesktop: Desktop {
+    func open(_ url: URL) { NSWorkspace.shared.open(url) }
+
+    func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    func reveal(_ path: String) {
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
     }
 }
