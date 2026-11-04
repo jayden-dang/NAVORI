@@ -563,10 +563,10 @@ _Requirements: PSTOP-9.1, PSTOP-9.2, PSTOP-9.3, PSTOP-9.4_
 
 **Depends-on:** Task 13
 
-- [ ] **Step 1: Write the failing check** as a grep step: `rg -n "Nothing is written to Docker" docs/architecture docs/specs/2026-11-04-port-discovery` and `rg -n "integrations and logs\." apps/macos` return hits — expect: hits now (the PSTOP spec itself quotes the phrase and is out of the grep's scope).
-- [ ] **Step 2: Edit** the files above.
-- [ ] **Step 3: Run** the same greps — expect: no hit for either phrase, and `rg -n "Amended 2026-11-04 by PSTOP" docs/specs/2026-11-02-awake-leases/requirements.md` returns six lines (AWAKE-11.1, 11.7, 11.13, 11.15, 11.17, 17.7); `navori --profile dev doctor` still lists the same rows in the same order with `ports` after `logs`; `cargo test -p navori-ffi --test integrations` passes (guard for the doctor row order).
-- [ ] **Step 4: Run** `cargo xtask ci` — expect: pass. Commit `git commit -m "docs(PSTOP): amend the Docker row, the Awake criteria and the Doctor text"`
+- [x] **Step 1: Write the failing check** as a grep step: `rg -n "Nothing is written to Docker" docs/architecture docs/specs/2026-11-04-port-discovery` and `rg -n "integrations and logs\." apps/macos` return hits — expect: hits now (the PSTOP spec itself quotes the phrase and is out of the grep's scope).
+- [x] **Step 2: Edit** the files above.
+- [x] **Step 3: Run** the same greps — expect: no hit for either phrase, and `rg -n "Amended 2026-11-04 by PSTOP" docs/specs/2026-11-02-awake-leases/requirements.md` returns six lines (AWAKE-11.1, 11.7, 11.13, 11.15, 11.17, 17.7); `navori --profile dev doctor` still lists the same rows in the same order with `ports` after `logs`; `cargo test -p navori-ffi --test integrations` passes (guard for the doctor row order).
+- [x] **Step 4: Run** `cargo xtask ci` — expect: pass. Commit `git commit -m "docs(PSTOP): amend the Docker row, the Awake criteria and the Doctor text"`
 
 _Requirements: PSTOP-3.10, PSTOP-4.19, PSTOP-8.1, PSTOP-8.2_
 
