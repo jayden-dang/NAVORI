@@ -77,20 +77,12 @@ final class CoreStore {
 
     func saveProviderKey(_ key: String) async throws {
         guard let core else { throw StoreError.notRunning }
-        do {
-            try await core.saveProviderKey(key: key)
-        } catch CoreError.Secrets(let message) {
-            throw StoreError.keychain(message)
-        }
+        try await core.saveProviderKey(key: key)
     }
 
     func removeProviderKey() async throws -> Bool {
         guard let core else { throw StoreError.notRunning }
-        do {
-            return try await core.removeProviderKey()
-        } catch CoreError.Secrets(let message) {
-            throw StoreError.keychain(message)
-        }
+        return try await core.removeProviderKey()
     }
 
     var moduleCount: Int {
@@ -230,12 +222,10 @@ final class CoreStore {
 
     enum StoreError: LocalizedError {
         case notRunning
-        case keychain(String)
 
         var errorDescription: String? {
             switch self {
             case .notRunning: "The Navori core is not running."
-            case .keychain(let message): message
             }
         }
     }
