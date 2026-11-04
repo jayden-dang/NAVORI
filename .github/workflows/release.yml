@@ -35,6 +35,10 @@ jobs:
             echo "The tag check produced no version output." >&2
             exit 1
           fi
+          if ! grep -Eq '^prerelease=(true|false)$' "$RUNNER_TEMP/check.txt"; then
+            echo "The tag check produced no prerelease=true|false output." >&2
+            exit 1
+          fi
           cat "$RUNNER_TEMP/check.txt" >> "$GITHUB_OUTPUT"
 
       - name: Run the CI gate

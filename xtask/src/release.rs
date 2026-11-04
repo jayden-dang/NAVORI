@@ -38,13 +38,13 @@ pub(crate) fn cask_text(version: &str, sha256: &str, prerelease: bool) -> String
             "navori-rc",
             " (RC)",
             "navori",
-            "    This is a release candidate. `brew install --cask navori` is the stable cask.\n    ",
+            "    This is a release candidate. `brew install --cask navori` is the stable cask.\n",
         )
     } else {
         ("navori", "", "navori-rc", "")
     };
     include_str!("../assets/navori.rb.in")
-        .replace("    @CAVEAT_EXTRA@\n    ", caveat_extra)
+        .replace("    @CAVEAT_EXTRA@\n", caveat_extra)
         .replace("@CASK@", cask)
         .replace("@DESC_SUFFIX@", desc_suffix)
         .replace("@CONFLICTS@", conflicts)
@@ -425,6 +425,50 @@ mod tests {
 
     fn rc_cask() -> String {
         cask_text("0.2.0-rc.1", &"b".repeat(64), true)
+    }
+
+    fn caveat_lines(cask: &str) -> Vec<&str> {
+        let body = cask
+            .split("caveats <<~EOS\n")
+            .nth(1)
+            .and_then(|rest| rest.split("\n  EOS").next())
+            .expect("a caveats heredoc");
+        body.lines().collect()
+    }
+
+    #[test]
+    fn the_final_cask_caveats_start_with_the_self_signed_line_and_are_indented_alike() {
+        let cask = cask();
+        assert!(
+            cask.contains("caveats <<~EOS\n    Navori is self-signed"),
+            "{cask}"
+        );
+        let lines = caveat_lines(&cask);
+        assert_eq!(lines.len(), 3, "{cask}");
+        assert!(
+            lines
+                .iter()
+                .all(|l| l.starts_with("    ") && !l.starts_with("     ")),
+            "{cask}"
+        );
+    }
+
+    #[test]
+    fn the_release_candidate_cask_caveats_are_indented_alike() {
+        let cask = rc_cask();
+        let lines = caveat_lines(&cask);
+        assert_eq!(lines.len(), 4, "{cask}");
+        assert!(
+            lines
+                .iter()
+                .all(|l| l.starts_with("    ") && !l.starts_with("     ")),
+            "{cask}"
+        );
+        assert!(
+            lines[0].contains("release candidate") && lines[0].contains("navori"),
+            "{cask}"
+        );
+        assert!(lines[1].starts_with("    Navori is self-signed"), "{cask}");
     }
 
     #[test]

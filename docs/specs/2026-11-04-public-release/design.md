@@ -60,25 +60,33 @@ Interface: `cask_text(version: &str, sha256: &str, prerelease: bool) -> String` 
 Depth: n/a — a small fill of a reviewable Ruby template (version, hash, cask name, description suffix, the name of the cask it conflicts with); the cask knowledge lives in the template, not in code.
 Locality: new `xtask/assets/navori.rb.in`; `release.rs` — extend.
 
-Template shape (placeholders `@VERSION@`, `@SHA256@`):
+Template shape (placeholders `@VERSION@`, `@SHA256@`, `@CASK@`, `@DESC_SUFFIX@`, `@CONFLICTS@`, `@CAVEAT_EXTRA@`; `desc` takes the suffix ` (RC)` on a release candidate, which keeps it within the 80-character limit of `brew style`; the `@CAVEAT_EXTRA@` line is replaced by one full indented line for a release candidate and removed for a final) *(Amended 2026-11-04.)*:
 
 ```ruby
-cask "navori" do
+cask "@CASK@" do
   version "@VERSION@"
   sha256 "@SHA256@"
+
   url "https://github.com/jayden-dang/NAVORI/releases/download/v#{version}/Navori-#{version}.zip"
   name "Navori"
-  desc "AI-first menubar cockpit for developers running coding agents"
+  desc "AI-first menubar cockpit for developers running coding agents@DESC_SUFFIX@"
   homepage "https://github.com/jayden-dang/NAVORI"
+
+  conflicts_with cask: "@CONFLICTS@"
   depends_on arch: :arm64
   depends_on macos: :tahoe
+
   app "Navori.app"
   binary "#{appdir}/Navori.app/Contents/Helpers/navori"
+
   postflight_steps do
     run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/Navori.app"]
   end
+
   zap trash: ["~/Library/Application Support/Navori", "~/Library/Logs/Navori"]
+
   caveats <<~EOS
+    @CAVEAT_EXTRA@
     Navori is self-signed and not notarized. This cask removed the quarantine
     flag so macOS opens it without a Gatekeeper prompt.
     Before uninstalling, remove Navori's hooks in Settings → Integrations.
@@ -114,7 +122,7 @@ A `uses:` line passes when its ref after `@` is 40 hex characters or it starts w
 Satisfies: RELEASE-1.1, RELEASE-1.2, RELEASE-1.4, RELEASE-1.9, RELEASE-1.10, RELEASE-1.11, RELEASE-1.12, RELEASE-3.1, RELEASE-3.6, RELEASE-6.1, RELEASE-6.2, RELEASE-6.4, RELEASE-7.3, RELEASE-7.5, RELEASE-7.7
 Reuse: rung 4 — GitHub Actions (`push.tags`, Environments, `vars`, `concurrency`), the `gh` CLI preinstalled on the `macos-26` runner, Homebrew preinstalled on the runner; `actions/checkout` pinned by SHA
 Security: TB-7 (writes into another repository's cask only through a token scoped to it)
-Interface: trigger `on: push: tags: ['v*']`; inputs: secrets `SIGNING_P12`, `SIGNING_P12_PASSWORD`, `TAP_TOKEN` (Environment `release`), variables `TAP_REPOSITORY` and `PUBLISH_RELEASE`; outputs: a GitHub Release `v<version>` and, when the variable is set, one commit to `Casks/navori.rb` in the tap.
+Interface: trigger `on: push: tags: ['v*']`; inputs: secrets `SIGNING_P12`, `SIGNING_P12_PASSWORD`, `TAP_TOKEN` (Environment `release`), variables `TAP_REPOSITORY` and `PUBLISH_RELEASE`; outputs: a GitHub Release `v<version>` and, when the variable is set, one commit to `Casks/navori.rb` (final tag) or `Casks/navori-rc.rb` (pre-release tag) in the tap. *(Amended 2026-11-04.)*
 Depth: n/a — a pipeline of existing commands; all decisions live in `cargo xtask release`.
 Locality: new file; no existing file changes.
 
