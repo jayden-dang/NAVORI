@@ -31,7 +31,19 @@ const OUTCOMES: [(&str, &str); 8] = [
     ("outside_selector", "outside the selector"),
     ("failed", "failed"),
 ];
-const FAILED: usize = 7;
+
+fn slot(outcome: Outcome) -> usize {
+    match outcome {
+        Outcome::Stopped => 0,
+        Outcome::StoppedAlone => 1,
+        Outcome::AlreadyGone => 2,
+        Outcome::StillStopping => 3,
+        Outcome::Stale => 4,
+        Outcome::Protected => 5,
+        Outcome::OutsideSelector => 6,
+        Outcome::Failed => 7,
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum Claim {
@@ -53,8 +65,16 @@ pub(crate) struct StopDone {
 }
 
 impl StopDone {
+    fn of(outcomes: impl IntoIterator<Item = Outcome>) -> Self {
+        let mut counts = [0; 8];
+        for outcome in outcomes {
+            counts[slot(outcome)] += 1;
+        }
+        Self { counts }
+    }
+
     pub(crate) fn severity(&self) -> Severity {
-        if self.counts[FAILED] > 0 {
+        if self.counts[slot(Outcome::Failed)] > 0 {
             Severity::Warn
         } else {
             Severity::Info
@@ -172,13 +192,11 @@ impl StopTask {
             drive(&env, &selector, &targets, &mut slots),
         )
         .await;
-        let mut counts = [0; 8];
-        let results = targets
+        let results: Vec<TargetResult> = targets
             .into_iter()
             .enumerate()
             .map(|(at, target)| {
                 let (result, why) = answer(&slots, at);
-                counts[result as usize] += 1;
                 TargetResult {
                     target,
                     result,
@@ -186,8 +204,9 @@ impl StopTask {
                 }
             })
             .collect();
+        let done = StopDone::of(results.iter().map(|each| each.result));
         request.respond(Ok(KillReply { results }));
-        StopDone { counts }
+        done
     }
 }
 
@@ -363,6 +382,52 @@ async fn stop_container(containers: &dyn Containers, id: &str) -> Answer {
                 _ => reason::DOCKER_REFUSED,
             };
             (Outcome::Failed, Some(why))
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    const EVERY_OUTCOME: [Outcome; 8] = [
+        Outcome::Stopped,
+        Outcome::StoppedAlone,
+        Outcome::AlreadyGone,
+        Outcome::StillStopping,
+        Outcome::Stale,
+        Outcome::Protected,
+        Outcome::OutsideSelector,
+        Outcome::Failed,
+    ];
+
+    #[test]
+    fn every_outcome_counts_under_its_own_name() {
+        for outcome in EVERY_OUTCOME {
+            let done = StopDone::of([outcome]);
+            let name = serde_json::to_value(outcome).unwrap();
+            let payload = done.payload();
+            let counted: Vec<&str> = payload
+                .as_object()
+                .unwrap()
+                .iter()
+                .filter(|(_, count)| **count == json!(1))
+                .map(|(key, _)| key.as_str())
+                .collect();
+            assert_eq!(counted, [name.as_str().unwrap()], "{outcome:?}");
+        }
+    }
+
+    #[test]
+    fn only_a_failed_outcome_raises_the_severity() {
+        for outcome in EVERY_OUTCOME {
+            let expected = if outcome == Outcome::Failed {
+                Severity::Warn
+            } else {
+                Severity::Info
+            };
+            assert_eq!(StopDone::of([outcome]).severity(), expected, "{outcome:?}");
         }
     }
 }
