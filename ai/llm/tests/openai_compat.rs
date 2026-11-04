@@ -4,8 +4,7 @@ mod common;
 
 use common::{Responder, refused_url};
 use navori_llm::{
-    ChatRequest, DEEPSEEK_BASE_URL, DEEPSEEK_PROVIDER, LlmError, LlmProvider, Message,
-    OpenAiCompat, Role,
+    ChatRequest, DEEPSEEK_BASE_URL, LlmError, LlmProvider, Message, OpenAiCompat, Role,
 };
 use navori_secrets::Secret;
 
@@ -152,7 +151,6 @@ async fn a_redirect_is_reported_as_a_status_and_never_followed() {
 #[test]
 fn the_deepseek_preset_is_an_https_url() {
     assert!(DEEPSEEK_BASE_URL.starts_with("https://"));
-    assert_eq!(DEEPSEEK_PROVIDER, "deepseek");
 }
 
 #[tokio::test]
