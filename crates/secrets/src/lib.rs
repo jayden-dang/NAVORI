@@ -15,3 +15,6 @@ pub mod fake;
 mod store;
 pub use error::*;
 pub use store::*;
+
+mod keychain;
+pub use keychain::*;

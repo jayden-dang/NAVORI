@@ -49,3 +49,7 @@ impl SecretError {
         }
     }
 }
+/// The Keychain store could not be built.
+#[derive(Debug, thiserror::Error)]
+#[error("the Keychain store could not be opened; check that this is macOS and retry")]
+pub struct OpenError;
