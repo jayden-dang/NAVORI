@@ -645,30 +645,33 @@ fn join_pipe(handle: thread::JoinHandle<std::io::Result<Vec<u8>>>, which: &str) 
 
 /// Runs as an ignored test in the process crate: its code has no place in the app bundle.
 fn measure_snapshot_ms(root: &Path) -> Result<f64> {
-    let output = super::cargo(root)
-        .args(["test", "-p", "navori-procs", "--test", "real_os", "--"])
-        .args(["--ignored", "--exact", "--nocapture"])
-        .arg("snapshot_cost_for_the_perf_gate")
-        .output()
-        .context("cannot run the snapshot timing test")?;
-    ensure!(
-        output.status.success(),
-        "the snapshot timing test failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    median_ms(&String::from_utf8_lossy(&output.stdout))
+    measure_real_os_ms(
+        root,
+        "navori-procs",
+        "snapshot_cost_for_the_perf_gate",
+        "snapshot",
+    )
 }
 
 fn measure_port_scan_ms(root: &Path) -> Result<f64> {
+    measure_real_os_ms(
+        root,
+        "navori-mod-ports",
+        "port_scan_cost_for_the_perf_gate",
+        "port scan",
+    )
+}
+
+fn measure_real_os_ms(root: &Path, package: &str, test: &str, what: &str) -> Result<f64> {
     let output = super::cargo(root)
-        .args(["test", "-p", "navori-mod-ports", "--test", "real_os", "--"])
+        .args(["test", "-p", package, "--test", "real_os", "--"])
         .args(["--ignored", "--exact", "--nocapture"])
-        .arg("port_scan_cost_for_the_perf_gate")
+        .arg(test)
         .output()
-        .context("cannot run the port scan timing test")?;
+        .with_context(|| format!("cannot run the {what} timing test"))?;
     ensure!(
         output.status.success(),
-        "the port scan timing test failed: {}",
+        "the {what} timing test failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
     median_ms(&String::from_utf8_lossy(&output.stdout))
