@@ -457,7 +457,7 @@ fn container(listed: Listed) -> Container {
         id: listed.id,
         name,
         working_dir,
-        image: listed.image.as_deref().and_then(crate::image::repository),
+        image: listed.image.as_deref().and_then(crate::image::image_name),
         ports,
     }
 }

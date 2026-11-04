@@ -55,7 +55,7 @@ async fn image_of(listed: &str) -> Option<String> {
 }
 
 #[tokio::test]
-async fn a_container_image_is_reduced_to_its_repository_name() {
+async fn a_container_image_is_reduced_to_its_last_path_segment_with_no_registry_host_or_path() {
     assert_eq!(
         image_of("postgres:16-alpine").await.as_deref(),
         Some("postgres")
@@ -64,7 +64,13 @@ async fn a_container_image_is_reduced_to_its_repository_name() {
         image_of("localhost:5000/team/db:1@sha256:abc")
             .await
             .as_deref(),
-        Some("localhost:5000/team/db")
+        Some("db")
+    );
+    assert_eq!(
+        image_of("registry.corp.example:5443/secret-team/postgres:16")
+            .await
+            .as_deref(),
+        Some("postgres")
     );
     assert_eq!(image_of("sha256:abc123").await, None);
 }
