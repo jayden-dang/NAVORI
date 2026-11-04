@@ -313,7 +313,7 @@ async fn the_published_state_stays_empty() {
 }
 
 #[tokio::test]
-async fn a_command_that_is_not_the_single_quoted_helper_then_hook_reads_not_installed() {
+async fn a_command_in_neither_recognised_form_reads_not_installed() {
     let lookalikes = [
         "\"/A/Navori.app/Contents/Helpers/navori\" hook",
         "/A/Navori.app/Contents/Helpers/navori hook",

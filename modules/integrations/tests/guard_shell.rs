@@ -22,9 +22,17 @@ struct Installed {
 
 impl Installed {
     async fn new() -> Self {
+        Self::with_profile(false).await
+    }
+
+    async fn dev() -> Self {
+        Self::with_profile(true).await
+    }
+
+    async fn with_profile(dev: bool) -> Self {
         let apps = tempfile::Builder::new().tempdir_in("/tmp").unwrap();
         let helper = apps.path().join("Navori.app/Contents/Helpers/navori");
-        let rig = Rig::new(false, helper.to_str().unwrap());
+        let rig = Rig::new(dev, helper.to_str().unwrap());
         rig.make_dir(".claude");
         rig.dispatch(json!({ "install": { "harness": "claude" } }))
             .await
@@ -50,8 +58,12 @@ impl Installed {
     fn place_helper(&self, script: &str, mode: u32) {
         let helper = self.helper();
         std::fs::create_dir_all(helper.parent().unwrap()).unwrap();
-        std::fs::write(&helper, script).unwrap();
-        std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(mode)).unwrap();
+        // Write under another name and rename into place, so no writable descriptor to the
+        // script is still open when the shell execs it (ETXTBSY).
+        let staging = helper.with_file_name("navori.staging");
+        std::fs::write(&staging, script).unwrap();
+        std::fs::set_permissions(&staging, std::fs::Permissions::from_mode(mode)).unwrap();
+        std::fs::rename(&staging, &helper).unwrap();
     }
 
     /// Runs the command through `/bin/sh -c`; returns its output and the shell's pid.
@@ -137,6 +149,21 @@ async fn a_present_helper_gets_the_same_arguments_and_stdin() {
 }
 
 #[tokio::test]
+async fn the_dev_command_passes_the_profile_and_the_same_stdin() {
+    let installed = Installed::dev().await;
+    let (args, stdin, _) = installed.place_recording_helper();
+
+    let (output, _) = installed.run(b"{\"session\":\"s1\"}\n");
+
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        std::fs::read_to_string(&args).unwrap(),
+        "--profile\ndev\nhook\n"
+    );
+    assert_eq!(std::fs::read(&stdin).unwrap(), b"{\"session\":\"s1\"}\n");
+}
+
+#[tokio::test]
 async fn the_helper_runs_as_the_shell_process_itself() {
     let installed = Installed::new().await;
     let (_, _, pid) = installed.place_recording_helper();
@@ -152,7 +179,7 @@ async fn the_helper_runs_as_the_shell_process_itself() {
 }
 
 #[tokio::test]
-async fn the_command_finishes_well_inside_the_hook_timeout() {
+async fn the_command_finishes_inside_the_shortest_hook_timeout() {
     let installed = Installed::new().await;
     installed.place_recording_helper();
 
@@ -160,5 +187,5 @@ async fn the_command_finishes_well_inside_the_hook_timeout() {
     let (output, _) = installed.run(b"{}");
 
     assert_eq!(output.status.code(), Some(0));
-    assert!(started.elapsed() < Duration::from_secs(2));
+    assert!(started.elapsed() < Duration::from_secs(1));
 }
