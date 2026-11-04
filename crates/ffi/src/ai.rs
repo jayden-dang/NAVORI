@@ -84,7 +84,14 @@ impl Sender for LlmSender {
                 .complete(request, key)
                 .await
                 .map(|reply| reply.text)
-                .map_err(|error| SendError(error.to_string()))
+                .map_err(|error| {
+                    tracing::warn!(
+                        provider = DEEPSEEK_PROVIDER,
+                        kind = error.kind(),
+                        "provider request failed"
+                    );
+                    SendError(error.to_string())
+                })
         })
     }
 }
@@ -128,7 +135,7 @@ impl StoreAudit {
         if !*migrated {
             self.store
                 .migrate(AUDIT_OWNER, AUDIT_MIGRATIONS)
-                .map_err(|_| AuditError)?;
+                .map_err(|_| AuditError::Migration)?;
             *migrated = true;
         }
         Ok(())
@@ -144,7 +151,7 @@ impl AuditSink for StoreAudit {
                 redact_text(&row.kinds.join(",")).text,
             )
         }))
-        .map_err(|_| AuditError)?;
+        .map_err(|_| AuditError::ShieldPass)?;
         let outcome = match row.outcome {
             Outcome::Authorized => "authorized",
             Outcome::Blocked => "blocked",
@@ -157,7 +164,7 @@ impl AuditSink for StoreAudit {
                 )
             })
             .map(|_| ())
-            .map_err(|_| AuditError)
+            .map_err(|_| AuditError::Write)
     }
 }
 
@@ -205,6 +212,7 @@ fn secrets_error(message: impl ToString) -> CoreError {
 }
 
 fn did_not_finish(_: tokio::task::JoinError) -> CoreError {
+    tracing::warn!("keychain call did not finish");
     secrets_error("the Keychain call did not finish")
 }
 
@@ -249,7 +257,10 @@ impl AiRuntime {
                 tokio::task::spawn_blocking(move || open(service))
                     .await
                     .map_err(did_not_finish)?
-                    .map_err(secrets_error)
+                    .map_err(|error| {
+                        tracing::warn!("keychain open failed");
+                        secrets_error(error)
+                    })
             })
             .await
             .cloned()
@@ -285,5 +296,6 @@ fn slot() -> Result<SecretKey, CoreError> {
 }
 
 fn secrets_error_key(_: navori_secrets::KeyError) -> CoreError {
+    tracing::warn!("provider key slot invalid");
     secrets_error("the provider key slot is not valid")
 }

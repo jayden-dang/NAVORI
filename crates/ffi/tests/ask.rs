@@ -699,6 +699,86 @@ fn an_unrecordable_audit_refuses_the_ask_with_one_content_free_log_line() {
         .collect();
     assert_eq!(lines.len(), 1, "{lines:?}");
     assert!(!lines[0].contains("review") && !lines[0].contains(PLANTED));
+    assert!(lines[0].contains(r#"reason="migration""#), "{lines:?}");
+    core.shutdown();
+}
+
+#[test]
+fn a_provider_that_cannot_be_reached_logs_one_line_naming_only_the_kind() {
+    let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", closed.local_addr().unwrap());
+    drop(closed);
+    let fixture = Fixture::new();
+    let home = home();
+    let sender: Arc<dyn Sender> = Arc::new(navori_ffi::LlmSender::new(
+        navori_llm::OpenAiCompat::new(url),
+    ));
+    let core = fixture.core_sending(&home, sender);
+    futures::executor::block_on(core.save_provider_key("k1".into())).unwrap();
+
+    let failed = rpc_error(ask(&core, &format!("review {PLANTED} now")));
+
+    assert_eq!(failed.code, -32007);
+    let lines: Vec<String> = tracing_output()
+        .lines()
+        .filter(|line| line.contains("provider request failed"))
+        .map(str::to_owned)
+        .collect();
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(lines[0].contains("WARN"), "{lines:?}");
+    assert!(lines[0].contains(r#"kind="network""#), "{lines:?}");
+    assert!(lines[0].contains(r#"provider="deepseek""#), "{lines:?}");
+    for secret in ["review", PLANTED, "REDACTED", "127.0.0.1", "k1"] {
+        assert!(!lines[0].contains(secret), "{secret} in {lines:?}");
+    }
+    core.shutdown();
+}
+
+#[test]
+fn a_keychain_that_cannot_open_logs_a_content_free_line() {
+    let deps = AiDeps {
+        open_secrets: Arc::new(|_| Err(navori_secrets::OpenError)),
+        make_sender: Arc::new(|| Arc::new(StubSender)),
+    };
+    let home = home();
+    captured_tracing();
+    let core = NavoriCore::start_with(config(&home, "dev"), Arc::new(Quiet), deps).unwrap();
+
+    let refused = rpc_error(ask(&core, "review this"));
+
+    assert_eq!(refused.code, -32005);
+    let output = tracing_output();
+    let lines: Vec<&str> = output
+        .lines()
+        .filter(|line| line.contains("keychain open failed"))
+        .collect();
+    assert!(!lines.is_empty());
+    for line in lines {
+        assert!(line.contains("WARN") && !line.contains("review"), "{line}");
+    }
+    core.shutdown();
+}
+
+#[test]
+fn a_keychain_open_that_panics_logs_that_it_did_not_finish() {
+    let deps = AiDeps {
+        open_secrets: Arc::new(|_| std::panic::panic_any("keychain open exploded")),
+        make_sender: Arc::new(|| Arc::new(StubSender)),
+    };
+    let home = home();
+    captured_tracing();
+    let core = NavoriCore::start_with(config(&home, "dev"), Arc::new(Quiet), deps).unwrap();
+
+    let refused = rpc_error(ask(&core, "review this"));
+
+    assert_eq!(refused.code, -32005);
+    let output = tracing_output();
+    assert!(
+        output
+            .lines()
+            .any(|line| line.contains("keychain call did not finish") && line.contains("WARN")),
+        "{output}"
+    );
     core.shutdown();
 }
 

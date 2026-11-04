@@ -20,8 +20,25 @@ pub trait Sender: Send + Sync {
     ) -> BoxFuture<'a, Result<String, SendError>>;
 }
 
+/// Why an audit row was not recorded. Fixed names only: they go to logs, never to the user.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct AuditError;
+pub enum AuditError {
+    Migration,
+    Write,
+    ShieldPass,
+    Unfinished,
+}
+
+impl AuditError {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Migration => "migration",
+            Self::Write => "write",
+            Self::ShieldPass => "shield_pass",
+            Self::Unfinished => "unfinished",
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outcome {
@@ -106,13 +123,28 @@ impl Gateway {
         let secret = self.read_key().await?;
 
         let Some(redacted) = self.inspect(text) else {
-            let _ = self.write_row(Outcome::Blocked, 0).await;
+            tracing::warn!(
+                provider = self.provider,
+                reason = "shield_refused",
+                "ask refused"
+            );
+            if let Err(error) = self.write_row(Outcome::Blocked, 0).await {
+                tracing::warn!(
+                    provider = self.provider,
+                    reason = error.as_str(),
+                    "blocked audit row not recorded"
+                );
+            }
             return Err(AskError::Shield);
         };
 
         let count = u32::try_from(redacted.findings.len()).unwrap_or(u32::MAX);
-        if self.write_row(Outcome::Authorized, count).await.is_err() {
-            tracing::warn!("context audit write failed");
+        if let Err(error) = self.write_row(Outcome::Authorized, count).await {
+            tracing::warn!(
+                provider = self.provider,
+                reason = error.as_str(),
+                "context audit write failed"
+            );
             return Err(AskError::Audit);
         }
 
@@ -128,10 +160,24 @@ impl Gateway {
         match spawn_blocking(move || secrets.get(&key)).await {
             Ok(Ok(Some(secret))) => Ok(secret),
             Ok(Ok(None)) => Err(AskError::NoKey),
-            Ok(Err(error)) => Err(AskError::Keychain(error.to_string())),
-            Err(_) => Err(AskError::Keychain(
-                "the Keychain call did not finish".to_owned(),
-            )),
+            Ok(Err(error)) => {
+                tracing::warn!(
+                    provider = self.provider,
+                    reason = "keychain_failed",
+                    "ask refused"
+                );
+                Err(AskError::Keychain(error.to_string()))
+            }
+            Err(_) => {
+                tracing::warn!(
+                    provider = self.provider,
+                    reason = "keychain_unfinished",
+                    "ask refused"
+                );
+                Err(AskError::Keychain(
+                    "the Keychain call did not finish".to_owned(),
+                ))
+            }
         }
     }
 
@@ -151,7 +197,7 @@ impl Gateway {
         let audit = Arc::clone(&self.audit);
         spawn_blocking(move || audit.record(row))
             .await
-            .unwrap_or(Err(AuditError))
+            .unwrap_or(Err(AuditError::Unfinished))
     }
 }
 

@@ -44,6 +44,18 @@ pub enum LlmError {
     Malformed,
 }
 
+impl LlmError {
+    /// A fixed name for the failure, safe to log.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Network => "network",
+            Self::Timeout => "timeout",
+            Self::Status(_) => "status",
+            Self::Malformed => "malformed",
+        }
+    }
+}
+
 fn status_hint(status: u16) -> &'static str {
     match status {
         401 => " (check the key saved in Settings → AI)",

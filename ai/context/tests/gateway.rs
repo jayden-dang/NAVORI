@@ -3,7 +3,7 @@
 use std::io;
 use std::panic::panic_any;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex, OnceLock};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use futures::future::BoxFuture;
@@ -76,7 +76,7 @@ impl AuditSink for RecordingAudit {
     fn record(&self, row: AuditRow) -> Result<(), AuditError> {
         match self.mode {
             AuditMode::Panic => panic_any("audit sink exploded"),
-            AuditMode::Fail => return Err(AuditError),
+            AuditMode::Fail => return Err(AuditError::Write),
             AuditMode::Record => {}
         }
         let name = match row.outcome {
@@ -493,21 +493,151 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Capture {
     }
 }
 
-fn captured_logs() -> &'static Capture {
-    static CAPTURE: OnceLock<Capture> = OnceLock::new();
-    CAPTURE.get_or_init(|| {
-        let capture = Capture::default();
+fn capture_logs() -> (Capture, tracing::subscriber::DefaultGuard) {
+    let capture = Capture::default();
+    let guard = tracing::subscriber::set_default(
         tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
             .with_writer(capture.clone())
             .with_ansi(false)
-            .init();
-        capture
-    })
+            .finish(),
+    );
+    (capture, guard)
+}
+
+fn log_lines(capture: &Capture) -> Vec<String> {
+    String::from_utf8(capture.0.lock().unwrap().clone())
+        .unwrap()
+        .lines()
+        .map(str::to_owned)
+        .collect()
+}
+
+#[tokio::test]
+async fn an_audit_failure_logs_one_line_naming_the_write() {
+    let (logs, _guard) = capture_logs();
+    let mut harness = Harness::with_key();
+    harness.audit_mode = AuditMode::Fail;
+
+    harness.gateway().ask("m", PROMPT).await.unwrap_err();
+
+    let lines = log_lines(&logs);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(lines[0].contains("WARN"), "{lines:?}");
+    assert!(lines[0].contains("context audit write failed"), "{lines:?}");
+    assert!(lines[0].contains(r#"reason="write""#), "{lines:?}");
+    assert!(lines[0].contains(r#"provider="deepseek""#), "{lines:?}");
+}
+
+#[tokio::test]
+async fn a_panicking_audit_sink_logs_one_line_naming_the_unfinished_write() {
+    let (logs, _guard) = capture_logs();
+    let mut harness = Harness::with_key();
+    harness.audit_mode = AuditMode::Panic;
+
+    harness.gateway().ask("m", PROMPT).await.unwrap_err();
+
+    let lines = log_lines(&logs);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(lines[0].contains(r#"reason="unfinished""#), "{lines:?}");
+}
+
+#[tokio::test]
+async fn a_shield_refusal_logs_one_line() {
+    let (logs, _guard) = capture_logs();
+    let harness = Harness::with_key();
+
+    harness
+        .gateway_with_shield(panicking_shield)
+        .ask("m", PROMPT)
+        .await
+        .unwrap_err();
+
+    let lines = log_lines(&logs);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(lines[0].contains("ask refused"), "{lines:?}");
+    assert!(lines[0].contains(r#"reason="shield_refused""#), "{lines:?}");
+    assert!(lines[0].contains(r#"provider="deepseek""#), "{lines:?}");
+}
+
+#[tokio::test]
+async fn a_shield_refusal_whose_blocked_row_fails_logs_both_reasons() {
+    let (logs, _guard) = capture_logs();
+    let mut harness = Harness::with_key();
+    harness.audit_mode = AuditMode::Fail;
+
+    harness
+        .gateway_with_shield(panicking_shield)
+        .ask("m", PROMPT)
+        .await
+        .unwrap_err();
+
+    let lines = log_lines(&logs);
+    assert_eq!(lines.len(), 2, "{lines:?}");
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.contains(r#"reason="shield_refused""#))
+    );
+    assert!(lines.iter().any(|l| {
+        l.contains("blocked audit row not recorded") && l.contains(r#"reason="write""#)
+    }));
+}
+
+#[tokio::test]
+async fn a_keychain_failure_logs_one_line() {
+    let (logs, _guard) = capture_logs();
+    let harness = Harness::with_key();
+    harness.vault.fail_next(Operation::Get);
+
+    harness.gateway().ask("m", PROMPT).await.unwrap_err();
+
+    let lines = log_lines(&logs);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(lines[0].contains("ask refused"), "{lines:?}");
+    assert!(
+        lines[0].contains(r#"reason="keychain_failed""#),
+        "{lines:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_keychain_call_that_panics_logs_one_line() {
+    let (logs, _guard) = capture_logs();
+    let mut harness = Harness::with_key();
+    harness.store = Arc::new(PanickingStore);
+
+    harness.gateway().ask("m", PROMPT).await.unwrap_err();
+
+    let lines = log_lines(&logs);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(
+        lines[0].contains(r#"reason="keychain_unfinished""#),
+        "{lines:?}"
+    );
+}
+
+#[tokio::test]
+async fn an_ask_that_succeeds_or_finds_no_key_logs_nothing() {
+    let (logs, _guard) = capture_logs();
+
+    Harness::with_key()
+        .gateway()
+        .ask("m", PROMPT)
+        .await
+        .unwrap();
+    Harness::without_key()
+        .gateway()
+        .ask("m", PROMPT)
+        .await
+        .unwrap_err();
+
+    assert!(log_lines(&logs).is_empty());
 }
 
 #[tokio::test]
 async fn no_error_log_or_audit_row_holds_the_prompt_the_redacted_text_the_reply_or_the_key() {
-    let logs = captured_logs();
+    let (logs, _guard) = capture_logs();
     let text = prompt_with_secret();
     let mut outputs: Vec<String> = Vec::new();
 
@@ -547,14 +677,25 @@ async fn no_error_log_or_audit_row_holds_the_prompt_the_redacted_text_the_reply_
         keychain_down.gateway().ask("m", &text).await.unwrap_err()
     ));
     outputs.push(format!("{:?}", keychain_down.gateway()));
-    outputs.push(String::from_utf8(logs.0.lock().unwrap().clone()).unwrap());
-
-    assert!(
-        outputs
-            .last()
-            .unwrap()
-            .contains("context audit write failed")
-    );
+    let mut shield_and_audit_down = Harness::with_key();
+    shield_and_audit_down.audit_mode = AuditMode::Fail;
+    shield_and_audit_down
+        .gateway_with_shield(panicking_shield)
+        .ask("m", &text)
+        .await
+        .unwrap_err();
+    let mut panicking_store = Harness::with_key();
+    panicking_store.store = Arc::new(PanickingStore);
+    panicking_store.gateway().ask("m", &text).await.unwrap_err();
+    let logged = String::from_utf8(logs.0.lock().unwrap().clone()).unwrap();
+    for line in [
+        "context audit write failed",
+        "ask refused",
+        "blocked audit row not recorded",
+    ] {
+        assert!(logged.contains(line), "{line} missing from {logged}");
+    }
+    outputs.push(logged);
     for output in &outputs {
         for secret in [PROMPT, STORED_KEY, "REDACTED", "ghp_", "abcdefghijklmnop"] {
             assert!(!output.contains(secret), "{secret} leaked into {output}");

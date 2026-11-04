@@ -149,6 +149,19 @@ async fn a_redirect_is_reported_as_a_status_and_never_followed() {
 }
 
 #[test]
+fn each_failure_has_a_coarse_content_free_kind() {
+    let kinds = [
+        (LlmError::Network, "network"),
+        (LlmError::Timeout, "timeout"),
+        (LlmError::Status(401), "status"),
+        (LlmError::Malformed, "malformed"),
+    ];
+    for (error, kind) in kinds {
+        assert_eq!(error.kind(), kind);
+    }
+}
+
+#[test]
 fn the_deepseek_preset_is_an_https_url() {
     assert!(DEEPSEEK_BASE_URL.starts_with("https://"));
 }
