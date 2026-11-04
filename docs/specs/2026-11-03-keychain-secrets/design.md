@@ -1,7 +1,7 @@
 # Design: Keychain secrets
 
 Feature code: SECRETS
-Status: In-progress
+Status: Implemented
 Date: 2026-11-03
 Approved by the operator ("approve", 2026-11-03 21:01, on the review page at e3b886c, no card selected).
 Requirements: ./requirements.md
@@ -26,7 +26,7 @@ A second constraint shapes the error path. `keyring_core::Error` is `#[non_exhau
 2. **No global default store.** Entries are built through `CredentialStoreApi::build` on a store this crate holds (keyring-core api.rs:201), never `Entry::new`.
 3. **The service is a value, not a Profile (`agent-decided`).** `KeychainService` has two constants, `RELEASE` = `dev.navori` and `DEV` = `dev.navori.dev` (F1). The crate neither imports `navori-config` nor repeats its `Profile` enum (crates/config/src/lib.rs:16, CONTEXT.md **Profile**); the composition root maps Profile to a constant.
 4. **`SecretStore` is a synchronous trait** with four operations; `list` is out (`agent-decided`, F3). Consumers keep calls off the actor thread (ARCH-10) and read lazily; that is their rule.
-5. **One error type, no reason enum, no backend text (`agent-decided`).** `SecretError` carries the operation, service, kind and name only. The real store never produces `Ambiguous` (it keys by service and account), and `NoStorageAccess` covers only six status codes while a locked or cancelled Keychain arrives as `PlatformFailure` (apple keychain.rs:367-377), so a reason enum would claim distinctions the backend does not make. The cost: a failure cannot be told apart by cause from the error; the backend's status code is dropped to stay inside SECRETS-6.3. If a failure proves undebuggable, adding the status text for the two boxed variants is the follow-up.
+5. **One error type, no reason enum, no backend text (`agent-decided`).** `SecretError` carries the operation, service, kind and name only. The real store never produces `Ambiguous` (it keys by service and account), and `NoStorageAccess` covers only six status codes while a locked or cancelled Keychain arrives as `PlatformFailure` (apple keychain.rs:367-377), so a reason enum would claim distinctions the backend does not make. The cost: a failure cannot be told apart by cause from the error; the backend's status code is dropped to stay inside SECRETS-6.3. If a failure proves undebuggable, adding the status text for the two boxed variants is the follow-up. Shipped wording (changed in review): the message lists the possible causes (locked, access denied, unreadable item) instead of telling the person to unlock the Keychain, because the error does not know which one it was. The operator confirmed on 2026-11-04 to keep this decision as it is; a payload-free cause enum would be additive and is left to ROAD-11, the first consumer.
 6. **`exists` is `Entry::get_credential` mapped `NoEntry` to false (`agent-decided`).** It reads the item without decoding it as UTF-8, so an item written by another tool as non-UTF-8 still answers true, and no value is copied into a `String`. The API has no attribute-only lookup except `Store::search`, whose matching rules and prompt behavior are unverified (design-scan.md B), so `exists` may prompt like `get`. If the contract run shows prompts, `search` is the follow-up.
 7. **Hand-written `MemoryStore` fake** (`agent-decided`) under feature `fake` over a shared `FakeKeychain` vault, with failure injection (`fail_next`), so consumers' tests can also exercise "the Keychain failed".
 8. **`KeychainStore::with_backend` exists only under feature `fake`** (`agent-decided`), so the shipped interface does not expose a `keyring-core` type and a mock backend cannot reach release builds.
@@ -51,7 +51,7 @@ Interface: `KeychainService::RELEASE`, `KeychainService::DEV`, `as_str()`; `Secr
 Depth: if this module vanished, callers would still have to know the account format, the two service strings, the key grammar and how to keep a value out of `Debug` — about four rules, not the code.
 Locality: leave — new files only; `navori-config` is untouched.
 
-`SecretKey::new` checks kind then name; for each it rejects empty, then `/`, then any `char::is_control`. A name that is too long for the Keychain is not caught here: the backend refuses it at the call and it surfaces as `SecretError` (requirement 1.2 lists only the three cases). An empty `Secret` is accepted and passed through; the real Keychain's handling of an empty value is unverified and no requirement addresses it.
+`SecretKey::new` checks kind then name; for each it rejects empty, then `/`, then any `char::is_control`. A name that is too long for the Keychain is not caught here: the backend would refuse it at the call and it would surface as `SecretError` (requirement 1.2 lists only the three cases); the real Keychain accepted a 2000-character name in the manual run of 2026-11-04. An empty `Secret` is accepted and passed through; the real Keychain accepts an empty value (manual run, 2026-11-04: `get` returns an empty secret and `exists` is true) and no requirement addresses it.
 
 ### Store interface and errors: `SecretStore`, `SecretError`, `Deleted`
 
@@ -75,7 +75,7 @@ Interface: `KeychainStore::open(service: KeychainService) -> Result<KeychainStor
 Depth: if this module vanished, callers would still need the service/account mapping and the rule that every backend failure becomes one error without a payload — but not the `keyring-core` API, which stays out of `SecretStore`.
 Locality: leave — new file.
 
-Each operation builds an `Entry` with `service = service.as_str()` and `user = key account`, and calls `set_password`, `get_password`, `get_credential` (`exists`) or `delete_credential`. The mapping function takes the `keyring_core::Error` by value and matches by variant with a `_` arm: `NoEntry` is the absent outcome for get, exists and delete; every other variant, including `BadEncoding`, `Ambiguous`, `NoStorageAccess` and `PlatformFailure`, becomes a `SecretError`. The error value is never formatted, logged, stored or `unwrap`ped. The crate has no `tracing` or `log` dependency of its own, so nothing in this crate emits a log line (SECRETS-6.4, reviewed, no automated test). `set` is `set_generic_password` underneath: it finds the item first and falls back to add on any find error (security-framework `src/os/macos/passwords.rs:275-278`), so `set` can also prompt, a denied find on an existing item surfaces as a duplicate-item failure, and two first `set`s of one key can race; all unverified on the real Keychain and covered only by the manual run.
+Each operation builds an `Entry` with `service = service.as_str()` and `user = key account`, and calls `set_password`, `get_password`, `get_credential` (`exists`) or `delete_credential`. One private helper, `KeychainStore::call`, builds the `Entry` and matches the `keyring_core::Error` by variant with a `_` arm (a failing `build` maps the same way): `NoEntry` is the absent outcome for get, exists and delete; every other variant, including `BadEncoding`, `Ambiguous`, `NoStorageAccess` and `PlatformFailure`, becomes a `SecretError`. The error value is never formatted, logged, stored or `unwrap`ped. The crate has no `tracing` or `log` dependency of its own, so nothing in this crate emits a log line (SECRETS-6.4, reviewed, no automated test). `set` is `set_generic_password` underneath: it finds the item first and falls back to add on any find error (security-framework `src/os/macos/passwords.rs:275-278`), so `set` can also prompt, a denied find on an existing item surfaces as a duplicate-item failure, and two first `set`s of one key can race; the prompt and the denied find stay unverified on the real Keychain; two manual runs on 2026-11-04 saw no blocking prompt.
 
 ### In-memory fake and the contract suite: `FakeKeychain`, `MemoryStore`
 
@@ -125,10 +125,10 @@ Locality: leave — one new test file.
 | grep of docs and roadmap (a task step) | review | SECRETS-9.1, SECRETS-9.2, SECRETS-9.3, SECRETS-10.3, SECRETS-10.4, SECRETS-10.5 |
 | whole-branch review | review | SECRETS-6.4, SECRETS-8.3 (search half) |
 
-The only seam beyond the trait is `with_backend`, available under `fake`. SECRETS-2.2 on the real Keychain (replace in place, one item) is shown only by the manual run.
+The only seam beyond the trait is `with_backend`, available under `fake`. SECRETS-2.2 on the real Keychain (replace in place, one item) was shown by a manual run on 2026-11-04: one item after the first `set`, one after the second.
 
 ## Coverage check
 
 Every requirement ID appears in exactly one `Satisfies:` line: 1.1, 1.2, 5.1, 5.2, 6.1, 6.2 names and values; 2.2 to 2.5, 3.1, 4.1, 4.2, 7.1 interface and errors; 2.1, 2.6, 6.3, 6.4 keychain store; 5.3, 7.2, 7.3, 7.4 fake and suite; 8.1 to 8.3 crate checks; 9.1 to 9.3 and 10.1 to 10.5 wiring. No ID is unmapped. Story 8 (NFR) has no section of its own: its three criteria live in the crate-checks section.
 
-Open items carried: whether `exists` and `set` prompt, and what `set` does when the find is denied (unverified, manual run); the first build confirming the dependency delta; the empty-value and over-long-name behavior on the real Keychain; the dropped backend status code (decision 5).
+Open items carried: whether `exists` and `set` prompt without blocking (none blocked in two manual runs; a flashing dialog is not ruled out), what `set` does when the find is denied, and which error a locked Keychain or a cancelled prompt returns (all unverified); the dropped backend status code (decision 5). Closed: the first build confirmed the dependency delta, and the manual runs covered the empty value, an over-long name, non-text bytes and a large non-ASCII value.
