@@ -58,7 +58,7 @@ small chunked body, so this design writes that read on `tokio::net::UnixStream` 
    `Connection: close`, a status line and headers, then a `Content-Length` or chunked body. The Engine on this Mac
    answers chunked. Limits are 2 s and 1 MiB (`agent-decided`). The socket is `<home>/.docker/run/docker.sock` only,
    Docker Desktop's default on macOS (`agent-decided`). Neither `/var/run/docker.sock` nor `DOCKER_HOST` is read, so a
-   test with a temporary home never reaches Docker.
+   test with a temporary home never reaches Docker. *(Amended 2026-11-04 by PSTOP: the same socket also carries the one write Navori makes, `POST /containers/{id}/stop`, PSTOP-3.3 and PSTOP-3.9.)*
 8. Containers are deserialized into a struct with only id, names, ports and one label. The other fields exist only
    in the buffered body (≤ 1 MiB) until it is parsed. They are never stored, returned or logged, and the body buffer
    is zeroed before it is dropped (PORTS-4.4; `agent-decided`: the zeroing).
@@ -250,7 +250,7 @@ Locality: new — modules/ports/src/infra/docker.rs (client) and src/docker.rs (
 
 The read is called only when the scan found a backend port (PORTS-4.1, PORTS-4.2). It sends exactly
 `GET /containers/json HTTP/1.1`, `Host: docker` and `Connection: close` (PORTS-4.3). The whole exchange is under one
-2 s timeout, connect included, and the body under a 1 MiB cap (PORTS-4.9).
+2 s timeout, connect included, and the body under a 1 MiB cap (PORTS-4.9). *(Amended 2026-11-04 by PSTOP: the scan's read sends only this request. The stop request is not held to the 2 s read limit; the request deadline of 25 s, PSTOP-1.11, ends it.)*
 
 Framing: the header block is capped at 16 KiB. With `Content-Length`, read exactly that many bytes. With
 `Transfer-Encoding: chunked`, each size line is capped at 32 bytes, chunks are appended until the 0-size chunk, and
@@ -388,7 +388,7 @@ Infrastructure, no Satisfies line.
   the Engine API's `GET /containers/json`.
 - docs/architecture/system.md:65: Ports module status.
 - docs/security/threat-model.md: THR-1/THR-3 mitigation gains the marker read (names only, wiped, never copied); a
-  line for the Docker socket read as a local read-only client.
+  line for the Docker socket read as a local read-only client. *(Amended 2026-11-04 by PSTOP: the client is no longer read-only: it also stops a container, PSTOP-3.9.)*
 
 ## Seams for testing
 

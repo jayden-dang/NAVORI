@@ -77,7 +77,7 @@ Guard walk (Step 3 of specify-behavior). Files the change touches:
 
 - **PORTS-4.1** WHILE a listener whose exe name is `com.docker.backend` exists THE SYSTEM SHALL read the running containers from the Docker Engine API over its Unix socket on every scan (L12 leaves the read to this design; `agent-decided`: this path and frequency).
 - **PORTS-4.2** WHILE no such listener exists THE SYSTEM SHALL NOT contact the Docker socket (`agent-decided`).
-- **PORTS-4.3** THE SYSTEM SHALL send only the request that lists running containers, and SHALL send no write to Docker (`agent-decided`).
+- **PORTS-4.3** THE SYSTEM SHALL send only the request that lists running containers, and SHALL send no write to Docker (`agent-decided`). *(Amended 2026-11-04 by PSTOP: this holds for the scan. A `kill` request may send the one `stop` call of PSTOP-3.3, PSTOP-3.9.)*
 - **PORTS-4.4** THE SYSTEM SHALL keep from each container only its id, its name, its published host addresses and ports, and the value of its `com.docker.compose.project.working_dir` label, and SHALL drop every other field (`agent-decided`).
 - **PORTS-4.5** THE SYSTEM SHALL attribute a Docker port by matching a published (host address, port) to the backend's bound address, returning one entry per (pid, port, container), so two containers publishing one port on different addresses are two entries (`agent-decided`). Fixtures cover that case and a publish on `0.0.0.0` or `::`.
 - **PORTS-4.6** WHEN a container has a `working_dir` THE SYSTEM SHALL set the entry's project, worktree and branch from it under PORTS-2.1, PORTS-2.4 and PORTS-2.5 (`agent-decided`): a live linked worktree gives that worktree, and a removed one gives the project, no worktree and no branch.
@@ -159,10 +159,10 @@ Consult record: `docs/product/metrics.md` absent, no `docs/ops/reliability.md` (
 ## Out of Scope
 
 - The ports panel, the Running menu, the `CoreSnapshot` field and all Swift: ROAD-18.
-- Stop, kill and `ports.kill`, the `protected` list, and whether `protected` also covers a project row's `Stop N`: ROAD-18 and ROAD-37.
-- Re-reading a container before stopping it: ROAD-18.
-- A project's checkout path for the child menu's header (running-menu brief :54): no field carries it here; ROAD-18 adds it.
-- Any write to Docker, or any Engine API call other than listing running containers.
+- Stop, kill and `ports.kill`, the `protected` list, and whether `protected` also covers a project row's `Stop N`: ROAD-18 and ROAD-37. *(Amended 2026-11-04 by PSTOP: the `kill` Action, its fixed protected set and the `Stop` controls are built by the PSTOP feature; the approval step stays with ROAD-37.)*
+- Re-reading a container before stopping it: ROAD-18. *(Amended 2026-11-04 by PSTOP: PSTOP-3.1 re-reads the running containers before a stop.)*
+- A project's checkout path for the child menu's header (running-menu brief :54): no field carries it here; ROAD-18 adds it. *(Amended 2026-11-04 by PSTOP: entries carry `root`, the root of the oldest listener, and the Running view carries the project's checkout path, PSTOP-4.6.)*
+- Any write to Docker, or any Engine API call other than listing running containers. *(Amended 2026-11-04 by PSTOP: PSTOP-3.9 allows one more request, `stop` of a container, and no other; the scan itself still sends only the list, PORTS-4.3.)*
 - Connecting to a port to learn what it speaks.
 - Other UIDs and EndpointSecurity.
 - Persisting anything: no Owner, table or migration. No per-port Event.
