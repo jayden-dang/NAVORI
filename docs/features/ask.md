@@ -51,7 +51,16 @@ Two environment variables exist for tests only and are not in `--help`: `NAVORI_
 
 ## Logs
 
-A refusal or failure writes one `warn` line with only the provider id, a fixed reason name (for example `shield_refused`, `keychain_failed`, `write`, `network`) and no prompt, reply, key, model or URL.
+Every line is a `warn`. The gateway lines carry `provider` and a `reason` field; the provider-failure line carries `provider` and a `kind` field; three lines in the FFI layer carry neither.
+
+- `reason` is one of `shield_refused`, `keychain_failed`, `keychain_unfinished`, or an audit reason: `migration`, `write`, `shield_pass`, `unfinished`.
+- `kind` is one of `network`, `timeout`, `status`, `malformed`. `network` is shared: it covers a refused connection, a failed HTTP client build and any other transport error that is not a timeout.
+- A Shield refusal whose `blocked` audit row also fails to write logs two lines: `shield_refused`, then the audit reason.
+- An audit write that fails before a send logs one line with the audit reason.
+- No key stored is a refusal (`AskError::NoKey`) that logs nothing.
+- The FFI layer logs `keychain call did not finish`, `keychain open failed` and `provider key slot invalid`, with no `provider` field. Saving or removing a key reaches them too, not only Ask.
+
+No line carries the prompt, the redacted text, the reply, the key, the model or the URL.
 
 ## The live test
 
