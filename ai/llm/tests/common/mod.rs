@@ -14,6 +14,14 @@ pub struct Responder {
 
 impl Responder {
     pub async fn start(status: u16, body: &'static str) -> Self {
+        Self::start_with_headers(status, body, String::new()).await
+    }
+
+    pub async fn redirecting_to(location: &str) -> Self {
+        Self::start_with_headers(302, "", format!("location: {location}\r\n")).await
+    }
+
+    async fn start_with_headers(status: u16, body: &'static str, headers: String) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let base_url = format!("http://{}", listener.local_addr().unwrap());
         let requests = Arc::new(Mutex::new(Vec::new()));
@@ -25,7 +33,7 @@ impl Responder {
                     return;
                 };
                 accepted.fetch_add(1, Ordering::SeqCst);
-                tokio::spawn(serve(stream, status, body, seen.clone()));
+                tokio::spawn(serve(stream, status, body, headers.clone(), seen.clone()));
             }
         });
         Self {
@@ -48,6 +56,7 @@ async fn serve(
     mut stream: tokio::net::TcpStream,
     status: u16,
     body: &'static str,
+    headers: String,
     seen: Arc<Mutex<Vec<String>>>,
 ) {
     let mut pending: Vec<u8> = Vec::new();
@@ -64,7 +73,7 @@ async fn serve(
         };
         seen.lock().unwrap().push(request);
         let reply = format!(
-            "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{body}",
+            "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\n{headers}content-length: {}\r\n\r\n{body}",
             body.len()
         );
         if stream.write_all(reply.as_bytes()).await.is_err() {

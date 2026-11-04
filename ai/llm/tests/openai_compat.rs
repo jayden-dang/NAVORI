@@ -132,6 +132,23 @@ async fn a_refused_connection_is_a_network_error() {
     assert!(!shown.contains(KEY) && !shown.contains("hello") && !shown.contains("127.0.0.1"));
 }
 
+#[tokio::test]
+async fn a_redirect_is_reported_as_a_status_and_never_followed() {
+    let elsewhere = Responder::start(200, r#"{"choices":[{"message":{"content":"x"}}]}"#).await;
+    let provider =
+        Responder::redirecting_to(&format!("{}/chat/completions", elsewhere.base_url)).await;
+    let adapter = OpenAiCompat::new(provider.base_url.clone());
+
+    let error = adapter
+        .complete(hello(), &Secret::new("k"))
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, LlmError::Status(302)), "{error:?}");
+    assert_eq!(provider.requests().len(), 1);
+    assert!(elsewhere.requests().is_empty());
+}
+
 #[test]
 fn the_deepseek_preset_is_an_https_url() {
     assert!(DEEPSEEK_BASE_URL.starts_with("https://"));

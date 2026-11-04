@@ -35,6 +35,7 @@ impl OpenAiCompat {
             .get_or_try_init(|| async {
                 let client = reqwest::Client::builder()
                     .timeout(TIMEOUT)
+                    .redirect(reqwest::redirect::Policy::none())
                     .build()
                     .map_err(|_| LlmError::Network)?;
                 self.builds.fetch_add(1, Ordering::SeqCst);
