@@ -256,11 +256,11 @@ _Requirements: PORTS-1.1, PORTS-1.3, PORTS-1.4, PORTS-1.5, PORTS-1.6, PORTS-1.7,
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Write the failing `find_repo` tests** in `crates/procs/tests/location.rs`:
+- [x] **Step 1: Write the failing `find_repo` tests** in `crates/procs/tests/location.rs`:
   - `a_directory_with_no_repository_above_it_has_no_repo`.
   - `a_linked_worktree_reports_its_checkout_as_the_root`.
   - Every existing location test stays as it is.
-- [ ] **Step 2: Write the failing table test** `each_listener_is_placed_by_the_first_rule_that_holds` in `modules/ports/tests/place.rs`.
+- [x] **Step 2: Write the failing table test** `each_listener_is_placed_by_the_first_rule_that_holds` in `modules/ports/tests/place.rs`.
   - Fixture: a canonical temp home with `git init` repos, and a linked worktree made inside its repo by `git worktree add <repo>/.worktrees/lane`. The `/opt`-like root is a separate canonical temp dir.
   - Rows:
     - cwd in a repo under home gives project, worktree and branch, with the text `resolve_location` gives.
@@ -270,16 +270,16 @@ _Requirements: PORTS-1.1, PORTS-1.3, PORTS-1.4, PORTS-1.5, PORTS-1.6, PORTS-1.7,
     - A repo root in `home/.dotdir` places nothing.
     - After `rm -rf <repo>/.worktrees/lane`, a cwd inside it gives the project, no worktree, no branch, and `missing_path` set.
     - An unread exe makes no exe join.
-- [ ] **Step 3: Write** `#[ignore]` `a_removed_working_directory_is_still_read_as_its_old_path` in `crates/macos/tests/process_source.rs`.
+- [x] **Step 3: Write** `#[ignore]` `a_removed_working_directory_is_still_read_as_its_old_path` in `crates/macos/tests/process_source.rs`.
   - Use `ChildTree::spawn`'s canonical temp dir. Start `sleep 5` there and remove the dir.
   - Expect `MacProcesses::cwd` to return the canonical removed path.
-- [ ] **Step 4: Run** `cargo test -p navori-procs --test location && cargo test -p navori-mod-ports --test place` — expect: `find_repo` and `place` not found.
-- [ ] **Step 5: Implement** the placement.
+- [x] **Step 4: Run** `cargo test -p navori-procs --test location && cargo test -p navori-mod-ports --test place` — expect: `find_repo` and `place` not found.
+- [x] **Step 5: Implement** the placement.
   - Move the walk out of `resolve_location` into `find_repo`. `resolve_location` becomes `find_repo(cwd).map(|r| r.location)` with the old `dir_name(cwd)` fallback.
   - Write `place.rs` per the design and call it from `scan.rs`.
   - Logs name outcomes only, never paths.
-- [ ] **Step 6: Run** `cargo test -p navori-procs && cargo test -p navori-mod-ports && cargo test -p navori-mod-awake && cargo test -p navori-macos --test process_source -- --ignored` — expect: pass.
-- [ ] **Step 7: Commit** `git commit -m "feat(ports): place each port under its project and worktree"`
+- [x] **Step 6: Run** `cargo test -p navori-procs && cargo test -p navori-mod-ports && cargo test -p navori-mod-awake && cargo test -p navori-macos --test process_source -- --ignored` — expect: pass.
+- [x] **Step 7: Commit** `git commit -m "feat(ports): place each port under its project and worktree"`
 
 _Requirements: PORTS-2.1, PORTS-2.2, PORTS-2.3, PORTS-2.4, PORTS-2.5, PORTS-2.6, PORTS-2.7, PORTS-9.1_
 
