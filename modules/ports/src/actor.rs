@@ -1,8 +1,9 @@
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use navori_kernel::{ModuleCtx, Request, Wake};
+use navori_kernel::{ActionError, ModuleCtx, Request, Wake};
 use navori_macos::ProcessSource;
 
 use crate::action::PortsAction;
@@ -54,6 +55,10 @@ impl Ports {
             PortsAction::List => {
                 let state = ctx.state();
                 req.respond(Ok(state));
+            }
+            PortsAction::Open { port, address } => {
+                let reply = open_url(&ctx.state(), port, address);
+                req.respond(reply);
             }
         }
     }
@@ -130,6 +135,54 @@ async fn with_docker(
     let docker = attribute(&scan.backend, &running, |path| place(path, &home));
     scan.entries.extend(docker);
     (scan, status)
+}
+
+fn open_url(
+    state: &PortsState,
+    port: u16,
+    address: Option<IpAddr>,
+) -> Result<serde_json::Value, ActionError> {
+    let mut bound: Vec<IpAddr> = state
+        .groups
+        .iter()
+        .flat_map(|project| &project.worktrees)
+        .flat_map(|worktree| &worktree.processes)
+        .flat_map(|process| &process.entries)
+        .filter(|entry| entry.port == port)
+        .flat_map(|entry| entry.addresses.iter().copied())
+        .collect();
+    bound.sort();
+    bound.dedup();
+    if bound.is_empty() {
+        return Err(ActionError::Invalid(format!(
+            "port {port} is not in the last scan"
+        )));
+    }
+    let chosen: Vec<IpAddr> = match address {
+        Some(wanted) => bound.iter().copied().filter(|a| *a == wanted).collect(),
+        None => bound.clone(),
+    };
+    let mut urls: Vec<String> = chosen.iter().map(|a| url(*a, port)).collect();
+    urls.dedup();
+    if let [only] = urls.as_slice() {
+        return Ok(serde_json::json!({ "url": only }));
+    }
+    let listed: Vec<String> = bound.iter().map(IpAddr::to_string).collect();
+    let listed = listed.join(", ");
+    Err(ActionError::Invalid(match address {
+        Some(wanted) => format!("port {port} is not bound to {wanted}; it is bound to {listed}"),
+        None => format!("port {port} is bound to {listed}; name one with address"),
+    }))
+}
+
+fn url(address: IpAddr, port: u16) -> String {
+    if address.is_loopback() || address.is_unspecified() {
+        return format!("http://localhost:{port}");
+    }
+    match address {
+        IpAddr::V4(v4) => format!("http://{v4}:{port}"),
+        IpAddr::V6(v6) => format!("http://[{v6}]:{port}"),
+    }
 }
 
 fn millis(time: SystemTime) -> u64 {

@@ -207,7 +207,7 @@ async fn list_is_a_read_action_with_a_schema_and_description() {
         .into_iter()
         .filter(|spec| spec.module == "ports")
         .collect();
-    assert_eq!(specs.len(), 1);
+    assert_eq!(specs.len(), 2);
     assert_eq!(specs[0].name, "list");
     assert_eq!(specs[0].risk, Risk::Read);
     assert!(specs[0].description.contains(' ') && specs[0].description.ends_with('.'));
