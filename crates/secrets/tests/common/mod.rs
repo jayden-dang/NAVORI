@@ -80,6 +80,10 @@ pub fn contract_errors(
         let err = call_with(store, op, key, NEVER_STORED)
             .expect_err("an injected failure must be an error");
         assert_eq!(err.operation(), op);
+        assert!(
+            err.to_string().contains(&op.to_string()),
+            "operation {op} missing from {err}"
+        );
         for shown in [format!("{err}"), format!("{err:?}")] {
             assert!(
                 !shown.contains(FIXTURE)

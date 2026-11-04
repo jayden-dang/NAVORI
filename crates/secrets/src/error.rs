@@ -23,10 +23,11 @@ impl fmt::Display for Operation {
 }
 
 /// A Keychain call failed. It names the call, the service, the kind and the name, and never
-/// a value or any text from the backend.
+/// a value or any text from the backend. The cause is not told apart, so the fixed advice
+/// lists the possible causes (locked, access denied, unreadable item) instead of guessing one.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error(
-    "{operation} failed for {kind}/{name} in service {service}; unlock the Keychain, allow Navori access and retry"
+    "{operation} failed for {kind}/{name} in service {service}; the Keychain could not complete the call (it may be locked, access may be denied, or the item may be unreadable), so check Keychain Access and retry"
 )]
 pub struct SecretError {
     operation: Operation,
@@ -49,7 +50,10 @@ impl SecretError {
         }
     }
 }
-/// The Keychain store could not be built.
+/// The Keychain store could not be built. The cause is not told apart, and no backend text
+/// is carried.
 #[derive(Debug, thiserror::Error)]
-#[error("the Keychain store could not be opened; check that this is macOS and retry")]
+#[error(
+    "the Keychain store could not be opened; the Keychain may be unavailable, so check Keychain Access and retry"
+)]
 pub struct OpenError;

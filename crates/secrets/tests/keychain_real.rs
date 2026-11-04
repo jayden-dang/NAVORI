@@ -6,8 +6,9 @@ use common::{contract_exists_delete, contract_set_get};
 use navori_secrets::{KeychainService, KeychainStore, SecretKey, SecretStore};
 
 /// Manual only. Writes to the login Keychain under service `dev.navori.dev`, kind `contract-test`,
-/// and deletes what it wrote. A run that panics midway can leave an item named `run-<pid>-<nanos>`
-/// there; remove it with Keychain Access.
+/// and deletes what it wrote. macOS may show a Keychain access prompt. A run that panics midway
+/// can leave an item named `run-<pid>-<nanos>` (the first key, also when the second step panics)
+/// and `run-<pid>-<nanos>-b` (the second key) there; remove them with Keychain Access.
 /// Run: NAVORI_KEYCHAIN_CONTRACT=1 cargo test -p navori-secrets --test keychain_real -- --ignored
 #[test]
 #[ignore = "writes to the login Keychain; run by hand with NAVORI_KEYCHAIN_CONTRACT=1 and --ignored"]

@@ -20,6 +20,10 @@ fn an_empty_part_a_slash_and_a_control_character_are_each_rejected() {
         ("kind", "", KeyPart::Name, KeyProblem::Empty),
         ("kind", "tab\there", KeyPart::Name, KeyProblem::Control),
         ("new\nline", "x", KeyPart::Kind, KeyProblem::Control),
+        ("k", "del\u{7f}x", KeyPart::Name, KeyProblem::Control),
+        ("k", "c1\u{85}x", KeyPart::Name, KeyProblem::Control),
+        ("", "", KeyPart::Kind, KeyProblem::Empty),
+        ("a/b", "t\tb", KeyPart::Kind, KeyProblem::Slash),
     ];
     for (kind, name, part, problem) in cases {
         let err = SecretKey::new(kind, name).expect_err("must be rejected");
