@@ -19,6 +19,7 @@ Date: 2026-11-01
 | Submenu open | ≤ 16 ms | trigger to first frame, Core Submenu |
 | Release `.app` size | ≤ 25 MB | perf bundle on disk |
 | Process snapshot with Agent session resolution | ≤ 10 ms | PROCS-8.4; median of 5 in one test run, debug build on this Mac, the pessimistic case |
+| Port scan (process list, sockets, environment reads; no Docker read) | ≤ 50 ms | median of 5 `Scanner::scan` calls in one test run, debug build on this Mac |
 
 GOAL-7's single 50 ms menu-open line was retired on 2026-11-02. First opens on this Mac (`Mac17,9`, macOS 27.0.1) measured 47.3–63.7 ms. 80 ms is the round budget above that high sample. Later opens measured 8.6–10.5 ms and keep 50 ms.
 
@@ -27,11 +28,11 @@ R0 baseline (debug build, 2026-11-01): 0.0% CPU, 0 wake-ups/s, 21 MB footprint, 
 ## Method
 
 - `cargo xtask perf` measures **release code packaged as the dev identity** (bundle id `dev.navori.app.debug`, `NavoriProfile=dev`) on this Mac. It does not measure `/Applications/Navori.app`. MB means MiB (1,048,576 bytes).
-- `snapshot_ms` is the exception to release code: it runs the ignored real-OS test in `crates/procs/tests/real_os.rs` in a debug build, so it does not touch the app under measurement. It needs an idle machine for the same reason the other metrics do: a compile running beside it pushed the median to 14–16 ms (2026-11-04).
+- `snapshot_ms` and `port_scan_ms` are the exception to release code: each runs an ignored real-OS test (`crates/procs/tests/real_os.rs`, `modules/ports/tests/real_os.rs`) in a debug build, so it does not touch the app under measurement. It needs an idle machine for the same reason the other metrics do: a compile running beside it pushed the median to 14–16 ms (2026-11-04).
 - Counters come from `proc_pid_rusage`: phys_footprint (equal to `footprint`), peak footprint, logical writes, CPU time and idle wake-ups (equal to `top` IDLEW). Thread count comes from `proc_pidinfo`.
 - Idle metrics are the median of 5 consecutive 12 s windows after a 10 s settle. Cold start, the first menu open and the menu-open footprint are the median of 5 processes. Menu reopen is the median across those processes of 5 reopens each. Core Submenu open is the median across those processes of 5 Core Submenu opens each.
 - A gated metric fails over its budget. Idle CPU is compared to 0.0 after rounding to one decimal. An enabled metric with no measurement fails. With a baseline from the same machine model and macOS version, every measured metric also fails when its value exceeds `baseline median + max(10% of that median, floor)`. The floor is the one listed below, not the copy stored in the baseline file. No baseline, or a different `hw.model` or macOS version, skips only the regression check and prints why.
-- Floors: 10 ms `cold_start_ms`; 2 ms `snapshot_ms`; 5 ms `menu_open_after_launch_ms`, `menu_reopen_ms`, `submenu_open_ms` and `menu_open_cpu_ms`; 1 MB `footprint_menu_open_mb` and `idle_footprint_mb`; 2 MB `peak_footprint_mb`; 0.5 MB `app_size_mb`; 0.1 percentage points `idle_cpu_pct`; 0.2 per second `idle_wakeups_per_s`; 64 KiB `idle_disk_writes_kb`; 2 threads `thread_count`. `idle_disk_writes_kb` is kibibytes (1024 bytes).
+- Floors: 10 ms `cold_start_ms`; 2 ms `snapshot_ms`; 5 ms `port_scan_ms`; 5 ms `menu_open_after_launch_ms`, `menu_reopen_ms`, `submenu_open_ms` and `menu_open_cpu_ms`; 1 MB `footprint_menu_open_mb` and `idle_footprint_mb`; 2 MB `peak_footprint_mb`; 0.5 MB `app_size_mb`; 0.1 percentage points `idle_cpu_pct`; 0.2 per second `idle_wakeups_per_s`; 64 KiB `idle_disk_writes_kb`; 2 threads `thread_count`. `idle_disk_writes_kb` is kibibytes (1024 bytes).
 - `cargo xtask perf --record` writes `perf-baseline.json` (machine model, macOS version, git revision, date, and each measured metric's median and floor) only when the run passes. Without `--record`, or when the run fails, the file is left unchanged.
 - Baseline-only metrics have no budget and are still regression-checked: `peak_footprint_mb`, `idle_disk_writes_kb`, `menu_open_cpu_ms`, `thread_count`.
 - Perf runs use the same `dev.navori.app.debug` preferences domain as `cargo xtask run`.

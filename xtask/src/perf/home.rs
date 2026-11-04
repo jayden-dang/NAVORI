@@ -51,8 +51,14 @@ impl PerfHome {
     }
 
     pub fn fresh_run(&self, n: u32) -> Result<PathBuf> {
+        let real_home = std::env::var_os("HOME").unwrap_or_default();
+        self.fresh_run_linking(n, Path::new(&real_home))
+    }
+
+    fn fresh_run_linking(&self, n: u32, real_home: &Path) -> Result<PathBuf> {
         let dest = self.root.join(format!("run-{n}"));
         copy_dir(&self.template(), &dest)?;
+        link_docker_socket(real_home, &dest)?;
         Ok(dest)
     }
 
@@ -182,6 +188,17 @@ fn create_dir_mode(path: &Path, mode: u32) -> Result<()> {
         path.display()
     );
     Ok(())
+}
+
+fn link_docker_socket(real_home: &Path, run: &Path) -> Result<()> {
+    let socket = real_home.join(".docker/run/docker.sock");
+    if !socket.is_absolute() || fs::symlink_metadata(&socket).is_err() {
+        return Ok(());
+    }
+    let dir = run.join(".docker/run");
+    fs::create_dir_all(&dir).with_context(|| format!("create {}", dir.display()))?;
+    let link = dir.join("docker.sock");
+    std::os::unix::fs::symlink(&socket, &link).with_context(|| format!("link {}", link.display()))
 }
 
 fn copy_dir(src: &Path, dest: &Path) -> Result<()> {
@@ -586,6 +603,35 @@ mod tests {
                 .unwrap()
                 .all(|entry| { entry.unwrap().file_name() != std::ffi::OsStr::new("secret") })
         );
+    }
+
+    #[test]
+    fn a_run_copy_links_the_docker_socket_when_it_exists() {
+        let base = temp_base();
+        let real_home = temp_base();
+        let socket = real_home.path().join(".docker/run/docker.sock");
+        fs::create_dir_all(socket.parent().unwrap()).unwrap();
+        fs::write(&socket, b"").unwrap();
+        let home = PerfHome::prepare(base.path(), current_uid().unwrap()).unwrap();
+        fs::create_dir(home.template()).unwrap();
+
+        let run = home.fresh_run_linking(1, real_home.path()).unwrap();
+
+        let link = run.join(".docker/run/docker.sock");
+        assert_eq!(fs::read_link(&link).unwrap(), socket);
+        assert!(!home.template().join(".docker").exists());
+    }
+
+    #[test]
+    fn a_run_copy_has_no_docker_link_when_there_is_none() {
+        let base = temp_base();
+        let real_home = temp_base();
+        let home = PerfHome::prepare(base.path(), current_uid().unwrap()).unwrap();
+        fs::create_dir(home.template()).unwrap();
+
+        let run = home.fresh_run_linking(1, real_home.path()).unwrap();
+
+        assert!(!run.join(".docker").exists());
     }
 
     const SOCKET_SUFFIX: &str = "Library/Application Support/Navori Dev/run/navori.sock";

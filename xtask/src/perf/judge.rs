@@ -101,6 +101,12 @@ pub const METRICS: &[MetricSpec] = &[
         kind: Kind::Gated { budget: 10.0 },
         floor: 2.0,
     },
+    MetricSpec {
+        name: "port_scan_ms",
+        unit: "ms",
+        kind: Kind::Gated { budget: 50.0 },
+        floor: 5.0,
+    },
 ];
 
 pub type Measurements = BTreeMap<String, f64>;
@@ -264,6 +270,7 @@ mod tests {
             ("thread_count".to_owned(), 2.0),
             ("submenu_open_ms".to_owned(), 16.0),
             ("snapshot_ms".to_owned(), 10.0),
+            ("port_scan_ms".to_owned(), 50.0),
         ])
     }
 
@@ -297,6 +304,7 @@ mod tests {
             "thread_count",
             "submenu_open_ms",
             "snapshot_ms",
+            "port_scan_ms",
         ];
         assert_eq!(verdict.lines.len(), names.len(), "{:?}", verdict.lines);
         for (line, name) in verdict.lines.iter().zip(names) {
@@ -537,6 +545,7 @@ mod tests {
             ("thread_count", 2.0, None, "2 threads `thread_count`"),
             ("submenu_open_ms", 5.0, Some(16.0), "≤ 16 ms"),
             ("snapshot_ms", 2.0, Some(10.0), "≤ 10 ms"),
+            ("port_scan_ms", 5.0, Some(50.0), "≤ 50 ms"),
         ];
         assert_eq!(METRICS.len(), expected.len());
         for (spec, (name, floor, budget, phrase)) in METRICS.iter().zip(expected) {
@@ -552,6 +561,16 @@ mod tests {
                 "{name} phrase {phrase:?} missing from the standard"
             );
         }
+    }
+
+    #[test]
+    fn the_standard_names_the_port_scan_floor() {
+        let standard = include_str!("../../../docs/standards/performance.md");
+        let floors = standard
+            .lines()
+            .find(|line| line.starts_with("- Floors:"))
+            .unwrap();
+        assert!(floors.contains("`port_scan_ms`"), "{floors}");
     }
 
     #[test]
