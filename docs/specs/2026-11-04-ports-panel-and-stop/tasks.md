@@ -230,15 +230,15 @@ _Requirements: PSTOP-1.1, PSTOP-1.2, PSTOP-1.4, PSTOP-1.18, PSTOP-2.5, PSTOP-2.6
 
 **Depends-on:** Task 2, Task 3
 
-- [ ] **Step 1: Write the failing tests** in `modules/ports/tests/stop_resolve.rs` (pure `resolve` over a hand-built `FreshRead` and a fake `Guard`):
+- [x] **Step 1: Write the failing tests** in `modules/ports/tests/stop_resolve.rs` (pure `resolve` over a hand-built `FreshRead` and a fake `Guard`):
   - process: `a_gone_pid_is_already_gone`, `a_zombie_is_already_gone`, `a_reused_pid_with_another_start_time_is_stale`, `a_pid_of_another_user_is_stale`, `a_pid_that_stopped_listening_is_stale_with_the_port_closed_sentence`
   - protection: `navoris_own_pid_is_protected_under_every_selector` (kill-self), `an_ancestor_of_navori_is_protected_under_every_selector` (kill-ancestor), `the_helper_by_exe_path_is_protected`, `an_unclaimed_docker_backend_entry_is_protected`, `a_container_entry_whose_pid_is_the_backend_is_free_under_stop_class`, `a_process_target_naming_the_backend_pid_is_protected` (the container check precedes the pid check), `a_database_under_a_project_selector_is_protected_but_under_a_pid_selector_is_free`, `a_system_port_follows_the_same_rule`, `protection_comes_from_the_fresh_entry_not_the_request`
   - selector: `a_target_outside_the_named_worktree_is_outside_the_selector`, `a_project_selector_with_no_project_reaches_only_unplaced_targets`, `a_selector_never_adds_a_target_the_request_did_not_name`
   - container: `a_container_not_running_is_stale`, `a_container_that_no_longer_publishes_a_port_is_stale`, `a_container_in_another_project_is_outside_the_selector`, `a_database_image_container_is_protected_under_a_project_selector`, `unreachable_docker_fails_every_container_before_membership_is_checked`
-- [ ] **Step 2: Run** `cargo test -p navori-mod-ports --test stop_resolve` — expect: compile errors.
-- [ ] **Step 3: Implement** `stop_class` as the one predicate (a container entry is `Free` unless its image names a database, then `GroupProtected`; only an unclaimed Docker entry, a Docker-backend pid, own pid and the helper are `Never`) and `resolve` in the order of design section C, first hit wins.
-- [ ] **Step 4: Implement** the fresh read helper that runs `Scanner::scan` on `spawn_blocking` and `with_docker`, and `Guard`.
-- [ ] **Step 5: Run** `cargo test -p navori-mod-ports` — expect: pass. Commit `git commit -m "feat(ports): re-read and protect every stop target"`
+- [x] **Step 2: Run** `cargo test -p navori-mod-ports --test stop_resolve` — expect: compile errors.
+- [x] **Step 3: Implement** `stop_class` as the one predicate (a container entry is `Free` unless its image names a database, then `GroupProtected`; only an unclaimed Docker entry, a Docker-backend pid, own pid and the helper are `Never`) and `resolve` in the order of design section C, first hit wins.
+- [x] **Step 4: Implement** the fresh read helper that runs `Scanner::scan` on `spawn_blocking` and `with_docker`, and `Guard`.
+- [x] **Step 5: Run** `cargo test -p navori-mod-ports` — expect: pass. Commit `git commit -m "feat(ports): re-read and protect every stop target"`
 
 _Requirements: PSTOP-1.3, PSTOP-1.5, PSTOP-1.6, PSTOP-2.1, PSTOP-2.2, PSTOP-2.3, PSTOP-2.4, PSTOP-3.1, PSTOP-3.2, PSTOP-3.6, PSTOP-10.3_
 
