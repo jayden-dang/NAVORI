@@ -483,11 +483,11 @@ _Requirements: PSTOP-4.15, PSTOP-4.16, PSTOP-4.18, PSTOP-10.1, PSTOP-10.5_
 
 **Depends-on:** Task 9, Task 10
 
-- [ ] **Step 1: Write the failing tests** in `StopFlowTests.swift`: `stop_all_sends_one_request_per_idle_project_after_one_confirmation`, `a_failed_target_keeps_its_row_with_the_reason`, `fewer_stops_than_confirmed_read_as_results_not_as_an_error`, `a_confirmation_text_names_ports_and_the_in_use_and_other_counts`.
-- [ ] **Step 2: Run** the Swift test command — expect: failures.
-- [ ] **Step 3: Implement** `CoreStore.stop`, `InlineConfirmation`, the `Stop N` button as a sibling of the row's own button (Tab reaches it, VoiceOver reads `Stop 3 ports`, pressing it does not open the child), and `Stop all ports…`.
-- [ ] **Step 4: Verify** in the dev app on a throwaway listener this step spawns (`python3 -m http.server 0`, started in a fresh `git init` repo at `target/pstop-e2e-<n>` inside this worktree: `target/` is gitignored, lies under `$HOME` with a non-hidden first component, so `place()` counts it as project `pstop-e2e-<n>`; then a hand-made session Lease labelled `pstop-e2e-<n>/main` with `navori --profile dev dispatch awake` so the project joins and the row is working, and a second run with no Lease so it is idle): hover, press `Stop N`, confirm, and read the row leave on the next state; dismiss sends nothing (check with `navori --profile dev events`). Never press `Stop` on a listener the step did not start.
-- [ ] **Step 5: Run** `cargo xtask ci` — expect: pass. Commit `git commit -m "feat(shell): stop a project's ports or all idle ports"`
+- [x] **Step 1: Write the failing tests** in `StopFlowTests.swift`: `stop_all_sends_one_request_per_idle_project_after_one_confirmation`, `a_failed_target_keeps_its_row_with_the_reason`, `fewer_stops_than_confirmed_read_as_results_not_as_an_error`, `a_confirmation_text_names_ports_and_the_in_use_and_other_counts`.
+- [x] **Step 2: Run** the Swift test command — expect: failures.
+- [x] **Step 3: Implement** `CoreStore.stop`, `InlineConfirmation`, the `Stop N` button as a sibling of the row's own button (Tab reaches it, VoiceOver reads `Stop 3 ports`, pressing it does not open the child), and `Stop all ports…`.
+- [x] **Step 4: Verify** in the dev app on a throwaway listener this step spawns (`python3 -m http.server 0`, started in a fresh `git init` repo at `target/pstop-e2e-<n>` inside this worktree: `target/` is gitignored, lies under `$HOME` with a non-hidden first component, so `place()` counts it as project `pstop-e2e-<n>`; then a hand-made session Lease labelled `pstop-e2e-<n>/main` with `navori --profile dev dispatch awake` so the project joins and the row is working, and a second run with no Lease so it is idle): hover, press `Stop N`, confirm, and read the row leave on the next state; dismiss sends nothing (check with `navori --profile dev events`). Never press `Stop` on a listener the step did not start.
+- [x] **Step 5: Run** `cargo xtask ci` — expect: pass. Commit `git commit -m "feat(shell): stop a project's ports or all idle ports"`
 
 _Requirements: PSTOP-5.2, PSTOP-5.3, PSTOP-5.4, PSTOP-5.5, PSTOP-5.6, PSTOP-5.7, PSTOP-5.8, PSTOP-7.2, PSTOP-7.4, PSTOP-7.5_
 
