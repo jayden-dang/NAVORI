@@ -24,17 +24,18 @@ Paths are shown for `release`; `dev` uses `Navori Dev` in place of `Navori`. Not
 | Session marker `~/Library/Application Support/Navori/session.marker` | Exists while the Core runs (pid, start time, redacted panic text); a leftover one means the last session ended uncleanly. |
 | Logs `~/Library/Logs/Navori/navori.YYYY-MM-DD.log` | `tracing` output, daily rotation, 14 files kept; no prompt content or secrets unless debug is on. |
 | Socket `~/Library/Application Support/Navori/run/navori.sock` | Not data at rest — the IPC endpoint and single-instance lock, in a `0700` directory. |
+| `context_audit` (Owner `context`) | One row per ask that passed the key read: `id` (autoincrement), `ts_ms`, `provider` (`deepseek`), `kinds` (comma-joined, `text`), `redacted_count`, `outcome` (`authorized` or `blocked`). Never the content. Created lazily on the first audit write; not pruned. |
+| Keychain item, service `dev.navori` (release) or `dev.navori.dev` (dev), account `llm-provider/deepseek` | The DeepSeek API key, stored trimmed; written from Settings → AI, read only inside the Core (ARCH-8). |
 | `awake_leases` | Process-owned (session and command) Leases: pid and process start time, plus session fields. Manual duration, until-off and display Leases are not stored; they end when the app closes. On reopen, if the process is still the same, the assertion returns. |
 
 **Planned** (schemas are decided in each feature's design, not here)
 
 | Entity / store | Notes |
 |---|---|
-| Keychain items, service `dev.navori` for the release Profile and `dev.navori.dev` for the dev Profile (R2, R4) | GitHub token, AI provider API keys. Never in the database, config or logs (ARCH-8). |
+| Keychain items, service `dev.navori` for the release Profile and `dev.navori.dev` for the dev Profile (R2, R4) | GitHub token, other AI provider API keys. Never in the database, config or logs (ARCH-8). |
 | `inbox_*` (R2) | Needs you: Decisions, To-dos, Updates and their outcomes. |
 | `ai_session_*`, usage (R2) | Conversations in the canonical message format, tool calls, token usage and estimated cost per turn. |
 | `memory_*` (R2) | Facts and preferences, episodic summaries, embeddings. Written only after redaction. |
-| Context audit log (R2) | Per LLM request: the kinds of data sent, the provider, the number of redacted items — never the content. |
 | `github_*` (R4) | Cached PR inbox, checks, notification cursor, so the menu shows data without a network call. |
 | On-disk cache (R4) | Network-sourced files such as avatars (ARCH-18); location set in the R4 design. |
 

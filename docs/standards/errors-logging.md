@@ -9,7 +9,7 @@ Date: 2026-11-01
 - Never swallow an error. Either handle it, return it, or log it with `tracing::warn!/error!` and surface it to the user — a silent fallback is a defect. `navori hook` is the one exemption: a Harness runs it on every prompt, so it drops every failure, prints nothing and writes no file.
 - An error message says what went wrong and how to fix it, with the path or value involved: `invalid config …/config.toml: journal.retention_days must be at least 1`. No apologies, no vague "something went wrong".
 - A missing or invalid config never stops the app (ARCH-13): run with defaults and show the error (panel banner, `navori doctor`).
-- Errors crossing FFI become a `CoreError` variant with a readable message; panics are caught by UniFFI and recorded in the session marker (redacted).
+- Errors crossing FFI become a `CoreError` variant with a readable message (`CoreError::Secrets` for a Keychain failure); panics are caught by UniFFI and recorded in the session marker (redacted).
 - Module action failures return `ActionError` to the caller; a module crash is the supervisor's job (ARCH-10), not the caller's.
 
 ## CLI exit codes

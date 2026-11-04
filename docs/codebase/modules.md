@@ -34,6 +34,13 @@ The inventory of code units in the repository — every Rust crate and Swift tar
 | `navori-mod-awake` | `modules/awake/` | Feature Module: Leases and the power assertion. Surface: `Awake`, `AwakeAction`, `AwakeState`, and its `tray()` contribution to the menubar icon; other units reach it through the kernel. Tests: `tests/{tray,duration,manual,command,session,stop,restore,display,refusal,restart,actions,idle,real_os}.rs`. |
 | `navori-mod-integrations` | `modules/integrations/` | Feature Module: reports, installs, repairs and removes Navori's hooks in each Harness's Hook file. Surface: `Integrations`, `IntegrationsEnv`, `inspect`, `IntegrationsAction`, `Harness`, `IntegrationsState`, `HarnessStatus`, `State`, `Offer`, the `HOOK_*` event kinds; other units reach it through the kernel. Tests: `tests/{status,install,repair,remove}.rs`. |
 
+**Built (ASK walking skeleton)**
+
+| Module | Path | Responsibility |
+|---|---|---|
+| `navori-llm` | `ai/llm/` | Provider-neutral LLM client. Surface: `LlmProvider`, `OpenAiCompat`, `ChatRequest`, `ChatReply`, `Message`, `Role`, `LlmError`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_PROVIDER`. Depends on `navori-secrets` for `Secret` only. |
+| `navori-context` | `ai/context/` | Context Gateway: key read, Shield pass over the prompt, audit row, send; fails closed. Surface: `Gateway`, `Sender`, `AuditSink`, `AuditRow`, `Outcome`, `AskError`, `SendError`, `AuditError`. Depends on `navori-redact` and `navori-secrets`, not on `navori-llm`; `navori-ffi` wires them. |
+
 **Planned**
 
 | Module | Path | Responsibility |
@@ -42,7 +49,7 @@ The inventory of code units in the repository — every Rust crate and Swift tar
 | `navori-mod-inbox` | `modules/inbox/` | Feature Module: Needs you — Decisions, To-dos, Updates (R2). |
 | `navori-mod-ports` | `modules/ports/` | Feature Module: listening ports by project/worktree/harness (R3). |
 | `navori-mod-github` | `modules/github/` | Feature Module: pull requests, checks, approve/merge (R4). |
-| `navori-llm`, `navori-models`, `navori-context`, `navori-agent`, `navori-memory` | `ai/{llm,models,context,agent,memory}/` | AI runtime: providers, model routing, context and gateway, agent loop and policy, memory (R2). |
+| `navori-models`, `navori-agent`, `navori-memory` | `ai/{models,agent,memory}/` | AI runtime: model routing, agent loop and policy, memory (R2). |
 | `navori-triggers` | `ai/triggers/` | Proactive rules (R5). |
 | `navori-mcp` | `ai/mcp/` | MCP client and server (R6). |
 
