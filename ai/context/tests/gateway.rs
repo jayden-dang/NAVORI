@@ -2,7 +2,9 @@
 
 use std::io;
 use std::panic::panic_any;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Condvar, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use futures::future::BoxFuture;
 use navori_context::{
@@ -382,6 +384,73 @@ async fn a_failing_send_is_reported_with_its_message() {
     assert_eq!(error.to_string(), "the provider said no");
     assert_eq!(events(&harness.log), ["audit:authorized", "send"]);
     assert_eq!(harness.rows.lock().unwrap()[0].outcome, Outcome::Authorized);
+}
+
+struct ParkingAudit {
+    parked: AtomicUsize,
+    open: Mutex<bool>,
+    changed: Condvar,
+}
+
+impl AuditSink for ParkingAudit {
+    fn record(&self, _: AuditRow) -> Result<(), AuditError> {
+        self.parked.fetch_add(1, Ordering::SeqCst);
+        let open = self.open.lock().unwrap();
+        let _ = self
+            .changed
+            .wait_timeout_while(open, Duration::from_secs(30), |open| !*open)
+            .unwrap();
+        Ok(())
+    }
+}
+
+#[test]
+fn blocked_audit_writes_leave_the_runtime_free_to_serve_other_work() {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    let harness = Harness::with_key();
+    let audit = Arc::new(ParkingAudit {
+        parked: AtomicUsize::new(0),
+        open: Mutex::new(false),
+        changed: Condvar::new(),
+    });
+    let gateway = Arc::new(Gateway::new(
+        harness.store.clone(),
+        harness.key.clone(),
+        harness.sender(),
+        audit.clone(),
+        "deepseek",
+    ));
+    let asks: Vec<_> = (0..2)
+        .map(|_| {
+            let gateway = gateway.clone();
+            runtime.spawn(async move { gateway.ask("m", PROMPT).await })
+        })
+        .collect();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while audit.parked.load(Ordering::SeqCst) < 2 && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let (probe_tx, probe_rx) = std::sync::mpsc::channel();
+    runtime.spawn(async move {
+        let _ = probe_tx.send(());
+    });
+
+    let served = probe_rx.recv_timeout(Duration::from_secs(2)).is_ok();
+
+    *audit.open.lock().unwrap() = true;
+    audit.changed.notify_all();
+    for ask in asks {
+        assert_eq!(runtime.block_on(ask).unwrap().unwrap(), "a reply");
+    }
+    assert_eq!(audit.parked.load(Ordering::SeqCst), 2);
+    assert!(
+        served,
+        "other work was not served while two audit writes were blocked"
+    );
 }
 
 #[test]

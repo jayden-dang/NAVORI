@@ -824,6 +824,143 @@ fn status_answers_while_an_ask_is_pending() {
     core.shutdown();
 }
 
+const PARK_LIMIT: std::time::Duration = std::time::Duration::from_secs(30);
+
+struct Gate {
+    open: Mutex<bool>,
+    changed: std::sync::Condvar,
+    parked: AtomicUsize,
+}
+
+impl Gate {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            open: Mutex::new(false),
+            changed: std::sync::Condvar::new(),
+            parked: AtomicUsize::new(0),
+        })
+    }
+
+    fn park(&self) {
+        self.parked.fetch_add(1, Ordering::SeqCst);
+        let open = self.open.lock().unwrap();
+        let _ = self
+            .changed
+            .wait_timeout_while(open, PARK_LIMIT, |open| !*open)
+            .unwrap();
+    }
+
+    fn release(&self) {
+        *self.open.lock().unwrap() = true;
+        self.changed.notify_all();
+    }
+}
+
+struct GatedStore {
+    inner: MemoryStore,
+    gate: Arc<Gate>,
+}
+
+impl SecretStore for GatedStore {
+    fn set(&self, key: &SecretKey, value: &Secret) -> Result<(), navori_secrets::SecretError> {
+        self.inner.set(key, value)
+    }
+    fn get(&self, key: &SecretKey) -> Result<Option<Secret>, navori_secrets::SecretError> {
+        self.gate.park();
+        self.inner.get(key)
+    }
+    fn exists(&self, key: &SecretKey) -> Result<bool, navori_secrets::SecretError> {
+        self.inner.exists(key)
+    }
+    fn delete(
+        &self,
+        key: &SecretKey,
+    ) -> Result<navori_secrets::Deleted, navori_secrets::SecretError> {
+        self.inner.delete(key)
+    }
+}
+
+fn wait_until(limit: std::time::Duration, mut condition: impl FnMut() -> bool) -> bool {
+    let deadline = std::time::Instant::now() + limit;
+    while std::time::Instant::now() < deadline {
+        if condition() {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    condition()
+}
+
+/// Starts two asks, waits until both are parked, then reports whether `status` answered
+/// on another connection before `release` frees them.
+fn status_answers_with_two_asks_parked(
+    core: &Arc<NavoriCore>,
+    both_parked: impl FnMut() -> bool,
+    release: impl FnOnce(),
+) -> bool {
+    let asks: Vec<_> = (0..2)
+        .map(|_| {
+            let core = core.clone();
+            std::thread::spawn(move || ask(&core, "hello"))
+        })
+        .collect();
+    let parked = wait_until(std::time::Duration::from_secs(5), both_parked);
+    let (answered_tx, answered_rx) = std::sync::mpsc::channel();
+    {
+        let core = core.clone();
+        std::thread::spawn(move || {
+            let status = call(&core, rpc::method::STATUS, serde_json::Value::Null);
+            let _ = answered_tx.send(status.is_ok());
+        });
+    }
+    let answered = answered_rx
+        .recv_timeout(std::time::Duration::from_secs(2))
+        .unwrap_or(false);
+    let still_pending = asks.iter().all(|ask| !ask.is_finished());
+    release();
+    for ask in asks {
+        ask.join().unwrap().unwrap();
+    }
+    assert!(parked, "the asks never reached the gate");
+    assert!(still_pending, "an ask finished while it should be parked");
+    answered
+}
+
+#[test]
+fn status_answers_while_two_keychain_reads_are_blocked() {
+    let gate = Gate::new();
+    let fixture = Fixture::new();
+    let home = home();
+    let deps = {
+        let vault = fixture.vault.clone();
+        let gate = gate.clone();
+        AiDeps {
+            open_secrets: Arc::new(move |service| {
+                let store: Arc<dyn SecretStore> = Arc::new(GatedStore {
+                    inner: MemoryStore::new(service, &vault),
+                    gate: gate.clone(),
+                });
+                Ok(store)
+            }),
+            ..fixture.deps()
+        }
+    };
+    let core = NavoriCore::start_with(config(&home, "dev"), Arc::new(Quiet), deps).unwrap();
+    futures::executor::block_on(core.save_provider_key("k1".into())).unwrap();
+
+    let answered = status_answers_with_two_asks_parked(
+        &core,
+        || gate.parked.load(Ordering::SeqCst) >= 2,
+        || gate.release(),
+    );
+
+    assert!(
+        answered,
+        "status did not answer while two Keychain reads were blocked"
+    );
+    core.shutdown();
+}
+
 struct Counted {
     fixture: Fixture,
     senders: Arc<AtomicUsize>,
