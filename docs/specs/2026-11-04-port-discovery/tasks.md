@@ -533,7 +533,7 @@ _Requirements: PORTS-7.1, PORTS-7.2, PORTS-7.3, PORTS-7.4, PORTS-7.6, PORTS-7.7,
 
 **Depends-on:** Task 8
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - In `modules/ports/tests/failure.rs`:
     - `a_failed_scan_keeps_the_last_good_list_and_says_why`: `fail_list(true)` before the second scan.
     - `a_failed_scan_asks_for_the_problem_glyph`.
@@ -544,14 +544,14 @@ _Requirements: PORTS-7.1, PORTS-7.2, PORTS-7.3, PORTS-7.4, PORTS-7.6, PORTS-7.7,
     - Add `the_ports_row_passes_before_the_first_scan`.
     - Table-test `ports_check` for down, unreadable, `problem`, not scanned, and `N ports`.
   - In `crates/ffi/tests/integrations.rs`, the exact-list test (:83-93) gains `ports` after `logs`.
-- [ ] **Step 2: Run** `cargo test -p navori-mod-ports --test failure && cargo test -p navori-ffi` — expect: failures on the row list and the glyph.
-- [ ] **Step 3: Implement** the failure reporting.
+- [x] **Step 2: Run** `cargo test -p navori-mod-ports --test failure && cargo test -p navori-ffi` — expect: failures on the row list and the glyph.
+- [x] **Step 3: Implement** the failure reporting.
   - Rebase on `main`.
   - Add `problem` handling and `tray` in the Module.
   - Add `module_is_down` and `ports_check`, and append the row after `logs`.
   - Update `docs/agents/verify.md` (:46-49, :96-101, :160-165) and `README.md:27`.
-- [ ] **Step 4: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(ports): report scan failures in ports.list, doctor and the status icon"`
+- [x] **Step 4: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "feat(ports): report scan failures in ports.list, doctor and the status icon"`
 
 _Requirements: PORTS-8.1, PORTS-8.2, PORTS-8.3, PORTS-8.4, PORTS-8.5, PORTS-8.6, PORTS-9.4, PORTS-9.6_
 
