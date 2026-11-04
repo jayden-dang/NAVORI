@@ -219,7 +219,7 @@ impl Ports {
     }
 }
 
-async fn with_docker(
+pub(crate) async fn with_docker(
     containers: Arc<dyn Containers>,
     home: PathBuf,
     mut scan: Scan,

@@ -9,6 +9,7 @@ mod kind;
 mod place;
 mod scan;
 mod state;
+mod stop;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -20,10 +21,14 @@ pub use action::{KillReply, Outcome, PortsAction, Selector, Target, TargetResult
 pub use docker::attribute;
 pub use image::database_image;
 pub use infra::docker::{Container, Containers, DockerError, DockerSocket};
-pub use kind::kind;
+pub use kind::{is_docker_backend, kind};
 pub use place::{place, place_listener};
 pub use scan::{BackendPort, HarnessMemo, Scan, Scanner};
 pub use state::*;
+pub use stop::{
+    ContainerPlan, FreshRead, Guard, Plan, ProcessPlan, Reach, Resolved, StopClass, reason,
+    resolve, stop_class,
+};
 
 /// Opens the process source, once, when the first scan needs it.
 pub type OpenProcesses = Box<dyn FnMut() -> Result<Arc<dyn ProcessSource>, PlatformError> + Send>;

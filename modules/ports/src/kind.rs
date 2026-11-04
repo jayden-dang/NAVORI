@@ -33,7 +33,8 @@ pub fn kind(exe: Option<&Path>, placed: bool) -> PortKind {
     }
 }
 
-pub(crate) fn is_docker_backend(exe: Option<&Path>) -> bool {
+/// Whether the executable is the Docker backend, whose listeners belong to containers.
+pub fn is_docker_backend(exe: Option<&Path>) -> bool {
     exe.and_then(Path::file_name)
         .is_some_and(|name| name == DOCKER_BACKEND)
 }
