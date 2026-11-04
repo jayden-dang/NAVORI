@@ -104,7 +104,7 @@ struct ProjectChildView: View {
             .truncationMode(.middle)
         if let reveal {
             Button(action: {
-                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: reveal)])
+                store.reveal(reveal)
             }) {
                 text
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -284,6 +284,9 @@ private struct PortRowView: View {
                     onCancel: { store.dismissStop(state.id) }
                 )
             }
+            if let sentence = store.openFailures[state.id] {
+                StopFailureLines(reasons: [sentence], leading: MenuColumn.childName)
+            }
             if stopping == false, let reason = failure(entry: entry, flow: flow) {
                 StopFailureLines(reasons: ["Stop failed. \(reason)"], leading: MenuColumn.childName)
             }
@@ -297,7 +300,10 @@ private struct PortRowView: View {
             }
         }
         .onChange(of: selected) { _, isSelected in
-            if isSelected == false { store.dismissStop(state.id) }
+            if isSelected == false {
+                store.dismissStop(state.id)
+                store.dismissOpenFailure(state.id)
+            }
         }
     }
 
@@ -323,12 +329,11 @@ private struct PortRowView: View {
             HStack(spacing: 4) {
                 if state.offersOpen {
                     capsule("Open", label: "Open \(state.name) in the browser") {
-                        Task { await store.openPort(UInt16(state.port)) }
+                        Task { await store.openPort(row: state.id, port: state.port) }
                     }
                 }
                 capsule("Copy", label: "Copy \(state.copyText)") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(state.copyText, forType: .string)
+                    store.copyPort(state.port)
                 }
                 if let stop = state.stop {
                     capsule("Stop", label: "Stop \(state.name)") { store.askStop(state.id, count: stop.count) }

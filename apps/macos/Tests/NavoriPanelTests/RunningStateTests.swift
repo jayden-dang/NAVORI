@@ -1,3 +1,4 @@
+import Foundation
 import NavoriPanel
 import Testing
 
@@ -637,5 +638,84 @@ struct PortActionsTests {
         )
         #expect(state.header.path == "~/dev/api")
         #expect(state.header.revealPath == "/Users/me/dev/api")
+    }
+}
+
+@MainActor
+private final class FakeDesktop: Desktop {
+    var opened: [URL] = []
+    var copied: [String] = []
+    var revealed: [String] = []
+
+    func open(_ url: URL) { opened.append(url) }
+    func copy(_ text: String) { copied.append(text) }
+    func reveal(_ path: String) { revealed.append(path) }
+}
+
+private struct Unreachable: Error {}
+
+@MainActor
+@Suite
+struct PortDesktopActionTests {
+    @Test func open_dispatches_the_open_action_and_opens_the_url_the_core_returns() async throws {
+        let desktop = FakeDesktop()
+        var sent: [String] = []
+        let failure = await PortActions.open(port: 3000, address: nil, desktop: desktop) { request in
+            sent.append(request)
+            return #"{"url":"http://localhost:3000"}"#
+        }
+        #expect(failure == nil)
+        #expect(desktop.opened == [URL(string: "http://localhost:3000")!])
+        let object = try #require(JSONSerialization.jsonObject(with: Data(sent[0].utf8)) as? [String: [String: Int]])
+        #expect(object == ["open": ["port": 3000]])
+    }
+
+    @Test func open_names_the_address_when_one_is_given() async throws {
+        let desktop = FakeDesktop()
+        var sent = ""
+        _ = await PortActions.open(port: 80, address: "10.0.0.2", desktop: desktop) { request in
+            sent = request
+            return #"{"url":"http://10.0.0.2:80"}"#
+        }
+        let object = try #require(JSONSerialization.jsonObject(with: Data(sent.utf8)) as? [String: [String: Any]])
+        #expect(object["open"]?["address"] as? String == "10.0.0.2")
+    }
+
+    @Test func open_that_fails_gives_one_fixed_sentence_and_opens_nothing() async {
+        let replies: [@Sendable (String) async throws -> String] = [
+            { _ in throw Unreachable() },
+            { _ in "{}" },
+            { _ in #"{"url":""}"# },
+        ]
+        for reply in replies {
+            let desktop = FakeDesktop()
+            let failure = await PortActions.open(port: 3000, address: nil, desktop: desktop, dispatch: reply)
+            #expect(failure == "Could not open :3000")
+            #expect(desktop.opened.isEmpty)
+        }
+    }
+
+    @Test func a_port_outside_the_port_range_is_not_sent() async {
+        let desktop = FakeDesktop()
+        var sent = false
+        let failure = await PortActions.open(port: 70_000, address: nil, desktop: desktop) { _ in
+            sent = true
+            return ""
+        }
+        #expect(failure == "Could not open :70000")
+        #expect(sent == false)
+    }
+
+    @Test func copy_puts_localhost_and_the_port_on_the_pasteboard() {
+        let desktop = FakeDesktop()
+        PortActions.copy(port: 3000, desktop: desktop)
+        #expect(desktop.copied == ["localhost:3000"])
+        #expect(desktop.opened.isEmpty)
+    }
+
+    @Test func reveal_shows_the_full_path() {
+        let desktop = FakeDesktop()
+        PortActions.reveal("/Users/me/dev/api", desktop: desktop)
+        #expect(desktop.revealed == ["/Users/me/dev/api"])
     }
 }

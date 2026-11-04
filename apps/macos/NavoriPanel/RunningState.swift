@@ -1,3 +1,5 @@
+import Foundation
+
 public enum RunningProjectState: Equatable, Sendable {
     case working, idle, unknown
 }
@@ -350,8 +352,48 @@ public struct SessionRowState: Equatable, Sendable {
     }
 }
 
+/// The three things a port row does to the user's desktop, so the flow can run against a fake.
+@MainActor
+public protocol Desktop: AnyObject {
+    func open(_ url: URL)
+    func copy(_ text: String)
+    func reveal(_ path: String)
+}
+
 public enum PortActions {
     public static func copyText(_ port: Int) -> String { "localhost:\(port)" }
+
+    public static func openFailure(port: Int) -> String { "Could not open :\(port)" }
+
+    /// Returns nil once the Core's URL is opened, else the sentence to show on the row.
+    @MainActor
+    public static func open(
+        port: Int,
+        address: String?,
+        desktop: Desktop,
+        dispatch: (String) async throws -> String
+    ) async -> String? {
+        let failure = openFailure(port: port)
+        guard let number = UInt16(exactly: port) else { return failure }
+        var action: [String: Any] = ["port": number]
+        if let address { action["address"] = address }
+        guard let request = try? JSONSerialization.data(withJSONObject: ["open": action]),
+              let reply = try? await dispatch(String(decoding: request, as: UTF8.self)),
+              let url = (try? JSONDecoder().decode(OpenReply.self, from: Data(reply.utf8)))
+                  .flatMap({ URL(string: $0.url) }),
+              url.scheme != nil
+        else { return failure }
+        desktop.open(url)
+        return nil
+    }
+
+    @MainActor
+    public static func copy(port: Int, desktop: Desktop) { desktop.copy(copyText(port)) }
+
+    @MainActor
+    public static func reveal(_ path: String, desktop: Desktop) { desktop.reveal(path) }
+
+    private struct OpenReply: Decodable { let url: String }
 
     public static func hasOpen(_ port: RunningPortInput) -> Bool { port.openable }
 }

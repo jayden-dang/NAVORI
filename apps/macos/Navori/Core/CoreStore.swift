@@ -19,6 +19,8 @@ final class CoreStore {
     private(set) var isRunningChecks = false
 
     @ObservationIgnored private var core: NavoriCore?
+    private(set) var openFailures: [String: String] = [:]
+    @ObservationIgnored private let desktop: Desktop = AppDesktop()
     @ObservationIgnored private let log = Logger(subsystem: "dev.navori", category: "core")
     private var awakeActionFailure: AwakeActionFailure?
     private(set) var stopFlows: [String: StopFlow] = [:]
@@ -307,19 +309,22 @@ final class CoreStore {
         }
     }
 
-    func openPort(_ port: UInt16, address: String = "") async {
-        var action: [String: Any] = ["port": port]
-        if address.isEmpty == false { action["address"] = address }
-        do {
-            let json = try JSONSerialization.data(withJSONObject: ["open": action])
-            let reply = try await dispatch(module: "ports", actionJSON: String(decoding: json, as: UTF8.self))
-            let url = try JSONDecoder().decode(OpenReply.self, from: Data(reply.utf8)).url
-            guard let target = URL(string: url) else { return }
-            NSWorkspace.shared.open(target)
-        } catch {
-            log.error("open port failed: \(CoreStartupBanner.menuFailure(for: error), privacy: .public)")
+    func openPort(row: String, port: Int, address: String? = nil) async {
+        openFailures[row] = nil
+        let failure = await PortActions.open(port: port, address: address, desktop: desktop) { request in
+            try await self.dispatch(module: "ports", actionJSON: request)
+        }
+        if let failure {
+            log.error("open port \(port) failed")
+            openFailures[row] = failure
         }
     }
+
+    func copyPort(_ port: Int) { PortActions.copy(port: port, desktop: desktop) }
+
+    func reveal(_ path: String) { PortActions.reveal(path, desktop: desktop) }
+
+    func dismissOpenFailure(_ row: String) { openFailures[row] = nil }
 
     func stop(_ requests: [String]) async -> [StopResult] {
         let sends = requests.map { request in Task { @MainActor in await self.send(request) } }
@@ -484,6 +489,16 @@ final class SnapshotRelay: SnapshotListener, @unchecked Sendable {
     }
 }
 
-private struct OpenReply: Decodable {
-    let url: String
+@MainActor
+private final class AppDesktop: Desktop {
+    func open(_ url: URL) { NSWorkspace.shared.open(url) }
+
+    func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    func reveal(_ path: String) {
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
 }
