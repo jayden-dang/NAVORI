@@ -10,7 +10,7 @@ Written in an unattended run under .skills/_pending-ports/auto/charter.md (`.ski
 "THE SYSTEM" is the running Core plus the `navori` CLI, unless a criterion names a part. No criterion here is Shell or Swift UI.
 "Listener" is one process holding at least one TCP socket in LISTEN state. "Entry" is one row of `ports.list`.
 "Counted repo" is a git repository whose root passes PORTS-2.4.
-"Fake" means the existing `fake` feature of `navori-macos` and a fake container source; no default test touches Docker or the real process table except the real-OS tests that already exist in that style.
+"Fake" means the existing `fake` feature of `navori-macos` and a fake container source. No default test touches Docker. The real process table is read only by real-OS tests, and by crates/ffi tests that start a real core, where the Module scans it read-only.
 Grouping reading of L2 and L8 (`agent-decided`): the levels are Project, Worktree, Process, Ports; `harness` is a field on each entry, not a level.
 
 Guard walk (Step 3 of specify-behavior). Files the change touches:
@@ -32,7 +32,7 @@ Guard walk (Step 3 of specify-behavior). Files the change touches:
 **Story:** As the user, I want to run `navori dispatch ports '"list"'`, so that I can read every TCP port my own processes are listening on without running `lsof`.
 
 - **PORTS-1.1** WHEN a scan runs THE SYSTEM SHALL find listeners by listing the current UID's processes, then their socket file descriptors, then their TCP sockets in LISTEN state, without running `lsof` (L6) or any other subprocess (`agent-decided`: the wider rule).
-- **PORTS-1.2** THE SYSTEM SHALL read file descriptors and sockets only of processes whose real UID is the current user's.
+- **PORTS-1.2** THE SYSTEM SHALL read file descriptors and sockets only of processes the scan's listing showed under the current user's real UID, and SHALL drop any result from a process whose start time or real UID changed during the scan (`agent-decided`: the drop, since a pid can be reused between listing and reading).
 - **PORTS-1.3** WHEN `ports.list` is dispatched THE SYSTEM SHALL reply with the last published scan and SHALL NOT start a scan for that call (`agent-decided`).
 - **PORTS-1.4** THE SYSTEM SHALL return one entry per (pid, port), holding every address that process has bound for that port, so a v4 and a v6 socket on one port are one entry (`agent-decided`). PORTS-4.5 keys Docker ports differently.
 - **PORTS-1.5** THE SYSTEM SHALL put these fields on each entry: port, bound addresses, pid, process start time, process name, exe path when read, project, worktree, branch, `missing_path` (the removed working directory or `working_dir` of PORTS-2.5 and PORTS-4.6, absent otherwise), harness, kind, and for a Docker port the container id and name (`agent-decided`: the field set, including what ROAD-18 needs to act on an entry).
@@ -132,7 +132,7 @@ Guard walk (Step 3 of specify-behavior). Files the change touches:
 - **PORTS-9.1** (guard) WHEN Awake labels a Lease THE SYSTEM SHALL CONTINUE TO use `resolve_location` as it is today, including its fallback to the working directory's name when no repo is found (crates/procs/src/location.rs:38-42).
 - **PORTS-9.2** (guard) WHEN argv is read THE SYSTEM SHALL CONTINUE TO return it without the environment (PROCS-1.8).
 - **PORTS-9.3** (guard) WHEN a snapshot with sessions is taken THE SYSTEM SHALL CONTINUE TO meet PROCS-8.4 and PROCS-8.8.
-- **PORTS-9.4** (guard) WHEN `navori doctor` runs THE SYSTEM SHALL CONTINUE TO report every row it reports today.
+- **PORTS-9.4** (guard) WHEN `navori doctor` runs THE SYSTEM SHALL CONTINUE TO report every row it reports today, in today's order, with `ports` added after `logs` (`agent-decided`: the position).
 - **PORTS-9.5** (guard) WHEN `cargo xtask check-deps` runs THE SYSTEM SHALL CONTINUE TO reject a Module depending on another Module and any crate other than `navori-ffi` depending on a Module, with the new crate named `navori-mod-ports` so those rules see it (xtask/src/main.rs:697-727), and `unsafe` SHALL stay confined to `navori-macos` and `navori-ffi` by the workspace lints.
 - **PORTS-9.6** (guard) WHEN port counts change THE SYSTEM SHALL CONTINUE TO leave the status icon's attention mark off (crates/kernel/src/module.rs:71-72).
 - **PORTS-9.7** (guard) WHEN the release menu renders THE SYSTEM SHALL CONTINUE TO show no Ports row until ROAD-18 ships it (MENU requirements).
@@ -150,7 +150,7 @@ Consult record: `docs/product/metrics.md` absent, no `docs/ops/reliability.md` (
 - **Performance:** **PORTS-10.2** WHEN a scan runs on this Mac THE SYSTEM SHALL finish it, excluding the Docker read, within 50 ms as the median of 5 — verified by an ignored real-OS test run through the perf gate, not the normal suite, because PROCS-8.4 flaked under load (`agent-decided`: turning "usually < 50 ms" of docs/ARCHITECTURE.md:321 into this limit, and the method).
 - **Security:** **PORTS-10.3** THE SYSTEM SHALL let no environment value and no unmatched environment name leave the reader by a return value, an error, a log line, an Event, the Journal, a panic or published state, and SHALL wipe the read buffer (THR-1, THR-3, PROCS-8.5; `agent-decided`: the wipe, as commit 75ffedd does for argument scratch) — verified by a leak test in the style of crates/procs/tests/no_leaks.rs with a fake buffer holding a token.
 - **Security:** **PORTS-10.4** THE SYSTEM SHALL write no working directory, argv or container working directory of any process to logs, Events, the Journal or panic text (PROCS-8.5; `agent-decided`: extending it to a container's `working_dir`) — verified by the same leak test.
-- **Security:** **PORTS-10.5** THE SYSTEM SHALL never read another UID's process in a scan (THR-5, L11) — verified with `FakeProcesses::reads()`, as PROCS-8.6 does.
+- **Security:** **PORTS-10.5** THE SYSTEM SHALL never read a process the listing showed under another UID, and SHALL return or count nothing from a pid that another user took over during the scan (THR-5, L11; `agent-decided`: the drop) — verified with `FakeProcesses::reads()` and `replace_on_read`, as PROCS-8.6 does.
 - **Reliability:** **PORTS-10.6** WHEN the Module restarts after a crash THE SYSTEM SHALL publish the not-scanned state of PORTS-8.1 and scan again within 30 seconds, with nothing to recover from disk (`agent-decided`: the state and the 30 s) — verified by a test that fails the Module once.
 - **Accessibility:** None — ROAD-17 ships no UI; ROAD-18 owns the menu's accessibility.
 
