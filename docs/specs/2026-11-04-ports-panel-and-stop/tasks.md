@@ -124,17 +124,17 @@ Order: Tasks 3, 4, 5, 6, 7 share `modules/ports/src/actor.rs`, `action.rs` and `
 
 **Depends-on:** none
 
-- [ ] **Step 1: Write the failing tests** in `crates/macos/tests/signals.rs`:
+- [x] **Step 1: Write the failing tests** in `crates/macos/tests/signals.rs`:
   - `a_fake_signal_to_an_obedient_process_ends_it_and_is_recorded`
   - `a_fake_signal_to_a_process_that_ignores_term_leaves_it_running`
   - `a_denied_signal_reports_denied_and_is_not_recorded_as_delivered`
   - `a_group_signal_is_recorded_as_a_group_target`
   - `a_real_child_started_in_its_own_group_reports_that_group_and_dies_on_kill` (`#[ignore]`, spawns a `sleep` child with `process_group(0)`, reads `MacSignals::group_of`, sends `Kill` to `Group`, expects `Gone` on a second send)
-- [ ] **Step 2: Run** `cargo test -p navori-macos --features fake --test signals` — expect: compile errors for `Signals`, `FakeSignals`.
-- [ ] **Step 3: Implement `signals.rs`.** `send` maps `Process(p)` to `libc::kill(p, sig)` and `Group(g)` to `libc::kill(-g, sig)`; errno `ESRCH` → `Gone`, `EPERM` → `Denied`, else `Failed`. `group_of` is `libc::getpgid` with the `read_error` mapping. Every `unsafe` block carries `// SAFETY:`. No `unsafe` item is `pub`.
-- [ ] **Step 4: Implement `FakeSignals`** over a shared `FakeProcesses` handle; `before_send` runs just before a signal is recorded.
-- [ ] **Step 5: Run** `cargo test -p navori-macos --features fake && cargo test -p navori-macos --test signals -- --ignored && cargo xtask check-deps` — expect: pass.
-- [ ] **Step 6: Commit** `git commit -m "feat(macos): add a Signals seam for stopping processes"`
+- [x] **Step 2: Run** `cargo test -p navori-macos --features fake --test signals` — expect: compile errors for `Signals`, `FakeSignals`.
+- [x] **Step 3: Implement `signals.rs`.** `send` maps `Process(p)` to `libc::kill(p, sig)` and `Group(g)` to `libc::kill(-g, sig)`; errno `ESRCH` → `Gone`, `EPERM` → `Denied`, else `Failed`. `group_of` is `libc::getpgid` with the `read_error` mapping. Every `unsafe` block carries `// SAFETY:`. No `unsafe` item is `pub`.
+- [x] **Step 4: Implement `FakeSignals`** over a shared `FakeProcesses` handle; `before_send` runs just before a signal is recorded.
+- [x] **Step 5: Run** `cargo test -p navori-macos --features fake && cargo test -p navori-macos --test signals -- --ignored && cargo xtask check-deps` — expect: pass.
+- [x] **Step 6: Commit** `git commit -m "feat(macos): add a Signals seam for stopping processes"`
 
 _Requirements: PSTOP-1.16_
 
