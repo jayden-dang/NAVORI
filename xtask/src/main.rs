@@ -677,7 +677,17 @@ fn check_deps(root: &Path) -> Result<()> {
             let dep_name = d["name"].as_str().unwrap_or_default();
             let kind = d["kind"].as_str().unwrap_or("normal");
             violations.extend(fake_feature_violation(name, dep_name, kind, &features));
+            if let Some(dep_package) = packages.iter().find(|q| q["name"] == dep_name) {
+                violations.extend(forwarded_fake_edge_violations(
+                    name,
+                    dep_name,
+                    kind,
+                    &features,
+                    &feature_table(dep_package),
+                ));
+            }
         }
+        violations.extend(default_forwarding_violations(name, &feature_table(p)));
 
         let is_module = path.contains("/modules/");
         let is_ai = path.contains("/ai/");
@@ -768,6 +778,104 @@ fn fake_feature_violation(krate: &str, dep: &str, kind: &str, features: &[&str])
              through a dev-dependency, not a {kind} dependency"
         )
     })
+}
+
+/// A package's `[features]` table as `cargo metadata` reports it.
+type FeatureTable = std::collections::BTreeMap<String, Vec<String>>;
+
+/// Reads the `features` map of a `cargo metadata` package.
+fn feature_table(package: &serde_json::Value) -> FeatureTable {
+    package["features"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .map(|(feature, entries)| {
+            let entries = entries
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|entry| entry.as_str().map(str::to_owned))
+                .collect();
+            (feature.clone(), entries)
+        })
+        .collect()
+}
+
+/// Features of one package that forward `fake` to a guarded crate (`crate/fake` or
+/// `crate?/fake`), as `(feature, guarded crate)`. `dep:name` entries and the implicit
+/// feature of an optional dependency only switch the dependency on, so they do not count.
+fn fake_forwarding_features(features: &FeatureTable) -> Vec<(String, String)> {
+    features
+        .iter()
+        .flat_map(|(feature, entries)| {
+            entries.iter().filter_map(move |entry| {
+                let (krate, enabled) = entry.split_once('/')?;
+                let krate = krate.strip_suffix('?').unwrap_or(krate);
+                (enabled == "fake" && FAKE_GUARDED.contains(&krate))
+                    .then(|| (feature.clone(), krate.to_owned()))
+            })
+        })
+        .collect()
+}
+
+/// The features switched on by `roots` within one package, transitively. Entries naming
+/// another crate (`dep:x`, `x/y`) are not followed; the visited set ends feature cycles.
+fn enabled_features<'a>(
+    features: &'a FeatureTable,
+    roots: impl IntoIterator<Item = &'a str>,
+) -> std::collections::BTreeSet<&'a str> {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut pending: Vec<&str> = roots.into_iter().collect();
+    while let Some(name) = pending.pop() {
+        if let Some((key, entries)) = features.get_key_value(name)
+            && seen.insert(key.as_str())
+        {
+            pending.extend(entries.iter().map(String::as_str));
+        }
+    }
+    seen
+}
+
+/// Reports a forwarding feature that the package's `default` set switches on, directly or
+/// through other features of the same package.
+fn default_forwarding_violations(krate: &str, features: &FeatureTable) -> Vec<String> {
+    let on = enabled_features(features, ["default"]);
+    fake_forwarding_features(features)
+        .into_iter()
+        .filter(|(feature, _)| on.contains(feature.as_str()))
+        .map(|(feature, guarded)| {
+            format!(
+                "{krate} → {guarded}: the default features of {krate} enable `{feature}`, which \
+                 forwards the test-only `fake` feature (ARCH-8); make `{feature}` opt-in and \
+                 enable it only through a dev-dependency"
+            )
+        })
+        .collect()
+}
+
+/// Reports a non-dev dependency edge that turns on a forwarding feature of another package.
+fn forwarded_fake_edge_violations(
+    krate: &str,
+    dep: &str,
+    kind: &str,
+    enabled: &[&str],
+    dep_features: &FeatureTable,
+) -> Vec<String> {
+    if kind == "dev" {
+        return Vec::new();
+    }
+    let on = enabled_features(dep_features, enabled.iter().copied());
+    fake_forwarding_features(dep_features)
+        .into_iter()
+        .filter(|(feature, _)| on.contains(feature.as_str()))
+        .map(|(feature, guarded)| {
+            format!(
+                "{krate} → {dep}: enables `{feature}`, which forwards the test-only `fake` feature \
+                 to {guarded} (ARCH-8); it may be enabled only through a dev-dependency, not a \
+                 {kind} dependency"
+            )
+        })
+        .collect()
 }
 
 fn read_manifest(path: &str) -> Result<toml::Table> {
@@ -1146,6 +1254,177 @@ mod tests {
         assert_eq!(
             fake_feature_violation("navori-ffi", "navori-config", "normal", &["fake"]),
             None
+        );
+    }
+
+    use super::{
+        FeatureTable, default_forwarding_violations, fake_forwarding_features,
+        forwarded_fake_edge_violations,
+    };
+
+    fn table(entries: &[(&str, &[&str])]) -> FeatureTable {
+        entries
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), v.iter().map(|s| (*s).to_owned()).collect()))
+            .collect()
+    }
+
+    #[test]
+    fn a_default_feature_forwarding_fake_is_rejected() {
+        let t = table(&[
+            ("default", &["testing"]),
+            ("testing", &["navori-secrets/fake"]),
+        ]);
+        let v = default_forwarding_violations("navori-ffi", &t);
+        assert_eq!(v.len(), 1, "{v:?}");
+        assert!(v[0].contains("navori-ffi"), "{v:?}");
+        assert!(v[0].contains("testing"), "{v:?}");
+        assert!(v[0].contains("navori-secrets"), "{v:?}");
+    }
+
+    #[test]
+    fn a_forwarding_feature_reached_through_other_features_is_rejected() {
+        let t = table(&[
+            ("default", &["a"]),
+            ("a", &["b"]),
+            ("b", &["navori-macos/fake"]),
+        ]);
+        let v = default_forwarding_violations("navori-procs", &t);
+        assert_eq!(v.len(), 1, "{v:?}");
+        assert!(v[0].contains('b') && v[0].contains("navori-macos"), "{v:?}");
+    }
+
+    #[test]
+    fn an_optional_dependency_spelling_is_rejected_from_default_too() {
+        let t = table(&[
+            ("default", &["testing", "other"]),
+            ("testing", &["navori-secrets?/fake", "other"]),
+            ("other", &[]),
+        ]);
+        let v = default_forwarding_violations("navori-ffi", &t);
+        assert_eq!(v.len(), 1, "{v:?}");
+        assert!(v[0].contains("navori-secrets"), "{v:?}");
+    }
+
+    #[test]
+    fn a_forwarding_feature_outside_default_passes() {
+        let t = table(&[
+            ("default", &["other"]),
+            ("other", &[]),
+            ("testing", &["navori-secrets/fake", "navori-macos?/fake"]),
+        ]);
+        assert!(default_forwarding_violations("navori-ffi", &t).is_empty());
+        assert_eq!(fake_forwarding_features(&t).len(), 2);
+    }
+
+    #[test]
+    fn a_package_without_default_passes() {
+        let t = table(&[("testing", &["navori-secrets/fake"])]);
+        assert!(default_forwarding_violations("navori-ffi", &t).is_empty());
+    }
+
+    #[test]
+    fn dep_syntax_and_implicit_features_do_not_forward() {
+        let t = table(&[
+            ("default", &["navori-secrets", "dep-form"]),
+            ("navori-secrets", &["dep:navori-secrets"]),
+            ("dep-form", &["dep:navori-macos"]),
+        ]);
+        assert!(fake_forwarding_features(&t).is_empty());
+        assert!(default_forwarding_violations("navori-ffi", &t).is_empty());
+    }
+
+    #[test]
+    fn forwarding_to_an_unguarded_crate_or_another_feature_is_out_of_scope() {
+        let t = table(&[
+            ("default", &["a"]),
+            ("a", &["navori-config/fake", "navori-secrets/other"]),
+        ]);
+        assert!(fake_forwarding_features(&t).is_empty());
+        assert!(default_forwarding_violations("navori-ffi", &t).is_empty());
+    }
+
+    #[test]
+    fn feature_cycles_terminate() {
+        let t = table(&[
+            ("default", &["a"]),
+            ("a", &["b"]),
+            ("b", &["a", "default", "navori-secrets/fake"]),
+        ]);
+        let v = default_forwarding_violations("navori-ffi", &t);
+        assert_eq!(v.len(), 1, "{v:?}");
+        let cyclic = table(&[("default", &["a"]), ("a", &["b"]), ("b", &["a", "default"])]);
+        assert!(default_forwarding_violations("navori-ffi", &cyclic).is_empty());
+    }
+
+    #[test]
+    fn a_normal_edge_enabling_a_forwarding_feature_is_rejected() {
+        let other = table(&[("testing", &["navori-secrets/fake"])]);
+        let v = forwarded_fake_edge_violations(
+            "navori-ffi",
+            "navori-other",
+            "normal",
+            &["testing"],
+            &other,
+        );
+        assert_eq!(v.len(), 1, "{v:?}");
+        for needle in ["navori-ffi", "navori-other", "testing", "navori-secrets"] {
+            assert!(v[0].contains(needle), "{needle}: {v:?}");
+        }
+    }
+
+    #[test]
+    fn a_normal_edge_enabling_a_feature_that_reaches_a_forwarding_one_is_rejected() {
+        let other = table(&[("all", &["testing"]), ("testing", &["navori-macos?/fake"])]);
+        let v =
+            forwarded_fake_edge_violations("navori-ffi", "navori-other", "build", &["all"], &other);
+        assert_eq!(v.len(), 1, "{v:?}");
+    }
+
+    #[test]
+    fn a_dev_edge_enabling_a_forwarding_feature_passes() {
+        let other = table(&[("testing", &["navori-secrets/fake"])]);
+        assert!(
+            forwarded_fake_edge_violations(
+                "navori-ffi",
+                "navori-other",
+                "dev",
+                &["testing"],
+                &other
+            )
+            .is_empty()
+        );
+    }
+
+    #[test]
+    fn a_normal_edge_enabling_a_harmless_feature_passes() {
+        let other = table(&[
+            ("testing", &["navori-secrets/fake"]),
+            ("extra", &["dep:bee"]),
+            ("bee", &["dep:bee"]),
+        ]);
+        assert!(
+            forwarded_fake_edge_violations(
+                "navori-ffi",
+                "navori-other",
+                "normal",
+                &["extra", "bee", "missing"],
+                &other
+            )
+            .is_empty()
+        );
+        assert!(
+            forwarded_fake_edge_violations("navori-ffi", "navori-other", "normal", &[], &other)
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn a_cyclic_dependency_feature_table_terminates_on_an_edge() {
+        let other = table(&[("a", &["b"]), ("b", &["a"])]);
+        assert!(
+            forwarded_fake_edge_violations("navori-ffi", "navori-other", "normal", &["a"], &other)
+                .is_empty()
         );
     }
 }
