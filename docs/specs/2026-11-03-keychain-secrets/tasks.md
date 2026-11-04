@@ -1334,19 +1334,19 @@ _Requirements: SECRETS-9.1, SECRETS-9.2, SECRETS-9.3, SECRETS-10.3, SECRETS-10.4
 
 **Depends-on:** Task 7, Task 8
 
-- [ ] **Step 1: Full gate**
+- [x] **Step 1: Full gate**
 
 Run: `cargo fmt --all --check`, then `cargo xtask ci` — expect: pass (fmt, clippy `-D warnings`, workspace tests, `check-deps`, `build-core`, Swift build).
 
-- [ ] **Step 2: Review searches (SECRETS-6.1, 6.4, 8.1, 8.3)**
+- [x] **Step 2: Review searches (SECRETS-6.1, 6.4, 8.1, 8.3)**
 
 Run: `rg -n '\bunsafe\s*(\{|fn|impl|trait|extern)' crates/secrets/` — expect: no match (the crate doc line that says the crate has no `unsafe` is prose and does not match). Run: `rg -n 'tracing|log::|println!|eprintln!|dbg!' crates/secrets/src` — expect: no match. Run: `rg -n 'std::fs|File::|rusqlite|OpenOptions' crates/secrets/src` — expect: no match. Run: `rg -n 'unwrap\(|expect\(' crates/secrets/src` — expect: no match. Run: `rg -n 'impl.*(Display|Serialize|Clone).*for Secret|derive.*(Serialize|Clone)' crates/secrets/src/secret.rs` — expect: no match.
 
-- [ ] **Step 3: Lock delta**
+- [x] **Step 3: Lock delta**
 
 Run: `git diff $(git merge-base HEAD main) -- Cargo.lock | grep '^-version'` — expect: no match. If one appears, add it to `requirements.md` Open Questions (SECRETS-10.2).
 
-- [ ] **Step 4: Commit only if something changed**
+- [x] **Step 4: Commit only if something changed**
 
 If a check above failed and was fixed, stage the changed paths and commit with a conventional subject that names the finding. Otherwise make no commit.
 
