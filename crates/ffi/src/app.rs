@@ -17,7 +17,7 @@ use navori_mod_awake::{Awake, AwakeState, LeaseState, Platform, Timing};
 use navori_mod_integrations::{
     Harness, Integrations, IntegrationsEnv, IntegrationsState, State, inspect,
 };
-use navori_mod_ports::{Ports, PortsEnv};
+use navori_mod_ports::{Ports, PortsEnv, PortsState};
 use navori_protocol::{
     AskReply, AskRequest, Check, CoreStatus, Envelope, Event, ModuleInfo, Severity, rpc,
 };
@@ -143,6 +143,11 @@ impl Inner {
                 ),
             },
         );
+
+        checks.push(ports_check(
+            module_is_down(&self.kernel, Ports::ID),
+            ports_state(&self.kernel).as_ref(),
+        ));
 
         checks
     }
@@ -326,7 +331,7 @@ pub fn awake_view(kernel: &Kernel) -> Option<crate::AwakeView> {
             return None;
         }
     };
-    if awake_is_down(kernel) {
+    if module_is_down(kernel, Awake::ID) {
         view.system_held = false;
         view.display_held = false;
         view.problem = Some(STOPPED_PROBLEM.to_owned());
@@ -334,9 +339,9 @@ pub fn awake_view(kernel: &Kernel) -> Option<crate::AwakeView> {
     Some(view)
 }
 
-fn awake_is_down(kernel: &Kernel) -> bool {
+fn module_is_down(kernel: &Kernel, id: &str) -> bool {
     kernel.modules().into_iter().any(|module| {
-        module.id == Awake::ID
+        module.id == id
             && matches!(
                 module.state,
                 ModuleState::Failed { .. } | ModuleState::Stopped
@@ -374,6 +379,41 @@ fn state_word(state: State) -> &'static str {
         State::NeedsRepair => "needs repair",
         State::Unreadable => "unreadable",
     }
+}
+
+fn ports_state(kernel: &Kernel) -> Option<PortsState> {
+    let value = kernel.state(Ports::ID)?;
+    match serde_json::from_value(value) {
+        Ok(state) => Some(state),
+        Err(error) => {
+            tracing::warn!(%error, "ports state will not deserialize");
+            None
+        }
+    }
+}
+
+pub fn ports_check(down: bool, state: Option<&PortsState>) -> Check {
+    if down {
+        return check("ports", false, "The Ports module stopped.".to_owned());
+    }
+    let Some(state) = state else {
+        return check("ports", false, "Ports' state could not be read.".to_owned());
+    };
+    if let Some(problem) = &state.problem {
+        return check("ports", false, problem.clone());
+    }
+    if state.scanned_at_ms.is_none() {
+        return check("ports", true, "not scanned yet".to_owned());
+    }
+    let count: usize = state
+        .groups
+        .iter()
+        .flat_map(|project| &project.worktrees)
+        .flat_map(|worktree| &worktree.processes)
+        .map(|process| process.entries.len())
+        .sum();
+    let noun = if count == 1 { "port" } else { "ports" };
+    check("ports", true, format!("{count} {noun}"))
 }
 
 /// One fixed doctor row: passing with `no problem` or the lease count, failing with the problem.

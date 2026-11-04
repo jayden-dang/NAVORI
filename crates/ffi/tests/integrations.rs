@@ -90,7 +90,8 @@ fn the_existing_rows_keep_their_order() {
             "modules",
             "awake",
             "integrations",
-            "logs"
+            "logs",
+            "ports"
         ]
     );
     core.shutdown();

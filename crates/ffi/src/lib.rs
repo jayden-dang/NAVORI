@@ -32,7 +32,7 @@ use crate::ai::AiRuntime;
 use crate::app::{Inner, IpcBridge};
 
 pub use ai::{AiDeps, LlmSender, StoreAudit, ask_error_to_rpc, service_for};
-pub use app::{awake_check, awake_view, config_notice};
+pub use app::{awake_check, awake_view, config_notice, ports_check};
 
 uniffi::setup_scaffolding!();
 

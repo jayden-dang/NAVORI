@@ -12,7 +12,7 @@ mod state;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use navori_kernel::{Module, ModuleCtx, NoConfig};
+use navori_kernel::{Module, ModuleCtx, NoConfig, TrayContribution, TrayGlyph};
 use navori_macos::{MacProcesses, PlatformError, ProcessSource};
 
 pub use action::PortsAction;
@@ -79,6 +79,16 @@ impl Module for Ports {
 
     fn initial_state(&self) -> PortsState {
         PortsState::default()
+    }
+
+    fn tray(state: &PortsState) -> TrayContribution {
+        TrayContribution {
+            glyph: state
+                .problem
+                .as_ref()
+                .map(|problem| (TrayGlyph::Problem, format!("Can't scan ports. {problem}"))),
+            attention: None,
+        }
     }
 
     async fn run(&mut self, ctx: &mut ModuleCtx<Self>) -> anyhow::Result<()> {
