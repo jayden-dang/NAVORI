@@ -71,3 +71,16 @@ fn check(part: KeyPart, text: &str) -> Result<(), KeyError> {
     };
     Err(KeyError { part, problem })
 }
+
+/// The Keychain service that holds one Profile's items. The composition root maps a Profile to one constant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KeychainService(&'static str);
+
+impl KeychainService {
+    pub const RELEASE: Self = Self("dev.navori");
+    pub const DEV: Self = Self("dev.navori.dev");
+
+    pub fn as_str(self) -> &'static str {
+        self.0
+    }
+}

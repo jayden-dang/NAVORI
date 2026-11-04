@@ -5,3 +5,6 @@
 
 mod key;
 pub use key::*;
+
+mod secret;
+pub use secret::*;
