@@ -684,10 +684,15 @@ fn check_deps(root: &Path) -> Result<()> {
                     kind,
                     &features,
                     &feature_table(dep_package),
+                    &dep_aliases(dep_package),
                 ));
             }
         }
-        violations.extend(default_forwarding_violations(name, &feature_table(p)));
+        violations.extend(default_forwarding_violations(
+            name,
+            &feature_table(p),
+            &dep_aliases(p),
+        ));
 
         let is_module = path.contains("/modules/");
         let is_ai = path.contains("/ai/");
@@ -783,6 +788,25 @@ fn fake_feature_violation(krate: &str, dep: &str, kind: &str, features: &[&str])
 /// A package's `[features]` table as `cargo metadata` reports it.
 type FeatureTable = std::collections::BTreeMap<String, Vec<String>>;
 
+/// A package's dependency names as written in its manifest (the `rename`, else the crate
+/// name) mapped to the real package name. A name absent from the map stands for itself.
+type Aliases = std::collections::BTreeMap<String, String>;
+
+/// Reads the alias map from the `dependencies` of a `cargo metadata` package.
+fn dep_aliases(package: &serde_json::Value) -> Aliases {
+    package["dependencies"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|d| {
+            Some((
+                d["rename"].as_str()?.to_owned(),
+                d["name"].as_str()?.to_owned(),
+            ))
+        })
+        .collect()
+}
+
 /// Reads the `features` map of a `cargo metadata` package.
 fn feature_table(package: &serde_json::Value) -> FeatureTable {
     package["features"]
@@ -804,13 +828,14 @@ fn feature_table(package: &serde_json::Value) -> FeatureTable {
 /// Features of one package that forward `fake` to a guarded crate (`crate/fake` or
 /// `crate?/fake`), as `(feature, guarded crate)`. `dep:name` entries and the implicit
 /// feature of an optional dependency only switch the dependency on, so they do not count.
-fn fake_forwarding_features(features: &FeatureTable) -> Vec<(String, String)> {
+fn fake_forwarding_features(features: &FeatureTable, aliases: &Aliases) -> Vec<(String, String)> {
     features
         .iter()
         .flat_map(|(feature, entries)| {
             entries.iter().filter_map(move |entry| {
                 let (krate, enabled) = entry.split_once('/')?;
                 let krate = krate.strip_suffix('?').unwrap_or(krate);
+                let krate = aliases.get(krate).map_or(krate, String::as_str);
                 (enabled == "fake" && FAKE_GUARDED.contains(&krate))
                     .then(|| (feature.clone(), krate.to_owned()))
             })
@@ -838,17 +863,29 @@ fn enabled_features<'a>(
 
 /// Reports a forwarding feature that the package's `default` set switches on, directly or
 /// through other features of the same package.
-fn default_forwarding_violations(krate: &str, features: &FeatureTable) -> Vec<String> {
+fn default_forwarding_violations(
+    krate: &str,
+    features: &FeatureTable,
+    aliases: &Aliases,
+) -> Vec<String> {
     let on = enabled_features(features, ["default"]);
-    fake_forwarding_features(features)
+    fake_forwarding_features(features, aliases)
         .into_iter()
         .filter(|(feature, _)| on.contains(feature.as_str()))
         .map(|(feature, guarded)| {
-            format!(
-                "{krate} → {guarded}: the default features of {krate} enable `{feature}`, which \
-                 forwards the test-only `fake` feature (ARCH-8); make `{feature}` opt-in and \
-                 enable it only through a dev-dependency"
-            )
+            if feature == "default" {
+                format!(
+                    "{krate} → {guarded}: the default features of {krate} forward the test-only \
+                     `fake` feature (ARCH-8); stop forwarding `fake` from default and enable it \
+                     only through a dev-dependency"
+                )
+            } else {
+                format!(
+                    "{krate} → {guarded}: the default features of {krate} enable `{feature}`, \
+                     which forwards the test-only `fake` feature (ARCH-8); make `{feature}` \
+                     opt-in and enable it only through a dev-dependency"
+                )
+            }
         })
         .collect()
 }
@@ -860,12 +897,13 @@ fn forwarded_fake_edge_violations(
     kind: &str,
     enabled: &[&str],
     dep_features: &FeatureTable,
+    dep_aliases: &Aliases,
 ) -> Vec<String> {
     if kind == "dev" {
         return Vec::new();
     }
     let on = enabled_features(dep_features, enabled.iter().copied());
-    fake_forwarding_features(dep_features)
+    fake_forwarding_features(dep_features, dep_aliases)
         .into_iter()
         .filter(|(feature, _)| on.contains(feature.as_str()))
         .map(|(feature, guarded)| {
@@ -1258,9 +1296,20 @@ mod tests {
     }
 
     use super::{
-        FeatureTable, default_forwarding_violations, fake_forwarding_features,
+        Aliases, FeatureTable, default_forwarding_violations, fake_forwarding_features,
         forwarded_fake_edge_violations,
     };
+
+    fn no_aliases() -> Aliases {
+        Aliases::new()
+    }
+
+    fn aliases(pairs: &[(&str, &str)]) -> Aliases {
+        pairs
+            .iter()
+            .map(|(a, r)| ((*a).to_owned(), (*r).to_owned()))
+            .collect()
+    }
 
     fn table(entries: &[(&str, &[&str])]) -> FeatureTable {
         entries
@@ -1275,7 +1324,7 @@ mod tests {
             ("default", &["testing"]),
             ("testing", &["navori-secrets/fake"]),
         ]);
-        let v = default_forwarding_violations("navori-ffi", &t);
+        let v = default_forwarding_violations("navori-ffi", &t, &no_aliases());
         assert_eq!(v.len(), 1, "{v:?}");
         assert!(v[0].contains("navori-ffi"), "{v:?}");
         assert!(v[0].contains("testing"), "{v:?}");
@@ -1289,7 +1338,7 @@ mod tests {
             ("a", &["b"]),
             ("b", &["navori-macos/fake"]),
         ]);
-        let v = default_forwarding_violations("navori-procs", &t);
+        let v = default_forwarding_violations("navori-procs", &t, &no_aliases());
         assert_eq!(v.len(), 1, "{v:?}");
         assert!(v[0].contains('b') && v[0].contains("navori-macos"), "{v:?}");
     }
@@ -1301,7 +1350,7 @@ mod tests {
             ("testing", &["navori-secrets?/fake", "other"]),
             ("other", &[]),
         ]);
-        let v = default_forwarding_violations("navori-ffi", &t);
+        let v = default_forwarding_violations("navori-ffi", &t, &no_aliases());
         assert_eq!(v.len(), 1, "{v:?}");
         assert!(v[0].contains("navori-secrets"), "{v:?}");
     }
@@ -1313,14 +1362,14 @@ mod tests {
             ("other", &[]),
             ("testing", &["navori-secrets/fake", "navori-macos?/fake"]),
         ]);
-        assert!(default_forwarding_violations("navori-ffi", &t).is_empty());
-        assert_eq!(fake_forwarding_features(&t).len(), 2);
+        assert!(default_forwarding_violations("navori-ffi", &t, &no_aliases()).is_empty());
+        assert_eq!(fake_forwarding_features(&t, &no_aliases()).len(), 2);
     }
 
     #[test]
     fn a_package_without_default_passes() {
         let t = table(&[("testing", &["navori-secrets/fake"])]);
-        assert!(default_forwarding_violations("navori-ffi", &t).is_empty());
+        assert!(default_forwarding_violations("navori-ffi", &t, &no_aliases()).is_empty());
     }
 
     #[test]
@@ -1330,8 +1379,8 @@ mod tests {
             ("navori-secrets", &["dep:navori-secrets"]),
             ("dep-form", &["dep:navori-macos"]),
         ]);
-        assert!(fake_forwarding_features(&t).is_empty());
-        assert!(default_forwarding_violations("navori-ffi", &t).is_empty());
+        assert!(fake_forwarding_features(&t, &no_aliases()).is_empty());
+        assert!(default_forwarding_violations("navori-ffi", &t, &no_aliases()).is_empty());
     }
 
     #[test]
@@ -1340,8 +1389,8 @@ mod tests {
             ("default", &["a"]),
             ("a", &["navori-config/fake", "navori-secrets/other"]),
         ]);
-        assert!(fake_forwarding_features(&t).is_empty());
-        assert!(default_forwarding_violations("navori-ffi", &t).is_empty());
+        assert!(fake_forwarding_features(&t, &no_aliases()).is_empty());
+        assert!(default_forwarding_violations("navori-ffi", &t, &no_aliases()).is_empty());
     }
 
     #[test]
@@ -1351,10 +1400,10 @@ mod tests {
             ("a", &["b"]),
             ("b", &["a", "default", "navori-secrets/fake"]),
         ]);
-        let v = default_forwarding_violations("navori-ffi", &t);
+        let v = default_forwarding_violations("navori-ffi", &t, &no_aliases());
         assert_eq!(v.len(), 1, "{v:?}");
         let cyclic = table(&[("default", &["a"]), ("a", &["b"]), ("b", &["a", "default"])]);
-        assert!(default_forwarding_violations("navori-ffi", &cyclic).is_empty());
+        assert!(default_forwarding_violations("navori-ffi", &cyclic, &no_aliases()).is_empty());
     }
 
     #[test]
@@ -1366,6 +1415,7 @@ mod tests {
             "normal",
             &["testing"],
             &other,
+            &no_aliases(),
         );
         assert_eq!(v.len(), 1, "{v:?}");
         for needle in ["navori-ffi", "navori-other", "testing", "navori-secrets"] {
@@ -1376,8 +1426,14 @@ mod tests {
     #[test]
     fn a_normal_edge_enabling_a_feature_that_reaches_a_forwarding_one_is_rejected() {
         let other = table(&[("all", &["testing"]), ("testing", &["navori-macos?/fake"])]);
-        let v =
-            forwarded_fake_edge_violations("navori-ffi", "navori-other", "build", &["all"], &other);
+        let v = forwarded_fake_edge_violations(
+            "navori-ffi",
+            "navori-other",
+            "build",
+            &["all"],
+            &other,
+            &no_aliases(),
+        );
         assert_eq!(v.len(), 1, "{v:?}");
     }
 
@@ -1390,7 +1446,8 @@ mod tests {
                 "navori-other",
                 "dev",
                 &["testing"],
-                &other
+                &other,
+                &no_aliases()
             )
             .is_empty()
         );
@@ -1409,13 +1466,21 @@ mod tests {
                 "navori-other",
                 "normal",
                 &["extra", "bee", "missing"],
-                &other
+                &other,
+                &no_aliases()
             )
             .is_empty()
         );
         assert!(
-            forwarded_fake_edge_violations("navori-ffi", "navori-other", "normal", &[], &other)
-                .is_empty()
+            forwarded_fake_edge_violations(
+                "navori-ffi",
+                "navori-other",
+                "normal",
+                &[],
+                &other,
+                &no_aliases()
+            )
+            .is_empty()
         );
     }
 
@@ -1423,8 +1488,90 @@ mod tests {
     fn a_cyclic_dependency_feature_table_terminates_on_an_edge() {
         let other = table(&[("a", &["b"]), ("b", &["a"])]);
         assert!(
-            forwarded_fake_edge_violations("navori-ffi", "navori-other", "normal", &["a"], &other)
-                .is_empty()
+            forwarded_fake_edge_violations(
+                "navori-ffi",
+                "navori-other",
+                "normal",
+                &["a"],
+                &other,
+                &no_aliases()
+            )
+            .is_empty()
         );
+    }
+
+    #[test]
+    fn a_renamed_dependency_forwarding_fake_from_default_is_rejected() {
+        let t = table(&[("default", &["testing"]), ("testing", &["sec/fake"])]);
+        let a = aliases(&[("sec", "navori-secrets")]);
+        let v = default_forwarding_violations("navori-ffi", &t, &a);
+        assert_eq!(v.len(), 1, "{v:?}");
+        for needle in ["navori-ffi", "testing", "navori-secrets"] {
+            assert!(v[0].contains(needle), "{needle}: {v:?}");
+        }
+    }
+
+    #[test]
+    fn a_renamed_forwarding_feature_outside_default_passes() {
+        let t = table(&[("default", &[]), ("testing", &["sec?/fake"])]);
+        let a = aliases(&[("sec", "navori-secrets")]);
+        assert!(default_forwarding_violations("navori-ffi", &t, &a).is_empty());
+        assert_eq!(
+            fake_forwarding_features(&t, &a),
+            [("testing".to_owned(), "navori-secrets".to_owned())]
+        );
+    }
+
+    #[test]
+    fn a_normal_edge_enabling_a_renamed_forwarding_feature_is_rejected() {
+        let other = table(&[("testing", &["mac/fake"])]);
+        let a = aliases(&[("mac", "navori-macos")]);
+        let v = forwarded_fake_edge_violations(
+            "navori-ffi",
+            "navori-other",
+            "normal",
+            &["testing"],
+            &other,
+            &a,
+        );
+        assert_eq!(v.len(), 1, "{v:?}");
+        for needle in ["navori-ffi", "navori-other", "testing", "navori-macos"] {
+            assert!(v[0].contains(needle), "{needle}: {v:?}");
+        }
+    }
+
+    #[test]
+    fn a_renamed_unguarded_dependency_is_ignored() {
+        let t = table(&[("default", &["testing"]), ("testing", &["cfg/fake"])]);
+        let a = aliases(&[("cfg", "navori-config")]);
+        assert!(default_forwarding_violations("navori-ffi", &t, &a).is_empty());
+        assert!(fake_forwarding_features(&t, &a).is_empty());
+    }
+
+    #[test]
+    fn an_alias_equal_to_another_crates_real_name_does_not_confuse_the_lookup() {
+        // `navori-secrets = { package = "navori-config" }`: the name is an alias of an
+        // unguarded crate, and the guarded crate is reached under `sec`.
+        let t = table(&[
+            ("default", &["a"]),
+            ("a", &["navori-secrets/fake"]),
+            ("b", &["sec/fake"]),
+        ]);
+        let a = aliases(&[("navori-secrets", "navori-config"), ("sec", "navori-macos")]);
+        assert_eq!(
+            fake_forwarding_features(&t, &a),
+            [("b".to_owned(), "navori-macos".to_owned())]
+        );
+        assert!(default_forwarding_violations("navori-ffi", &t, &a).is_empty());
+    }
+
+    #[test]
+    fn forwarding_straight_from_default_does_not_ask_to_make_default_opt_in() {
+        let t = table(&[("default", &["navori-secrets/fake"])]);
+        let v = default_forwarding_violations("navori-ffi", &t, &no_aliases());
+        assert_eq!(v.len(), 1, "{v:?}");
+        assert!(!v[0].contains("make `default` opt-in"), "{v:?}");
+        assert!(v[0].contains("stop forwarding"), "{v:?}");
+        assert!(v[0].contains("dev-dependency"), "{v:?}");
     }
 }
