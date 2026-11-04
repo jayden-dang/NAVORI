@@ -120,7 +120,6 @@ fn go_process(pid: i32) -> Resolved {
     Resolved::Go(Plan::Process(ProcessPlan {
         pid,
         start_us: START_US,
-        members: vec![(pid, START_US)],
         reach: Reach::Alone,
     }))
 }
@@ -499,8 +498,7 @@ fn a_container_that_no_longer_publishes_a_port_is_stale() {
         got,
         vec![
             Resolved::Go(Plan::Container(ContainerPlan {
-                id: "aaaa".to_owned(),
-                ports: vec![8080]
+                id: "aaaa".to_owned()
             })),
             refused(Outcome::Stale, "The container is not running")
         ]
@@ -508,7 +506,7 @@ fn a_container_that_no_longer_publishes_a_port_is_stale() {
 }
 
 #[test]
-fn a_container_with_several_ports_is_planned_once_with_all_of_them() {
+fn a_container_with_several_ports_is_planned_once() {
     let world = world();
     let read = fresh(vec![
         container_entry(CONTAINER, 9090, "nginx", Some("klynt")),
@@ -524,8 +522,7 @@ fn a_container_with_several_ports_is_planned_once_with_all_of_them() {
     assert_eq!(
         got,
         Resolved::Go(Plan::Container(ContainerPlan {
-            id: CONTAINER.to_owned(),
-            ports: vec![8080, 9090]
+            id: CONTAINER.to_owned()
         }))
     );
 }

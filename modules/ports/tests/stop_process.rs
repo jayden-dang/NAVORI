@@ -96,7 +96,6 @@ fn plan(pid: i32, reach: Reach) -> ProcessPlan {
     ProcessPlan {
         pid,
         start_us: START_US,
-        members: vec![(pid, START_US)],
         reach,
     }
 }

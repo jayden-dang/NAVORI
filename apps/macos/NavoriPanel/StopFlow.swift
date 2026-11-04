@@ -89,14 +89,6 @@ public enum StopFlow: Equatable, Sendable {
         self = .asking(count: count)
     }
 
-    /// True when the caller should send the request now.
-    @discardableResult
-    public mutating func confirm() -> Bool {
-        guard case .asking = self else { return false }
-        self = .running
-        return true
-    }
-
     /// The requests to send now: only the Core's non-empty ones, once, and only if the count still matches.
     public mutating func confirm(sending requests: [String], count: Int) -> [String] {
         guard case .asking(let asked) = self else { return [] }

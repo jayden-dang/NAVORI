@@ -147,14 +147,12 @@ pub enum Reach {
 pub struct ProcessPlan {
     pub pid: i32,
     pub start_us: u64,
-    pub members: Vec<(i32, u64)>,
     pub reach: Reach,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContainerPlan {
     pub id: String,
-    pub ports: Vec<u16>,
 }
 
 /// The verdict for one target. `AlreadyGone` is refused without a sentence.
@@ -226,7 +224,6 @@ fn resolve_process(
     Resolved::Go(Plan::Process(ProcessPlan {
         pid,
         start_us,
-        members: vec![(pid, start_us)],
         reach: Reach::Alone,
     }))
 }
@@ -265,11 +262,7 @@ fn resolve_container(fresh: &FreshRead, guard: &Guard, selector: &Selector, id: 
     if !within(selector, first) {
         return Resolved::Refused(Outcome::OutsideSelector, Some(reason::NOT_IN_PROJECT));
     }
-    let ports: BTreeSet<u16> = held.iter().map(|entry| entry.port).collect();
-    Resolved::Go(Plan::Container(ContainerPlan {
-        id: id.to_owned(),
-        ports: ports.into_iter().collect(),
-    }))
+    Resolved::Go(Plan::Container(ContainerPlan { id: id.to_owned() }))
 }
 
 fn within(selector: &Selector, entry: &PortEntry) -> bool {

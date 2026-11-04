@@ -17,15 +17,15 @@ struct StopFlowTests {
     @Test func confirming_starts_the_send_once() {
         var flow = StopFlow.idle
         flow.press(count: 2)
-        let sent = flow.confirm()
-        #expect(sent)
+        let sent = flow.confirm(sending: ["stop"], count: 2)
+        #expect(sent == ["stop"])
         #expect(flow == .running)
     }
 
     @Test func confirming_without_asking_sends_nothing() {
         var flow = StopFlow.idle
-        let sent = flow.confirm()
-        #expect(sent == false)
+        let sent = flow.confirm(sending: ["stop"], count: 1)
+        #expect(sent.isEmpty)
         #expect(flow == .idle)
     }
 
@@ -34,24 +34,24 @@ struct StopFlowTests {
         flow.press(count: 2)
         flow.dismiss()
         #expect(flow == .idle)
-        let sent = flow.confirm()
-        #expect(sent == false)
+        let sent = flow.confirm(sending: ["stop"], count: 2)
+        #expect(sent.isEmpty)
     }
 
     @Test func a_second_confirm_while_running_is_ignored() {
         var flow = StopFlow.idle
         flow.press(count: 2)
-        let first = flow.confirm()
-        let second = flow.confirm()
-        #expect(first)
-        #expect(second == false)
+        let first = flow.confirm(sending: ["stop"], count: 2)
+        let second = flow.confirm(sending: ["stop"], count: 2)
+        #expect(first == ["stop"])
+        #expect(second.isEmpty)
         #expect(flow == .running)
     }
 
     @Test func a_second_press_or_dismissal_while_running_is_ignored() {
         var flow = StopFlow.idle
         flow.press(count: 2)
-        _ = flow.confirm()
+        _ = flow.confirm(sending: ["stop"], count: 2)
         flow.press(count: 5)
         flow.dismiss()
         #expect(flow == .running)
@@ -60,7 +60,7 @@ struct StopFlowTests {
     @Test func a_stale_result_keeps_the_row_and_carries_the_reason() {
         var flow = StopFlow.idle
         flow.press(count: 1)
-        _ = flow.confirm()
+        _ = flow.confirm(sending: ["stop"], count: 1)
         flow.finish([result(.stale, reason: "The port closed.")])
         #expect(flow == .failed(["The port closed."]))
     }
@@ -68,7 +68,7 @@ struct StopFlowTests {
     @Test func a_result_with_no_reason_still_says_why() {
         var flow = StopFlow.idle
         flow.press(count: 1)
-        _ = flow.confirm()
+        _ = flow.confirm(sending: ["stop"], count: 1)
         flow.finish([result(.stillStopping)])
         guard case .failed(let reasons) = flow else {
             Issue.record("expected failed, got \(flow)")
@@ -82,7 +82,7 @@ struct StopFlowTests {
         for outcome in [StopOutcome.stopped, .stoppedAlone, .alreadyGone] {
             var flow = StopFlow.idle
             flow.press(count: 1)
-            _ = flow.confirm()
+            _ = flow.confirm(sending: ["stop"], count: 1)
             flow.finish([result(outcome)])
             #expect(flow == .idle)
         }
@@ -91,7 +91,7 @@ struct StopFlowTests {
     @Test func fewer_stops_than_asked_lists_each_reason_for_the_rest() {
         var flow = StopFlow.idle
         flow.press(count: 3)
-        _ = flow.confirm()
+        _ = flow.confirm(sending: ["stop"], count: 3)
         flow.finish([
             result(.stopped),
             result(.protected, reason: "Navori needs this process."),
@@ -112,7 +112,7 @@ struct StopFlowTests {
     @Test func a_reply_with_no_results_ends_in_a_visible_failure() {
         var flow = StopFlow.idle
         flow.press(count: 2)
-        _ = flow.confirm()
+        _ = flow.confirm(sending: ["stop"], count: 2)
         flow.finish([])
         #expect(flow == .failed(["Navori got no answer to the stop."]))
     }
