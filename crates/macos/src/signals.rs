@@ -85,9 +85,12 @@ impl Signals for MacSignals {
     }
 
     fn send(&self, to: SignalTarget, signal: Signal) -> Result<(), SignalError> {
+        if !names_one_target(to) {
+            return Err(SignalError::Failed);
+        }
         let target = match to {
             SignalTarget::Process(pid) => pid,
-            SignalTarget::Group(group) => group.checked_neg().ok_or(SignalError::Failed)?,
+            SignalTarget::Group(group) => -group,
         };
         let number = match signal {
             Signal::Term => libc::SIGTERM,
@@ -105,5 +108,12 @@ impl Signals for MacSignals {
             libc::EPERM => SignalError::Denied,
             _ => SignalError::Failed,
         })
+    }
+}
+
+/// Ids at or below 1 make `kill(2)` reach the caller's group, every process, or init instead of the named target.
+pub(crate) fn names_one_target(to: SignalTarget) -> bool {
+    match to {
+        SignalTarget::Process(id) | SignalTarget::Group(id) => id > 1,
     }
 }

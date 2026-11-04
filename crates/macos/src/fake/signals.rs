@@ -100,6 +100,9 @@ impl Signals for FakeSignals {
     }
 
     fn send(&self, to: SignalTarget, signal: Signal) -> Result<(), SignalError> {
+        if !crate::signals::names_one_target(to) {
+            return Err(SignalError::Failed);
+        }
         let hook = lock(&self.state).hook.clone();
         if let Some(hook) = hook {
             hook();

@@ -125,4 +125,40 @@ fn a_real_child_started_in_its_own_group_reports_that_group_and_dies_on_kill() {
     assert!(waited.is_ok());
     assert_eq!(again, Err(SignalError::Gone));
     assert_ne!(signals.own_pid(), pid);
+    assert_ne!(signals.own_group(), pid);
+}
+
+const BROAD_IDS: [i32; 3] = [1, 0, -1];
+
+#[test]
+fn a_fake_refuses_ids_that_would_reach_more_than_the_named_target() {
+    let signals = FakeSignals::new(100, 100);
+
+    for id in BROAD_IDS {
+        assert_eq!(
+            signals.send(SignalTarget::Process(id), Signal::Kill),
+            Err(SignalError::Failed)
+        );
+        assert_eq!(
+            signals.send(SignalTarget::Group(id), Signal::Kill),
+            Err(SignalError::Failed)
+        );
+    }
+    assert!(signals.sent().is_empty());
+}
+
+#[test]
+fn the_real_seam_refuses_ids_that_would_reach_more_than_the_named_target() {
+    let signals = MacSignals::new();
+
+    for id in BROAD_IDS {
+        assert_eq!(
+            signals.send(SignalTarget::Process(id), Signal::Term),
+            Err(SignalError::Failed)
+        );
+        assert_eq!(
+            signals.send(SignalTarget::Group(id), Signal::Term),
+            Err(SignalError::Failed)
+        );
+    }
 }
