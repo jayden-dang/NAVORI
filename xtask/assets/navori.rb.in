@@ -1,0 +1,29 @@
+cask "@CASK@" do
+  version "@VERSION@"
+  sha256 "@SHA256@"
+
+  url "https://github.com/jayden-dang/NAVORI/releases/download/v#{version}/Navori-#{version}.zip"
+  name "Navori"
+  desc "AI-first menubar cockpit for developers running coding agents@DESC_SUFFIX@"
+  homepage "https://github.com/jayden-dang/NAVORI"
+
+  conflicts_with cask: "@CONFLICTS@"
+  depends_on arch: :arm64
+  depends_on macos: :tahoe
+
+  app "Navori.app"
+  binary "#{appdir}/Navori.app/Contents/Helpers/navori"
+
+  postflight_steps do
+    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/Navori.app"]
+  end
+
+  zap trash: ["~/Library/Application Support/Navori", "~/Library/Logs/Navori"]
+
+  caveats <<~EOS
+    @CAVEAT_EXTRA@
+    Navori is self-signed and not notarized. This cask removed the quarantine
+    flag so macOS opens it without a Gatekeeper prompt.
+    Before uninstalling, remove Navori's hooks in Settings → Integrations.
+  EOS
+end

@@ -1130,7 +1130,7 @@ checksum = "743fb55ba31b18fb1ecef6bdc9aa2743314978ac084044301a7eee33fb99a20d"
 
 [[package]]
 name = "navori-cli"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1152,7 +1152,7 @@ dependencies = [
 
 [[package]]
 name = "navori-config"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -1162,7 +1162,7 @@ dependencies = [
 
 [[package]]
 name = "navori-context"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "futures",
  "navori-redact",
@@ -1175,7 +1175,7 @@ dependencies = [
 
 [[package]]
 name = "navori-ffi"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "anyhow",
  "futures",
@@ -1206,7 +1206,7 @@ dependencies = [
 
 [[package]]
 name = "navori-ipc"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "futures",
  "navori-protocol",
@@ -1220,7 +1220,7 @@ dependencies = [
 
 [[package]]
 name = "navori-kernel"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "anyhow",
  "futures",
@@ -1239,7 +1239,7 @@ dependencies = [
 
 [[package]]
 name = "navori-llm"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "futures",
  "navori-secrets",
@@ -1252,7 +1252,7 @@ dependencies = [
 
 [[package]]
 name = "navori-macos"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "libc",
  "navori-macos",
@@ -1265,7 +1265,7 @@ dependencies = [
 
 [[package]]
 name = "navori-mod-awake"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "anyhow",
  "navori-kernel",
@@ -1282,7 +1282,7 @@ dependencies = [
 
 [[package]]
 name = "navori-mod-integrations"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "anyhow",
  "navori-kernel",
@@ -1298,7 +1298,7 @@ dependencies = [
 
 [[package]]
 name = "navori-mod-ports"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "anyhow",
  "futures",
@@ -1318,7 +1318,7 @@ dependencies = [
 
 [[package]]
 name = "navori-procs"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "navori-macos",
  "tempfile",
@@ -1330,7 +1330,7 @@ dependencies = [
 
 [[package]]
 name = "navori-protocol"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -1338,7 +1338,7 @@ dependencies = [
 
 [[package]]
 name = "navori-redact"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "regex",
  "serde_json",
@@ -1346,7 +1346,7 @@ dependencies = [
 
 [[package]]
 name = "navori-secrets"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "apple-native-keyring-store",
  "keyring-core",
@@ -1357,7 +1357,7 @@ dependencies = [
 
 [[package]]
 name = "navori-store"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "navori-protocol",
  "navori-redact",
@@ -2985,7 +2985,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "0.1.0-rc.5"
 dependencies = [
  "anyhow",
  "clap",

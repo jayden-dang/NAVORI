@@ -1,0 +1,2 @@
+designated => identifier "dev.navori.app" and certificate leaf = H"8c56e155bdd4ed3c038035509193fb7d33d302c1"
+designated => identifier "dev.navori.app.cli" and certificate leaf = H"8c56e155bdd4ed3c038035509193fb7d33d302c1"

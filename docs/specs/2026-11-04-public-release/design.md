@@ -24,7 +24,7 @@ Retrieval (fresh, catalog query over `xtask/`, `modules/integrations/`, `.github
 3. `cargo xtask release-check` (local) runs `ci` then `perf`; CI runs `ci` and never `perf`.
 4. CI builds and checks through one new command, `cargo xtask release --tag <tag> --out <dir>`, so the workflow holds no build logic and the logic is unit-tested in Rust.
 5. The designated requirements of `Navori.app` and its helper are committed in `xtask/assets/designated-requirement.txt`; a mismatch fails the release before publishing.
-6. The cask is generated from a template in `xtask/assets/navori.rb.in` and pushed to the tap named by the repository variable `TAP_REPOSITORY`; while that variable is unset, the Release stays a draft and no cask changes.
+6. The cask is generated from a template in `xtask/assets/navori.rb.in` and pushed to the tap named by the repository variable `TAP_REPOSITORY`, but only once the Release is public, which `PUBLISH_RELEASE=true` decides (amended 2026-11-04); while that variable is unset, the Release stays a draft and no cask changes.
 7. No new dependencies: Cargo already rejects a workspace version that is not SemVer, so `release-check` only needs to split off a pre-release part; SHA-256 comes from `shasum -a 256`, the zip from `ditto`, and the workflow lint reads YAML line by line.
 8. Hooks are written in the guarded form `[ -f 'P' ] && [ -x 'P' ] && exec 'P' hook || true` (dev: `… exec 'P' --profile dev hook || true`); the earlier unguarded form is still recognized as Navori's, and is reported as needing repair.
 9. Third-party actions in the workflow are pinned to full commit SHAs, enforced by a lint inside `cargo xtask ci`.
@@ -53,32 +53,40 @@ Flow:
 
 ### Cask template
 
-Satisfies: RELEASE-3.2, RELEASE-3.3, RELEASE-3.4, RELEASE-3.5, RELEASE-5.5
+Satisfies: RELEASE-3.2, RELEASE-3.3, RELEASE-3.4, RELEASE-3.5, RELEASE-3.9, RELEASE-3.10, RELEASE-5.5
 Reuse: rung 3 — `str::replace` over `include_str!("../assets/navori.rb.in")`; no templating crate
 Respects: ARCH-14 (zap names only the release profile's directories)
-Interface: `cask_text(version: &str, sha256: &str) -> String`
-Depth: n/a — a two-field fill of a reviewable Ruby template; the cask knowledge lives in the template, not in code.
+Interface: `cask_text(version: &str, sha256: &str, prerelease: bool) -> String` and `cask_file(prerelease: bool) -> &'static str` (`navori.rb` or `navori-rc.rb`). *(Amended 2026-11-04.)*
+Depth: n/a — a small fill of a reviewable Ruby template (version, hash, cask name, description suffix, the name of the cask it conflicts with); the cask knowledge lives in the template, not in code.
 Locality: new `xtask/assets/navori.rb.in`; `release.rs` — extend.
 
-Template shape (placeholders `@VERSION@`, `@SHA256@`):
+Template shape (placeholders `@VERSION@`, `@SHA256@`, `@CASK@`, `@DESC_SUFFIX@`, `@CONFLICTS@`, `@CAVEAT_EXTRA@`; `desc` takes the suffix ` (RC)` on a release candidate, which keeps it within the 80-character limit of `brew style`; the `@CAVEAT_EXTRA@` line is replaced by one full indented line for a release candidate and removed for a final) *(Amended 2026-11-04.)*:
 
 ```ruby
-cask "navori" do
+cask "@CASK@" do
   version "@VERSION@"
   sha256 "@SHA256@"
+
   url "https://github.com/jayden-dang/NAVORI/releases/download/v#{version}/Navori-#{version}.zip"
   name "Navori"
-  desc "AI-first menubar cockpit for developers running coding agents"
+  desc "AI-first menubar cockpit for developers running coding agents@DESC_SUFFIX@"
   homepage "https://github.com/jayden-dang/NAVORI"
+
+  conflicts_with cask: "@CONFLICTS@"
   depends_on arch: :arm64
   depends_on macos: :tahoe
+
   app "Navori.app"
   binary "#{appdir}/Navori.app/Contents/Helpers/navori"
-  postflight do
-    system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{appdir}/Navori.app"]
+
+  postflight_steps do
+    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/Navori.app"]
   end
+
   zap trash: ["~/Library/Application Support/Navori", "~/Library/Logs/Navori"]
+
   caveats <<~EOS
+    @CAVEAT_EXTRA@
     Navori is self-signed and not notarized. This cask removed the quarantine
     flag so macOS opens it without a Gatekeeper prompt.
     Before uninstalling, remove Navori's hooks in Settings → Integrations.
@@ -86,7 +94,7 @@ cask "navori" do
 end
 ```
 
-`zap trash:` moves the two directories to the Trash, the Homebrew convention, so a mistaken zap is recoverable (RELEASE-5.5 amended to say so). The exact stanza order and the `macos:` value are whatever `brew style` / `brew audit` accept (checked in the workflow, RELEASE-3.6); that `postflight` also runs on `brew upgrade` is checked by RELEASE-4.4.
+`zap trash:` moves the two directories to the Trash, the Homebrew convention, so a mistaken zap is recoverable (RELEASE-5.5 amended to say so). The exact stanza order and the `macos:` value are whatever `brew style` / `brew audit` accept (checked in the workflow, RELEASE-3.6).
 
 ### `cargo xtask release-check` — the local gate before tagging
 
@@ -111,10 +119,10 @@ A `uses:` line passes when its ref after `@` is 40 hex characters or it starts w
 
 ### Release workflow — `.github/workflows/release.yml`
 
-Satisfies: RELEASE-1.1, RELEASE-1.2, RELEASE-1.4, RELEASE-1.9, RELEASE-1.10, RELEASE-1.11, RELEASE-1.12, RELEASE-3.1, RELEASE-3.6, RELEASE-6.1, RELEASE-6.2, RELEASE-7.3, RELEASE-7.5, RELEASE-7.7
+Satisfies: RELEASE-1.1, RELEASE-1.2, RELEASE-1.4, RELEASE-1.9, RELEASE-1.10, RELEASE-1.11, RELEASE-1.12, RELEASE-3.1, RELEASE-3.6, RELEASE-6.1, RELEASE-6.2, RELEASE-6.4, RELEASE-7.3, RELEASE-7.5, RELEASE-7.7
 Reuse: rung 4 — GitHub Actions (`push.tags`, Environments, `vars`, `concurrency`), the `gh` CLI preinstalled on the `macos-26` runner, Homebrew preinstalled on the runner; `actions/checkout` pinned by SHA
 Security: TB-7 (writes into another repository's cask only through a token scoped to it)
-Interface: trigger `on: push: tags: ['v*']`; inputs: secrets `SIGNING_P12`, `SIGNING_P12_PASSWORD`, `TAP_TOKEN` (Environment `release`), variable `TAP_REPOSITORY`; outputs: a GitHub Release `v<version>` and, when the variable is set, one commit to `Casks/navori.rb` in the tap.
+Interface: trigger `on: push: tags: ['v*']`; inputs: secrets `SIGNING_P12`, `SIGNING_P12_PASSWORD`, `TAP_TOKEN` (Environment `release`), variables `TAP_REPOSITORY` and `PUBLISH_RELEASE`; outputs: a GitHub Release `v<version>` and, when the variable is set, one commit to `Casks/navori.rb` (final tag) or `Casks/navori-rc.rb` (pre-release tag) in the tap. *(Amended 2026-11-04.)*
 Depth: n/a — a pipeline of existing commands; all decisions live in `cargo xtask release`.
 Locality: new file; no existing file changes.
 
@@ -126,8 +134,8 @@ One job, `runs-on: macos-26`, `environment: release`, `permissions: contents: wr
 5. Otherwise import signing: decode `SIGNING_P12` into a temp file, create a temporary keychain with a random password, import with `-T /usr/bin/codesign`, `security set-key-partition-list`, add it to the search list, trust the certificate for code signing (`sudo security add-trusted-cert -p codeSign`), export `NAVORI_SIGN_IDENTITY="Navori Local Signing"`, delete the temp `.p12` file. No secret is echoed (7.3).
 6. `cargo xtask release --tag "$GITHUB_REF_NAME" --out dist` (1.5–1.8; with downloaded assets it only writes the cask).
 7. If no Release exists, `gh release create --draft --verify-tag`, with `--prerelease` when step 2 printed `prerelease=true` (1.10); then `gh release upload --clobber` the zip and `.sha256` (1.9). The Release always starts as a draft, so nobody can download a half-uploaded one.
-8. While `vars.TAP_REPOSITORY` is empty, stop here: the Release stays a draft and no cask changes (6.1).
-9. When it is set: check out the tap with `TAP_TOKEN`, copy `dist/navori.rb` to `Casks/navori.rb`, trust and `brew tap` the checkout locally, run `brew style` and `brew audit --cask` — any error stops before anything is published (3.6); then `gh release edit --draft=false` (6.2); then commit `navori <version>` and push only when the file changed (3.1). The cask is pushed only after its Release is public, so it never points at a draft.
+8. While `vars.PUBLISH_RELEASE` is not `true`, the Release stays a draft and nothing is pushed (6.1). When `vars.TAP_REPOSITORY` is set the tap checkout, local cask commit and `brew style` / `brew audit` still run (6.4) and then the job stops; when it is empty the job stops here. (Amended 2026-11-04.)
+9. When `vars.TAP_REPOSITORY` is set: check out the tap with `TAP_TOKEN`, copy the cask file `cargo xtask release` wrote (`dist/navori.rb` for a final tag, `dist/navori-rc.rb` for a pre-release tag) to the same name under `Casks/`, commit it in the local checkout, `brew tap` the checkout, run `brew trust --cask`, `brew style` and `brew audit --cask` — any error stops before anything is published (3.6, 6.4). Then, only when `vars.PUBLISH_RELEASE` is `true`: `gh release edit --draft=false` (6.2), and push the commit when it is ahead of the tap (3.1). The cask is pushed only after its Release is public, so it never points at a draft. When `PUBLISH_RELEASE` is `true` and `TAP_REPOSITORY` is empty, the Release is published and no tap is touched. (Amended 2026-11-04.)
 10. `if: always()`: delete the temporary keychain and restore the default search list (7.5).
 
 Partial failure (7.7): a failure before step 9's publish leaves at most a draft Release and an unchanged tap; a failure between publish and push leaves a public Release while the tap still names the previous version, which installs fine. Rerunning the job reaches step 4, reuses the assets, and finishes the remaining steps; a second rerun finds the cask unchanged and pushes nothing. Setting `TAP_REPOSITORY` later and rerunning the job for a draft tag publishes it the same way.
@@ -196,12 +204,12 @@ One-time setup, written into `docs/agents/project.md`: export `Navori Local Sign
 | Integrations Module through its Actions (`modules/integrations/tests/*`, existing) | integration | RELEASE-5.1, 5.4, 5.11, 5.6, 5.8, 5.9, 5.10 |
 | The guarded command run through `/bin/sh -c` with a missing helper and a fake helper script (in `modules/integrations/tests/`) | integration | RELEASE-5.2, 5.3, 5.7, 7.2 |
 | Existing xtask, store and procs tests (`cargo xtask ci`) | unit / integration | RELEASE-1.13, 1.14, 1.15, 2.8, 4.5 |
-| A pre-release tag pushed with `TAP_REPOSITORY` unset, then set to a test tap, then a failed rerun | e2e (GitHub, by hand) | RELEASE-1.1, 1.2, 1.4, 1.9, 1.10, 1.11, 1.12, 3.1, 3.6, 6.1, 6.2, 7.3, 7.5, 7.7 |
+| A pre-release tag pushed with both variables unset, then `TAP_REPOSITORY` set to a test tap with the Publish switch off (audit only), then the switch on with a test tap, then a failed rerun | e2e (GitHub, by hand) | RELEASE-1.1, 1.2, 1.4, 1.9, 1.10, 1.11, 1.12, 3.1, 3.6, 6.1, 6.2, 6.4, 7.3, 7.5, 7.7 |
 | Clean macOS 26 account: install, Claude Code session, upgrade between two pre-releases, `brew uninstall --zap` | e2e (by hand) | RELEASE-3.7, 3.8, 4.1, 4.2, 4.3, 4.4 |
 | Review of `docs/agents/project.md` and the token's settings | review | RELEASE-6.3, 7.6 |
 
 ## Coverage check
 
-Every ID in requirements.md (57) appears in exactly one `Satisfies:` line: 1.1–1.15, 2.1–2.8, 3.1–3.8, 4.1–4.5, 5.1–5.11, 6.1–6.3, 7.1–7.7. None is deliberately unmapped.
+Every ID in requirements.md (60) appears in exactly one `Satisfies:` line: 1.1–1.15, 2.1–2.8, 3.1–3.10, 4.1–4.5, 5.1–5.11, 6.1–6.4, 7.1–7.7. None is deliberately unmapped.
 
 Risks to check on the first pre-release run, not decisions (each is caught by a workflow step failing, never by a broken user install): the `macos-26` runner label and its Rust toolchain; Homebrew Tap Trust in CI (`brew trust --cask` on the local tap before `brew style` / `brew audit`); the `depends_on macos:` value `brew style` accepts for macOS 26; fish ≥ 3 running the guarded hook (verified locally only for sh, bash 3.2 and zsh); whether `codesign` on the runner accepts the imported self-signed identity after `add-trusted-cert` (if not, sign by the certificate's SHA-1 instead of its name); whether `brew audit --cask` without `--online` passes for a draft Release URL (the cask is only pushed after the Release is published in step 6, so audit can run after `gh release edit --draft=false` if it needs the URL).

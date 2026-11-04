@@ -136,17 +136,78 @@ None — not deployed
 
 Run in order; `cut-release` executes exactly these and does not improvise.
 
-1. `cargo xtask ci` — the full gate.
-2. `cargo xtask perf` — the GOAL-11 budget on release code packaged as the dev identity
-   (`docs/standards/performance.md`). `--record` is not part of a release.
-3. `cargo xtask install` — builds the release bundle, signs it with `Navori Local Signing`,
+1. `cargo xtask release-check` — the local gate: tag free, tree clean, `cargo xtask ci`,
+   `cargo xtask perf` (GOAL-11 budget; `--record` is not part of a release). On success it
+   prints the tag to push. `<version>` is `[workspace.package] version` in `Cargo.toml`.
+2. `cargo xtask install` — builds the release bundle, signs it with `Navori Local Signing`,
    runs `codesign --verify --strict --deep`, installs to `/Applications/Navori.app`
    (the previous install is kept as `/Applications/Navori.app.previous`) and launches it.
-4. Smoke: `/Applications/Navori.app/Contents/Helpers/navori doctor` — every check ✓, exit 0.
-5. Tag: `git tag v<version> && git push origin v<version>` — `<version>` is
-   `[workspace.package] version` in `Cargo.toml`.
+3. Smoke: `/Applications/Navori.app/Contents/Helpers/navori doctor` — every check ✓, exit 0.
+4. Tag: `git tag v<version> && git push origin v<version>` — pushing a `v*` tag runs
+   `.github/workflows/release.yml`, which builds and signs the zip and always creates the
+   Release as a draft first. While the repository variable `TAP_REPOSITORY` is set, the
+   workflow also audits the cask in that tap (`brew style`, `brew audit`) and stops before
+   publishing if the audit fails. The Release is published and the cask pushed to the tap
+   only when the repository variable `PUBLISH_RELEASE` is exactly `true`; otherwise the
+   Release stays a draft and nothing is pushed. Pre-release tags
+   behave the same way, but their cask is `navori-rc` (`brew install --cask navori-rc`);
+   final tags use `navori`. Build the artifacts by hand with
+   `cargo xtask release --tag v<version> --out <dir>` (`--check` only validates the tag).
+5. Clean-account checks (RELEASE-6.3), once the Release is published and the cask updated.
+   Use a macOS 26 user account that has never run Navori:
+   1. RELEASE-3.7: `brew tap jayden-dang/navori`, `brew trust --cask jayden-dang/navori/navori`,
+      `brew install --cask navori`, then open Navori. Expected: it opens with no Gatekeeper
+      dialog.
+   2. RELEASE-3.8: in Settings → Integrations install the Claude Code hooks, work in a
+      Claude Code session, then run `pmset -g assertions`. Expected: it lists
+      "Navori: keeping this Mac awake".
+   3. RELEASE-4.4: with two pre-releases published, install the older, set a setting, keep
+      the hooks and save an AI key, then `brew upgrade --cask navori`. Expected: settings,
+      hooks and the saved AI key survive with no Keychain prompt.
+   4. Open verification from implementation: the cask's `postflight_steps` also runs on
+      `brew upgrade` (check during step 3 that the upgraded app is not quarantined:
+      `xattr -p com.apple.quarantine /Applications/Navori.app` prints nothing, and it opens
+      without a Gatekeeper dialog).
+   5. Open verification from implementation: the Task-9 style checks (draft run with a bad
+      tag, draft pre-release, then the published run against the tap). Expected: each
+      behaves as listed in `docs/specs/2026-11-04-public-release/tasks.md` Task 9; record one
+      row per check (what was run, by whom, when, observed result, pass/fail) in
+      `docs/specs/2026-11-04-public-release/acceptance.md`.
 
-No notarization or public distribution yet (no Apple Developer ID).
+No notarization (no Apple Developer ID): the app is self-signed and the cask clears the
+quarantine flag.
+
+## Release setup (one time)
+
+Do this once, before the first tag. Create nothing here from an agent session and commit
+nothing secret.
+
+1. Export the `Navori Local Signing` identity with its private key as a `.p12`: in Keychain
+   Access select that single identity, File → Export Items…, format `.p12`. Choose a
+   NON-EMPTY export passphrase and store it as `SIGNING_P12_PASSWORD`. Keep an OFFLINE copy
+   (encrypted drive): losing the key means a new identity and a new designated requirement
+   for every user. (CLI alternative: `security export -k <keychain> -t identities -f pkcs12
+   -o navori.p12 -P <passphrase>` exports EVERY identity in that keychain, so use it only
+   against a keychain that holds just this identity.)
+2. Create the tap repository (`jayden-dang/homebrew-navori`) and a fine-grained token with
+   `contents: write` on that tap ONLY. Verify the token's repository access lists only the
+   tap (RELEASE-7.6).
+3. Create the GitHub Environment `release`, restricted to tags matching `v*`, with secrets
+   `SIGNING_P12` (`base64 < navori.p12`), `SIGNING_P12_PASSWORD` and `TAP_TOKEN` (the token
+   from step 2; it must be non-empty before `TAP_REPOSITORY` is set).
+4. Add a repository ruleset so only the owner can create `v*` tags.
+5. Set two repository variables, which are separate switches:
+   - `TAP_REPOSITORY` names the tap (`jayden-dang/homebrew-navori`). While it is set, every
+     tag audits the cask in that tap; while `PUBLISH_RELEASE` is off this is audit-only and
+     nothing is published or pushed.
+   - `PUBLISH_RELEASE` publishes. Leave it UNSET until the first public release; tags then
+     produce draft Releases only. To go public, set it to `true` (any other value is off).
+     From then on a tag publishes the Release and, when `TAP_REPOSITORY` is set, pushes the
+     updated cask to the tap. With `PUBLISH_RELEASE` true and `TAP_REPOSITORY` empty, the
+     Release is published and no tap is touched.
+6. Right before the first FINAL tag (not a pre-release), add `- **Compat obligation:**
+   External` as a line of its own in the `## Project posture` bullet list (it must start
+   the line); `cargo xtask release-check` enforces it.
 
 ## Paths
 

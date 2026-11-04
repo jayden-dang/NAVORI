@@ -84,17 +84,17 @@ Compact delta every task inherits:
 
 **Depends-on:** none
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `install.rs`: `installing_writes_a_command_that_runs_the_helper_only_when_it_exists` expects exactly `[ -f '/Applications/Navori.app/Contents/Helpers/navori' ] && [ -x '/Applications/Navori.app/Contents/Helpers/navori' ] && exec '/Applications/Navori.app/Contents/Helpers/navori' hook || true`; the quote-in-path and dev cases at today's `:369`, `:384`, `:399` move to the guarded form.
   - `status.rs`: `hooks_written_in_the_earlier_form_need_repair` (loads `claude_installed.json`); the three tests that read the earlier form as installed move to guarded input — `a_complete_correct_set_is_installed` (`:77`, loads `claude_guarded.json` and `grok_guarded.json`), `a_symlinked_hook_file_is_read_through_the_link` (`:186`, links to `claude_guarded.json`), `a_quote_inside_the_helper_path_is_read_back_as_ours` (`:342`, the string at `:344` in the guarded form); `guarded_lookalikes_are_not_navoris` — paths that differ between the three places, a missing `exec`, `|| false`, the other profile's arguments, a path not ending `Contents/Helpers/navori`.
   - `repair.rs`: `repair_rewrites_earlier_form_hooks_as_guarded_and_keeps_other_hooks`.
   - `remove.rs`: `remove_deletes_the_running_profiles_hooks_in_both_forms_and_nothing_else`.
   - `guard_shell.rs` (runs `/bin/sh -c <command>` built by the module's install path into a temp Hook file, then read back): `a_missing_helper_exits_zero_with_no_output`; `a_directory_in_place_of_the_helper_exits_zero_with_no_output`; `a_helper_without_the_execute_bit_exits_zero_with_no_output`; `a_present_helper_gets_the_same_arguments_and_stdin` (a fake helper script writes `"$@"` and its stdin to files; expect `hook` and the exact payload bytes); `the_helper_runs_as_the_shell_process_itself` (the fake writes `$$`; expect it to equal the `sh` child's pid); `the_command_finishes_well_inside_the_hook_timeout` (under 2 s with the fake present). `guard_shell.rs` defines its own install helper over `Rig::new(dev, helper)` (the one in `install.rs` is local). The Session Lease through a real Harness (RELEASE-5.7) is exercised in Task 9 Step 4.
-- [ ] **Step 2: Run** `cargo test -p navori-mod-integrations` — expect: the new and moved tests fail on the earlier command text.
-- [ ] **Step 3: Implement** the guarded `command_for` and the two-form recognizer; switch `tests/common/mod.rs` `command()` to the guarded form and add `legacy_command()`; add `claude_guarded.json` and `grok_guarded.json`. `crates/ffi/tests/integrations.rs` needs no edit: its installed cases install through the Core and pick up the guarded form, and `:150` stays a needs-repair case.
-- [ ] **Step 4: Update the docs:** `docs/features/integrations.md:60`; amend HOOKS-4.4 (`requirements.md:96`) and HOOKS-5.2 (`:117`) in place to say the guarded command and its two-form recognition, each ending `*(Amended 2026-11-04 by RELEASE-5.1 — guarded hook command.)*` / `*(Amended 2026-11-04 by RELEASE-5.11.)*` — amended, not struck, because HOOKS `tasks.md:239,265` cite them and HOOKS is still In-progress; update HOOKS `design.md` decision 5 (`:27`) and the lines that say only the single-quoted form is recognized.
-- [ ] **Step 5: Run** `cargo test -p navori-mod-integrations && cargo xtask ci` — expect: pass.
-- [ ] **Step 6: Commit** `git commit -m "feat(integrations): write hooks that do nothing once the Navori helper is gone"`
+- [x] **Step 2: Run** `cargo test -p navori-mod-integrations` — expect: the new and moved tests fail on the earlier command text.
+- [x] **Step 3: Implement** the guarded `command_for` and the two-form recognizer; switch `tests/common/mod.rs` `command()` to the guarded form and add `legacy_command()`; add `claude_guarded.json` and `grok_guarded.json`. `crates/ffi/tests/integrations.rs` needs no edit: its installed cases install through the Core and pick up the guarded form, and `:150` stays a needs-repair case.
+- [x] **Step 4: Update the docs:** `docs/features/integrations.md:60`; amend HOOKS-4.4 (`requirements.md:96`) and HOOKS-5.2 (`:117`) in place to say the guarded command and its two-form recognition, each ending `*(Amended 2026-11-04 by RELEASE-5.1 — guarded hook command.)*` / `*(Amended 2026-11-04 by RELEASE-5.11.)*` — amended, not struck, because HOOKS `tasks.md:239,265` cite them and HOOKS is still In-progress; update HOOKS `design.md` decision 5 (`:27`) and the lines that say only the single-quoted form is recognized.
+- [x] **Step 5: Run** `cargo test -p navori-mod-integrations && cargo xtask ci` — expect: pass.
+- [x] **Step 6: Commit** `git commit -m "feat(integrations): write hooks that do nothing once the Navori helper is gone"`
 
 _Requirements: RELEASE-5.1, RELEASE-5.2, RELEASE-5.3, RELEASE-5.4, RELEASE-5.6, RELEASE-5.7, RELEASE-5.8, RELEASE-5.9, RELEASE-5.10, RELEASE-5.11, RELEASE-7.2_
 
@@ -115,11 +115,11 @@ _Requirements: RELEASE-5.1, RELEASE-5.2, RELEASE-5.3, RELEASE-5.4, RELEASE-5.6, 
 
 **Depends-on:** none
 
-- [ ] **Step 1: Write the failing tests:** `a_tag_naming_the_workspace_version_passes` (`v0.1.0`, `0.1.0` → `0.1.0`); `a_tag_naming_another_version_fails_naming_both` (`v0.2.0`, `0.1.0` → error text contains `0.2.0` and `0.1.0`); `a_tag_without_the_v_prefix_fails`; `a_version_with_a_pre_release_part_is_a_pre_release` (`0.2.0-rc.1` true, `1.0.0-rc.1+b.7` true); `build_metadata_alone_is_not_a_pre_release` (`1.0.0+build-1` false, `0.1.0` false).
-- [ ] **Step 2: Run** `cargo test -p xtask release::` — expect: does not compile (`release` module missing).
-- [ ] **Step 3: Implement** `release.rs` with the two functions and `run` handling `--check` only (the build path arrives in Task 4: until then `run` without `--check` bails with "release build not implemented"); add `mod release;` and the `Cmd::Release` arm in `main.rs`, the workspace version taken from `env!("CARGO_PKG_VERSION")`.
-- [ ] **Step 4: Run** `cargo test -p xtask && cargo xtask release --tag v0.1.0 --check` — expect: pass, then `version=0.1.0` and `prerelease=false`.
-- [ ] **Step 5: Commit** `git commit -m "feat(xtask): check that a release tag names the workspace version"`
+- [x] **Step 1: Write the failing tests:** `a_tag_naming_the_workspace_version_passes` (`v0.1.0`, `0.1.0` → `0.1.0`); `a_tag_naming_another_version_fails_naming_both` (`v0.2.0`, `0.1.0` → error text contains `0.2.0` and `0.1.0`); `a_tag_without_the_v_prefix_fails`; `a_version_with_a_pre_release_part_is_a_pre_release` (`0.2.0-rc.1` true, `1.0.0-rc.1+b.7` true); `build_metadata_alone_is_not_a_pre_release` (`1.0.0+build-1` false, `0.1.0` false).
+- [x] **Step 2: Run** `cargo test -p xtask release::` — expect: does not compile (`release` module missing).
+- [x] **Step 3: Implement** `release.rs` with the two functions and `run` handling `--check` only (the build path arrives in Task 4: until then `run` without `--check` bails with "release build not implemented"); add `mod release;` and the `Cmd::Release` arm in `main.rs`, the workspace version taken from `env!("CARGO_PKG_VERSION")`.
+- [x] **Step 4: Run** `cargo test -p xtask && cargo xtask release --tag v0.1.0 --check` — expect: pass, then `version=0.1.0` and `prerelease=false`.
+- [x] **Step 5: Commit** `git commit -m "feat(xtask): check that a release tag names the workspace version"`
 
 _Requirements: RELEASE-1.3, RELEASE-1.10_
 
@@ -140,11 +140,11 @@ _Requirements: RELEASE-1.3, RELEASE-1.10_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Write the failing tests:** `the_cask_names_the_version_and_the_zip_hash` (`cask_text("0.1.0", "<64 × a>")` contains `version "0.1.0"` and `sha256 "aaaa…"`, and no `@`); `the_cask_needs_an_arm64_mac_on_macos_26` (`depends_on arch: :arm64`, `depends_on macos: :tahoe`); `the_cask_installs_the_app_and_links_the_cli` (`app "Navori.app"`, `binary "#{appdir}/Navori.app/Contents/Helpers/navori"`); `the_cask_clears_quarantine_after_install` (postflight with `/usr/bin/xattr`, `-dr`, `com.apple.quarantine`); `zap_moves_only_the_release_profiles_directories_to_the_trash` (both release paths present, `Navori Dev` absent); `the_caveats_say_self_signed_not_notarized_and_how_to_remove_hooks`.
-- [ ] **Step 2: Run** `cargo test -p xtask release::` — expect: fails (`cask_text` missing).
-- [ ] **Step 3: Implement** the template file and `cask_text`.
-- [ ] **Step 4: Run** `cargo test -p xtask` — expect: pass. Then write `cask_text("0.1.0", <64 × a>)` to `Casks/navori.rb` in a temporary git repo, `brew tap local/navori-check <that repo>`, `brew trust --cask local/navori-check/navori` and `brew style --cask local/navori-check/navori` — expect: no offenses (adjust the template until clean); a copy with `depends_on arch: :bogus` — expect: an error; `brew untap local/navori-check`.
-- [ ] **Step 5: Commit** `git commit -m "feat(xtask): generate the Homebrew cask for a release"`
+- [x] **Step 1: Write the failing tests:** `the_cask_names_the_version_and_the_zip_hash` (`cask_text("0.1.0", "<64 × a>")` contains `version "0.1.0"` and `sha256 "aaaa…"`, and no `@`); `the_cask_needs_an_arm64_mac_on_macos_26` (`depends_on arch: :arm64`, `depends_on macos: :tahoe`); `the_cask_installs_the_app_and_links_the_cli` (`app "Navori.app"`, `binary "#{appdir}/Navori.app/Contents/Helpers/navori"`); `the_cask_clears_quarantine_after_install` (postflight with `/usr/bin/xattr`, `-dr`, `com.apple.quarantine`); `zap_moves_only_the_release_profiles_directories_to_the_trash` (both release paths present, `Navori Dev` absent); `the_caveats_say_self_signed_not_notarized_and_how_to_remove_hooks`.
+- [x] **Step 2: Run** `cargo test -p xtask release::` — expect: fails (`cask_text` missing).
+- [x] **Step 3: Implement** the template file and `cask_text`.
+- [x] **Step 4: Run** `cargo test -p xtask` — expect: pass. Then write `cask_text("0.1.0", <64 × a>)` to `Casks/navori.rb` in a temporary git repo, `brew tap local/navori-check <that repo>`, `brew trust --cask local/navori-check/navori` and `brew style --cask local/navori-check/navori` — expect: no offenses (adjust the template until clean); a copy with `depends_on arch: :bogus` — expect: an error; `brew untap local/navori-check`.
+- [x] **Step 5: Commit** `git commit -m "feat(xtask): generate the Homebrew cask for a release"`
 
 _Requirements: RELEASE-3.2, RELEASE-3.3, RELEASE-3.4, RELEASE-3.5, RELEASE-5.5_
 
@@ -167,11 +167,11 @@ _Requirements: RELEASE-3.2, RELEASE-3.3, RELEASE-3.4, RELEASE-3.5, RELEASE-5.5_
 
 **Depends-on:** Task 2, Task 3
 
-- [ ] **Step 1: Write the failing tests:** `only_the_designated_lines_of_codesign_output_are_compared` (input with an `Executable=` line, a `# designated =>` comment-free line and two `designated =>` lines → the two lines); `a_designated_requirement_with_another_certificate_is_a_mismatch` (a pure `requirement_mismatch(expected: &str, actual: &[String]) -> Option<String>` returns text showing both); `matching_requirements_are_not_a_mismatch`; `a_missing_signing_identity_stops_the_release` (pure `identity_problem(env: Option<&str>, find_identity_stdout: &str) -> Option<String>`: `None` env → problem; env set but not listed → problem; listed → none).
-- [ ] **Step 2: Run** `cargo test -p xtask release::` — expect: fails (functions missing).
-- [ ] **Step 3: Implement** the build path in the order of `design.md` "`cargo xtask release`" steps 1–5, including the reuse path for an existing zip; record `designated-requirement.txt` from `codesign -d -r- /Applications/Navori.app` and its helper on this Mac.
-- [ ] **Step 4: Run** `cargo test -p xtask`, then on this Mac `NAVORI_SIGN_IDENTITY="Navori Local Signing" cargo xtask release --tag v0.1.0 --out "$(mktemp -d)"` — expect: three files, and `codesign -dv` of the unzipped app shows `CFBundleShortVersionString` `0.1.0`; and `CFBundleVersion` equal to `git rev-list --count HEAD`; run the same command again into the same directory — expect: only `navori.rb` rewritten, the zip and `.sha256` untouched, and the cask's `sha256` equal to the `.sha256` file; then the same with `NAVORI_SIGN_IDENTITY` unset — expect: fails naming the identity, no zip written; then `cargo xtask install` and `cargo xtask run` — expect: both install or launch as before (`sign()`'s ad-hoc fallback is not touched by this task: `git diff` shows no change to `sign`).
-- [ ] **Step 5: Commit** `git commit -m "feat(xtask): build, sign and check a release bundle for publishing"`
+- [x] **Step 1: Write the failing tests:** `only_the_designated_lines_of_codesign_output_are_compared` (input with an `Executable=` line, a `# designated =>` comment-free line and two `designated =>` lines → the two lines); `a_designated_requirement_with_another_certificate_is_a_mismatch` (a pure `requirement_mismatch(expected: &str, actual: &[String]) -> Option<String>` returns text showing both); `matching_requirements_are_not_a_mismatch`; `a_missing_signing_identity_stops_the_release` (pure `identity_problem(env: Option<&str>, find_identity_stdout: &str) -> Option<String>`: `None` env → problem; env set but not listed → problem; listed → none).
+- [x] **Step 2: Run** `cargo test -p xtask release::` — expect: fails (functions missing).
+- [x] **Step 3: Implement** the build path in the order of `design.md` "`cargo xtask release`" steps 1–5, including the reuse path for an existing zip; record `designated-requirement.txt` from `codesign -d -r- /Applications/Navori.app` and its helper on this Mac.
+- [x] **Step 4: Run** `cargo test -p xtask`, then on this Mac `NAVORI_SIGN_IDENTITY="Navori Local Signing" cargo xtask release --tag v0.1.0 --out "$(mktemp -d)"` — expect: three files, and `codesign -dv` of the unzipped app shows `CFBundleShortVersionString` `0.1.0`; and `CFBundleVersion` equal to `git rev-list --count HEAD`; run the same command again into the same directory — expect: only `navori.rb` rewritten, the zip and `.sha256` untouched, and the cask's `sha256` equal to the `.sha256` file; then the same with `NAVORI_SIGN_IDENTITY` unset — expect: fails naming the identity, no zip written; then `cargo xtask install` and `cargo xtask run` — expect: both install or launch as before (`sign()`'s ad-hoc fallback is not touched by this task: `git diff` shows no change to `sign`).
+- [x] **Step 5: Commit** `git commit -m "feat(xtask): build, sign and check a release bundle for publishing"`
 
 _Requirements: RELEASE-1.5, RELEASE-1.6, RELEASE-1.7, RELEASE-1.8, RELEASE-1.13, RELEASE-1.14, RELEASE-1.15_
 
@@ -191,11 +191,11 @@ _Requirements: RELEASE-1.5, RELEASE-1.6, RELEASE-1.7, RELEASE-1.8, RELEASE-1.13,
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Write the failing tests:** `a_free_tag_on_a_clean_tree_passes` (pre-release version, empty tag lists, empty dirty, any project text); `a_tag_that_already_exists_locally_fails_naming_it`; `a_tag_that_already_exists_on_origin_fails_naming_it` (`ls-remote` line `<sha>\trefs/tags/v0.1.0`); `uncommitted_changes_fail_listing_the_files` (` M Cargo.toml` → text contains `Cargo.toml`); `a_final_version_needs_the_external_compat_line` (`0.1.0` with no line starting `- **Compat obligation:** External` → fails naming the line; with that line → passes); `a_compat_line_quoted_in_prose_does_not_count` (the text appears mid-sentence, not as a line start → fails); `a_pre_release_does_not_need_the_compat_line`.
-- [ ] **Step 2: Run** `cargo test -p xtask release::` — expect: fails (`preflight` missing).
-- [ ] **Step 3: Implement** `preflight`, `check` and the `Cmd::ReleaseCheck` arm; `check` runs no `git tag` or `git push`.
-- [ ] **Step 4: Run** `cargo test -p xtask`, then `cargo xtask release-check` on this Mac — expect: on today's tree it fails at preflight (uncommitted changes or the missing Compat line for `0.1.0`), naming the cause.
-- [ ] **Step 5: Commit** `git commit -m "feat(xtask): add release-check, the local gate that prints the tag to push"`
+- [x] **Step 1: Write the failing tests:** `a_free_tag_on_a_clean_tree_passes` (pre-release version, empty tag lists, empty dirty, any project text); `a_tag_that_already_exists_locally_fails_naming_it`; `a_tag_that_already_exists_on_origin_fails_naming_it` (`ls-remote` line `<sha>\trefs/tags/v0.1.0`); `uncommitted_changes_fail_listing_the_files` (` M Cargo.toml` → text contains `Cargo.toml`); `a_final_version_needs_the_external_compat_line` (`0.1.0` with no line starting `- **Compat obligation:** External` → fails naming the line; with that line → passes); `a_compat_line_quoted_in_prose_does_not_count` (the text appears mid-sentence, not as a line start → fails); `a_pre_release_does_not_need_the_compat_line`.
+- [x] **Step 2: Run** `cargo test -p xtask release::` — expect: fails (`preflight` missing).
+- [x] **Step 3: Implement** `preflight`, `check` and the `Cmd::ReleaseCheck` arm; `check` runs no `git tag` or `git push`.
+- [x] **Step 4: Run** `cargo test -p xtask`, then `cargo xtask release-check` on this Mac — expect: on today's tree it fails at preflight (uncommitted changes or the missing Compat line for `0.1.0`), naming the cause.
+- [x] **Step 5: Commit** `git commit -m "feat(xtask): add release-check, the local gate that prints the tag to push"`
 
 _Requirements: RELEASE-2.1, RELEASE-2.2, RELEASE-2.3, RELEASE-2.4, RELEASE-2.5, RELEASE-2.6, RELEASE-2.7, RELEASE-7.1_
 
@@ -215,11 +215,11 @@ _Requirements: RELEASE-2.1, RELEASE-2.2, RELEASE-2.3, RELEASE-2.4, RELEASE-2.5, 
 
 **Depends-on:** Task 5
 
-- [ ] **Step 1: Write the failing tests:** `an_action_pinned_to_a_tag_is_reported` (`      - uses: actions/checkout@v4`); `an_action_pinned_to_a_full_sha_passes` (`uses: actions/checkout@` + 40 hex); `a_local_action_passes` (`uses: ./.github/actions/x`); `a_short_sha_is_reported` (7 hex); `quoted_uses_values_are_read` (`uses: "actions/checkout@v4"` reported); `a_sha_pin_followed_by_a_version_comment_passes` (`uses: actions/checkout@` + 40 hex + ` # v4.2.2`).
-- [ ] **Step 2: Run** `cargo test -p xtask release::` — expect: fails (function missing).
-- [ ] **Step 3: Implement** both functions and the one call in `ci()`; no existing check in `ci()` changes.
-- [ ] **Step 4: Run** `cargo test -p xtask && cargo xtask ci` — expect: pass (no workflow yet).
-- [ ] **Step 5: Commit** `git commit -m "feat(xtask): reject workflow actions not pinned to a commit SHA"`
+- [x] **Step 1: Write the failing tests:** `an_action_pinned_to_a_tag_is_reported` (`      - uses: actions/checkout@v4`); `an_action_pinned_to_a_full_sha_passes` (`uses: actions/checkout@` + 40 hex); `a_local_action_passes` (`uses: ./.github/actions/x`); `a_short_sha_is_reported` (7 hex); `quoted_uses_values_are_read` (`uses: "actions/checkout@v4"` reported); `a_sha_pin_followed_by_a_version_comment_passes` (`uses: actions/checkout@` + 40 hex + ` # v4.2.2`).
+- [x] **Step 2: Run** `cargo test -p xtask release::` — expect: fails (function missing).
+- [x] **Step 3: Implement** both functions and the one call in `ci()`; no existing check in `ci()` changes.
+- [x] **Step 4: Run** `cargo test -p xtask && cargo xtask ci` — expect: pass (no workflow yet).
+- [x] **Step 5: Commit** `git commit -m "feat(xtask): reject workflow actions not pinned to a commit SHA"`
 
 _Requirements: RELEASE-7.4, RELEASE-2.8_
 
@@ -234,16 +234,20 @@ _Requirements: RELEASE-7.4, RELEASE-2.8_
 
 **Interfaces:**
 - Consumes: `cargo xtask release --tag <t> --check` (Task 2) — `version=` / `prerelease=` lines appended to `$GITHUB_OUTPUT`; `cargo xtask release --tag <t> --out dist` (Task 4); `cargo xtask ci` with the pin lint (Task 6).
-- Produces: workflow `release` — `on: push: tags: ['v*']`; job `release`, `runs-on: macos-26`, `environment: release`, `permissions: contents: write`, `concurrency: release-${{ github.ref_name }}`; secrets `SIGNING_P12`, `SIGNING_P12_PASSWORD`, `TAP_TOKEN`; variable `TAP_REPOSITORY`.
+- Produces: workflow `release` — `on: push: tags: ['v*']`; job `release`, `runs-on: macos-26`, `environment: release`, `permissions: contents: write`, `concurrency: release-${{ github.ref_name }}`; secrets `SIGNING_P12`, `SIGNING_P12_PASSWORD`, `TAP_TOKEN`; variables `TAP_REPOSITORY` and `PUBLISH_RELEASE`.
 
 **Depends-on:** Task 4, Task 6
 
-- [ ] **Step 1: Resolve the pin** for `actions/checkout`'s latest release tag with `gh api repos/actions/checkout/releases/latest --jq .tag_name` and `gh api repos/actions/checkout/git/ref/tags/<tag> --jq .object.sha` (dereference an annotated tag through `git/tags/<sha>`); write it as `actions/checkout@<40-hex> # <tag>`.
-- [ ] **Step 2: Write** `release.yml` with steps 1–10 of `design.md` "Release workflow" in that order: checkout `fetch-depth: 0`; tag check before `ci`; `ci`; find the Release by `tag_name` through `gh api repos/${{ github.repository }}/releases` and download existing assets; import signing into a temporary keychain with `sudo security add-trusted-cert -p codeSign`; `cargo xtask release`; `gh release create --draft --verify-tag [--prerelease]` only when absent, then `gh release upload --clobber`; stop while `vars.TAP_REPOSITORY == ''`; otherwise checkout the tap with `TAP_TOKEN`, copy the cask, `brew trust --cask` and `brew tap` the checkout, `brew style` and `brew audit --cask`, `gh release edit --draft=false`, commit `navori <version>` and push only on a diff; `if: always()` keychain cleanup. No `run:` line echoes a secret.
-- [ ] **Step 3: Run** `cargo xtask ci` — expect: pass, the pin lint reading `release.yml`. Then change the pin to `@v4` locally — expect: `ci` fails naming that line; restore.
-- [ ] **Step 4: Commit** `git commit -m "ci: publish a signed release and update the tap when a version tag is pushed"`
+- [x] **Step 1: Resolve the pin** for `actions/checkout`'s latest release tag with `gh api repos/actions/checkout/releases/latest --jq .tag_name` and `gh api repos/actions/checkout/git/ref/tags/<tag> --jq .object.sha` (dereference an annotated tag through `git/tags/<sha>`); write it as `actions/checkout@<40-hex> # <tag>`.
+- [x] **Step 2: Write** `release.yml` with steps 1–10 of `design.md` "Release workflow" in that order: checkout `fetch-depth: 0`; tag check before `ci`; `ci`; find the Release by `tag_name` through `gh api repos/${{ github.repository }}/releases` and download existing assets; import signing into a temporary keychain with `sudo security add-trusted-cert -p codeSign`; `cargo xtask release`; `gh release create --draft --verify-tag [--prerelease]` only when absent, then `gh release upload --clobber`; stop while `vars.TAP_REPOSITORY == ''`; otherwise checkout the tap with `TAP_TOKEN`, copy the cask, `brew trust --cask` and `brew tap` the checkout, `brew style` and `brew audit --cask`, `gh release edit --draft=false`, commit `navori <version>` and push only on a diff; `if: always()` keychain cleanup. No `run:` line echoes a secret.
+- [x] **Step 3: Run** `cargo xtask ci` — expect: pass, the pin lint reading `release.yml`. Then change the pin to `@v4` locally — expect: `ci` fails naming that line; restore.
+- [x] **Step 4: Commit** `git commit -m "ci: publish a signed release and update the tap when a version tag is pushed"`
 
-_Requirements: RELEASE-1.1, RELEASE-1.2, RELEASE-1.4, RELEASE-1.9, RELEASE-1.11, RELEASE-1.12, RELEASE-3.1, RELEASE-3.6, RELEASE-6.1, RELEASE-6.2, RELEASE-7.3, RELEASE-7.5, RELEASE-7.7_
+- [ ] **Amendment (2026-11-04, operator's choice, after the first workflow runs):** add the repository variable `PUBLISH_RELEASE`. Until it is exactly `true` the Release stays a draft and no cask is pushed. While `TAP_REPOSITORY` is set the tap steps up to the local commit, `brew tap`, `brew trust`, `brew style` and `brew audit` still run; the `gh release edit --draft=false` step and the cask push run only when `PUBLISH_RELEASE` is `true`. Update `docs/agents/project.md` (release steps, setup step 5) to describe both variables. Test by reading the workflow and by Task 9 Step 3.
+
+- [ ] **Amendment 2 (2026-11-04, advisor finding before merge):** a pre-release tag writes the cask `navori-rc` to `Casks/navori-rc.rb` and never touches `Casks/navori.rb`; a final tag writes `navori.rb` only. `xtask/assets/navori.rb.in` gains `@CASK@`, `@DESC_SUFFIX@` and `@CONFLICTS@` placeholders; `cask_text(version, sha256, prerelease)` and a new `cask_file(prerelease)` in `xtask/src/release.rs` pick them; `release::run` writes `<out>/<cask_file>`; the workflow copies that file. Each cask has `conflicts_with cask: "<the other>"`. Tests: both casks name themselves, conflict with each other, differ only in those fields, and `cask_file` is `navori-rc.rb` exactly for a pre-release.
+
+_Requirements: RELEASE-1.1, RELEASE-1.2, RELEASE-1.4, RELEASE-1.9, RELEASE-1.11, RELEASE-1.12, RELEASE-3.1, RELEASE-3.6, RELEASE-6.1, RELEASE-6.2, RELEASE-6.4, RELEASE-7.3, RELEASE-7.5, RELEASE-7.7_
 
 ---
 
@@ -260,9 +264,9 @@ _Requirements: RELEASE-1.1, RELEASE-1.2, RELEASE-1.4, RELEASE-1.9, RELEASE-1.11,
 
 **Depends-on:** Task 5, Task 7
 
-- [ ] **Step 1: Write** both docs from the Produces list; remove "No notarization or public distribution yet" and point to ADR 0007.
-- [ ] **Step 2: Check** every command in the new text exists (`cargo xtask --help` lists `release` and `release-check`) and every requirement named is in `requirements.md`.
-- [ ] **Step 3: Commit** `git commit -m "docs: release steps and one-time setup for tagged public releases"`
+- [x] **Step 1: Write** both docs from the Produces list; remove "No notarization or public distribution yet" and point to ADR 0007.
+- [x] **Step 2: Check** every command in the new text exists (`cargo xtask --help` lists `release` and `release-check`) and every requirement named is in `requirements.md`.
+- [x] **Step 3: Commit** `git commit -m "docs: release steps and one-time setup for tagged public releases"`
 
 _Requirements: RELEASE-6.3, RELEASE-7.6_
 
@@ -281,12 +285,12 @@ _Requirements: RELEASE-6.3, RELEASE-7.6_
 
 **Depends-on:** Task 1, Task 7, Task 8
 
-- [ ] **Step 1: Operator setup** (the operator runs these; the agent only lists them): the one-time setup of Task 8 against a **test tap** repository, `TAP_REPOSITORY` unset.
+- [ ] **Step 1: Operator setup** (the operator runs these; the agent only lists them): the one-time setup of Task 8 against a **test tap** repository, with `TAP_REPOSITORY` and `PUBLISH_RELEASE` both unset.
 - [ ] **Step 2: Draft run:** bump the workspace version to `0.1.0-rc.1` on a branch and commit; `cargo xtask release-check` — expect: `ci` and `perf` pass and it prints `v0.1.0-rc.1` with the push commands, and `git tag -l` shows no new tag; push tag `v0.1.0-rc.9` — expect: the run fails at the tag check naming `0.1.0-rc.9` and `0.1.0-rc.1`, no Release; push tag `v0.1.0-rc.1` — expect: a draft pre-release with the zip and `.sha256`, no tap change; a push to a branch without a tag starts no release run.
-- [ ] **Step 3: Tap run:** set `TAP_REPOSITORY` to the test tap, rerun the job — expect: the Release is published, the cask commit lands; rerun again — expect: no second Release, no new tap commit. Break the tap step once (wrong token) and rerun after fixing — expect: it completes.
-- [ ] **Step 4: Clean account:** on a new macOS 26 user, `brew tap`, `brew trust --cask`, `brew install --cask` from the test tap, open Navori — expect: menubar icon, no Gatekeeper dialog; install Claude Code hooks, work in a session — expect: `Navori: keeping this Mac awake` in `pmset -g assertions`.
+- [ ] **Step 3: Tap run:** (a) set `TAP_REPOSITORY` to the test tap, leave `PUBLISH_RELEASE` unset, rerun the job — expect: the cask is audited (`brew style`, `brew audit --cask` pass), the Release is still a draft and the tap has no new commit; (b) set `PUBLISH_RELEASE` to `true` (this makes a pre-release public on the public repository: the operator confirms first), rerun — expect: the Release is published, then the cask commit lands in the tap; rerun again — expect: no second Release, no new tap commit. Break the tap step once (wrong token) and rerun after fixing — expect: it completes. Afterwards set `PUBLISH_RELEASE` back to unset and turn each rc Release back into a draft or delete it.
+- [ ] **Step 4: Clean account:** on a new macOS 26 user, `brew tap`, `brew trust --cask`, `brew install --cask navori-rc` from the test tap (rc tags install the `navori-rc` cask), open Navori — expect: menubar icon, no Gatekeeper dialog; install Claude Code hooks, work in a session — expect: `Navori: keeping this Mac awake` in `pmset -g assertions`.
 - [ ] **Step 5: Upgrade:** save an AI key and change a setting, push `v0.1.0-rc.2`, `brew upgrade` — expect: setting, key (no Keychain prompt) and hooks (installed, not needing repair) still there; `navori doctor` all ✓.
 - [ ] **Step 6: Uninstall:** `brew uninstall --zap --cask navori`, then a Claude Code session — expect: no hook error, the two release directories in the Trash, the dev profile's untouched.
 - [ ] **Step 7: Record** every result in `acceptance.md`, run `cargo xtask ci`, and commit `git commit -m "docs(release): record the release acceptance run"`. The test tap is then deleted or kept private; the public tap is created only when MILE-2 closes and ROAD-17 and ROAD-18 ship.
 
-_Requirements: RELEASE-3.7, RELEASE-3.8, RELEASE-4.1, RELEASE-4.2, RELEASE-4.3, RELEASE-4.4, RELEASE-4.5_
+_Requirements: RELEASE-6.4, RELEASE-3.7, RELEASE-3.8, RELEASE-4.1, RELEASE-4.2, RELEASE-4.3, RELEASE-4.4, RELEASE-4.5_

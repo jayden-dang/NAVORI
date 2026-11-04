@@ -145,8 +145,10 @@ fn list_records() -> Result<Vec<ProcEntry>, PlatformError> {
                 }
                 buf.truncate(len);
                 return buf
-                    .chunks_exact(RECORD_LEN)
-                    .map(parse_record)
+                    .as_chunks::<RECORD_LEN>()
+                    .0
+                    .iter()
+                    .map(|record| parse_record(record))
                     .collect::<Option<Vec<_>>>()
                     .ok_or(PlatformError::Layout { len });
             }
