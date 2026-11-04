@@ -452,7 +452,7 @@ _Requirements: SECRETS-6.1, SECRETS-6.2, SECRETS-5.1, SECRETS-5.2_
 
 **Depends-on:** Task 2, Task 3
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `crates/secrets/tests/common/mod.rs`:
 
@@ -584,7 +584,7 @@ fn the_debug_output_of_the_fake_and_its_store_never_contains_a_value() {
 
 Run: `cargo nextest run -p navori-secrets --test memory_store` — expect: compile error, ``unresolved import `navori_secrets::fake` ``.
 
-- [ ] **Step 2: Implement keys, errors and the trait**
+- [x] **Step 2: Implement keys, errors and the trait**
 
 Append to `impl SecretKey` in `key.rs`:
 
@@ -678,7 +678,7 @@ pub trait SecretStore: Send + Sync {
 }
 ```
 
-- [ ] **Step 3: Implement the fake**
+- [x] **Step 3: Implement the fake**
 
 `crates/secrets/src/fake.rs`:
 
@@ -805,11 +805,11 @@ pub use error::*;
 pub use store::*;
 ```
 
-- [ ] **Step 4: Run and gate**
+- [x] **Step 4: Run and gate**
 
 Run: `cargo fmt --all`, then `cargo nextest run -p navori-secrets` — expect: all pass (3 + 3 + 5 tests). Run: `cargo clippy -p navori-secrets --all-targets -- -D warnings` — expect: clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 `git add crates/secrets && git commit -m "feat(secrets): add the SecretStore interface and an in-memory fake"`
 
