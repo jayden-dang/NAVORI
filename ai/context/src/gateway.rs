@@ -157,28 +157,17 @@ impl Gateway {
     async fn read_key(&self) -> Result<Secret, AskError> {
         let secrets = Arc::clone(&self.secrets);
         let key = self.key.clone();
-        match spawn_blocking(move || secrets.get(&key)).await {
-            Ok(Ok(Some(secret))) => Ok(secret),
-            Ok(Ok(None)) => Err(AskError::NoKey),
-            Ok(Err(error)) => {
-                tracing::warn!(
-                    provider = self.provider,
-                    reason = "keychain_failed",
-                    "ask refused"
-                );
-                Err(AskError::Keychain(error.to_string()))
-            }
-            Err(_) => {
-                tracing::warn!(
-                    provider = self.provider,
-                    reason = "keychain_unfinished",
-                    "ask refused"
-                );
-                Err(AskError::Keychain(
-                    "the Keychain call did not finish".to_owned(),
-                ))
-            }
-        }
+        let (reason, message) = match spawn_blocking(move || secrets.get(&key)).await {
+            Ok(Ok(Some(secret))) => return Ok(secret),
+            Ok(Ok(None)) => return Err(AskError::NoKey),
+            Ok(Err(error)) => ("keychain_failed", error.to_string()),
+            Err(_) => (
+                "keychain_unfinished",
+                "the Keychain call did not finish".to_owned(),
+            ),
+        };
+        tracing::warn!(provider = self.provider, reason, "ask refused");
+        Err(AskError::Keychain(message))
     }
 
     fn inspect(&self, text: &str) -> Option<Redacted> {
