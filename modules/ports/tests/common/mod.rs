@@ -531,9 +531,26 @@ impl Write for Captured {
     }
 }
 
-/// Collects this thread's log lines, at every level, until the guard is dropped.
+/// Captures take turns, so one test's lines never reach another's.
 static ONE_CAPTURE_AT_A_TIME: Mutex<()> = Mutex::new(());
 
+/// A subscriber that is registered for the whole process and says yes to every callsite.
+///
+/// tracing decides a callsite's interest, the first time any thread hits it, from the hitting
+/// thread's own subscriber whenever at most one subscriber is registered. Captures that never
+/// overlap keep that true, so a test thread without a capture would cache "never" for a callsite
+/// that a capture on another thread then relies on. Two registered subscribers make tracing ask
+/// all of them.
+static WITNESS: std::sync::LazyLock<tracing::Dispatch> = std::sync::LazyLock::new(|| {
+    tracing::Dispatch::new(
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_writer(std::io::sink)
+            .finish(),
+    )
+});
+
+/// Collects this thread's log lines, at every level, until the guard is dropped.
 pub struct LogCapture {
     written: Arc<Mutex<Vec<u8>>>,
     _guard: tracing::subscriber::DefaultGuard,
@@ -545,6 +562,7 @@ impl LogCapture {
         let alone = ONE_CAPTURE_AT_A_TIME
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
+        std::sync::LazyLock::force(&WITNESS);
         let written = Arc::new(Mutex::new(Vec::<u8>::new()));
         let sink = Arc::clone(&written);
         let subscriber = tracing_subscriber::fmt()
