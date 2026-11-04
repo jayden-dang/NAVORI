@@ -6,8 +6,9 @@ use std::sync::Arc;
 use navori_macos::ProcessSource;
 use navori_procs::{Harness, ProcId, ProcsError, Snapshot, started_by};
 
+use crate::kind::kind;
 use crate::place::place_listener;
-use crate::state::{HarnessName, PortEntry, PortKind};
+use crate::state::{HarnessName, PortEntry};
 
 /// A listener of the Docker backend, which a later stage attributes to a container.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -86,6 +87,7 @@ impl Scanner {
             let name = name_of(&snapshot, process.id, exe.as_deref());
             let harness = harness_for(&snapshot, process.id, exe.as_deref(), memo, kept);
             let place = place_listener(snapshot.cwd(process.id), process.exe.clone(), &self.home);
+            let kind = kind(exe.as_deref(), place.project.is_some());
             let mut ports: BTreeMap<u16, BTreeSet<IpAddr>> = BTreeMap::new();
             for listener in listeners {
                 ports
@@ -103,7 +105,7 @@ impl Scanner {
                     exe: exe.clone(),
                     place: place.clone(),
                     harness,
-                    kind: PortKind::Other,
+                    kind,
                     container: None,
                 });
             }
