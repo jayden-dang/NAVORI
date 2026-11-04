@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use common::{
     CLAUDE, CODEX, DEV_HELPER, FIVE, RELEASE_HELPER, Rig, THREE, command, complete, group, handler,
-    tree,
+    legacy_command, tree,
 };
 use serde_json::{Value, json};
 
@@ -383,4 +383,24 @@ async fn codex_repair_and_remove_behave_like_claude() {
     let doc = read_json(&rig.path(CODEX_FILE));
     assert_eq!(doc["hooks"], json!({ "Stop": [group(vec![foreign])] }));
     assert_eq!(rig.row("codex").await["state"], "not_installed");
+}
+
+#[tokio::test]
+async fn repair_rewrites_earlier_form_hooks_as_guarded_and_keeps_other_hooks() {
+    let rig = Rig::release();
+    let mut doc = complete(&legacy_command(RELEASE_HELPER, false), &CLAUDE);
+    doc["hooks"]["Stop"]
+        .as_array_mut()
+        .unwrap()
+        .push(group(vec![handler("echo foreign", 5)]));
+    rig.write_json(CLAUDE_FILE, &doc);
+
+    let after = assert_repairs_to_installed(&rig, CLAUDE_FILE, "claude").await;
+
+    let mut expected = complete(&release_command(), &CLAUDE);
+    expected["hooks"]["Stop"]
+        .as_array_mut()
+        .unwrap()
+        .push(group(vec![handler("echo foreign", 5)]));
+    assert_eq!(after, expected);
 }

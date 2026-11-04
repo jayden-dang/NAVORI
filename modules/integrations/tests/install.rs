@@ -356,7 +356,7 @@ async fn the_written_file_keeps_the_original_mode() {
 }
 
 #[tokio::test]
-async fn the_release_command_is_the_single_quoted_helper_path_then_hook() {
+async fn installing_writes_a_command_that_runs_the_helper_only_when_it_exists() {
     let rig = Rig::release();
     rig.make_dir(".claude");
 
@@ -366,7 +366,7 @@ async fn the_release_command_is_the_single_quoted_helper_path_then_hook() {
     for handler in handlers(&doc) {
         assert_eq!(
             handler["command"],
-            "'/Applications/Navori.app/Contents/Helpers/navori' hook"
+            "[ -f '/Applications/Navori.app/Contents/Helpers/navori' ] && [ -x '/Applications/Navori.app/Contents/Helpers/navori' ] && exec '/Applications/Navori.app/Contents/Helpers/navori' hook || true"
         );
     }
 }
@@ -381,7 +381,7 @@ async fn a_helper_path_with_a_space_and_a_quote_is_quoted_safely() {
     let doc = read_json(&rig.path(CLAUDE_FILE));
     assert_eq!(
         handlers(&doc)[0]["command"],
-        "'/Apps/It'\\''s Mine/Navori.app/Contents/Helpers/navori' hook"
+        "[ -f '/Apps/It'\\''s Mine/Navori.app/Contents/Helpers/navori' ] && [ -x '/Apps/It'\\''s Mine/Navori.app/Contents/Helpers/navori' ] && exec '/Apps/It'\\''s Mine/Navori.app/Contents/Helpers/navori' hook || true"
     );
 }
 
@@ -396,7 +396,7 @@ async fn the_dev_command_carries_profile_dev_before_hook() {
     for handler in handlers(&doc) {
         assert_eq!(
             handler["command"],
-            "'/Applications/Navori Dev.app/Contents/Helpers/navori' --profile dev hook"
+            "[ -f '/Applications/Navori Dev.app/Contents/Helpers/navori' ] && [ -x '/Applications/Navori Dev.app/Contents/Helpers/navori' ] && exec '/Applications/Navori Dev.app/Contents/Helpers/navori' --profile dev hook || true"
         );
     }
 }

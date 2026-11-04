@@ -1,0 +1,23 @@
+{
+  "theme": "dark",
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "[ -f '/Applications/Navori.app/Contents/Helpers/navori' ] && [ -x '/Applications/Navori.app/Contents/Helpers/navori' ] && exec '/Applications/Navori.app/Contents/Helpers/navori' hook || true", "timeout": 2 } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "[ -f '/Applications/Navori.app/Contents/Helpers/navori' ] && [ -x '/Applications/Navori.app/Contents/Helpers/navori' ] && exec '/Applications/Navori.app/Contents/Helpers/navori' hook || true", "timeout": 2 } ] }
+    ],
+    "StopFailure": [
+      { "hooks": [ { "type": "command", "command": "[ -f '/Applications/Navori.app/Contents/Helpers/navori' ] && [ -x '/Applications/Navori.app/Contents/Helpers/navori' ] && exec '/Applications/Navori.app/Contents/Helpers/navori' hook || true", "timeout": 2 } ] }
+    ],
+    "SubagentStart": [
+      { "hooks": [ { "type": "command", "command": "[ -f '/Applications/Navori.app/Contents/Helpers/navori' ] && [ -x '/Applications/Navori.app/Contents/Helpers/navori' ] && exec '/Applications/Navori.app/Contents/Helpers/navori' hook || true", "timeout": 2 } ] }
+    ],
+    "SubagentStop": [
+      { "hooks": [ { "type": "command", "command": "[ -f '/Applications/Navori.app/Contents/Helpers/navori' ] && [ -x '/Applications/Navori.app/Contents/Helpers/navori' ] && exec '/Applications/Navori.app/Contents/Helpers/navori' hook || true", "timeout": 2 } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "[ -f '/Applications/Navori.app/Contents/Helpers/navori' ] && [ -x '/Applications/Navori.app/Contents/Helpers/navori' ] && exec '/Applications/Navori.app/Contents/Helpers/navori' hook || true", "timeout": 1 } ] }
+    ]
+  }
+}
