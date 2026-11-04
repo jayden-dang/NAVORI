@@ -7,8 +7,10 @@ A Harness runs `navori hook` on a lifecycle event with a JSON payload on stdin. 
 | Event | Action |
 |---|---|
 | `UserPromptSubmit` | `hold_session` |
-| `Stop` (only when it carries no `reason`, or `reason` is `end_turn`) | `stop_session` |
+| `Stop` (only when it carries no `reason`, or `reason` is `end_turn`) | `stop_session`, with `background` when its `background_tasks` list is not empty |
 | `StopCancelled`, `StopFailure` | `stop_session` |
+| `SubagentStart` | `subagent_start` with the agent id and pids |
+| `SubagentStop` | `subagent_stop` with the agent id, and `background` as above |
 | `SessionEnd` | `end_session` |
 
 Any other event sends nothing. The same event arriving twice for one session (Grok also runs Claude's hooks) leaves one Lease.
@@ -53,7 +55,7 @@ Only these paths, under the home directory the Core was started with, and their 
 - Codex: `~/.codex/hooks.json` (never written yet)
 - Grok Build: `~/.grok/hooks/navori.json`
 
-Install adds a `UserPromptSubmit`, `Stop`, `StopFailure` and `SessionEnd` entry for Claude Code, and `UserPromptSubmit`, `Stop`, `StopCancelled`, `StopFailure` and `SessionEnd` for Grok. Each entry is one command handler, with the quoted absolute path of the app's `Contents/Helpers/navori` followed by ` hook` (` --profile dev hook` for the dev app), and a timeout of 2 seconds (1 for `SessionEnd`). It never uses `~/.local/bin/navori`. Install never creates `~/.claude`, `~/.codex` or `~/.grok`; for Grok it creates `~/.grok/hooks` when `~/.grok` exists.
+Install adds a `UserPromptSubmit`, `Stop`, `StopFailure`, `SubagentStart`, `SubagentStop` and `SessionEnd` entry for Claude Code, and `UserPromptSubmit`, `Stop`, `StopCancelled`, `StopFailure` and `SessionEnd` for Grok. Each entry is one command handler, with the quoted absolute path of the app's `Contents/Helpers/navori` followed by ` hook` (` --profile dev hook` for the dev app), and a timeout of 2 seconds (1 for `SessionEnd`). It never uses `~/.local/bin/navori`. Install never creates `~/.claude`, `~/.codex` or `~/.grok`; for Grok it creates `~/.grok/hooks` when `~/.grok` exists.
 
 - Every other key, hook and array order stays. Whitespace may be rewritten.
 - Before changing an existing file, Navori copies it to `<name>.navori-bak-<seconds>` beside it. A file already correct, or with nothing to remove, is not touched and gets no Backup. Backups are never pruned.

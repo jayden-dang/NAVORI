@@ -53,7 +53,7 @@ fn handlers(doc: &Value) -> Vec<&Value> {
 }
 
 #[tokio::test]
-async fn installing_into_a_claude_file_adds_four_entries_and_keeps_foreign_hooks_and_key_order() {
+async fn installing_into_a_claude_file_adds_six_entries_and_keeps_foreign_hooks_and_key_order() {
     let rig = Rig::release();
     rig.write(CLAUDE_FILE, FOREIGN);
 
@@ -68,6 +68,8 @@ async fn installing_into_a_claude_file_adds_four_entries_and_keeps_foreign_hooks
             "Stop",
             "UserPromptSubmit",
             "StopFailure",
+            "SubagentStart",
+            "SubagentStop",
             "SessionEnd"
         ]
     );

@@ -8,7 +8,14 @@ use crate::state::State;
 
 pub(crate) type Event = &'static str;
 
-const CLAUDE_EVENTS: [Event; 4] = ["UserPromptSubmit", "Stop", "StopFailure", "SessionEnd"];
+const CLAUDE_EVENTS: [Event; 6] = [
+    "UserPromptSubmit",
+    "Stop",
+    "StopFailure",
+    "SubagentStart",
+    "SubagentStop",
+    "SessionEnd",
+];
 const CODEX_EVENTS: [Event; 3] = ["UserPromptSubmit", "Stop", "SessionEnd"];
 const GROK_EVENTS: [Event; 5] = [
     "UserPromptSubmit",

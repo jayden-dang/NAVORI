@@ -114,7 +114,14 @@ pub fn complete(command: &str, events: &[&str]) -> Value {
 }
 
 pub const THREE: [&str; 3] = ["UserPromptSubmit", "Stop", "SessionEnd"];
-pub const CLAUDE: [&str; 4] = ["UserPromptSubmit", "Stop", "StopFailure", "SessionEnd"];
+pub const CLAUDE: [&str; 6] = [
+    "UserPromptSubmit",
+    "Stop",
+    "StopFailure",
+    "SubagentStart",
+    "SubagentStop",
+    "SessionEnd",
+];
 pub const FIVE: [&str; 5] = [
     "UserPromptSubmit",
     "Stop",

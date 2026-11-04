@@ -663,3 +663,27 @@ Amendment after delivery, from stories 14 and 15 and `ui-brief.md` amendment 7.
 - [x] **Step 6: Commit** `git commit -m "feat(awake): add Keep awake lengths and a Tracking agents toggle"`
 
 _Requirements: AWAKE-14.1, AWAKE-14.2, AWAKE-14.3, AWAKE-14.4, AWAKE-14.5, AWAKE-14.6, AWAKE-14.7, AWAKE-14.8, AWAKE-14.9, AWAKE-14.10, AWAKE-14.11, AWAKE-15.1, AWAKE-15.2, AWAKE-15.3, AWAKE-15.4, AWAKE-15.5, AWAKE-15.6, AWAKE-15.7, AWAKE-15.8, AWAKE-15.9, AWAKE-15.10, AWAKE-15.11, AWAKE-15.12, AWAKE-15.13, AWAKE-15.14, AWAKE-15.15, AWAKE-15.16_
+
+### Task 23: Keep a session with running work held and labelled working
+
+Amendment after delivery, from story 16. A coordinating session read `stopped` while its subagents ran.
+
+**Files:**
+- Modify: `modules/awake/src/action.rs`, `modules/awake/src/actor.rs`, `modules/awake/src/domain/table.rs`, `docs/features/awake.md`, `docs/specs/2026-11-02-awake-leases/ui-brief.md`
+- Test: `modules/awake/tests/subagent.rs`, `modules/awake/tests/stop.rs`, `modules/awake/tests/actions.rs`, `modules/awake/tests/display.rs`, `modules/awake/tests/manual.rs`
+
+**Reuse:** rung 2 — `LeaseTable`, `hold_session`, `Platform::read_descendants`.
+
+**Interfaces:**
+- Consumes: `hold_session`, `stop_session`
+- Produces: Actions `subagent_start`, `subagent_stop`; `stop_session` gains `background`. `LeaseState.stopped` now means no known work.
+
+**Depends-on:** Task 22
+
+- [x] **Step 1: Write failing tests** in `modules/awake/tests/subagent.rs`. Run: `cargo test -p navori-mod-awake --test subagent` — expect: the new cases fail.
+- [x] **Step 2: Implement** from `design.md` Decisions 21 and 22.
+- [x] **Step 3: Verify** `cargo xtask ci` — expect: pass.
+- [x] **Step 4: Verify on a real Claude Code run**: with a background subagent, the row reads `working` after the main `Stop`, until the last `Stop` with nothing in flight.
+- [x] **Step 5: Commit** `git commit -m "feat(awake): keep sessions with running subagents held and labelled working"`
+
+_Requirements: AWAKE-16.1, AWAKE-16.2, AWAKE-16.3, AWAKE-16.4, AWAKE-16.5, AWAKE-16.6, AWAKE-16.7, AWAKE-16.8, AWAKE-16.9, AWAKE-16.10, AWAKE-16.11_

@@ -194,7 +194,7 @@ async fn a_new_descendant_keeps_the_lease_and_it_is_read_again_60_seconds_on() {
     assert_eq!(after_grace, after_hold + 2);
     let kept = awake_state(&rig);
     assert_held(&kept);
-    assert_eq!(kept["leases"][0]["stopped"], true);
+    assert_eq!(kept["leases"][0]["stopped"], false);
     assert_eq!(rig.power.releases(), 0);
     assert!(ended(&rig).is_empty());
 

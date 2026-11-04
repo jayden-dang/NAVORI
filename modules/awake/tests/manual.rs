@@ -261,6 +261,8 @@ fn only_display_release_all_and_the_keep_actions_end_a_manual_lease() {
         "stop_session",
         "end_session",
         "tracking",
+        "subagent_start",
+        "subagent_stop",
     ];
     let ending: Vec<&str> = names
         .into_iter()
