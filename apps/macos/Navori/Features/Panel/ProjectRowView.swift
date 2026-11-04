@@ -47,10 +47,11 @@ struct ProjectRowView: View {
             } action: { frame in
                 cascade.setRowFrame(state.id, frame)
             }
-            if case .asking(let count) = flow, let stop = state.stop {
+            if case .asking = flow, let stop = state.stop {
                 InlineConfirmation(
                     text: stop.confirmation,
-                    onConfirm: { store.confirmStop(state.id, requests: [stop.request], count: count) },
+                    stopLabel: stop.spoken,
+                    onConfirm: { store.confirmStop(state.id, offer: stop) },
                     onCancel: { store.dismissStop(state.id) }
                 )
             }

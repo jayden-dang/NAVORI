@@ -183,6 +183,8 @@ public struct StopAllOffer: Equatable, Sendable {
 }
 
 extension StopAllOffer {
+    public var spoken: String { "Stop \(ports) \(ports == 1 ? "port" : "ports")" }
+
     public var confirmation: String {
         var text = "Stop \(ports) \(ports == 1 ? "port" : "ports") in \(projects) \(projects == 1 ? "project" : "projects")?"
         var left: [String] = []

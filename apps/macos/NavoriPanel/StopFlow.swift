@@ -62,7 +62,6 @@ public struct StopResult: Decodable, Equatable, Sendable {
         reason.flatMap { $0.isEmpty ? nil : $0 } ?? result.fallbackReason
     }
 
-
     public let target: StopTarget
     public let result: StopOutcome
     public let reason: String?
@@ -108,6 +107,14 @@ public enum StopFlow: Equatable, Sendable {
         }
         self = .running
         return usable
+    }
+
+    public mutating func confirm(_ offer: StopOffer) -> [String] {
+        confirm(sending: [offer.request], count: offer.count)
+    }
+
+    public mutating func confirm(_ offer: StopAllOffer) -> [String] {
+        confirm(sending: offer.requests, count: offer.ports)
     }
 
     public mutating func dismiss() {

@@ -135,11 +135,12 @@ private struct StopAllRowView: View {
         let flow = store.stopFlow(id)
         VStack(alignment: .leading, spacing: 0) {
             switch flow {
-            case let .asking(count):
+            case .asking:
                 InlineConfirmation(
                     text: offer.confirmation,
                     note: offer.systemNote,
-                    onConfirm: { store.confirmStop(id, requests: offer.requests, count: count) },
+                    stopLabel: offer.spoken,
+                    onConfirm: { store.confirmStop(id, offer: offer) },
                     onCancel: { store.dismissStop(id) }
                 )
             case .running:
@@ -175,15 +176,15 @@ private struct StopAllRowView: View {
                     .font(.system(size: 14))
                     .foregroundStyle(selected ? Color.white : Color(nsColor: .labelColor))
             }
-                .padding(.horizontal, 8)
-                .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
-                .background {
-                    if selected {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color(nsColor: .selectedContentBackgroundColor))
-                    }
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
+            .background {
+                if selected {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color(nsColor: .selectedContentBackgroundColor))
                 }
-                .contentShape(Rectangle())
+            }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .focusEffectDisabled()

@@ -244,4 +244,30 @@ struct StopFlowTests {
             #expect(text.localizedCaseInsensitiveContains("process") == false)
         }
     }
+
+    @Test func an_offer_whose_count_changed_since_asking_sends_nothing() {
+        var flow = StopFlow.idle
+        flow.press(count: 2)
+        #expect(flow.confirm(StopOffer(count: 3, request: "kill-api")).isEmpty)
+        #expect(flow == .idle)
+
+        flow.press(count: 2)
+        #expect(flow.confirm(StopOffer(count: 2, request: "kill-api")) == ["kill-api"])
+
+        var all = StopFlow.idle
+        let offer = StopAllOffer(requests: ["a", "b"], ports: 4, projects: 2, inUse: 0, otherLeft: 0, systemHidden: 0)
+        all.press(count: 3)
+        #expect(all.confirm(offer).isEmpty)
+        all.press(count: 4)
+        #expect(all.confirm(offer) == ["a", "b"])
+    }
+
+    @Test func the_stop_buttons_are_spoken_with_their_port_count() {
+        #expect(StopOffer(count: 3, request: "x").spoken == "Stop 3 ports")
+        #expect(StopOffer(count: 1, request: "x").spoken == "Stop 1 port")
+        let all = StopAllOffer(requests: ["a"], ports: 5, projects: 2, inUse: 0, otherLeft: 0, systemHidden: 0)
+        #expect(all.spoken == "Stop 5 ports")
+        let one = StopAllOffer(requests: ["a"], ports: 1, projects: 1, inUse: 0, otherLeft: 0, systemHidden: 0)
+        #expect(one.spoken == "Stop 1 port")
+    }
 }

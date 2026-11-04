@@ -251,10 +251,18 @@ final class CoreStore {
         stopFlows.values.contains { if case .asking = $0 { true } else { false } }
     }
 
-    /// Sends the Core's own requests, only if the confirmation for `owner` is still the one the user accepted.
-    func confirmStop(_ owner: String, requests: [String], count: Int) {
+    /// Sends the Core's own request, only if the confirmation for `owner` still matches the offer shown now.
+    func confirmStop(_ owner: String, offer: StopOffer) {
         var flow = stopFlow(owner)
-        let toSend = flow.confirm(sending: requests, count: count)
+        run(owner, flow.confirm(offer), flow: flow)
+    }
+
+    func confirmStop(_ owner: String, offer: StopAllOffer) {
+        var flow = stopFlow(owner)
+        run(owner, flow.confirm(offer), flow: flow)
+    }
+
+    private func run(_ owner: String, _ toSend: [String], flow: StopFlow) {
         stopFlows[owner] = flow
         guard toSend.isEmpty == false else { return }
         Task { @MainActor [weak self] in
