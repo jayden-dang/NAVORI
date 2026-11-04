@@ -1301,19 +1301,19 @@ _Requirements: SECRETS-2.6, SECRETS-7.4, SECRETS-8.2, SECRETS-8.3_
 
 **Collisions (load-subgraph blast_radius):** `docs/codebase/dependencies.md` is also in the Files of the PROCS, AWAKE and HOOKS plans, and `docs/architecture/data.md` in the AWAKE and KCONTRACT plans. Those plans add or edit other rows of the same tables; this task adds only the `navori-secrets` row, the Secrets row and line 33. On a merge conflict keep both sides' rows; never reorder or reformat the table.
 
-- [ ] **Step 1: Show what is missing**
+- [x] **Step 1: Show what is missing**
 
 Run: `rg -n 'navori-secrets' docs/codebase/dependencies.md` — expect: only the `ai/*` row (line 39) and no row of its own in the "Today" table. Run: `rg -n 'dev.navori.dev' docs/architecture/data.md` — expect: no match. Run: `rg -n 'keyring' docs/codebase/dependencies.md` — expect: the Secrets row naming `keyring` (apple-native) under Planned.
 
-- [ ] **Step 2: Edit**
+- [x] **Step 2: Edit**
 
 In `docs/codebase/dependencies.md`: add to the "Today" table, after the `navori-procs` row, `| \`navori-secrets\` | — | allowed: none — leaf; consumed by \`modules/*\` and \`ai/*\` (rows below) and may be opened by the composition root \`navori-ffi\` (it may depend on any foundation crate) |`; replace the Secrets row of the third-party table with `| Secrets | \`keyring-core\`, \`apple-native-keyring-store\` (feature \`keychain\`) | — |`. In `docs/architecture/data.md` line 33: write `Keychain items, service \`dev.navori\` for the release Profile and \`dev.navori.dev\` for the dev Profile (R2, R4)`, keeping the second cell unchanged (GitHub token, AI provider API keys; never in the database, config or logs).
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run the three `rg` commands again — expect: the new row, both service names, the new crate names, and no remaining `keyring` (apple-native). Run: `git diff -U0 docs/codebase/dependencies.md docs/architecture/data.md` — expect: only those lines changed. Run: `git diff $(git merge-base HEAD main) -- docs/roadmap/INDEX.md docs/specs/catalog/app.md` — expect: only `Status: Approved` to `Status: Draft`, ROAD-19 `After: none` to `After: ROAD-10`, `crates/ffi/` added to the Surfaces of ROAD-11 and ROAD-19 (each with its `agent-decided` marker comment), and one added `SECRETS` row (SECRETS-9.3, 10.5). Run: `head -4 docs/roadmap/INDEX.md` — expect: `Status: Draft`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 `git add docs/codebase/dependencies.md docs/architecture/data.md && git commit -m "docs(secrets): list navori-secrets, its backend crates and the dev Keychain service"`
 
