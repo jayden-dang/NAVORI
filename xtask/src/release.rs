@@ -1,6 +1,9 @@
 use std::path::Path;
+use std::process::Command;
 
-use anyhow::{Result, bail, ensure};
+use anyhow::{Context, Result, bail, ensure};
+
+use super::{Flavor, Profile, bundle, output, sh};
 
 /// The version a release tag names, which must equal the workspace version.
 pub(crate) fn tag_version<'a>(tag: &'a str, workspace: &str) -> Result<&'a str> {
@@ -20,32 +23,213 @@ pub(crate) fn is_prerelease(version: &str) -> bool {
     core.contains('-')
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the release build writes the cask once it packages the zip"
-    )
-)]
 pub(crate) fn cask_text(version: &str, sha256: &str) -> String {
     include_str!("../assets/navori.rb.in")
         .replace("@VERSION@", version)
         .replace("@SHA256@", sha256)
 }
 
-pub(crate) fn run(_root: &Path, tag: &str, _out: Option<&Path>, check: bool) -> Result<()> {
+/// The `designated =>` lines of `codesign -d -r-` stdout, trimmed.
+pub(crate) fn designated_lines(codesign_stdout: &str) -> Vec<String> {
+    codesign_stdout
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with("designated =>"))
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Text showing the expected and actual requirements when they differ.
+pub(crate) fn requirement_mismatch(expected: &str, actual: &[String]) -> Option<String> {
+    let expected: Vec<&str> = expected
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+    if expected == actual {
+        return None;
+    }
+    Some(format!(
+        "designated requirement mismatch\nexpected:\n  {}\nactual:\n  {}",
+        expected.join("\n  "),
+        actual.join("\n  ")
+    ))
+}
+
+/// Why the release cannot be signed, given `NAVORI_SIGN_IDENTITY` and the
+/// stdout of `security find-identity -v -p codesigning`.
+pub(crate) fn identity_problem(env: Option<&str>, find_identity_stdout: &str) -> Option<String> {
+    let Some(identity) = env.filter(|identity| !identity.is_empty()) else {
+        return Some(
+            "NAVORI_SIGN_IDENTITY is not set; a release is never signed ad-hoc".to_owned(),
+        );
+    };
+    let listed = find_identity_stdout
+        .lines()
+        .any(|line| line.contains(&format!("\"{identity}\"")));
+    (!listed).then(|| {
+        format!("signing identity \"{identity}\" (NAVORI_SIGN_IDENTITY) is not a valid code-signing identity in the keychain")
+    })
+}
+
+pub(crate) fn run(root: &Path, tag: &str, out: Option<&Path>, check: bool) -> Result<()> {
     let version = tag_version(tag, env!("CARGO_PKG_VERSION"))?;
     if check {
         println!("version={version}");
         println!("prerelease={}", is_prerelease(version));
         return Ok(());
     }
-    bail!("release build not implemented")
+    let out = out.context("--out <dir> is required unless --check is given")?;
+    std::fs::create_dir_all(out).with_context(|| format!("create {}", out.display()))?;
+    let zip_name = format!("Navori-{version}.zip");
+    let sha_path = out.join(format!("{zip_name}.sha256"));
+
+    if out.join(&zip_name).exists() && sha_path.exists() {
+        output(
+            Command::new("shasum")
+                .args(["-a", "256", "-c"])
+                .arg(sha_path.file_name().unwrap_or_default())
+                .current_dir(out),
+        )?;
+    } else {
+        build_zip(root, out, &zip_name, &sha_path)?;
+    }
+
+    let sha_text = std::fs::read_to_string(&sha_path)
+        .with_context(|| format!("read {}", sha_path.display()))?;
+    let hash = sha_text
+        .split_whitespace()
+        .next()
+        .with_context(|| format!("{} is empty", sha_path.display()))?;
+    let cask = out.join("navori.rb");
+    std::fs::write(&cask, cask_text(version, hash))
+        .with_context(|| format!("write {}", cask.display()))?;
+    println!("{}", out.join(&zip_name).display());
+    println!("{}", sha_path.display());
+    println!("{}", cask.display());
+    Ok(())
+}
+
+fn build_zip(root: &Path, out: &Path, zip_name: &str, sha_path: &Path) -> Result<()> {
+    let count = output(
+        Command::new("git")
+            .args(["rev-list", "--count", "HEAD"])
+            .current_dir(root),
+    )
+    .context(
+        "the build number comes from `git rev-list --count HEAD`; a release needs full history",
+    )?;
+    ensure!(
+        !count.trim().is_empty(),
+        "git rev-list printed no commit count"
+    );
+
+    let identities =
+        output(Command::new("security").args(["find-identity", "-v", "-p", "codesigning"]))?;
+    if let Some(problem) = identity_problem(
+        std::env::var("NAVORI_SIGN_IDENTITY").ok().as_deref(),
+        &identities,
+    ) {
+        bail!(problem);
+    }
+
+    let app = bundle(root, Profile::Release, Flavor::Release, out)?;
+    sh(Command::new("codesign")
+        .args(["--verify", "--strict", "--deep"])
+        .arg(&app))?;
+    let mut actual = Vec::new();
+    for target in [app.clone(), app.join("Contents/Helpers/navori")] {
+        let stdout = output(Command::new("codesign").args(["-d", "-r-"]).arg(&target))?;
+        actual.extend(designated_lines(&stdout));
+    }
+    if let Some(problem) = requirement_mismatch(
+        include_str!("../assets/designated-requirement.txt"),
+        &actual,
+    ) {
+        bail!(problem);
+    }
+
+    let zip = out.join(zip_name);
+    let _ = std::fs::remove_file(&zip);
+    sh(Command::new("ditto")
+        .args(["-c", "-k", "--sequesterRsrc", "--keepParent"])
+        .arg(&app)
+        .arg(&zip))?;
+    let sum = output(
+        Command::new("shasum")
+            .args(["-a", "256", zip_name])
+            .current_dir(out),
+    )?;
+    std::fs::write(sha_path, sum).with_context(|| format!("write {}", sha_path.display()))?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{cask_text, is_prerelease, tag_version};
+    use super::{
+        cask_text, designated_lines, identity_problem, is_prerelease, requirement_mismatch,
+        tag_version,
+    };
+
+    const LEAF: &str = "8c56e155bdd4ed3c038035509193fb7d33d302c1";
+    const IDENTITIES: &str = "  1) 8C56E155BDD4ED3C038035509193FB7D33D302C1 \"Navori Local Signing\"\n     1 valid identities found\n";
+
+    fn expected() -> String {
+        include_str!("../assets/designated-requirement.txt").to_owned()
+    }
+
+    fn app_requirement(leaf: &str) -> Vec<String> {
+        designated_lines(&format!(
+            "designated => identifier \"dev.navori.app\" and certificate leaf = H\"{leaf}\"\n\
+             designated => identifier \"dev.navori.app.cli\" and certificate leaf = H\"{leaf}\"\n"
+        ))
+    }
+
+    #[test]
+    fn only_the_designated_lines_of_codesign_output_are_compared() {
+        let stdout = "Executable=/tmp/Navori.app/Contents/MacOS/Navori\n\
+                      designated => identifier \"a\"\n\
+                      # designated => not a requirement line\n\
+                      \x20 designated => identifier \"b\"  \n";
+        assert_eq!(
+            designated_lines(stdout),
+            [
+                "designated => identifier \"a\"",
+                "designated => identifier \"b\""
+            ]
+        );
+    }
+
+    #[test]
+    fn a_designated_requirement_with_another_certificate_is_a_mismatch() {
+        let actual = app_requirement("0000000000000000000000000000000000000000");
+        let text = requirement_mismatch(&expected(), &actual).unwrap();
+        assert!(text.contains(LEAF), "{text}");
+        assert!(
+            text.contains("0000000000000000000000000000000000000000"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn matching_requirements_are_not_a_mismatch() {
+        assert_eq!(
+            requirement_mismatch(&expected(), &app_requirement(LEAF)),
+            None
+        );
+    }
+
+    #[test]
+    fn a_missing_signing_identity_stops_the_release() {
+        let unset = identity_problem(None, IDENTITIES).unwrap();
+        assert!(unset.contains("NAVORI_SIGN_IDENTITY"), "{unset}");
+        let unlisted = identity_problem(Some("Other Identity"), IDENTITIES).unwrap();
+        assert!(unlisted.contains("Other Identity"), "{unlisted}");
+        assert_eq!(
+            identity_problem(Some("Navori Local Signing"), IDENTITIES),
+            None
+        );
+    }
 
     fn cask() -> String {
         cask_text("0.1.0", &"a".repeat(64))
@@ -86,6 +270,7 @@ mod tests {
         assert!(cask.contains("/usr/bin/xattr"), "{cask}");
         assert!(cask.contains("\"-dr\""), "{cask}");
         assert!(cask.contains("com.apple.quarantine"), "{cask}");
+        assert!(cask.contains("{{appdir}}/Navori.app"), "{cask}");
     }
 
     #[test]
