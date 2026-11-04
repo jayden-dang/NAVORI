@@ -600,3 +600,27 @@ Fix after delivery. The Safe diagonal held rows of the deepest panel and measure
 - [x] **Step 4: Commit** `git commit -m "fix(menu): let the highlight follow the pointer in the cascade"`
 
 _Requirements: MENU-4.16, MENU-4.17, MENU-4.18_
+
+### Task 22: Place Submenus on every display
+
+Fix after delivery. `CascadeController` kept each row's position in screen coordinates, and SwiftUI reports no geometry change when a panel moves, so a position went stale when the menu opened on another display.
+
+**Files:**
+- Create: `apps/macos/NavoriPanel/CascadeRowFrames.swift`
+- Modify: `apps/macos/Navori/StatusBar/CascadeController.swift`
+- Test: `apps/macos/Tests/NavoriPanelTests/CascadeRowFramesTests.swift`
+
+**Reuse:** rung 2 — `CascadePlacement`; new (rung 7): `CascadeRowFrames`, reason: the conversion needs a seam a test can reach, and `CascadeController` is not in a tested target.
+
+**Interfaces:**
+- Consumes: `.onGeometryChange` frames from `MenuRowView`, through `CascadeController.setRowFrame`
+- Produces: `CascadeRowFrames.record(_:_:)`, `screenFrame(of:in:)`. Removes `CascadeController.screenFrame(fromSwiftUI:row:)`.
+
+**Depends-on:** Task 21
+
+- [x] **Step 1: Write a failing test** that a row recorded once follows its panel to another display. Run: `swift build --package-path apps/macos --build-tests` — expect: `CascadeRowFrames` does not exist yet.
+- [x] **Step 2: Implement** the store, and convert when a Submenu is placed.
+- [x] **Step 3: Verify by hand** on `cargo xtask run`: click the status button on each display and open each Submenu; every Submenu sits beside its row.
+- [x] **Step 4: Commit** `git commit -m "fix(menu): place Submenus beside their rows on every display"`
+
+_Requirements: MENU-4.19, MENU-4.20_

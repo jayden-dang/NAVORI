@@ -87,6 +87,8 @@ Terms used below:
 - **MENU-4.16** WHEN the pointer is on a row of the deepest open panel THE SYSTEM SHALL select that row at once, whatever direction the pointer is moving. *(Added 2026-11-04: the Safe diagonal also held rows of the Submenu it leads to, so the highlight lagged behind a pointer moving away from the parent.)*
 - **MENU-4.17** WHEN the pointer turns away from the open Submenu THE SYSTEM SHALL select the parent row under it within 16 pt of travel, without waiting for the pointer to stop. *(Added 2026-11-04: the Safe diagonal measured from a stale point, so a wide triangle covered rows the pointer was not crossing on its way to the Submenu.)*
 - **MENU-4.18** (guard) WHEN the pointer travels to the open Submenu along an uneven path, to any of its rows THE SYSTEM SHALL CONTINUE TO keep the Submenu open and the parent row selected.
+- **MENU-4.19** WHEN a Submenu opens THE SYSTEM SHALL place it beside its parent row where that row is now, wherever the Cascade last opened. *(Added 2026-11-04: row positions were kept in screen coordinates and went stale when the panel opened on another display.)*
+- **MENU-4.20** (guard) WHEN the Cascade opens on any display THE SYSTEM SHALL CONTINUE TO anchor level 0 under the status button of that display and to keep Submenus inside that display's visible frame, as in MENU-4.5 to MENU-4.7.
 
 ## 5. Drive the menu from the keyboard
 
