@@ -22,6 +22,13 @@ fn wait_limit() -> Duration {
         .map_or(ASK_WAIT, Duration::from_millis)
 }
 
+fn size_limit() -> usize {
+    std::env::var("NAVORI_ASK_MAX_BYTES")
+        .ok()
+        .and_then(|bytes| bytes.parse().ok())
+        .map_or(MAX_LINE_BYTES, |bytes: usize| bytes.min(MAX_LINE_BYTES))
+}
+
 fn params(model: &str, prompt: &str) -> Result<Value, Failure> {
     serde_json::to_value(AskRequest {
         model: model.to_owned(),
@@ -34,9 +41,10 @@ fn params(model: &str, prompt: &str) -> Result<Value, Failure> {
 pub fn check_size(model: &str, prompt: &str) -> Result<(), Failure> {
     let line = serde_json::to_string(&Request::new(1, method::ASK, params(model, prompt)?))
         .map_err(|e| Failure::Failed(e.to_string()))?;
-    if line.len() > MAX_LINE_BYTES {
+    let limit = size_limit();
+    if line.len() > limit {
         return Err(Failure::Failed(format!(
-            "the question is too large: the request would be {} bytes and the limit is {MAX_LINE_BYTES}",
+            "the question is too large: the request would be {} bytes and the limit is {limit}",
             line.len()
         )));
     }

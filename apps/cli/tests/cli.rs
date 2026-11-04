@@ -1363,3 +1363,74 @@ fn ask_gives_up_when_the_app_does_not_answer() {
         .stderr(predicate::str::contains("may still finish"));
     assert!(started.elapsed() < Duration::from_secs(10));
 }
+
+fn counting_server(home: &std::path::Path) -> Arc<std::sync::atomic::AtomicUsize> {
+    let uid = std::fs::metadata(home).unwrap().uid();
+    let socket = navori_config::Paths::new(navori_config::Profile::Dev, home, uid).socket;
+    std::fs::create_dir_all(socket.parent().unwrap()).unwrap();
+    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+    let connections = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counted = Arc::clone(&connections);
+    std::thread::spawn(move || {
+        let mut held = Vec::new();
+        for stream in listener.incoming().flatten() {
+            counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            held.push(stream);
+        }
+    });
+    connections
+}
+
+fn ask_line_length(prompt: &str) -> usize {
+    let params = serde_json::json!({ "model": "m", "text": prompt });
+    let request = navori_protocol::rpc::Request::new(1, navori_protocol::rpc::method::ASK, params);
+    serde_json::to_string(&request).unwrap().len()
+}
+
+fn prompt_for_line_of(len: usize) -> String {
+    let prompt = "a".repeat(len - ask_line_length(""));
+    assert_eq!(ask_line_length(&prompt), len);
+    prompt
+}
+
+#[test]
+fn ask_refuses_a_request_line_over_the_limit_before_connecting() {
+    let home = short_home();
+    let connections = counting_server(home.path());
+    let prompt = prompt_for_line_of(501);
+    navori(&home)
+        .env("NAVORI_ASK_MAX_BYTES", "500")
+        .env("NAVORI_ASK_WAIT_MS", "200")
+        .args(["ask", "--model", "m", &prompt])
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::contains(
+            "the request would be 501 bytes and the limit is 500",
+        ));
+    assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
+
+#[test]
+fn ask_sends_a_request_line_of_exactly_the_limit_and_refuses_one_byte_more() {
+    let server = recording_server_replying(Reply::Never);
+    navori(&server.home)
+        .env("NAVORI_ASK_MAX_BYTES", "500")
+        .env("NAVORI_ASK_WAIT_MS", "200")
+        .args(["ask", "--model", "m", &prompt_for_line_of(500)])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("did not answer"));
+    assert_eq!(server.requests.lock().unwrap().len(), 1);
+
+    let over = short_home();
+    let connections = counting_server(over.path());
+    navori(&over)
+        .env("NAVORI_ASK_MAX_BYTES", "500")
+        .env("NAVORI_ASK_WAIT_MS", "200")
+        .args(["ask", "--model", "m", &prompt_for_line_of(501)])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("the limit is 500"));
+    assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
