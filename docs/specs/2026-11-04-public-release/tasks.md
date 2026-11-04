@@ -260,9 +260,9 @@ _Requirements: RELEASE-1.1, RELEASE-1.2, RELEASE-1.4, RELEASE-1.9, RELEASE-1.11,
 
 **Depends-on:** Task 5, Task 7
 
-- [ ] **Step 1: Write** both docs from the Produces list; remove "No notarization or public distribution yet" and point to ADR 0007.
-- [ ] **Step 2: Check** every command in the new text exists (`cargo xtask --help` lists `release` and `release-check`) and every requirement named is in `requirements.md`.
-- [ ] **Step 3: Commit** `git commit -m "docs: release steps and one-time setup for tagged public releases"`
+- [x] **Step 1: Write** both docs from the Produces list; remove "No notarization or public distribution yet" and point to ADR 0007.
+- [x] **Step 2: Check** every command in the new text exists (`cargo xtask --help` lists `release` and `release-check`) and every requirement named is in `requirements.md`.
+- [x] **Step 3: Commit** `git commit -m "docs: release steps and one-time setup for tagged public releases"`
 
 _Requirements: RELEASE-6.3, RELEASE-7.6_
 
