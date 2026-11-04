@@ -687,3 +687,27 @@ Amendment after delivery, from story 16. A coordinating session read `stopped` w
 - [x] **Step 5: Commit** `git commit -m "feat(awake): keep sessions with running subagents held and labelled working"`
 
 _Requirements: AWAKE-16.1, AWAKE-16.2, AWAKE-16.3, AWAKE-16.4, AWAKE-16.5, AWAKE-16.6, AWAKE-16.7, AWAKE-16.8, AWAKE-16.9, AWAKE-16.10, AWAKE-16.11_
+
+### Task 24: Name each session row
+
+Amendment after delivery, from story 17 and `ui-brief.md` amendment 8.
+
+**Files:**
+- Modify: `modules/awake/src/action.rs`, `modules/awake/src/actor.rs`, `modules/awake/src/domain/table.rs`, `modules/awake/src/state.rs`, `crates/ffi/src/lib.rs`, `crates/ffi/src/app.rs`, `apps/macos/NavoriPanel/AwakeSubmenuState.swift`, `apps/macos/NavoriPanel/AwakeLeaseMap.swift`, `apps/macos/Navori/Core/CoreStore.swift`, `docs/features/awake.md`, `docs/design/2026-11-01-menubar-ui-brief.md`
+- Test: `modules/awake/tests/title.rs`, `apps/macos/Tests/NavoriPanelTests/AwakeSubmenuStateTests.swift`, `apps/macos/Tests/NavoriPanelTests/AwakeLeaseMapTests.swift`
+
+**Reuse:** rung 2 — `hold_session`, `stop_session`, `HoldingRow`.
+
+**Interfaces:**
+- Consumes: `title` on `hold_session` and `stop_session`
+- Produces: `LeaseState.title`, `LeaseView.title`, `AwakeLeaseInput.title`.
+
+**Depends-on:** Task 23
+
+- [x] **Step 1: Write failing tests** for the title rules and the row. Run: `cargo test -p navori-mod-awake --test title` — expect: 4 of 6 fail.
+- [x] **Step 2: Implement** from `design.md` Decision 23.
+- [x] **Step 3: Verify** `cargo xtask ci` — expect: pass.
+- [x] **Step 4: Verify** with a real transcript, read only, and `--name`: the Core holds the title.
+- [x] **Step 5: Commit** `git commit -m "feat(awake): show each session's name on its Holding row"`
+
+_Requirements: AWAKE-17.1, AWAKE-17.2, AWAKE-17.3, AWAKE-17.4, AWAKE-17.5, AWAKE-17.6, AWAKE-17.7_

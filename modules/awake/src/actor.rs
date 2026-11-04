@@ -173,14 +173,23 @@ impl Awake {
                 session_id,
                 pid,
                 ppid,
+                title,
             } => {
-                self.hold_session(ctx, now, session_id.clone(), *pid, *ppid)
-                    .await
+                let started = self
+                    .hold_session(ctx, now, session_id.clone(), *pid, *ppid)
+                    .await;
+                self.table.set_session_title(session_id, title.as_deref());
+                started
             }
             AwakeAction::StopSession {
                 session_id,
                 background,
-            } => self.stop_session(ctx, session_id, truncate_us(now), *background),
+                title,
+            } => {
+                let stopped = self.stop_session(ctx, session_id, truncate_us(now), *background);
+                self.table.set_session_title(session_id, title.as_deref());
+                stopped
+            }
             AwakeAction::EndSession { session_id } => self.end_session(ctx, session_id, now),
             AwakeAction::ReleaseAll => self.release_all(ctx),
             AwakeAction::KeepFor { seconds } => self.keep_for(ctx, now, *seconds),

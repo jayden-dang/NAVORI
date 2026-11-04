@@ -156,6 +156,8 @@ struct SessionLease {
     label: Option<String>,
     /// Running subagents, from hooks. Not stored: after a reopen the descendant reading decides.
     agents: BTreeSet<String>,
+    /// The session's name, for the menu only. Never stored, so a reopen waits for the next hook.
+    title: Option<String>,
     /// The Harness's latest `Stop` or `SubagentStop` listed work still in flight.
     background: bool,
     /// The latest reading since the Stop mark found a New descendant.
@@ -302,6 +304,7 @@ impl LeaseTable {
             next_check: None,
             label,
             agents: BTreeSet::new(),
+            title: None,
             background: false,
             found_work: false,
         });
@@ -338,6 +341,20 @@ impl LeaseTable {
 
     pub(crate) fn saved_commands(&self) -> Vec<ProcId> {
         self.commands.iter().map(|lease| lease.process).collect()
+    }
+
+    /// A missing or blank title leaves the current one.
+    pub(crate) fn set_session_title(&mut self, session_id: &str, title: Option<&str>) {
+        let Some(title) = title.and_then(clean_title) else {
+            return;
+        };
+        if let Some(lease) = self
+            .sessions
+            .iter_mut()
+            .find(|lease| lease.session_id == session_id)
+        {
+            lease.title = Some(title);
+        }
     }
 
     pub(crate) fn stop_session(&mut self, session_id: &str, now: SystemTime, background: bool) {
@@ -757,6 +774,7 @@ fn manual_state(lease: &Manual) -> LeaseState {
             pid: None,
             stopped: false,
             ends_at_ms: Some(wall_ms(*deadline)),
+            title: None,
         },
         Manual::UntilOff { .. } => LeaseState {
             key: LeaseKey::Manual.text(),
@@ -766,6 +784,7 @@ fn manual_state(lease: &Manual) -> LeaseState {
             pid: None,
             stopped: false,
             ends_at_ms: None,
+            title: None,
         },
     }
 }
@@ -779,6 +798,7 @@ fn display_state() -> LeaseState {
         pid: None,
         stopped: false,
         ends_at_ms: None,
+        title: None,
     }
 }
 
@@ -791,6 +811,7 @@ fn command_state(lease: &CommandLease) -> LeaseState {
         pid: Some(lease.process.pid),
         stopped: false,
         ends_at_ms: None,
+        title: None,
     }
 }
 
@@ -800,6 +821,21 @@ fn command_key(process: ProcId) -> String {
         start_us: process.start.0,
     }
     .text()
+}
+
+/// This text crosses a trust boundary and ends up on one menu row.
+fn clean_title(raw: &str) -> Option<String> {
+    const MAX_CHARS: usize = 120;
+    let spaced: String = raw
+        .chars()
+        .map(|c| if c.is_whitespace() { ' ' } else { c })
+        .filter(|c| !c.is_control())
+        .collect();
+    let words: Vec<&str> = spaced.split(' ').filter(|word| !word.is_empty()).collect();
+    if words.is_empty() {
+        return None;
+    }
+    Some(words.join(" ").chars().take(MAX_CHARS).collect())
 }
 
 fn session_state(lease: &SessionLease) -> LeaseState {
@@ -814,6 +850,7 @@ fn session_state(lease: &SessionLease) -> LeaseState {
         pid: Some(lease.process.pid),
         stopped: lease.stopped(),
         ends_at_ms: Some(wall_ms(lease.deadline)),
+        title: lease.title.clone(),
     }
 }
 

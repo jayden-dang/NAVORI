@@ -98,6 +98,7 @@ pub struct LeaseView {
     pub pid: Option<i32>,
     pub stopped: bool,
     pub ends_at_ms: Option<i64>,
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]

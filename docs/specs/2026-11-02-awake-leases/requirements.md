@@ -302,6 +302,20 @@ Files this story touches: `modules/awake/src/` (guards below), `apps/cli/src/hoo
 - **AWAKE-16.10** (guard) WHEN a session has no reported work and no New descendant at the end of grace THE SYSTEM SHALL CONTINUE TO end its Lease.
 - **AWAKE-16.11** (guard) WHEN a session-stop Action has no `background` field, as from any Harness that sends no background list, THE SYSTEM SHALL CONTINUE TO treat it as AWAKE-5.1 and AWAKE-5.2 do.
 
+## 17. Name each session row
+
+**Story:** As the user, I want each session row to show the session's name instead of its branch, so that two sessions on `dev` in one project can be told apart.
+
+Files this story touches: `modules/awake/src/` and `crates/ffi/src/` (AWAKE-12.3), `apps/cli/src/hook.rs` (HOOKS-1.15 to HOOKS-1.17), `apps/macos/NavoriPanel/`, `apps/macos/Navori/Core/CoreStore.swift` (AWAKE-12.7), docs (no behavior to guard).
+
+- **AWAKE-17.1** WHEN a session-hold or session-stop Action carries a `title` THE SYSTEM SHALL keep it as that session's title, and an Action with no title or a blank one SHALL leave the current title.
+- **AWAKE-17.2** THE SYSTEM SHALL remove control characters from a title, reduce whitespace to single spaces, and keep at most 120 characters.
+- **AWAKE-17.3** THE SYSTEM SHALL NOT store a title or put it in an Event or an assertion name, so that after an app reopen the row reads the branch until the next hook (ARCH-6, THR-3).
+- **AWAKE-17.4** WHILE a session has a title THE SYSTEM SHALL show the title as the name on its Holding row, and sort by that name within its project.
+- **AWAKE-17.5** WHILE a session has a title THE SYSTEM SHALL read the title, the Harness, the project and branch, and the pid in the row's tooltip and VoiceOver sentence.
+- **AWAKE-17.6** (guard) WHILE a session has no title THE SYSTEM SHALL CONTINUE TO show its branch as the name.
+- **AWAKE-17.7** (guard) WHEN a session has a title THE SYSTEM SHALL CONTINUE TO group its row by the project in its label, as AWAKE-11.13 does.
+
 ## Out of Scope
 
 - Installing hooks and `navori hook` — ROAD-9.

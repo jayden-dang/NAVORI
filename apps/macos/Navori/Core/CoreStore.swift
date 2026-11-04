@@ -172,7 +172,8 @@ final class CoreStore {
                 label: lease.label,
                 pid: lease.pid,
                 stopped: lease.stopped,
-                endsAtMs: lease.endsAtMs
+                endsAtMs: lease.endsAtMs,
+                title: lease.title
             )
         } ?? []
     }

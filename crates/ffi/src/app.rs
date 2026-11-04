@@ -271,6 +271,7 @@ impl From<LeaseState> for crate::LeaseView {
             pid,
             stopped,
             ends_at_ms,
+            title,
         } = lease;
         Self {
             key,
@@ -280,6 +281,7 @@ impl From<LeaseState> for crate::LeaseView {
             pid,
             stopped,
             ends_at_ms,
+            title,
         }
     }
 }

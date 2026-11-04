@@ -649,6 +649,122 @@ fn a_subagent_stop_with_background_tasks_says_so() {
     );
 }
 
+fn transcript(lines: &[String]) -> (tempfile::TempDir, String) {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("session.jsonl");
+    std::fs::write(&path, lines.join("\n") + "\n").unwrap();
+    let text = path.to_str().unwrap().to_owned();
+    (dir, text)
+}
+
+fn ai_title(title: &str) -> String {
+    serde_json::json!({"type": "ai-title", "aiTitle": title, "sessionId": "s-1"}).to_string()
+}
+
+fn custom_title(title: &str) -> String {
+    serde_json::json!({"type": "custom-title", "customTitle": title, "sessionId": "s-1"})
+        .to_string()
+}
+
+fn hook_payload(event: &str, transcript: &str, extra: &str) -> String {
+    format!(
+        r#"{{"hook_event_name":"{event}","session_id":"s-1","transcript_path":{}{extra}}}"#,
+        serde_json::json!(transcript)
+    )
+}
+
+#[test]
+fn a_named_session_sends_its_title_field_first() {
+    let server = recording_server();
+    let (_dir, path) = transcript(&[custom_title("older name"), ai_title("ai title")]);
+
+    let requests = server.hook(&hook_payload(
+        "UserPromptSubmit",
+        &path,
+        r#","session_title":"My name""#,
+    ));
+
+    assert_eq!(
+        dispatched_action(&requests[0])["hold_session"]["title"],
+        "My name"
+    );
+}
+
+#[test]
+fn with_no_title_field_a_custom_title_beats_a_later_ai_title() {
+    let server = recording_server();
+    let (_dir, path) = transcript(&[custom_title("My name"), ai_title("ai title")]);
+
+    let requests = server.hook(&hook_payload("Stop", &path, ""));
+
+    assert_eq!(
+        dispatched_action(&requests[0])["stop_session"]["title"],
+        "My name"
+    );
+}
+
+#[test]
+fn an_unnamed_session_sends_its_latest_ai_title() {
+    let server = recording_server();
+    let (_dir, path) = transcript(&[ai_title("old"), ai_title("Road-128 ticket shaping")]);
+
+    let requests = server.hook(&hook_payload("UserPromptSubmit", &path, ""));
+
+    assert_eq!(
+        dispatched_action(&requests[0])["hold_session"]["title"],
+        "Road-128 ticket shaping"
+    );
+}
+
+#[test]
+fn only_the_end_of_a_long_transcript_is_read() {
+    let server = recording_server();
+    let filler = serde_json::json!({"type": "user", "text": "x".repeat(4096)}).to_string();
+    let mut lines = vec![ai_title("too far back")];
+    lines.extend(std::iter::repeat_n(filler, 100));
+    let (_dir, path) = transcript(&lines);
+
+    let requests = server.hook(&hook_payload("Stop", &path, ""));
+
+    assert!(
+        dispatched_action(&requests[0])["stop_session"]
+            .get("title")
+            .is_none()
+    );
+}
+
+#[test]
+fn a_title_comes_only_from_a_title_record_and_nothing_else_leaves_the_transcript() {
+    let server = recording_server();
+    let prompt = serde_json::json!({
+        "type": "user",
+        "text": r#"SECRET-PROMPT "type":"ai-title","aiTitle":"forged""#
+    })
+    .to_string();
+    let (_dir, path) = transcript(&[prompt, r#"not json "type":"ai-title""#.to_owned()]);
+
+    let requests = server.hook(&hook_payload("UserPromptSubmit", &path, ""));
+
+    assert!(
+        dispatched_action(&requests[0])["hold_session"]
+            .get("title")
+            .is_none()
+    );
+    assert!(!requests[0].to_string().contains("SECRET-PROMPT"));
+}
+
+#[test]
+fn a_missing_transcript_still_sends_the_event() {
+    let server = recording_server();
+
+    let requests = server.hook(&hook_payload("Stop", "/nonexistent/session.jsonl", ""));
+
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"stop_session": {"session_id": "s-1"}})
+    );
+}
+
 #[test]
 fn a_subagent_event_with_no_agent_id_sends_nothing() {
     let server = recording_server();

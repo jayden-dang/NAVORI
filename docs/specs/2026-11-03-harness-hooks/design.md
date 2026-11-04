@@ -54,7 +54,7 @@ Both come from `research-hooks-claude-codex.md`. Neither is built around, and ne
 
 ### `navori hook` command
 
-Satisfies: HOOKS-1.11, HOOKS-1.12, HOOKS-1.13, HOOKS-1.14, HOOKS-1.1, HOOKS-1.2, HOOKS-1.3, HOOKS-1.4, HOOKS-1.5, HOOKS-1.6, HOOKS-1.7, HOOKS-1.8, HOOKS-1.9, HOOKS-1.10, HOOKS-2.1, HOOKS-2.2, HOOKS-2.3, HOOKS-2.4, HOOKS-2.5, HOOKS-2.6, HOOKS-8.4, HOOKS-9.1, HOOKS-10.2, HOOKS-10.3
+Satisfies: HOOKS-1.11, HOOKS-1.12, HOOKS-1.13, HOOKS-1.14, HOOKS-1.15, HOOKS-1.16, HOOKS-1.17, HOOKS-1.1, HOOKS-1.2, HOOKS-1.3, HOOKS-1.4, HOOKS-1.5, HOOKS-1.6, HOOKS-1.7, HOOKS-1.8, HOOKS-1.9, HOOKS-1.10, HOOKS-2.1, HOOKS-2.2, HOOKS-2.3, HOOKS-2.4, HOOKS-2.5, HOOKS-2.6, HOOKS-8.4, HOOKS-9.1, HOOKS-10.2, HOOKS-10.3
 Reuse: rung 2 — `Client::connect`/`call`, `socket_path`, `Failure`, the clap `Command` enum (`apps/cli/src/main.rs:32, 140, 248`); rung 2 — the fail-open `ask_for_command_lease` pattern (`main.rs:294-318`); rung 3 — `std::os::unix::process::parent_id`, `std::process::id`, `std::thread`, `std::sync::mpsc::recv_timeout`. New code (rung 7) only for the event map.
 Respects: ARCH-1 (no logic beyond a map), ARCH-3, ARCH-11 (the existing user-private socket), ARCH-14 (`--profile` global flag picks the socket)
 Security: THR-6

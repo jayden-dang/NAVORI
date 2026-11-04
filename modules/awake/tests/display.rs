@@ -88,7 +88,8 @@ async fn display_on_holds_one_display_and_one_system_assertion() {
             "label": "Display",
             "pid": null,
             "stopped": false,
-            "ends_at_ms": null
+            "ends_at_ms": null,
+            "title": null
         })
     );
     assert_eq!(state["system_held"], true);
@@ -147,7 +148,8 @@ async fn display_on_with_no_other_lease_holds_system_too() {
                 "label": "Display",
                 "pid": null,
                 "stopped": false,
-                "ends_at_ms": null
+                "ends_at_ms": null,
+                "title": null
             }],
             "system_held": true,
             "display_held": true,

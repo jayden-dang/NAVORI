@@ -498,3 +498,26 @@ Amendment from AWAKE story 16.
 - [x] **Step 5: Commit** with AWAKE Task 23.
 
 _Requirements: HOOKS-1.11, HOOKS-1.12, HOOKS-1.13, HOOKS-1.14, HOOKS-4.17_
+
+### Task 19: Send each session's title
+
+Amendment from AWAKE story 17.
+
+**Files:**
+- Modify: `apps/cli/src/hook.rs`, `docs/features/integrations.md`
+- Test: `apps/cli/tests/cli.rs`
+
+**Reuse:** rung 2 — `plan`.
+
+**Interfaces:**
+- Consumes: `session_title` and `transcript_path` from the payload
+- Produces: `title` on `hold_session` and `stop_session`.
+
+**Depends-on:** Task 18
+
+- [x] **Step 1: Write failing tests** for each source, the order, a long file, a forged line and a missing file.
+- [x] **Step 2: Implement** `session_title` and `title_in_transcript`.
+- [x] **Step 3: Verify** `cargo xtask ci` — expect: pass.
+- [x] **Step 4: Commit** with AWAKE Task 24.
+
+_Requirements: HOOKS-1.15, HOOKS-1.16, HOOKS-1.17_

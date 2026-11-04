@@ -31,7 +31,7 @@ AppKit semantic colors, as in MENU's design; `docs/standards/design-tokens.md` i
 - **Components:** rung 2 — `MenuRowView`, gaining `isChecked`; new (rung 7) — `AwakeProblemView`, `HoldingList`, `HoldingLine`, `HoldingMarkView`, reason: no existing row has a mark, a dot and a right-aligned word without selection; new (rung 7) — `HarnessMarkImage`, reason: SF Symbols has no Harness logos.
 - **States:** off (commands alone) · on (no status text) · Keep awake lease held (`until 11:38` or `Indefinitely` on its row) · Tracking agents (green dot and `On`, or `Off`) · not held · display refused · action failed or problem recorded.
 - **Type & color:** names 14 pt; words 12 pt; project titles 12 pt semibold in `secondaryLabelColor`; a stopped row entirely in `secondaryLabelColor`; monochrome marks; color only in the dots.
-- **A11y:** ↑ and ↓ reach the commands, → opens `Keep awake`. VoiceOver reads each row as one sentence, with Harness and pid: `Claude Code, NAVORI/main, working, pid 23719`. The pid is otherwise only in the tooltip.
+- **A11y:** ↑ and ↓ reach the commands, → opens `Keep awake`. VoiceOver reads each row as one sentence, with Harness and pid: `Road-128 ticket shaping, Claude Code, klynt/dev, working, pid 51865`, or without the name when there is none. The pid is otherwise only in the tooltip.
 
 ## Surface: Keep awake Submenu (level 2)
 
@@ -59,3 +59,4 @@ The Harness mark leads each one-line row under its project: which agent, where, 
 5. A command shows a check while its Lease exists, and `Display on` keeps its name rather than flipping to `Display off`.
 6. The level-0 row shows a green dot or nothing, with no text and no orange dot (user, 2026-11-04, after the first build). A problem is stated in the Submenu and by the tray icon.
 7. `Keep awake` and `Tracking agents` replace the four commands (user, 2026-11-04, after using `Release all`: "không có button để bật lại các session track đó", EN: "there is no button to turn those tracked sessions back on"). `Keep awake` opens a third level modeled on Caffeine. `Indefinitely` keeps the display on, replacing `Display on`. `Release all` leaves the menu and stays in the CLI. `ui-brief.png` shows the Holding list as locked and the commands as they were before this amendment.
+8. A session row shows the session's name when it has one, then falls back to its branch (user, 2026-11-04). The branch moves to the tooltip and VoiceOver, and the row stays one line. Amends the Signature's "where" only: the project title still says where.

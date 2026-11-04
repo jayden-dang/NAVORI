@@ -39,7 +39,8 @@ async fn a_one_hour_lease_holds_one_system_assertion_with_the_given_name() {
                 "label": "1 hour",
                 "pid": null,
                 "stopped": false,
-                "ends_at_ms": ORIGIN_MS as i64 + HOUR_MS
+                "ends_at_ms": ORIGIN_MS as i64 + HOUR_MS,
+                "title": null
             }],
             "system_held": true,
             "display_held": false,

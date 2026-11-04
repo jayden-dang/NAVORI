@@ -17,6 +17,7 @@ public enum AwakeLeaseMap {
         pid: Int32?,
         stopped: Bool,
         endsAtMs: Int64?,
+        title: String? = nil,
         timeZone: TimeZone = .current
     ) -> AwakeLeaseInput? {
         let mapped: AwakeLeaseInput.Kind
@@ -35,7 +36,8 @@ public enum AwakeLeaseMap {
             label: nonempty(label),
             pid: pid,
             stopped: stopped,
-            until: until
+            until: until,
+            title: nonempty(title)
         )
     }
 
