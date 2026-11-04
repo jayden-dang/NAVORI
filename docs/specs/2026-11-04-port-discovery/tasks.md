@@ -210,7 +210,7 @@ _Requirements: PORTS-1.2, PORTS-1.9, PORTS-10.5_
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1: Write the failing tests** in `modules/ports/tests/scan.rs` with `Rig` over `FakeProcesses`:
+- [x] **Step 1: Write the failing tests** in `modules/ports/tests/scan.rs` with `Rig` over `FakeProcesses`:
   - `listing_returns_one_entry_per_process_and_port_with_both_addresses`: `127.0.0.1:3000` and `::1:3000` give one entry with 2 addresses.
   - `listing_before_any_scan_says_nothing_was_scanned_and_starts_no_scan`: `"list"` at t=0 gives `scanned_at_ms` null, and `list_calls()` is unchanged.
   - `the_first_scan_comes_five_seconds_after_start`: `Rig::advance(Duration::from_secs(5)).await`.
@@ -219,19 +219,19 @@ _Requirements: PORTS-1.2, PORTS-1.9, PORTS-10.5_
   - `the_list_is_grouped_by_project_then_worktree_then_process_in_a_stable_order`.
   - `list_is_a_read_action_with_a_schema_and_description`: via `kernel.actions()`.
   - `the_list_states_when_its_scan_was_taken`.
-- [ ] **Step 2: Run** `cargo test -p navori-mod-ports` — expect: the crate does not build.
-- [ ] **Step 3: Implement** the crate.
+- [x] **Step 2: Run** `cargo test -p navori-mod-ports` — expect: the crate does not build.
+- [x] **Step 3: Implement** the crate.
   - Follow the design sections "modules/ports: scan and enrichment" (walk, no placement) and "the Module" (`List`).
   - One scan comes at start + 5 s, awaited inside the loop. Task 8 adds the cadence and the in-flight task.
   - The process name is the exe's last part, else `Snapshot::name`.
   - `Gate` and `canonical_temp_home` go in `tests/common/mod.rs`.
-- [ ] **Step 4: Register** the Module.
+- [x] **Step 4: Register** the Module.
   - Rebase on `main`.
   - In `build_kernel`, register it with `PortsEnv::mac(PathBuf::from(&config.home_dir))`.
   - Add the workspace member and dependency.
   - Update the module, crate and `navori doctor` lines in the docs under Files.
-- [ ] **Step 5: Run** `cargo test -p navori-mod-ports && cargo xtask ci` — expect: pass, with `check-deps` accepting `navori-mod-ports`.
-- [ ] **Step 6: Commit** `git commit -m "feat(ports): list the user's listening ports through ports.list"`
+- [x] **Step 5: Run** `cargo test -p navori-mod-ports && cargo xtask ci` — expect: pass, with `check-deps` accepting `navori-mod-ports`.
+- [x] **Step 6: Commit** `git commit -m "feat(ports): list the user's listening ports through ports.list"`
 
 _Requirements: PORTS-1.1, PORTS-1.3, PORTS-1.4, PORTS-1.5, PORTS-1.6, PORTS-1.7, PORTS-1.8, PORTS-1.10, PORTS-1.11, PORTS-7.5, PORTS-9.5, PORTS-9.7_
 
