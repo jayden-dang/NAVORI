@@ -535,11 +535,11 @@ _Requirements: PSTOP-6.1, PSTOP-6.2, PSTOP-6.3, PSTOP-6.4, PSTOP-6.5, PSTOP-6.6,
 
 **Depends-on:** Task 12
 
-- [ ] **Step 1: Write the failing tests** in `RunningStateTests.swift`: `open_is_offered_only_where_the_core_says_the_port_is_openable`, `copy_text_is_localhost_and_the_port`.
-- [ ] **Step 2: Run** the Swift test command — expect: failures.
-- [ ] **Step 3: Implement** `openPort`, the controls and the reveal.
-- [ ] **Step 4: Verify** in the dev app on the throwaway listener: `Open` opens the browser at `http://localhost:<port>`; `Copy` puts `localhost:<port>` on the pasteboard and sends nothing (check `navori --profile dev events`); the path reveals in Finder.
-- [ ] **Step 5: Run** `cargo xtask ci` — expect: pass. Commit `git commit -m "feat(shell): open, copy and reveal from the project menu"`
+- [x] **Step 1: Write the failing tests** in `RunningStateTests.swift`: `open_is_offered_only_where_the_core_says_the_port_is_openable`, `copy_text_is_localhost_and_the_port`.
+- [x] **Step 2: Run** the Swift test command — expect: failures.
+- [x] **Step 3: Implement** `openPort`, the controls and the reveal.
+- [x] **Step 4: Verify** in the dev app on the throwaway listener: `Open` opens the browser at `http://localhost:<port>`; `Copy` puts `localhost:<port>` on the pasteboard and sends nothing (check `navori --profile dev events`); the path reveals in Finder.
+- [x] **Step 5: Run** `cargo xtask ci` — expect: pass. Commit `git commit -m "feat(shell): open, copy and reveal from the project menu"`
 
 _Requirements: PSTOP-9.1, PSTOP-9.2, PSTOP-9.3, PSTOP-9.4_
 
