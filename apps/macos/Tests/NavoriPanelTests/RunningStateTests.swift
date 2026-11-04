@@ -264,3 +264,22 @@ struct RunningSubmenuStateTests {
         ))
     }
 }
+
+@Suite
+struct ProjectRowIdTests {
+    @Test func a_project_row_id_carries_its_name_and_other_has_its_own() {
+        let state = RunningSubmenuState(running: running([
+            project("klynt", state: .working, sessions: [live]),
+            project("Other", state: .idle, ports: [port(2)], isOther: true),
+        ]))
+        #expect(state.rows.map(\.id) == ["running.project.klynt", "running.other"])
+    }
+
+    @Test func a_project_that_is_named_other_keeps_a_distinct_id() {
+        let state = RunningSubmenuState(running: running([
+            project("Other", state: .idle, ports: [port(1)]),
+            project("Other", state: .idle, ports: [port(2)], isOther: true),
+        ]))
+        #expect(state.rows.map(\.id) == ["running.project.Other", "running.other"])
+    }
+}

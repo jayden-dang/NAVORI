@@ -127,6 +127,7 @@ public struct StopOffer: Equatable, Sendable {
 }
 
 public struct ProjectRowState: Equatable, Sendable {
+    public let id: String
     public let name: String
     public let dot: ProjectDot
     public let spoken: String
@@ -136,6 +137,7 @@ public struct ProjectRowState: Equatable, Sendable {
     public let childStop: StopOffer?
 
     init(_ project: RunningProjectInput) {
+        id = project.isOther ? "running.other" : "running.project.\(project.name)"
         name = project.name
         stop = StopOffer(count: project.stoppablePorts, request: project.rowStopRequest)
         childStop = StopOffer(count: project.stoppablePorts, request: project.childStopRequest)

@@ -198,6 +198,50 @@ final class CoreStore {
         )
     }
 
+    var running: RunningInput? {
+        guard let view = snapshot?.running else { return nil }
+        return RunningInput(
+            unknownReason: view.unknownReason,
+            projects: view.projects.map(Self.input),
+            hiddenSystemPorts: Int(view.hiddenSystemPorts),
+            stopAll: view.stopAll,
+            stopAllPorts: Int(view.stopAllPorts),
+            inUsePorts: Int(view.inUsePorts),
+            otherPortsLeft: Int(view.otherPortsLeft)
+        )
+    }
+
+    var runningSubmenu: RunningSubmenuState? {
+        running.map { RunningSubmenuState(running: $0, problem: awakeSubmenu.problem?.title) }
+    }
+
+    var runningRowIds: [String] {
+        runningSubmenu?.rows.map(\.id) ?? []
+    }
+
+    private static func input(_ state: ProjectState) -> RunningProjectState {
+        switch state {
+        case .working: .working
+        case .idle: .idle
+        case .unknown: .unknown
+        }
+    }
+
+    private static func input(_ project: RunningProject) -> RunningProjectInput {
+        RunningProjectInput(
+            name: project.name,
+            isOther: project.isOther,
+            state: Self.input(project.state),
+            sessions: project.sessions.map { RunningSessionInput(stopped: $0.stopped) },
+            ports: project.ports.map {
+                RunningPortInput(port: Int($0.port), name: $0.name, stopRequest: $0.stopRequest)
+            },
+            stoppablePorts: Int(project.stoppablePorts),
+            rowStopRequest: project.rowStopRequest,
+            childStopRequest: project.childStopRequest
+        )
+    }
+
     func perform(_ command: AwakeCommand) async {
         do {
             _ = try await dispatch(module: "awake", actionJSON: command.actionJSON)
