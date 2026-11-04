@@ -4,7 +4,7 @@ mod common;
 
 use common::{
     CLAUDE, CODEX, DEV_HELPER, FIVE, RELEASE_HELPER, Rig, THREE, command, complete, group, handler,
-    tree,
+    legacy_command, tree,
 };
 use serde_json::{Value, json};
 
@@ -76,8 +76,8 @@ async fn a_hook_file_with_only_foreign_hooks_is_not_installed() {
 #[tokio::test]
 async fn a_complete_correct_set_is_installed() {
     let rig = Rig::release();
-    rig.write(CLAUDE_FILE, include_str!("fixtures/claude_installed.json"));
-    rig.write(GROK_FILE, include_str!("fixtures/grok_installed.json"));
+    rig.write(CLAUDE_FILE, include_str!("fixtures/claude_guarded.json"));
+    rig.write(GROK_FILE, include_str!("fixtures/grok_guarded.json"));
     for harness in ["claude", "grok"] {
         let row = rig.row(harness).await;
         assert_eq!(row["state"], "installed", "{harness}");
@@ -187,7 +187,7 @@ async fn a_symlinked_hook_file_is_read_through_the_link() {
     let rig = Rig::release();
     rig.write(
         "dotfiles/settings.json",
-        include_str!("fixtures/claude_installed.json"),
+        include_str!("fixtures/claude_guarded.json"),
     );
     rig.make_dir(".claude");
     std::os::unix::fs::symlink(rig.path("dotfiles/settings.json"), rig.path(CLAUDE_FILE)).unwrap();
@@ -294,7 +294,7 @@ async fn the_three_harnesses_come_back_in_a_fixed_order() {
 async fn status_changes_no_file_and_creates_no_directory() {
     let rig = Rig::release();
     rig.make_dir(".grok");
-    rig.write(CLAUDE_FILE, include_str!("fixtures/claude_installed.json"));
+    rig.write(CLAUDE_FILE, include_str!("fixtures/claude_guarded.json"));
     let before = tree(rig.home.path());
     rig.status().await;
     rig.status().await;
@@ -313,7 +313,7 @@ async fn the_published_state_stays_empty() {
 }
 
 #[tokio::test]
-async fn a_command_that_is_not_the_single_quoted_helper_then_hook_reads_not_installed() {
+async fn a_command_in_neither_recognised_form_reads_not_installed() {
     let lookalikes = [
         "\"/A/Navori.app/Contents/Helpers/navori\" hook",
         "/A/Navori.app/Contents/Helpers/navori hook",
@@ -341,7 +341,76 @@ async fn a_command_that_is_not_the_single_quoted_helper_then_hook_reads_not_inst
 #[tokio::test]
 async fn a_quote_inside_the_helper_path_is_read_back_as_ours() {
     let rig = Rig::new(false, "/A/It's/Navori.app/Contents/Helpers/navori");
-    let written = "'/A/It'\\''s/Navori.app/Contents/Helpers/navori' hook";
-    rig.write_json(CLAUDE_FILE, &complete(written, &CLAUDE));
+    let q = "'/A/It'\\''s/Navori.app/Contents/Helpers/navori'";
+    let written = format!("[ -f {q} ] && [ -x {q} ] && exec {q} hook || true");
+    rig.write_json(CLAUDE_FILE, &complete(&written, &CLAUDE));
     assert_eq!(rig.row("claude").await["state"], "installed");
+}
+
+#[tokio::test]
+async fn hooks_written_in_the_earlier_form_need_repair() {
+    let rig = Rig::release();
+    rig.write(CLAUDE_FILE, include_str!("fixtures/claude_installed.json"));
+    let row = rig.row("claude").await;
+    assert_eq!(row["state"], "needs_repair");
+    assert_eq!(offers(&row), ["repair", "remove"]);
+
+    let dev = Rig::dev();
+    dev.write_json(
+        CLAUDE_FILE,
+        &complete(&legacy_command(DEV_HELPER, true), &CLAUDE),
+    );
+    assert_eq!(dev.row("claude").await["state"], "needs_repair");
+}
+
+#[tokio::test]
+async fn guarded_lookalikes_are_not_navoris() {
+    let h = "/A/Navori.app/Contents/Helpers/navori";
+    let guard = |a: &str, b: &str, c: &str, tail: &str| {
+        format!("[ -f '{a}' ] && [ -x '{b}' ] && exec '{c}'{tail}")
+    };
+    let lookalikes = [
+        guard(
+            h,
+            h,
+            "/B/Navori.app/Contents/Helpers/navori",
+            " hook || true",
+        ),
+        guard(
+            h,
+            "/B/Navori.app/Contents/Helpers/navori",
+            h,
+            " hook || true",
+        ),
+        guard(
+            "/B/Navori.app/Contents/Helpers/navori",
+            h,
+            h,
+            " hook || true",
+        ),
+        format!("[ -f '{h}' ] && [ -x '{h}' ] && '{h}' hook || true"),
+        guard(h, h, h, " hook || false"),
+        guard(h, h, h, " --profile dev hook || true"),
+        guard(h, h, h, " hook || true; rm -rf x"),
+        guard(h, h, h, " hook"),
+        guard(
+            "/A/Navori.app/Contents/Helpers/other",
+            "/A/Navori.app/Contents/Helpers/other",
+            "/A/Navori.app/Contents/Helpers/other",
+            " hook || true",
+        ),
+    ];
+    for lookalike in &lookalikes {
+        let rig = Rig::release();
+        rig.write_json(CLAUDE_FILE, &complete(lookalike, &CLAUDE));
+        assert_eq!(
+            rig.row("claude").await["state"],
+            "not_installed",
+            "{lookalike}"
+        );
+    }
+    let dev_guard = guard(h, h, h, " hook || true");
+    let rig = Rig::dev();
+    rig.write_json(CLAUDE_FILE, &complete(&dev_guard, &CLAUDE));
+    assert_eq!(rig.row("claude").await["state"], "not_installed");
 }

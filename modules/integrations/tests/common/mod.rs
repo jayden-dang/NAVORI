@@ -85,6 +85,12 @@ impl Rig {
 
 /// `helper` must hold no single quote.
 pub fn command(helper: &str, dev: bool) -> String {
+    let args = if dev { " --profile dev hook" } else { " hook" };
+    format!("[ -f '{helper}' ] && [ -x '{helper}' ] && exec '{helper}'{args} || true")
+}
+
+/// The command earlier Navori versions wrote. `helper` must hold no single quote.
+pub fn legacy_command(helper: &str, dev: bool) -> String {
     if dev {
         format!("'{helper}' --profile dev hook")
     } else {

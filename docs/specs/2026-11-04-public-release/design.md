@@ -74,8 +74,8 @@ cask "navori" do
   depends_on macos: :tahoe
   app "Navori.app"
   binary "#{appdir}/Navori.app/Contents/Helpers/navori"
-  postflight do
-    system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{appdir}/Navori.app"]
+  postflight_steps do
+    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/Navori.app"]
   end
   zap trash: ["~/Library/Application Support/Navori", "~/Library/Logs/Navori"]
   caveats <<~EOS
@@ -86,7 +86,7 @@ cask "navori" do
 end
 ```
 
-`zap trash:` moves the two directories to the Trash, the Homebrew convention, so a mistaken zap is recoverable (RELEASE-5.5 amended to say so). The exact stanza order and the `macos:` value are whatever `brew style` / `brew audit` accept (checked in the workflow, RELEASE-3.6); that `postflight` also runs on `brew upgrade` is checked by RELEASE-4.4.
+`zap trash:` moves the two directories to the Trash, the Homebrew convention, so a mistaken zap is recoverable (RELEASE-5.5 amended to say so). The exact stanza order and the `macos:` value are whatever `brew style` / `brew audit` accept (checked in the workflow, RELEASE-3.6).
 
 ### `cargo xtask release-check` — the local gate before tagging
 

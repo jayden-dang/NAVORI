@@ -5,7 +5,8 @@ mod common;
 use std::path::{Path, PathBuf};
 
 use common::{
-    CLAUDE, DEV_HELPER, FIVE, RELEASE_HELPER, Rig, command, complete, group, handler, tree,
+    CLAUDE, DEV_HELPER, FIVE, RELEASE_HELPER, Rig, command, complete, group, handler,
+    legacy_command, tree,
 };
 use serde_json::{Value, json};
 
@@ -382,4 +383,42 @@ async fn a_deletion_that_fails_after_the_backup_leaves_the_file_and_a_complete_b
     let found = backups(&rig.path(".grok/hooks"));
     assert_eq!(found.len(), 1);
     assert_eq!(read_text(&found[0]), body);
+}
+
+#[tokio::test]
+async fn remove_deletes_the_running_profiles_hooks_in_both_forms_and_nothing_else() {
+    let rig = Rig::release();
+    let guarded = release_command();
+    let earlier = legacy_command(RELEASE_HELPER, false);
+    let dev = command(DEV_HELPER, true);
+    let dev_earlier = legacy_command(DEV_HELPER, true);
+    rig.write_json(
+        CLAUDE_FILE,
+        &json!({
+            "hooks": {
+                "Stop": [
+                    group(vec![handler(&guarded, 2)]),
+                    group(vec![handler(&earlier, 2)]),
+                    group(vec![handler(&dev, 2)]),
+                    group(vec![handler(&dev_earlier, 2)]),
+                    group(vec![foreign()]),
+                ]
+            }
+        }),
+    );
+
+    remove(&rig, "claude").await.unwrap();
+
+    assert_eq!(
+        read_json(&rig.path(CLAUDE_FILE)),
+        json!({
+            "hooks": {
+                "Stop": [
+                    group(vec![handler(&dev, 2)]),
+                    group(vec![handler(&dev_earlier, 2)]),
+                    group(vec![foreign()]),
+                ]
+            }
+        })
+    );
 }

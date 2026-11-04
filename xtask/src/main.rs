@@ -12,6 +12,7 @@ use anyhow::{Context, Result, bail, ensure};
 use clap::{Parser, Subcommand, ValueEnum};
 
 mod perf;
+mod release;
 
 const SIGNING_IDENTITY: &str = "Navori Local Signing";
 const MIN_MACOS: &str = "26.0";
@@ -57,6 +58,20 @@ enum Cmd {
         #[arg(long)]
         record: bool,
     },
+    /// Check a release tag against the workspace version, or build the release artifacts.
+    Release {
+        /// The release tag, e.g. v0.1.0.
+        #[arg(long)]
+        tag: String,
+        /// Directory to write the release artifacts to.
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Only check the tag and print version and pre-release status.
+        #[arg(long)]
+        check: bool,
+    },
+    /// Gate a release locally (tag free, tree clean, ci, perf), then print the tag to push.
+    ReleaseCheck,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -143,6 +158,8 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
+        Cmd::Release { tag, out, check } => release::run(&root, &tag, out.as_deref(), check),
+        Cmd::ReleaseCheck => release::check(&root),
     }
 }
 
@@ -1176,6 +1193,7 @@ fn ci(root: &Path) -> Result<()> {
     sh(cargo(root).args(["test", "--workspace"]))?;
     check_deps(root)?;
     lint_probe(root)?;
+    release::check_workflows(root)?;
     build_core(root, Profile::Dev.default_flavor())?;
     sh(Command::new("swift")
         .args(["build", "--arch", "arm64", "--package-path"])

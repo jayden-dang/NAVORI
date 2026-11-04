@@ -48,13 +48,12 @@ impl Handler {
     }
 }
 
+/// `exec` keeps the helper the shell process itself; the guard makes the hook a silent no-op
+/// once the helper is gone, so an uninstalled Navori cannot break a Harness.
 fn command_for(dev: bool, helper: &Path) -> String {
     let quoted = helper.display().to_string().replace('\'', "'\\''");
-    if dev {
-        format!("'{quoted}' --profile dev hook")
-    } else {
-        format!("'{quoted}' hook")
-    }
+    let arguments = if dev { " --profile dev hook" } else { " hook" };
+    format!("[ -f '{quoted}' ] && [ -x '{quoted}' ] && exec '{quoted}'{arguments} || true")
 }
 
 pub(crate) fn desired(harness: Harness, dev: bool, helper: &Path) -> Vec<(Event, Handler)> {
