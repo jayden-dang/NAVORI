@@ -184,6 +184,23 @@ struct CascadeStateTests {
         #expect(state.selection == "core")
     }
 
+    @Test func keep_awake_opens_as_the_third_level_and_its_rows_activate() {
+        let tree = [
+            CascadeNode(id: "awake", isActionable: true, children: [
+                CascadeNode(id: "awake.keep", isActionable: true, children: [
+                    CascadeNode(id: "awake.keep.300", isActionable: true),
+                ]),
+                CascadeNode(id: "awake.tracking", isActionable: true),
+            ]),
+        ]
+        var state = CascadeState(root: tree)
+        #expect(state.handle(.click(row: "awake")).contains(.open(row: "awake")))
+        #expect(state.handle(.click(row: "awake.keep")).contains(.open(row: "awake.keep")))
+        #expect(state.openPath == ["awake", "awake.keep"])
+        #expect(state.handle(.click(row: "awake.keep.300")).contains(.activate(row: "awake.keep.300")))
+        #expect(state.openPath == ["awake", "awake.keep"])
+    }
+
     @Test func a_row_at_the_maximum_depth_never_opens() {
         var state = CascadeState(root: Self.tree)
         _ = state.handle(.click(row: "core"))

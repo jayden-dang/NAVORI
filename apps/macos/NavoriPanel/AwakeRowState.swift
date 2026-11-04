@@ -35,18 +35,11 @@ public enum AwakeLevel0 {
 
 /// A menu action that threw. The message stays until a later snapshot achieves the request.
 public struct AwakeActionFailure: Equatable, Sendable {
-    public enum Request: Equatable, Sendable {
-        case duration
-        case untilOff
-        case display(Bool)
-        case releaseAll
-    }
-
-    public let request: Request
+    public let request: AwakeCommand
     public let message: String
     private let marks: AwakeHeldMarks
 
-    public init(request: Request, message: String, marks: AwakeHeldMarks) {
+    public init(request: AwakeCommand, message: String, marks: AwakeHeldMarks) {
         self.request = request
         self.message = message
         self.marks = marks
@@ -59,17 +52,15 @@ public struct AwakeActionFailure: Equatable, Sendable {
 
     private func achieved(_ later: AwakeHeldMarks) -> Bool {
         switch request {
-        case .duration:
+        case .keepFor:
             guard let laterEnd = later.durationEndsAtMs else { return false }
             return laterEnd != marks.durationEndsAtMs
-        case .untilOff:
-            return later.hasUntilOff && marks.hasUntilOff == false
-        case .display(true):
+        case .keepIndefinitely:
             return later.hasDisplay && marks.hasDisplay == false
-        case .display(false):
-            return marks.hasDisplay && later.hasDisplay == false
-        case .releaseAll:
-            return marks.hasLease && later.hasLease == false
+        case .keepOff:
+            return later.durationEndsAtMs == nil && later.hasUntilOff == false && later.hasDisplay == false
+        case .tracking(let on):
+            return later.tracking == on
         }
     }
 }
@@ -78,13 +69,13 @@ public struct AwakeHeldMarks: Equatable, Sendable {
     public var durationEndsAtMs: Int64?
     public var hasUntilOff: Bool
     public var hasDisplay: Bool
-    public var hasLease: Bool
+    public var tracking: Bool
 
-    public init(durationEndsAtMs: Int64?, hasUntilOff: Bool, hasDisplay: Bool, hasLease: Bool) {
+    public init(durationEndsAtMs: Int64?, hasUntilOff: Bool, hasDisplay: Bool, tracking: Bool) {
         self.durationEndsAtMs = durationEndsAtMs
         self.hasUntilOff = hasUntilOff
         self.hasDisplay = hasDisplay
-        self.hasLease = hasLease
+        self.tracking = tracking
     }
 }
 

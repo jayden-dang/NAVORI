@@ -152,7 +152,8 @@ async fn display_on_with_no_other_lease_holds_system_too() {
             "system_held": true,
             "display_held": true,
             "since_ms": ORIGIN_MS as i64,
-            "problem": null
+            "problem": null,
+            "tracking": true
         })
     );
     let events = rig.kernel.recent_events(10).unwrap();
@@ -268,7 +269,7 @@ async fn display_writes_no_row() {
 }
 
 #[test]
-fn display_off_is_the_only_other_action_that_ends_a_manual_lease() {
+fn only_display_release_all_and_the_keep_actions_end_a_display_lease() {
     let AwakeAction::Display { on } = (AwakeAction::Display { on: false }) else {
         unreachable!("display off");
     };
@@ -283,10 +284,20 @@ fn display_off_is_the_only_other_action_that_ends_a_manual_lease() {
         "hold_session",
         "stop_session",
         "end_session",
+        "tracking",
     ];
     let ending: Vec<&str> = names
         .into_iter()
         .filter(|name| !not_ending_manual.contains(name))
         .collect();
-    assert_eq!(ending, vec!["display", "release_all"]);
+    assert_eq!(
+        ending,
+        vec![
+            "display",
+            "release_all",
+            "keep_for",
+            "keep_indefinitely",
+            "keep_off"
+        ]
+    );
 }

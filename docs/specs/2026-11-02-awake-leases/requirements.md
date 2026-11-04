@@ -14,7 +14,7 @@ Rules:
 
 Roadmap item: ROAD-8 (MILE-2) · Tracker: #7 · Decisions: frame-change close package (2026-11-02), confirmed by the user.
 
-Delivery order: stories 1–10 ship first. Story 11 builds on MENU (ROAD-34), which merged at `030774d`.
+Delivery order: stories 1–10 ship first. Story 11 builds on MENU (ROAD-34), which merged at `030774d`. Stories 14 and 15 amend the shipped menu (2026-11-04, user's request after using `Release all`).
 
 Terms used below:
 - **The system** — the Awake Module, `navori-ffi`, the `navori` CLI and the Shell code that shows Awake.
@@ -29,6 +29,8 @@ Terms used below:
 - **Cap** — 2 hours after the Stop mark.
 - **Session TTL** — 8 hours after the latest session-hold Action.
 - **New descendant** — a live descendant of the Harness process whose start time is after the First hold.
+- **Keep awake lease** — the Manual Lease the menu's `Keep awake` controls: a duration, until-off or display Lease.
+- **Tracking agents** — the on/off setting that decides whether Session Leases keep the Mac awake. While it is off, Navori still follows each session, but the session holds nothing.
 - **System assertion**, **Display assertion** — `PreventUserIdleSystemSleep` and `PreventUserIdleDisplaySleep`.
 
 ## 1. Keep the Mac awake for a fixed time
@@ -42,7 +44,7 @@ Terms used below:
 - **AWAKE-1.5** WHEN the Mac sleeps during a duration Lease THE SYSTEM SHALL keep that Lease's deadline unchanged, so that sleep time is subtracted from the duration.
 - **AWAKE-1.6** WHEN the Mac wakes after a Lease's deadline has passed THE SYSTEM SHALL end that Lease.
 - **AWAKE-1.7** WHEN the last Lease ends THE SYSTEM SHALL release the System assertion.
-- **AWAKE-1.8** THE SYSTEM SHALL use a fixed one-hour length for the menu's duration command.
+- ~~**AWAKE-1.8**~~ superseded by AWAKE-14.1 (the menu offers several lengths).
 
 ## 2. Keep the Mac awake until I turn it off
 
@@ -52,8 +54,8 @@ Terms used below:
 - **AWAKE-2.2** WHEN the user asks for Release all THE SYSTEM SHALL end every Lease.
 - **AWAKE-2.3** WHEN the user asks for Release all THE SYSTEM SHALL delete every stored Lease row.
 - **AWAKE-2.4** WHEN the app reopens after Release all THE SYSTEM SHALL NOT restore a Lease that Release all ended.
-- **AWAKE-2.5** THE SYSTEM SHALL offer Release all as its only user command for ending Leases, apart from turning `Display on` off.
-- **AWAKE-2.6** THE SYSTEM SHALL NOT have a Pause state.
+- ~~**AWAKE-2.5**~~ superseded by AWAKE-14.6, AWAKE-14.8 and AWAKE-15.1 (the menu ends a Keep awake lease and stops sessions holding; Release all stays outside the menu).
+- **AWAKE-2.6** THE SYSTEM SHALL NOT have a Pause state. *(Amended 2026-11-04: Tracking agents off, story 15, answers this file's "Comes back if" line. It has no timer and touches no Lease except by keeping Session Leases from holding; no timed Pause exists.)*
 - **AWAKE-2.7** THE SYSTEM SHALL NOT have an Action that puts the Mac to sleep.
 
 ## 3. Keep the Mac awake while a command runs
@@ -121,7 +123,7 @@ Terms used below:
 
 ## 7. Keep the display on for a Lease that asks for it
 
-**Story:** As the user, I want to press `Display on` and see the display stay on until I turn it off, so that the screen stays readable while the Mac is held awake.
+**Story:** As the user, I want to press `Display on` and see the display stay on until I turn it off, so that the screen stays readable while the Mac is held awake. *(Amended 2026-11-04: the menu reaches the display Lease through `Keep awake` → `Indefinitely`, AWAKE-14.3.)*
 
 - **AWAKE-7.1** WHILE a Lease asks for the display THE SYSTEM SHALL hold exactly one Display assertion in addition to the System assertion.
 - **AWAKE-7.2** WHEN no Lease asks for the display any longer THE SYSTEM SHALL release the Display assertion.
@@ -167,7 +169,7 @@ Terms used below:
 
 ## 11. Keep the Mac awake from the menu
 
-**Story:** As the user, I want to open the Awake row, press `Keep awake for 1 hour`, see the Lease under Holding and press `Release all`, so that I do all of this from the menubar.
+**Story:** As the user, I want to open the Awake row, press `Keep awake for 1 hour`, see the Lease under Holding and press `Release all`, so that I do all of this from the menubar. *(Amended 2026-11-04: the commands are now stories 14 and 15; the Holding list stays.)*
 
 It changes three things in MENU's spec: MENU-1.2 gains the Awake row before the Core row; MENU-1.4 no longer lists the Awake row among what Release code hides; and MENU's "The Awake row ships: decide whether the Core row stays" is answered: it stays.
 
@@ -175,7 +177,7 @@ It changes three things in MENU's spec: MENU-1.2 gains the Awake row before the 
 - **AWAKE-11.2** WHILE no Lease exists THE SYSTEM SHALL show no dot on the Awake row. *(Amended 2026-11-04: the row shows a dot and no text.)*
 - **AWAKE-11.3** WHILE a Lease exists with the System assertion held THE SYSTEM SHALL show a green dot on the Awake row, with VoiceOver reading `On` and the names of the sources holding. *(Amended 2026-11-04: the row shows a dot and no text.)*
 - **AWAKE-11.4** WHILE a Lease exists with no System assertion THE SYSTEM SHALL NOT show a green dot on the Awake row. *(Amended 2026-11-04: the row shows a dot and no text.)*
-- **AWAKE-11.5** WHEN the Awake row opens THE SYSTEM SHALL show `Keep awake for 1 hour`, `Keep awake until I turn it off`, `Display on` and `Release all`, in that order, above a Holding row for each current Lease. *(Amended 2026-11-04 by the locked Awake menu, `ui-brief.md`: the status block left this list; see AWAKE-11.11 and AWAKE-11.12.)*
+- ~~**AWAKE-11.5**~~ superseded by AWAKE-14.1 and AWAKE-15.2.
 - **AWAKE-11.6** THE SYSTEM SHALL NOT show `Pause 15m`, `Let my Mac sleep now`, an Agent sessions row, an Integrations row or a per-Lease release button in the Awake Submenu.
 - **AWAKE-11.7** THE SYSTEM SHALL write menu text about Navori's own Leases only.
 - **AWAKE-11.8** THE SYSTEM SHALL NOT say in the menu that the Mac will sleep.
@@ -186,11 +188,11 @@ It changes three things in MENU's spec: MENU-1.2 gains the Awake row before the 
 - **AWAKE-11.13** THE SYSTEM SHALL group Holding rows in this order: `Held by you`, `Commands`, then one group per session project in case-insensitive name order, where the project is the Lease label before its first `/`.
 - **AWAKE-11.14** THE SYSTEM SHALL lead a session's Holding row with the monochrome mark of its Harness, for Claude Code, Codex and Grok, and with a terminal symbol for any other Harness.
 - **AWAKE-11.15** THE SYSTEM SHALL show a working session with a green dot and the word `working`, and a stopped session dimmed with the word `stopped`.
-- **AWAKE-11.16** WHILE the Lease a command made exists THE SYSTEM SHALL show a check on `Keep awake for 1 hour`, `Keep awake until I turn it off` or `Display on`, with `until <time>` on the first of these.
+- ~~**AWAKE-11.16**~~ superseded by AWAKE-14.4 and AWAKE-14.5.
 - **AWAKE-11.17** WHEN one source holds more than one Lease THE SYSTEM SHALL have VoiceOver name it once on the Awake row with its count, as `Claude Code ×8`. *(Amended 2026-11-04: the row shows a dot and no text.)*
 - **AWAKE-11.18** IF a menu action fails or Awake records a problem other than a refused System assertion or a stopped Module THEN THE SYSTEM SHALL have VoiceOver read `Needs attention` on the Awake row. *(Amended 2026-11-04: the row shows a dot and no text.)*
-- **AWAKE-11.19** (guard) WHEN the Awake Submenu is open THE SYSTEM SHALL CONTINUE TO move ↑ and ↓ through the four commands and to give Holding rows no keyboard stop.
-- **AWAKE-11.20** (guard) WHEN `Display on` is pressed while a display Lease exists THE SYSTEM SHALL CONTINUE TO end that Lease.
+- ~~**AWAKE-11.19**~~ superseded by AWAKE-14.7.
+- ~~**AWAKE-11.20**~~ superseded by AWAKE-14.6.
 - **AWAKE-11.21** THE SYSTEM SHALL show no text value on the Awake row, in any state.
 
 ## 12. Keep what exists working
@@ -243,6 +245,45 @@ Files this feature touches, with what they guard:
 - **Reliability:** **AWAKE-13.9** WHEN the Awake Module fails permanently THE SYSTEM SHALL release its assertions — verified with `FakePower`.
 - **Accessibility:** **AWAKE-13.10** WHEN the Awake Submenu is shown THE SYSTEM SHALL make every command reachable by keyboard and read every row and button as one sentence by VoiceOver, following MENU's rules. No `docs/standards/accessibility.md` exists — verified by a manual walk with VoiceOver on.
 
+## 14. Choose how long to keep the Mac awake
+
+**Story:** As the user, I want to open `Keep awake` and pick `Indefinitely` or a length, so that the Mac stays awake for something that is not an agent, like music at night.
+
+Files this story and story 15 touch: `modules/awake/src/` (guards below), `crates/ffi/src/lib.rs` and `app.rs` (AWAKE-12.3), `apps/cli/src/main.rs` (AWAKE-14.9), `apps/macos/NavoriPanel/`, `apps/macos/Navori/Features/Panel/`, `apps/macos/Navori/StatusBar/StatusBarController.swift`, `apps/macos/Navori/Core/CoreStore.swift` (AWAKE-12.7 to 12.9, AWAKE-11.12), docs (no behavior to guard).
+
+- **AWAKE-14.1** WHEN the user opens `Keep awake` in the Awake Submenu THE SYSTEM SHALL show a third-level Submenu listing `Indefinitely`, `5 minutes`, `10 minutes`, `15 minutes`, `30 minutes`, `1 hour`, `2 hours` and `5 hours`, in that order.
+- **AWAKE-14.2** WHEN the user picks a length THE SYSTEM SHALL make a duration Lease of that length the only Keep awake lease.
+- **AWAKE-14.3** WHEN the user picks `Indefinitely` THE SYSTEM SHALL make a display Lease the only Keep awake lease, so that the display stays on as well as the Mac.
+- **AWAKE-14.4** WHILE a Keep awake lease exists THE SYSTEM SHALL show a check on its choice: `Indefinitely` for a display or until-off Lease, and the matching length for a duration Lease.
+- **AWAKE-14.5** THE SYSTEM SHALL show on the `Keep awake` row `until <time>` while a duration Lease exists, `Indefinitely` while a display or until-off Lease exists and no duration Lease does, and no value otherwise.
+- **AWAKE-14.6** WHEN the user picks a checked choice THE SYSTEM SHALL end every Keep awake lease and no other Lease.
+- **AWAKE-14.7** WHEN the Awake Submenu or the `Keep awake` Submenu is open THE SYSTEM SHALL move ↑ and ↓ through its commands, open `Keep awake` with →, and give Holding rows no keyboard stop.
+- **AWAKE-14.8** THE SYSTEM SHALL NOT show `Release all` in the menu.
+- **AWAKE-14.11** WHEN the `Keep awake` Submenu opens while the Awake Submenu sits left of level 0 THE SYSTEM SHALL place it left of the Awake Submenu, if it fits there on screen, so that it does not cover level 0.
+- **AWAKE-14.9** (guard) WHEN the user runs `navori awake release-all` or `navori awake hold` THE SYSTEM SHALL CONTINUE TO end every Lease, or make the requested Manual Lease without changing a display Lease, as before.
+- **AWAKE-14.10** (guard) WHEN one Keep awake choice replaces another THE SYSTEM SHALL CONTINUE TO keep the System assertion, with no moment without it.
+
+## 15. Turn agent tracking off and on
+
+**Story:** As the user, I want to press `Tracking agents` and see it read `On` or `Off`, so that agents keep the Mac awake only when I want, and the Mac sleeps by itself once they are done.
+
+- **AWAKE-15.1** WHEN the user presses `Tracking agents` THE SYSTEM SHALL switch it between on and off.
+- **AWAKE-15.2** THE SYSTEM SHALL show `Keep awake` then `Tracking agents` on top of the Awake Submenu, with `Tracking agents` reading a green dot and `On`, or `Off` with no dot.
+- **AWAKE-15.3** WHEN Navori has no stored Tracking agents setting THE SYSTEM SHALL treat it as on.
+- **AWAKE-15.4** WHEN Tracking agents changes THE SYSTEM SHALL store it, so that it reads the same after the app reopens.
+- **AWAKE-15.5** IF Tracking agents cannot be stored THEN THE SYSTEM SHALL answer the Action `Failed` and leave the setting unchanged.
+- **AWAKE-15.6** WHILE Tracking agents is off THE SYSTEM SHALL NOT let a Session Lease ask for an assertion.
+- **AWAKE-15.7** WHILE Tracking agents is off THE SYSTEM SHALL leave Session Leases out of Awake's published Leases, so that the Holding list, the Awake row, the Icon, `navori doctor` and `navori awake status` do not count them.
+- **AWAKE-15.8** WHILE Tracking agents is off THE SYSTEM SHALL keep applying the session-hold, session-stop and session-end Actions, process exits, grace, the Cap and the Session TTL to Session Leases.
+- **AWAKE-15.9** WHEN Tracking agents turns on THE SYSTEM SHALL at once count every Session Lease it has followed, and hold the System assertion for them.
+- **AWAKE-15.10** WHILE Tracking agents is off THE SYSTEM SHALL NOT emit a lease Event for a Session Lease.
+- **AWAKE-15.11** WHEN Tracking agents changes THE SYSTEM SHALL emit one Event with a one-sentence summary stating the new setting.
+- **AWAKE-15.12** THE SYSTEM SHALL carry Tracking agents on Awake's state and on the `CoreSnapshot` Awake record.
+- **AWAKE-15.13** WHEN the user runs `navori awake status` THE SYSTEM SHALL state whether Tracking agents is on or off.
+- **AWAKE-15.14** (guard) WHEN Tracking agents changes THE SYSTEM SHALL CONTINUE TO keep every Manual Lease and Command Lease, and the assertions they need.
+- **AWAKE-15.15** (guard) WHILE Tracking agents is on THE SYSTEM SHALL CONTINUE TO hold for sessions as in stories 4 and 5, including a new Lease on the next `UserPromptSubmit` after Release all (HOOKS-1.10).
+- **AWAKE-15.16** (guard) WHEN Release all runs while Tracking agents is off THE SYSTEM SHALL CONTINUE TO end every Lease, including followed Session Leases, and leave Tracking agents off.
+
 ## Out of Scope
 
 - Installing hooks and `navori hook` — ROAD-9.
@@ -291,7 +332,7 @@ These are not known facts. No requirement here assumes them unless it says how i
 These conditions reopen a decision. They are not requirements.
 
 - A Harness the user runs has no hooks: reopen the problem statement, and whether the 1-hour button may be the only holder while the app can reopen unattended.
-- ROAD-9 runs and the Mac must sleep while an agent keeps running: Pause.
+- ROAD-9 runs and the Mac must sleep while an agent keeps running: Pause. *(Reopened and answered 2026-11-04 by story 15.)*
 - The user often needs to sleep from this menu, or often cannot tell why the Mac stays awake after ending a Lease: sleep-now, the other-apps line.
 - A real hook event cannot be expressed as a command by `session_id`: the Action shape.
 - A `Stop` trace shows a helper not exiting so the Lease is not released, or a real job runs only in an old process and the Mac sleeps mid-way: the busy rule.

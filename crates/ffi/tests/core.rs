@@ -708,6 +708,15 @@ fn dispatch_json(core: &NavoriCore, module: &str, action: &str) -> String {
 }
 
 #[test]
+fn the_snapshot_carries_tracking_agents() {
+    let home = home();
+    let (core, _rec) = start(&home);
+    assert!(awake_of(&core).tracking);
+    dispatch_json(&core, "awake", r#"{"tracking":{"on":false}}"#);
+    assert!(!awake_of(&core).tracking);
+}
+
+#[test]
 fn the_snapshot_carries_awake_after_a_hold() {
     let home = home();
     let (core, rec) = start(&home);

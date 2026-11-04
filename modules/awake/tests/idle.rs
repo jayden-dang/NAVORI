@@ -24,7 +24,8 @@ fn idle_state() -> Value {
         "system_held": false,
         "display_held": false,
         "since_ms": null,
-        "problem": null
+        "problem": null,
+        "tracking": true
     })
 }
 

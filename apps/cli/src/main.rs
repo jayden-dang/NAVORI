@@ -465,6 +465,11 @@ fn print_awake_status(v: &Value) {
     if count > 0 && !system_held {
         println!("not held");
     }
+    if v["tracking"].as_bool() == Some(false) {
+        println!("Tracking agents: off");
+    } else {
+        println!("Tracking agents: on");
+    }
 }
 
 fn print_status(s: &CoreStatus) {

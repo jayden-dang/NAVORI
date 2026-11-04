@@ -41,6 +41,10 @@ fn sample(name: &str) -> Value {
         "stop_session" => json!({ "stop_session": { "session_id": "s" } }),
         "end_session" => json!({ "end_session": { "session_id": "s" } }),
         "release_all" => json!("release_all"),
+        "keep_for" => json!({ "keep_for": { "seconds": 1 } }),
+        "keep_indefinitely" => json!("keep_indefinitely"),
+        "keep_off" => json!("keep_off"),
+        "tracking" => json!({ "tracking": { "on": true } }),
         other => panic!("no sample payload for catalog name {other}"),
     }
 }
@@ -306,6 +310,10 @@ async fn every_action_has_a_description_a_schema_and_a_risk() {
             "stop_session",
             "end_session",
             "release_all",
+            "keep_for",
+            "keep_indefinitely",
+            "keep_off",
+            "tracking",
         ]
     );
     for spec in &specs {

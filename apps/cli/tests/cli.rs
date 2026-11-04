@@ -281,6 +281,25 @@ fn awake_hold_for_an_hour_shows_in_status() {
 }
 
 #[test]
+fn awake_status_states_tracking_agents() {
+    let r = running_core();
+    navori(&r.home)
+        .args(["awake", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Tracking agents: on"));
+    navori(&r.home)
+        .args(["dispatch", "awake", r#"{"tracking":{"on":false}}"#])
+        .assert()
+        .success();
+    navori(&r.home)
+        .args(["awake", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Tracking agents: off"));
+}
+
+#[test]
 fn awake_hold_with_no_flag_is_until_off() {
     let r = running_core();
     navori(&r.home).args(["awake", "hold"]).assert().success();

@@ -42,7 +42,8 @@ async fn an_until_off_lease_has_no_deadline_and_holds_past_any_hour() {
             "system_held": true,
             "display_held": false,
             "since_ms": ORIGIN_MS as i64,
-            "problem": null
+            "problem": null,
+            "tracking": true
         })
     );
     assert_eq!(state, rig.kernel.state("awake").unwrap());
@@ -245,7 +246,7 @@ fn the_action_catalog_has_no_pause_and_no_sleep_action() {
 }
 
 #[test]
-fn release_all_is_the_only_catalog_action_for_ending_manual_leases() {
+fn only_display_release_all_and_the_keep_actions_end_a_manual_lease() {
     let names = catalog_names();
     assert!(
         names.contains(&"release_all"),
@@ -259,10 +260,20 @@ fn release_all_is_the_only_catalog_action_for_ending_manual_leases() {
         "hold_session",
         "stop_session",
         "end_session",
+        "tracking",
     ];
     let ending: Vec<&str> = names
         .into_iter()
         .filter(|name| !not_ending_manual.contains(name))
         .collect();
-    assert_eq!(ending, vec!["display", "release_all"]);
+    assert_eq!(
+        ending,
+        vec![
+            "display",
+            "release_all",
+            "keep_for",
+            "keep_indefinitely",
+            "keep_off"
+        ]
+    );
 }

@@ -1,5 +1,6 @@
 pub const LEASE_STARTED: &str = "awake.lease_started";
 pub const LEASE_ENDED: &str = "awake.lease_ended";
+pub const TRACKING_CHANGED: &str = "awake.tracking_changed";
 
 const MINUTE: u64 = 60;
 const HOUR: u64 = 3600;
@@ -7,6 +8,14 @@ const DAY: u64 = 86_400;
 
 pub(crate) fn started(source: &str) -> String {
     format!("Keeping this Mac awake: {source}.")
+}
+
+pub(crate) fn tracking_changed(on: bool) -> &'static str {
+    if on {
+        "Tracking agents is on: agent sessions keep this Mac awake."
+    } else {
+        "Tracking agents is off: agent sessions no longer keep this Mac awake."
+    }
 }
 
 pub(crate) fn until_off_source() -> &'static str {

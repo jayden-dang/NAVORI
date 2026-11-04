@@ -27,11 +27,18 @@ AppKit semantic colors, as in MENU's design; `docs/standards/design-tokens.md` i
 
 ## Surface: Awake Submenu (level 1)
 
-- **Layout:** 360 pt wide. The four commands on top, then a problem line only when something is wrong, then Holding grouped by `Held by you`, `Commands` and project. Rows are 26 pt, on one line. The list scrolls past 344 pt.
+- **Layout:** 360 pt wide. The two commands on top (amendment 7), then a problem line only when something is wrong, then Holding grouped by `Held by you`, `Commands` and project. Rows are 26 pt, on one line. The list scrolls past 344 pt.
 - **Components:** rung 2 — `MenuRowView`, gaining `isChecked`; new (rung 7) — `AwakeProblemView`, `HoldingList`, `HoldingLine`, `HoldingMarkView`, reason: no existing row has a mark, a dot and a right-aligned word without selection; new (rung 7) — `HarnessMarkImage`, reason: SF Symbols has no Harness logos.
-- **States:** off (commands alone, `Release all` dimmed) · on (no status text) · command's Lease held (check, `until 11:38` on the hour) · not held · display refused · action failed or problem recorded.
+- **States:** off (commands alone) · on (no status text) · Keep awake lease held (`until 11:38` or `Indefinitely` on its row) · Tracking agents (green dot and `On`, or `Off`) · not held · display refused · action failed or problem recorded.
 - **Type & color:** names 14 pt; words 12 pt; project titles 12 pt semibold in `secondaryLabelColor`; a stopped row entirely in `secondaryLabelColor`; monochrome marks; color only in the dots.
-- **A11y:** ↑ and ↓ reach the four commands. VoiceOver reads each row as one sentence, with Harness and pid: `Claude Code, NAVORI/main, working, pid 23719`. The pid is otherwise only in the tooltip.
+- **A11y:** ↑ and ↓ reach the commands, → opens `Keep awake`. VoiceOver reads each row as one sentence, with Harness and pid: `Claude Code, NAVORI/main, working, pid 23719`. The pid is otherwise only in the tooltip.
+
+## Surface: Keep awake Submenu (level 2)
+
+- **Layout:** 180 pt wide. `Indefinitely`, `5 minutes`, `10 minutes`, `15 minutes`, `30 minutes`, `1 hour`, `2 hours`, `5 hours`, with no icons. Modeled on Caffeine's `Activate for` list, which the user supplied.
+- **Components:** rung 2 — `MenuRowView`; new (rung 7) — `KeepAwakeSubmenuView`.
+- **States:** a check on the current choice. Pressing it turns Keep awake off.
+- **A11y:** ↑ and ↓ reach every row; a checked row adds the selected trait.
 
 ## Signature
 
@@ -41,7 +48,7 @@ The Harness mark leads each one-line row under its project: which agent, where, 
 
 - **Question:** what is keeping this Mac awake, and how do I change that?
 - **Finding:** the Holding list itself, with `working` rows in full ink and `stopped` rows stepped back. The list states it without a summary sentence, by the user's decision.
-- **Primary job:** a command on the whole hold, in the four rows on top.
+- **Primary job:** a command on the whole hold, in the two rows on top.
 
 ## Amendments
 
@@ -51,3 +58,4 @@ The Harness mark leads each one-line row under its project: which agent, where, 
 4. Harness marks are monochrome, per amendment 3 of the menubar brief.
 5. A command shows a check while its Lease exists, and `Display on` keeps its name rather than flipping to `Display off`.
 6. The level-0 row shows a green dot or nothing, with no text and no orange dot (user, 2026-11-04, after the first build). A problem is stated in the Submenu and by the tray icon.
+7. `Keep awake` and `Tracking agents` replace the four commands (user, 2026-11-04, after using `Release all`: "không có button để bật lại các session track đó", EN: "there is no button to turn those tracked sessions back on"). `Keep awake` opens a third level modeled on Caffeine. `Indefinitely` keeps the display on, replacing `Display on`. `Release all` leaves the menu and stays in the CLI. `ui-brief.png` shows the Holding list as locked and the commands as they were before this amendment.

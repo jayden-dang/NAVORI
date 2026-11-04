@@ -187,7 +187,7 @@ Run: `cargo nextest run -p navori-mod-awake --test manual` — expect: no such v
 Run: same command — expect: pass.
 - [x] **Step 3: Commit** `git commit -m "feat(awake): hold until turned off and release everything"`
 
-_Requirements: AWAKE-2.1, AWAKE-2.2, AWAKE-2.5, AWAKE-2.6, AWAKE-2.7_
+_Requirements: AWAKE-2.1, AWAKE-2.2, AWAKE-2.6, AWAKE-2.7_
 
 ---
 
@@ -585,7 +585,7 @@ Run: `swift test --package-path apps/macos --filter AwakeSubmenuStateTests` — 
 - [x] **Step 4: Verify** `swift test --package-path apps/macos --filter AwakeSubmenuStateTests` — expect: pass. `cargo xtask ci` — expect: pass. `grep -nE "will sleep|Pause|sleep now|another app|other app" apps/macos/Navori/Features/Panel/AwakeSubmenuView.swift apps/macos/NavoriPanel/AwakeRowState.swift apps/macos/NavoriPanel/AwakeSubmenuState.swift` — expect: no match. In review of the diff, no Awake Swift code decodes JSON: state comes from `AwakeView`, and `dispatch` answers are ignored. By hand on `cargo xtask run`: run story 11's demo; ↑ and ↓ reach all four commands; VoiceOver reads each row and button as one sentence; each state in `design.md` shows, using `navori dispatch` to reach it.
 - [x] **Step 5: Commit** `git commit -m "feat(menu): keep the Mac awake from the Awake Submenu"`
 
-_Requirements: AWAKE-1.8, AWAKE-10.5, AWAKE-11.5, AWAKE-11.6, AWAKE-11.7, AWAKE-11.8, AWAKE-11.9, AWAKE-11.10, AWAKE-13.10_
+_Requirements: AWAKE-10.5, AWAKE-11.6, AWAKE-11.7, AWAKE-11.8, AWAKE-11.9, AWAKE-11.10, AWAKE-13.10_
 
 ### Task 20: Show the locked Awake menu
 
@@ -611,7 +611,7 @@ Amendment after delivery, from `ui-brief.md`.
 - [ ] **Step 5: Verify by hand** on `cargo xtask run`: ↑ and ↓ reach all four commands, pressing `Display on` twice ends its Lease, VoiceOver reads each row as one sentence, and each state in `design.md` shows.
 - [x] **Step 6: Commit** `git commit -m "feat(menu): group Awake's Holding list by project with Harness marks"`
 
-_Requirements: AWAKE-11.5, AWAKE-11.11, AWAKE-11.12, AWAKE-11.13, AWAKE-11.14, AWAKE-11.15, AWAKE-11.16, AWAKE-11.17, AWAKE-11.18, AWAKE-11.19, AWAKE-11.20_
+_Requirements: AWAKE-11.11, AWAKE-11.12, AWAKE-11.13, AWAKE-11.14, AWAKE-11.15, AWAKE-11.17, AWAKE-11.18_
 
 ### Task 21: Show the Awake row as a dot
 
@@ -637,3 +637,29 @@ Amendment after delivery, from `ui-brief.md` amendment 6.
 - [x] **Step 6: Commit** `git commit -m "feat(menu): show the Awake row as a dot"`
 
 _Requirements: AWAKE-11.2, AWAKE-11.3, AWAKE-11.4, AWAKE-11.17, AWAKE-11.18, AWAKE-11.21_
+
+### Task 22: Keep awake lengths and Tracking agents
+
+Amendment after delivery, from stories 14 and 15 and `ui-brief.md` amendment 7.
+
+**Files:**
+- Create: `apps/macos/NavoriPanel/KeepAwakeChoice.swift`
+- Modify: `modules/awake/src/action.rs`, `modules/awake/src/actor.rs`, `modules/awake/src/domain/table.rs`, `modules/awake/src/event.rs`, `modules/awake/src/infra/stored.rs`, `modules/awake/src/lib.rs`, `modules/awake/src/state.rs`, `crates/ffi/src/lib.rs`, `crates/ffi/src/app.rs`, `apps/cli/src/main.rs`, `apps/macos/NavoriPanel/AwakeRowState.swift`, `apps/macos/NavoriPanel/AwakeSubmenuState.swift`, `apps/macos/Navori/Core/CoreStore.swift`, `apps/macos/Navori/Features/Panel/AwakeSubmenuView.swift`, `apps/macos/Navori/StatusBar/StatusBarController.swift`, `apps/macos/Navori/StatusBar/CascadePanel.swift`, `apps/macos/NavoriPanel/CascadePlacement.swift`, `docs/design/2026-11-01-menubar-ui-brief.md`, `docs/features/awake.md`, `docs/agents/verify.md`, `CONTEXT.md`
+- Test: `modules/awake/tests/keep.rs`, `modules/awake/tests/tracking.rs`, `crates/ffi/tests/core.rs`, `apps/cli/tests/cli.rs`, `apps/macos/Tests/NavoriPanelTests/AwakeSubmenuStateTests.swift`, `apps/macos/Tests/NavoriPanelTests/AwakeRowStateTests.swift`, `apps/macos/Tests/NavoriPanelTests/CascadeStateTests.swift`, `apps/macos/Tests/NavoriPanelTests/CascadePlacementTests.swift`
+
+**Reuse:** rung 2 — `LeaseTable`, `Store::kv_set`, `MenuRowView`, `CascadeNode`; new (rung 7): `KeepAwakeChoice`, `AwakeCommand`, `KeepAwakeSubmenuView`.
+
+**Interfaces:**
+- Consumes: `CoreStore.awakeStatus`, `awakeLeases`, `awakeActionMessage`
+- Produces: Actions `keep_for`, `keep_indefinitely`, `keep_off`, `tracking`; `AwakeState.tracking`, `AwakeView.tracking`; `AwakeSubmenuState(status:leases:displayHeld:tracking:actionFailure:)` with `keepValue`, `trackingOn`, `trackingValue`, `trackingDot`, `isChecked(_:)`, `command(picking:)`; `CoreStore.awakeSubmenu`, `CoreStore.perform(_:)`. Removes `releaseAllEnabled`, `hourChecked`, `hourUntil`, `untilOffChecked`, `displayChecked`, `menuHoldSeconds`, `AwakeActionFailure.Request`, `AwakeHeldMarks.hasLease`.
+
+**Depends-on:** Task 21
+
+- [x] **Step 1: Write the tests** for the choices, the checks, the setting, a followed session and the third cascade level.
+- [x] **Step 2: Implement** the Module, FFI, CLI and Shell changes from `design.md` Decisions 15–20.
+- [x] **Step 3: Update** the design, both briefs and the feature docs.
+- [x] **Step 4: Verify** `cargo xtask ci` — expect: pass.
+- [ ] **Step 5: Verify by hand** on `cargo xtask run`: the third level opens and each length checks and shows `until <time>`; pressing a check ends it; `Tracking agents` off lets `pmset -g assertions` drop a session's hold with a real agent running, and on brings it back at once; VoiceOver reads each row.
+- [x] **Step 6: Commit** `git commit -m "feat(awake): add Keep awake lengths and a Tracking agents toggle"`
+
+_Requirements: AWAKE-14.1, AWAKE-14.2, AWAKE-14.3, AWAKE-14.4, AWAKE-14.5, AWAKE-14.6, AWAKE-14.7, AWAKE-14.8, AWAKE-14.9, AWAKE-14.10, AWAKE-14.11, AWAKE-15.1, AWAKE-15.2, AWAKE-15.3, AWAKE-15.4, AWAKE-15.5, AWAKE-15.6, AWAKE-15.7, AWAKE-15.8, AWAKE-15.9, AWAKE-15.10, AWAKE-15.11, AWAKE-15.12, AWAKE-15.13, AWAKE-15.14, AWAKE-15.15, AWAKE-15.16_

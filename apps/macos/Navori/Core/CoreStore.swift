@@ -160,7 +160,7 @@ final class CoreStore {
             durationEndsAtMs: leases.first { $0.kind == "duration" }?.endsAtMs,
             hasUntilOff: leases.contains { $0.kind == "until_off" },
             hasDisplay: leases.contains { $0.kind == "display" },
-            hasLease: leases.isEmpty == false
+            tracking: awake?.tracking ?? true
         )
     }
 
@@ -177,38 +177,25 @@ final class CoreStore {
         } ?? []
     }
 
-    var displayHeld: Bool { snapshot?.awake?.displayHeld ?? false }
-
-    var displayWanted: Bool {
-        snapshot?.awake?.leases.contains { $0.kind == "display" } ?? false
+    var awakeSubmenu: AwakeSubmenuState {
+        AwakeSubmenuState(
+            status: awakeStatus,
+            leases: awakeLeases,
+            displayHeld: snapshot?.awake?.displayHeld ?? false,
+            tracking: snapshot?.awake?.tracking ?? true,
+            actionFailure: awakeActionMessage
+        )
     }
 
-    func holdOneHour() async {
-        let seconds = AwakeSubmenuState.menuHoldSeconds
-        await performAwake("{\"hold_for\":{\"seconds\":\(seconds)}}", request: .duration)
-    }
-
-    func holdUntilOff() async {
-        await performAwake("\"hold_until_off\"", request: .untilOff)
-    }
-
-    func setDisplay(on: Bool) async {
-        await performAwake("{\"display\":{\"on\":\(on)}}", request: .display(on))
-    }
-
-    func releaseAll() async {
-        await performAwake("\"release_all\"", request: .releaseAll)
-    }
-
-    private func performAwake(_ actionJSON: String, request: AwakeActionFailure.Request) async {
+    func perform(_ command: AwakeCommand) async {
         do {
-            _ = try await dispatch(module: "awake", actionJSON: actionJSON)
+            _ = try await dispatch(module: "awake", actionJSON: command.actionJSON)
             awakeActionFailure = nil
         } catch {
             let message = CoreStartupBanner.menuFailure(for: error)
             log.error("awake command failed: \(message, privacy: .public)")
             awakeActionFailure = AwakeActionFailure(
-                request: request,
+                request: command,
                 message: message,
                 marks: awakeMarks
             )

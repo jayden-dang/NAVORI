@@ -191,3 +191,17 @@ fn required_us(time: SystemTime) -> Result<i64, String> {
         .map_err(|err| err.to_string())?;
     i64::try_from(duration.as_micros()).map_err(|err| err.to_string())
 }
+
+const SETTINGS_NS: &str = "awake";
+const TRACKING_KEY: &str = "tracking";
+
+/// `None` when nothing is stored or the stored value is not a bool.
+pub(crate) fn load_tracking(store: &Store) -> navori_store::Result<Option<bool>> {
+    Ok(store
+        .kv_get(SETTINGS_NS, TRACKING_KEY)?
+        .and_then(|value| value.as_bool()))
+}
+
+pub(crate) fn save_tracking(store: &Store, on: bool) -> navori_store::Result<()> {
+    store.kv_set(SETTINGS_NS, TRACKING_KEY, &serde_json::Value::Bool(on))
+}

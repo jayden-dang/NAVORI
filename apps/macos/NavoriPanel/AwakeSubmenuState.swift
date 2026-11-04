@@ -70,36 +70,47 @@ public struct AwakeProblem: Equatable, Sendable {
 }
 
 public struct AwakeSubmenuState: Equatable, Sendable {
-    public static let menuHoldSeconds = 3600
-
     public let problem: AwakeProblem?
-    public let releaseAllEnabled: Bool
-    public let hourChecked: Bool
-    public let hourUntil: String?
-    public let untilOffChecked: Bool
-    public let displayChecked: Bool
+    /// `until <time>`, `Indefinitely`, or nil while no Keep awake lease exists.
+    public let keepValue: String?
+    public let trackingOn: Bool
     public let holdingGroups: [HoldingGroup]
+    private let checkedTitles: [String]
 
     public init(
         status: AwakeStatus,
         leases: [AwakeLeaseInput],
         displayHeld: Bool,
+        tracking: Bool,
         actionFailure: String? = nil
     ) {
-        let hour = leases.first { $0.kind == .duration }
-        let displayChecked = leases.contains { $0.kind == .display }
+        let duration = leases.first { $0.kind == .duration }
+        let hasDisplay = leases.contains { $0.kind == .display }
+        let indefinite = hasDisplay || leases.contains { $0.kind == .untilOff }
         let base = Self.statusProblem(
             status,
-            displayRefused: displayChecked && displayHeld == false,
+            displayRefused: hasDisplay && displayHeld == false,
             leaseCount: leases.count
         )
         problem = Self.withFailure(base, actionFailure)
-        releaseAllEnabled = leases.isEmpty == false
-        hourChecked = hour != nil
-        hourUntil = hour?.until.map { "until \($0)" }
-        untilOffChecked = leases.contains { $0.kind == .untilOff }
-        self.displayChecked = displayChecked
+        keepValue = duration?.until.map { "until \($0)" } ?? (indefinite ? KeepAwakeChoice.indefinitely.title : nil)
+        trackingOn = tracking
+        checkedTitles = [duration?.label, indefinite ? KeepAwakeChoice.indefinitely.title : nil].compactMap { $0 }
         holdingGroups = Self.groups(leases, systemHeld: status != .notHeld)
+    }
+
+    public var trackingValue: String { trackingOn ? "On" : "Off" }
+    public var trackingDot: StatusDot? { trackingOn ? .green : nil }
+
+    public func isChecked(_ choice: KeepAwakeChoice) -> Bool {
+        checkedTitles.contains(choice.title)
+    }
+
+    /// Picking the checked choice turns Keep awake off. Any other choice replaces it.
+    public func command(picking choice: KeepAwakeChoice) -> AwakeCommand {
+        if isChecked(choice) { return .keepOff }
+        guard let seconds = choice.seconds else { return .keepIndefinitely }
+        return .keepFor(seconds: seconds)
     }
 
     private static func statusProblem(
