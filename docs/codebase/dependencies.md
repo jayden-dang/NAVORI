@@ -24,6 +24,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | `xtask` | — | allowed: none (tooling only) |
 | `navori-macos` | — | allowed: none — leaf |
 | `navori-procs` | `navori-macos` | allowed — through the safe traits |
+| `navori-secrets` | — | allowed: none — leaf; consumed by `modules/*` and `ai/*` (rows below) and may be opened by the composition root `navori-ffi` (it may depend on any foundation crate) |
 | `navori-mod-awake` | `navori-kernel`, `navori-macos`, `navori-procs`, `navori-store` | allowed — feature Module; depends on no other Module |
 | Swift `Navori` target | `NavoriCore` (generated) → `NavoriCoreFFI` (xcframework) | allowed — only `CoreStore` imports `NavoriCore` (ARCH-2) |
 
@@ -66,7 +67,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | Text matching | `regex` | — |
 | FFI | `uniffi` 0.32, `libc`, `objc2-io-kit`, `objc2-core-foundation` | — |
 | CLI | `clap` | — |
-| Secrets | — | `keyring` (apple-native) (R2) |
+| Secrets | `keyring-core`, `apple-native-keyring-store` (feature `keychain`) | — |
 | HTTP, SSE | — | `reqwest` (rustls), `eventsource-stream` (R2) |
 | GitHub | — | `graphql_client` (R4) |
 | MCP | — | `rmcp` (R6) |
