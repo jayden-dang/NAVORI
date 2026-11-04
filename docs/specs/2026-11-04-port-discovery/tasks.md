@@ -156,7 +156,7 @@ is what the tasks need, not a tidy-up.
 
 **Depends-on:** none
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - In `crates/macos/tests/sockets.rs`, `#[ignore]` `a_loopback_listener_in_this_process_is_read_back`:
     - Bind `127.0.0.1:0` and `[::1]:0` with `std::net::TcpListener`.
     - Connect one `TcpStream` to the first.
@@ -166,19 +166,19 @@ is what the tasks need, not a tidy-up.
     - `a_pid_taken_over_by_another_user_during_the_scan_is_dropped`: `replace_on_read(pid, "fds", 2, 0)`; `still_same()` excludes the old `ProcId`.
     - `a_process_that_exits_while_its_sockets_are_read_is_dropped`: `exit(pid)` after the read; `still_same()` excludes it.
     - `a_refused_socket_read_is_reported_as_an_error`: `.fds_err(ReadError::Denied)` gives `Err(Unavailable::PermissionDenied)`.
-- [ ] **Step 2: Run** `cargo test -p navori-procs --test listeners` — expect: compile errors for `listeners`, `still_same`, `listen`.
-- [ ] **Step 3: Implement `sockets.rs`.**
+- [x] **Step 2: Run** `cargo test -p navori-procs --test listeners` — expect: compile errors for `listeners`, `still_same`, `listen`.
+- [x] **Step 3: Implement `sockets.rs`.**
   - Probe the `PROC_PIDLISTFDS` size, read, and retry once if it grew.
   - For each `PROX_FDTYPE_SOCKET` fd, call `proc_pidfdinfo(.., PROC_PIDFDSOCKETINFO)` into 792 bytes. A short read is `Malformed`. `EBADF` skips the fd.
   - Keep `SOCKINFO_TCP` with `TSI_S_LISTEN`.
   - `name` uses `proc_name`.
   - Add both methods to `ProcessSource`, `MacProcesses`, `FakeProcesses` and `FirstRuid`.
-- [ ] **Step 4: Implement** the three `Snapshot` reads:
+- [x] **Step 4: Implement** the three `Snapshot` reads:
   - `listeners` is a plain read for a listed pid.
   - `name` goes through `read_verified`.
   - `still_same` makes one `list()` and keeps the `ProcId`s whose start time and real UID are unchanged.
-- [ ] **Step 5: Run** `cargo test -p navori-macos && cargo test -p navori-procs && cargo test -p navori-mod-awake && cargo test -p navori-macos --test sockets -- --ignored` — expect: pass.
-- [ ] **Step 6: Commit** `git commit -m "feat(macos): read the listening TCP sockets of a process"`
+- [x] **Step 5: Run** `cargo test -p navori-macos && cargo test -p navori-procs && cargo test -p navori-mod-awake && cargo test -p navori-macos --test sockets -- --ignored` — expect: pass.
+- [x] **Step 6: Commit** `git commit -m "feat(macos): read the listening TCP sockets of a process"`
 
 _Requirements: PORTS-1.2, PORTS-1.9, PORTS-10.5_
 
