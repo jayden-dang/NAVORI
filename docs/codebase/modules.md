@@ -38,7 +38,7 @@ The inventory of code units in the repository — every Rust crate and Swift tar
 
 | Module | Path | Responsibility |
 |---|---|---|
-| `navori-secrets` | `crates/secrets/` | Keychain store for tokens and API keys (R2). |
+| `navori-secrets` | `crates/secrets/` | Keychain store for tokens and API keys (landed; library only, no consumer yet, ROAD-11 and ROAD-19 consume it). |
 | `navori-mod-inbox` | `modules/inbox/` | Feature Module: Needs you — Decisions, To-dos, Updates (R2). |
 | `navori-mod-ports` | `modules/ports/` | Feature Module: listening ports by project/worktree/harness (R3). |
 | `navori-mod-github` | `modules/github/` | Feature Module: pull requests, checks, approve/merge (R4). |
