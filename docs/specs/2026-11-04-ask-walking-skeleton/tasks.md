@@ -304,6 +304,6 @@ _Requirements: ASK-10.1_
 
 ## Coverage
 
-Every live ID of `requirements.md` (50; ASK-3.2, ASK-4.7 and ASK-10.8 are struck through there) is cited by exactly one task footer (checked by script at the time of writing): Task 1 — 9.6, 9.7; Task 2 — 4.2, 7.5, 9.2; Task 3 — 4.1, 4.6, 7.3, 7.6, 10.7; Task 4 — 5.1, 5.2, 5.3, 5.6, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 10.6; Task 5a — 1.1, 1.2, 1.5, 1.6, 2.1, 2.2, 3.1; Task 5b — 5.4, 5.5, 9.1, 9.3, 10.2, 10.3, 10.4, 10.5; Task 6 — 4.3, 4.4, 4.5, 4.8, 7.4, 9.4; Task 7 — 1.3, 1.4, 1.7, 9.5; Task 8 — 8.1, 8.2, 8.3; Task 9 — 10.1.
+Every live ID of `requirements.md` (51; ASK-3.2, ASK-4.7 and ASK-10.8 are struck through there) is cited by exactly one task footer (checked by script at the time of writing): Task 1 — 9.6, 9.7; Task 2 — 4.2, 7.5, 9.2; Task 3 — 4.1, 4.6, 7.3, 7.6, 10.7; Task 4 — 5.1, 5.2, 5.3, 5.6, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 10.6; Task 5a — 1.1, 1.2, 1.5, 1.6, 2.1, 2.2, 3.1; Task 5b — 5.4, 5.5, 9.1, 9.3, 10.2, 10.3, 10.4, 10.5; Task 6 — 4.3, 4.4, 4.5, 4.8, 4.9, 7.4, 9.4; Task 7 — 1.3, 1.4, 1.7, 9.5; Task 8 — 8.1, 8.2, 8.3; Task 9 — 10.1.
 
 Dependencies for parallelism: Tasks 2, 3 and 4 depend only on Task 1 and share no files, so they may run together; Task 5a follows Task 4; Task 5b follows Tasks 2, 3 and 5a; Tasks 6 and 7 follow Task 5b and Task 5a respectively and share no files; Task 8 follows Task 3; Task 9 closes.
