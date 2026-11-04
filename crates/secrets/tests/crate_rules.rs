@@ -94,7 +94,7 @@ fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
         let path = entry.path();
         if matches!(
             entry.file_name().to_str(),
-            Some("target" | "build" | ".git" | ".worktrees" | "node_modules")
+            Some("target" | "build" | ".git" | ".worktrees" | ".claude" | "node_modules")
         ) {
             continue;
         }
