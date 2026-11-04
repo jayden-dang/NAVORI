@@ -13,6 +13,8 @@ const LIMIT: Duration = Duration::from_secs(2);
 const MAX_HEAD: usize = 16 * 1024;
 const MAX_BODY: usize = 1024 * 1024;
 const MAX_SIZE_LINE: usize = 32;
+const MAX_FRAMING: usize = 64 * 1024;
+const RAW_CAP: usize = MAX_HEAD + MAX_BODY + MAX_FRAMING;
 
 /// Why the running containers could not be read. The text is fixed and quotes nothing from the reply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -32,12 +34,20 @@ pub enum DockerError {
 }
 
 /// A running container, reduced to what placing its ports needs.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Container {
     pub id: String,
     pub name: String,
     pub working_dir: Option<PathBuf>,
     pub ports: Vec<(IpAddr, u16)>,
+}
+
+impl std::fmt::Debug for Container {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Container")
+            .field("id", &self.id)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Lists the running containers.
@@ -98,9 +108,10 @@ async fn exchange(path: &Path) -> Result<Vec<Container>, DockerError> {
     stream
         .write_all(REQUEST)
         .await
-        .map_err(|_| DockerError::BadReply)?;
-    let mut raw = Wiped(Vec::with_capacity(MAX_HEAD + MAX_BODY));
+        .map_err(|_| DockerError::Refused)?;
+    let mut raw = Wiped(Vec::with_capacity(RAW_CAP));
     let mut head = None;
+    let mut cursor = Cursor::default();
     loop {
         let read = stream
             .read_buf(&mut raw.0)
@@ -111,12 +122,18 @@ async fn exchange(path: &Path) -> Result<Vec<Container>, DockerError> {
             head = parse_head(&raw.0)?;
         }
         if let Some(head) = &head
-            && let Some(body) = body(raw.0.get(head.end..).unwrap_or_default(), head, ended)?
+            && let Some(body) = body(&raw.0, head, &mut cursor, ended)?
         {
-            return containers(&body.0);
+            return match body {
+                Body::Raw(range) => containers(raw.0.get(range).unwrap_or_default()),
+                Body::Owned(body) => containers(&body.0),
+            };
         }
         if ended {
             return Err(DockerError::BadReply);
+        }
+        if raw.0.len() >= RAW_CAP {
+            return Err(DockerError::TooLarge);
         }
     }
 }
@@ -142,19 +159,33 @@ fn parse_head(raw: &[u8]) -> Result<Option<Head>, DockerError> {
     }
     let mut framing = Framing::ToEnd;
     let mut chunked = false;
+    let mut sized = false;
     for line in lines {
         let (name, value) = line.split_once(':').ok_or(DockerError::BadReply)?;
         if name.trim().eq_ignore_ascii_case("content-length") {
-            let length = value.trim().parse().map_err(|_| DockerError::BadReply)?;
-            framing = Framing::Length(length);
+            if sized {
+                return Err(DockerError::BadReply);
+            }
+            sized = true;
+            framing = Framing::Length(length(value)?);
         } else if name.trim().eq_ignore_ascii_case("transfer-encoding") {
-            chunked |= value.to_ascii_lowercase().contains("chunked");
+            chunked |= value
+                .split(',')
+                .any(|token| token.trim().eq_ignore_ascii_case("chunked"));
         }
     }
     if chunked {
         framing = Framing::Chunked;
     }
     Ok(Some(Head { end, framing }))
+}
+
+fn length(value: &str) -> Result<usize, DockerError> {
+    let digits = value.trim();
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(DockerError::BadReply);
+    }
+    digits.parse().map_err(|_| DockerError::BadReply)
 }
 
 fn status(line: &str) -> Option<u16> {
@@ -165,17 +196,41 @@ fn status(line: &str) -> Option<u16> {
     parts.next()?.parse().ok()
 }
 
-fn body(rest: &[u8], head: &Head, ended: bool) -> Result<Option<Wiped>, DockerError> {
+enum Body {
+    Raw(std::ops::Range<usize>),
+    Owned(Wiped),
+}
+
+#[derive(Default)]
+struct Cursor {
+    at: usize,
+    decoded: usize,
+    trailing: bool,
+}
+
+fn body(
+    raw: &[u8],
+    head: &Head,
+    cursor: &mut Cursor,
+    ended: bool,
+) -> Result<Option<Body>, DockerError> {
+    let rest = raw.get(head.end..).unwrap_or_default();
     match head.framing {
         Framing::Length(length) if length > MAX_BODY => Err(DockerError::TooLarge),
-        Framing::Length(length) => match rest.get(..length) {
-            Some(body) => Ok(Some(Wiped(body.to_vec()))),
-            None => incomplete(ended),
-        },
+        Framing::Length(length) if rest.len() >= length => {
+            Ok(Some(Body::Raw(head.end..head.end + length)))
+        }
+        Framing::Length(_) => incomplete(ended),
         Framing::ToEnd if rest.len() > MAX_BODY => Err(DockerError::TooLarge),
-        Framing::ToEnd if ended => Ok(Some(Wiped(rest.to_vec()))),
+        Framing::ToEnd if ended => Ok(Some(Body::Raw(head.end..raw.len()))),
         Framing::ToEnd => Ok(None),
-        Framing::Chunked => dechunk(rest, ended),
+        Framing::Chunked => {
+            if advance(cursor, rest, ended)? {
+                gather(rest, cursor.decoded).map(|out| Some(Body::Owned(out)))
+            } else {
+                Ok(None)
+            }
+        }
     }
 }
 
@@ -187,46 +242,57 @@ fn incomplete<T>(ended: bool) -> Result<Option<T>, DockerError> {
     }
 }
 
-fn dechunk(rest: &[u8], ended: bool) -> Result<Option<Wiped>, DockerError> {
-    let mut out = Wiped(Vec::new());
-    let mut at = 0;
+fn advance(cursor: &mut Cursor, rest: &[u8], ended: bool) -> Result<bool, DockerError> {
     loop {
-        let Some(line) = line(rest, at, MAX_SIZE_LINE)? else {
-            return incomplete(ended);
+        let cap = if cursor.trailing {
+            MAX_HEAD
+        } else {
+            MAX_SIZE_LINE
         };
-        let size = chunk_size(line.text)?;
-        let data = line.next;
-        if size == 0 {
-            return trailers(rest, data, ended).map(|done| done.then_some(out));
+        let Some(line) = line(rest, cursor.at, cap)? else {
+            return incomplete::<()>(ended).map(|_| false);
+        };
+        if cursor.trailing {
+            if line.text.is_empty() {
+                return Ok(true);
+            }
+            cursor.at = line.next;
+            continue;
         }
-        if out.0.len().saturating_add(size) > MAX_BODY {
+        let size = chunk_size(line.text)?;
+        if size == 0 {
+            cursor.trailing = true;
+            cursor.at = line.next;
+            continue;
+        }
+        if cursor.decoded.saturating_add(size) > MAX_BODY {
             return Err(DockerError::TooLarge);
         }
-        let Some(chunk) = rest.get(data..data + size + 2) else {
-            return incomplete(ended);
+        let Some(chunk) = rest.get(line.next..line.next + size + 2) else {
+            return incomplete::<()>(ended).map(|_| false);
         };
-        let (bytes, end) = chunk.split_at(size);
-        if end != b"\r\n" {
+        if !chunk.ends_with(b"\r\n") {
             return Err(DockerError::BadReply);
         }
-        out.0.extend_from_slice(bytes);
-        at = data + size + 2;
+        cursor.decoded += size;
+        cursor.at = line.next + size + 2;
     }
 }
 
-fn trailers(rest: &[u8], mut at: usize, ended: bool) -> Result<bool, DockerError> {
+fn gather(rest: &[u8], decoded: usize) -> Result<Wiped, DockerError> {
+    let mut out = Wiped(Vec::with_capacity(decoded));
+    let mut at = 0;
     loop {
-        let Some(line) = line(rest, at, MAX_HEAD)? else {
-            return if ended {
-                Err(DockerError::BadReply)
-            } else {
-                Ok(false)
-            };
-        };
-        if line.text.is_empty() {
-            return Ok(true);
+        let line = line(rest, at, MAX_SIZE_LINE)?.ok_or(DockerError::BadReply)?;
+        let size = chunk_size(line.text)?;
+        if size == 0 {
+            return Ok(out);
         }
-        at = line.next;
+        let chunk = rest
+            .get(line.next..line.next + size)
+            .ok_or(DockerError::BadReply)?;
+        out.0.extend_from_slice(chunk);
+        at = line.next + size + 2;
     }
 }
 

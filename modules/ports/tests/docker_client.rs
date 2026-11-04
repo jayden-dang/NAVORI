@@ -4,6 +4,8 @@ mod common;
 
 use std::net::IpAddr;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use common::canonical_temp_home;
@@ -156,6 +158,91 @@ async fn a_body_that_is_not_the_container_list_is_a_bad_reply_that_quotes_nothin
     assert!(!format!("{err} {err:?}").contains("secret"));
 }
 
+#[tokio::test]
+async fn a_peer_streaming_trailers_without_end_is_too_large_before_the_deadline() {
+    let sent = Arc::new(AtomicUsize::new(0));
+    let counted = Arc::clone(&sent);
+    let served = serve(move |mut stream| {
+        tokio::spawn(async move {
+            let head = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n";
+            if stream.write_all(head).await.is_err() {
+                return;
+            }
+            let line = format!("X-Pad: {}\r\n", "a".repeat(1000));
+            while stream.write_all(line.as_bytes()).await.is_ok() {
+                counted.fetch_add(line.len(), Ordering::SeqCst);
+            }
+        })
+    });
+    let started = std::time::Instant::now();
+    assert_eq!(read(&served).await, Err(DockerError::TooLarge));
+    assert!(started.elapsed() < Duration::from_secs(1));
+    let _ = served.request.await;
+    assert!(sent.load(Ordering::SeqCst) < 2 * 1024 * 1024);
+}
+
+#[tokio::test]
+async fn a_body_of_many_small_chunks_is_decoded_whole() {
+    let body = format!("{BODY}{}", " ".repeat(100_000)).into_bytes();
+    let mut reply = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n".to_vec();
+    for byte in &body {
+        reply.extend(format!("1\r\n{}\r\n", *byte as char).bytes());
+    }
+    reply.extend(b"0\r\n\r\n");
+    let served = serve(say(reply));
+    assert_eq!(read(&served).await.unwrap(), expected());
+}
+
+#[tokio::test]
+async fn a_repeated_content_length_is_a_bad_reply() {
+    let reply = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nContent-Length: 2\r\n\r\n[]";
+    let served = serve(say(reply.as_bytes().to_vec()));
+    assert_eq!(read(&served).await, Err(DockerError::BadReply));
+}
+
+#[tokio::test]
+async fn conflicting_content_lengths_are_a_bad_reply() {
+    let reply = "HTTP/1.1 200 OK\r\nContent-Length: 9\r\nContent-Length: 2\r\n\r\n[]";
+    let served = serve(say(reply.as_bytes().to_vec()));
+    assert_eq!(read(&served).await, Err(DockerError::BadReply));
+}
+
+#[tokio::test]
+async fn a_content_length_with_a_sign_is_a_bad_reply() {
+    let reply = "HTTP/1.1 200 OK\r\nContent-Length: +2\r\n\r\n[]";
+    let served = serve(say(reply.as_bytes().to_vec()));
+    assert_eq!(read(&served).await, Err(DockerError::BadReply));
+}
+
+#[tokio::test]
+async fn only_the_exact_chunked_token_selects_chunked_framing() {
+    let reply = "HTTP/1.1 200 OK\r\nTransfer-Encoding: notchunked\r\nContent-Length: 2\r\n\r\n[]";
+    let served = serve(say(reply.as_bytes().to_vec()));
+    assert_eq!(read(&served).await, Ok(Vec::new()));
+}
+
+#[test]
+fn a_container_shows_only_its_id_when_printed() {
+    let shown = format!("{:?}", expected());
+    assert!(shown.contains("abc123"), "{shown}");
+    assert!(!shown.contains("/work/app"), "{shown}");
+    assert!(!shown.contains("\"db\""), "{shown}");
+}
+
+#[tokio::test]
+async fn a_request_that_cannot_be_written_is_refused() {
+    let guard = tempfile::Builder::new()
+        .prefix("nv")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let path = std::fs::canonicalize(guard.path()).unwrap().join("d.sock");
+    let listener = UnixListener::bind(&path).unwrap();
+    let socket = DockerSocket::new(path);
+    let client = tokio::spawn(async move { socket.running().await });
+    drop(listener.accept().await.unwrap());
+    assert_eq!(client.await.unwrap(), Err(DockerError::Refused));
+}
+
 #[tokio::test(start_paused = true)]
 async fn a_server_that_never_answers_times_out_after_two_seconds() {
     let served = serve(|stream| {
@@ -190,7 +277,13 @@ async fn the_real_docker_socket_lists_its_containers_when_it_is_there() {
     let home = PathBuf::from(std::env::var_os("HOME").unwrap());
     let socket = DockerSocket::new(home.join(".docker/run/docker.sock"));
     match socket.running().await {
-        Ok(_) | Err(DockerError::Absent | DockerError::Refused) => {}
+        Ok(containers) => {
+            for container in containers {
+                assert!(!container.id.is_empty());
+                assert!(container.ports.iter().all(|(_, port)| *port != 0));
+            }
+        }
+        Err(DockerError::Absent | DockerError::Refused) => {}
         Err(err) => panic!("{err}"),
     }
 }

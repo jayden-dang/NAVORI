@@ -359,10 +359,20 @@ async fn no_working_directory_or_container_path_reaches_a_log_or_event() {
         &[("127.0.0.1", 5432)],
     )]));
     first_scan(&rig).await;
-    rig.containers.reply(Err(DockerError::BadReply));
+    let failing = Rig::new();
+    failing.processes.add(docker_process());
+    failing.containers.reply(Err(DockerError::BadReply));
+    tracing::callsite::rebuild_interest_cache();
+    let state = first_scan(&failing).await;
+    assert_eq!(
+        state["docker"],
+        json!({"unreadable": "Docker's answer could not be read."})
+    );
 
     let logged = String::from_utf8(writer.lock().unwrap().clone()).unwrap();
+    assert!(logged.contains("Docker could not be read"), "{logged}");
     assert!(!logged.contains(FIXTURE_DIR), "{logged}");
+    assert!(!logged.contains("db-name"), "{logged}");
     let events = format!("{:?}", rig.kernel.recent_events(1000).unwrap());
     assert!(!events.contains(FIXTURE_DIR), "{events}");
 }
