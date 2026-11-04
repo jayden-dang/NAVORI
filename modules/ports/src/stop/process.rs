@@ -22,33 +22,70 @@ pub fn reach_for(
     confirmed: &[(i32, u64)],
 ) -> Reach {
     let pid = plan.pid;
-    if !guard.complete || pid <= 1 || signals.group_of(pid) != Ok(pid) || signals.own_group() == pid
-    {
-        return Reach::Alone;
+    if !guard.complete {
+        return alone(pid, "guard_incomplete");
+    }
+    if pid <= 1 {
+        return alone(pid, "reserved_pid");
+    }
+    if signals.group_of(pid) != Ok(pid) {
+        return alone(pid, "not_group_leader");
+    }
+    if signals.own_group() == pid {
+        return alone(pid, "own_group");
     }
     for ancestor in &guard.ancestors {
         match signals.group_of(*ancestor) {
             Ok(group) if group != pid => {}
-            _ => return Reach::Alone,
+            _ => return alone(pid, "ancestor_in_group"),
         }
     }
     let mut mates = BTreeMap::new();
     for listener in fresh.entries.iter().filter(|entry| entry.pid != pid) {
         let Ok(group) = signals.group_of(listener.pid) else {
-            return Reach::Alone;
+            return alone(pid, "group_unreadable");
         };
         if group != pid {
             continue;
         }
-        let known = confirmed.contains(&(listener.pid, listener.start_us));
-        if !known || guard.ancestors.contains(&listener.pid) || never(listener, guard) {
-            return Reach::Alone;
+        if !confirmed.contains(&(listener.pid, listener.start_us)) {
+            return alone(pid, "group_mate_unconfirmed");
+        }
+        if guard.ancestors.contains(&listener.pid) || never(listener, guard) {
+            return alone(pid, "group_mate_protected");
         }
         mates.insert(listener.pid, listener.start_us);
     }
     let mut members = vec![(pid, plan.start_us)];
     members.extend(mates);
     Reach::Group(members)
+}
+
+fn alone(pid: i32, reason: &'static str) -> Reach {
+    tracing::info!(pid, reason, "a stop signals the process alone");
+    Reach::Alone
+}
+
+fn send(
+    signals: &dyn Signals,
+    plan: &ProcessPlan,
+    to: SignalTarget,
+    signal: Signal,
+) -> Result<(), SignalError> {
+    let result = signals.send(to, signal);
+    let scope = match to {
+        SignalTarget::Group(_) => "group",
+        SignalTarget::Process(_) => "process",
+    };
+    tracing::info!(
+        pid = plan.pid,
+        start_us = plan.start_us,
+        signal = ?signal,
+        scope,
+        result = ?result,
+        "a stop signal was sent"
+    );
+    result
 }
 
 enum Presence {
@@ -98,7 +135,7 @@ pub async fn stop_process(
         Reach::Group(_) => (SignalTarget::Group(plan.pid), Outcome::Stopped),
         Reach::Alone => (SignalTarget::Process(plan.pid), Outcome::StoppedAlone),
     };
-    match signals.send(to, Signal::Term) {
+    match send(signals, &plan, to, Signal::Term) {
         Ok(()) => {}
         Err(SignalError::Gone) => return (Outcome::AlreadyGone, None),
         Err(_) => return (Outcome::Failed, Some(reason::SIGNAL_REFUSED)),
@@ -109,7 +146,7 @@ pub async fn stop_process(
         Presence::Unreadable => return (Outcome::Failed, Some(reason::PROCESS_LIST_TIMEOUT)),
         Presence::Same => {}
     }
-    match signals.send(to, Signal::Kill) {
+    match send(signals, &plan, to, Signal::Kill) {
         Ok(()) => {}
         Err(SignalError::Gone) => return (done, None),
         Err(_) => return (Outcome::Failed, Some(reason::SIGNAL_REFUSED)),

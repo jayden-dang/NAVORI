@@ -286,7 +286,15 @@ async fn drive(env: &StopEnv, selector: &Selector, targets: &[Target], slots: &m
     let mut containers: Vec<(usize, ContainerPlan)> = Vec::new();
     for (at, verdict) in asked.into_iter().zip(verdicts) {
         match verdict {
-            Resolved::Refused(outcome, why) => slots[at] = Slot::Done((outcome, why)),
+            Resolved::Refused(outcome, why) => {
+                let what = &targets[at];
+                if outcome == Outcome::Failed {
+                    tracing::warn!(?what, ?outcome, reason = why, "a stop target was refused");
+                } else {
+                    tracing::info!(?what, ?outcome, reason = why, "a stop target was refused");
+                }
+                slots[at] = Slot::Done((outcome, why));
+            }
             Resolved::Go(Plan::Process(plan)) => {
                 slots[at] = Slot::Running;
                 processes.push((at, plan));
@@ -370,11 +378,18 @@ async fn drive(env: &StopEnv, selector: &Selector, targets: &[Target], slots: &m
 }
 
 async fn stop_container(containers: &dyn Containers, id: &str) -> Answer {
-    match containers.stop(id).await {
-        Ok(Stopped::Stopped) => (Outcome::Stopped, None),
-        Ok(Stopped::AlreadyGone) => (Outcome::AlreadyGone, None),
+    let stopped = containers.stop(id).await;
+    match stopped {
+        Ok(Stopped::Stopped) => {
+            tracing::info!(id, result = ?stopped, "a container stop ended");
+            (Outcome::Stopped, None)
+        }
+        Ok(Stopped::AlreadyGone) => {
+            tracing::info!(id, result = ?stopped, "a container stop ended");
+            (Outcome::AlreadyGone, None)
+        }
         Err(err) => {
-            tracing::warn!(error = %err, "a container stop failed");
+            tracing::warn!(id, result = ?stopped, error = %err, "a container stop ended");
             let why = match err {
                 DockerError::BadId => reason::CONTAINER_ID_REFUSED,
                 DockerError::Absent | DockerError::Refused | DockerError::Timeout => {

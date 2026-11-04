@@ -665,3 +665,36 @@ async fn a_kill_when_the_process_list_cannot_be_opened_fails_every_target_and_sa
     assert!(rig.state()["problem"].is_string(), "no rescan started");
     assert!(logs.text().contains("WARN"), "{}", logs.text());
 }
+
+#[tokio::test(start_paused = true)]
+async fn the_decision_log_names_pids_container_ids_outcomes_and_nothing_else() {
+    let logs = LogCapture::start();
+    let rig = Rig::new();
+    seat(&rig);
+    obedient_server(&rig, 200, 3000);
+    docker_with(&rig, &[CONTAINER, OTHER_CONTAINER]);
+    rig.containers.reply_stop(Err(DockerError::Refused));
+
+    rig.dispatch(kill(&[
+        process(200),
+        process(999),
+        container(CONTAINER),
+        process(4000),
+    ]))
+    .await
+    .unwrap();
+    rig.idle().await;
+
+    let text = logs.text();
+    let stop = text
+        .lines()
+        .find(|line| line.contains("a container stop ended"))
+        .unwrap_or_else(|| panic!("no container stop line in {text}"));
+    assert!(stop.contains(CONTAINER), "{stop}");
+    assert!(stop.contains("Err(Refused)"), "{stop}");
+    assert!(text.contains("pid=200"), "{text}");
+    assert!(text.contains("a stop target was refused"), "{text}");
+    for hidden in ["checkout-db-secret", "usr/local", "node", "/bin/zsh"] {
+        assert!(!text.contains(hidden), "{hidden} in {text}");
+    }
+}

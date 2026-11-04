@@ -1,9 +1,12 @@
 #![allow(clippy::unwrap_used)]
 
+mod common;
+
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use common::LogCapture;
 use navori_macos::fake::{FakeProcess, FakeProcesses, FakeSignals};
 use navori_macos::{ProcessSource, Signal, SignalTarget, Signals};
 use navori_mod_ports::{
@@ -648,4 +651,126 @@ async fn a_check_that_cannot_be_read_after_the_term_wait_fails_and_gets_no_kill(
         world.signals.sent(),
         vec![(SignalTarget::Process(200), Signal::Term)]
     );
+}
+
+#[tokio::test(start_paused = true)]
+async fn each_signal_sent_is_logged_with_pid_start_time_signal_scope_and_result() {
+    let logs = LogCapture::start();
+    let world = world();
+    listener(&world, 200, 150);
+    listener(&world, 300, 300);
+
+    stop_process(
+        stopped_plan(200),
+        world.processes.as_ref(),
+        world.signals.as_ref(),
+    )
+    .await;
+    stop_process(
+        plan(300, Reach::Group(vec![(300, START_US)])),
+        world.processes.as_ref(),
+        world.signals.as_ref(),
+    )
+    .await;
+
+    let text = logs.text();
+    let sent: Vec<&str> = text
+        .lines()
+        .filter(|line| line.contains("a stop signal was sent"))
+        .collect();
+    assert_eq!(sent.len(), 4, "{text}");
+    let expected = [
+        ("pid=200", "signal=Term", "scope=\"process\""),
+        ("pid=200", "signal=Kill", "scope=\"process\""),
+        ("pid=300", "signal=Term", "scope=\"group\""),
+        ("pid=300", "signal=Kill", "scope=\"group\""),
+    ];
+    for (line, (pid, signal, scope)) in sent.iter().zip(expected) {
+        for part in [pid, signal, scope, "result=Ok(())"] {
+            assert!(line.contains(part), "{part} missing in {line}");
+        }
+        assert!(line.contains(&format!("start_us={START_US}")), "{line}");
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_refused_signal_and_a_vanished_target_are_logged_with_their_results() {
+    let logs = LogCapture::start();
+    let world = world();
+    listener(&world, 200, 150);
+    world.signals.deny(200);
+
+    stop_process(
+        stopped_plan(200),
+        world.processes.as_ref(),
+        world.signals.as_ref(),
+    )
+    .await;
+    stop_process(
+        plan(999, Reach::Group(vec![(999, START_US)])),
+        world.processes.as_ref(),
+        world.signals.as_ref(),
+    )
+    .await;
+
+    let text = logs.text();
+    assert!(text.contains("result=Err(Denied)"), "{text}");
+    assert!(text.contains("result=Err(Gone)"), "{text}");
+}
+
+#[test]
+fn every_reason_a_group_stop_falls_back_to_the_process_alone_is_logged() {
+    let logs = LogCapture::start();
+    let world = world();
+    listener(&world, 200, 200);
+    listener(&world, 201, 200);
+    let entries = vec![dev(200, 3000), dev(201, 3001)];
+
+    let got = reach(&world, entries.clone(), 200, &[(200, START_US)]);
+    assert_eq!(got, Reach::Alone);
+    assert!(
+        logs.text().contains("reason=\"group_mate_unconfirmed\""),
+        "{}",
+        logs.text()
+    );
+
+    let processes = Arc::new(FakeProcesses::new(USER));
+    let blind = Guard::new(
+        Arc::clone(&world.signals) as Arc<dyn Signals>,
+        processes as Arc<dyn ProcessSource>,
+        None,
+    );
+    let got = reach_for(
+        &plan(200, Reach::Alone),
+        &fresh(entries),
+        world.signals.as_ref(),
+        &blind,
+        &[(200, START_US), (201, START_US)],
+    );
+    assert_eq!(got, Reach::Alone);
+    assert!(
+        logs.text().contains("reason=\"guard_incomplete\""),
+        "{}",
+        logs.text()
+    );
+    assert!(logs.text().contains("pid=200"), "{}", logs.text());
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_signal_log_names_no_path_executable_or_environment() {
+    let logs = LogCapture::start();
+    let world = world();
+    listener(&world, 200, 150);
+
+    stop_process(
+        stopped_plan(200),
+        world.processes.as_ref(),
+        world.signals.as_ref(),
+    )
+    .await;
+
+    let text = logs.text();
+    for hidden in ["node", "/usr", "/bin", "klynt"] {
+        assert!(!text.contains(hidden), "{hidden} in {text}");
+    }
 }
