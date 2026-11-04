@@ -51,7 +51,7 @@ Guard walk (Step 3 of specify-behavior). Files the change touches:
 - **PORTS-2.2** WHEN a listener's working directory has no counted repo or cannot be read THE SYSTEM SHALL try the same walk from the directory of its exe path (`agent-decided`).
 - **PORTS-2.3** IF neither walk finds a counted repo THEN THE SYSTEM SHALL give the entry no project, no worktree and no branch, and group it in the one no-project group, which the Running menu names `Other` (`agent-decided`).
 - **PORTS-2.4** THE SYSTEM SHALL count a repo root only when it lies strictly under the user's home directory and not inside a dot-directory directly below home, so `/opt/homebrew` and `~/.oh-my-zsh` place nothing (`agent-decided`). A fixture proves both.
-- **PORTS-2.5** IF a listener's working directory no longer exists and an existing ancestor lies in a counted repo THEN THE SYSTEM SHALL take only the project from that repo, set worktree and branch to none, keep the removed path in `missing_path` and infer no name from it (`agent-decided`).
+- **PORTS-2.5** IF a listener's working directory no longer exists and its nearest existing ancestor lies in a counted repo THEN THE SYSTEM SHALL take only the project from that repo, set worktree and branch to none, keep the removed path in `missing_path` and infer no name from it (`agent-decided`).
 - **PORTS-2.6** IF a listener's exe path cannot be read THEN THE SYSTEM SHALL make no join from the exe and SHALL NOT fall back to `argv[0]` (`agent-decided`).
 - **PORTS-2.7** WHEN a process's working directory has been removed THE SYSTEM SHALL read the removed path through the Rust reader, or PORTS-2.5 is reopened — verified by an ignored real-OS test, since this was only read through Python on the same libproc call (`agent-decided`).
 

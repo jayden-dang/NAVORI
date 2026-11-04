@@ -159,7 +159,7 @@ instead of about 1,700 per-pid `KERN_PROC_PID` calls. `env_marker` and `name` go
 
 `started_by` returns the nearest recognized live ancestor, including the process itself, as `harness_of` does. If
 there is none, it reads the marker with `MARKERS = [("CLAUDE_CODE_CHILD_SESSION", ClaudeCode), ("CODEX_THREAD_ID",
-Codex), ("GROK_AGENT", Grok)]`. `Several` gives `None`. A read error is returned as an error, so the caller can avoid
+Codex), ("GROK_AGENT", Grok)]` (`agent-decided`, W16; PORTS-3.2). `Several` gives `None`. A read error is returned as an error, so the caller can avoid
 remembering it (PORTS-3.6). PORTS-3.9 is the manual check before ship and is recorded here because the markers live
 here.
 
