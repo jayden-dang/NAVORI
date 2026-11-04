@@ -14,7 +14,7 @@ Rules:
 
 Roadmap item: ROAD-27 (MILE-9) · Tracker: #22 · Decisions: frame-change close package (2026-11-04), confirmed by the user; ADR 0007 (amends ADR 0004).
 
-Delivery order: stories 1–6 can be built and tried now against a test tap. The first public release, `v0.1.0`, is cut only after MILE-2 closes and ROAD-17 and ROAD-18 ship (roadmap MILE-9 `Depends-on`), by setting the tap variable (RELEASE-6.1) and pushing the tag.
+Delivery order: stories 1–6 can be built and tried now against a test tap. The first public release, `v0.1.0`, is cut only after MILE-2 closes and ROAD-17 and ROAD-18 ship (roadmap MILE-9 `Depends-on`), by setting the repository variables `TAP_REPOSITORY` and `PUBLISH_RELEASE` (RELEASE-6.1, RELEASE-6.2) and pushing the tag. *(Amended 2026-11-04: a separate `PUBLISH_RELEASE` switch, so that pointing `TAP_REPOSITORY` at a test tap does not publish a Release.)*
 
 Terms used below:
 - **The system** — the `cargo xtask` release commands, the release workflow in `.github/workflows/`, the cask in the tap, and the Integrations Module's hook commands.
@@ -23,6 +23,7 @@ Terms used below:
 - **Pre-release tag** — a release tag whose version has a pre-release part.
 - **Release Environment** — the GitHub Environment `release` on `jayden-dang/NAVORI`, which holds `SIGNING_P12`, `SIGNING_P12_PASSWORD` and `TAP_TOKEN`, and lets only jobs started by a `v*` tag read them.
 - **Tap** — the repository named by the repository variable `TAP_REPOSITORY` (for the public release, `jayden-dang/homebrew-navori`); its cask is `Casks/navori.rb`.
+- **Publish switch** — the repository variable `PUBLISH_RELEASE`; it is on only when its value is exactly `true`.
 - **Release zip** — `Navori-<version>.zip`, holding `Navori.app` at its top level.
 - **Signing identity** — the self-signed certificate `Navori Local Signing` (ADR 0004, ADR 0007).
 - **Designated requirement** — the code requirement macOS uses to decide that two builds are the same app (`codesign -d -r-`); Keychain access and privacy grants follow it.
@@ -111,8 +112,9 @@ Files this change touches, and what in them is guarded:
 
 **Story:** As the maintainer, I want tags pushed before I am ready to produce only a draft Release that nobody can install, so that the whole pipeline can be built and tried before the first public release.
 
-- **RELEASE-6.1** WHILE the repository variable `TAP_REPOSITORY` is unset THE SYSTEM SHALL create the GitHub Release as a draft and SHALL change no cask.
-- **RELEASE-6.2** WHEN `TAP_REPOSITORY` is set THE SYSTEM SHALL publish the GitHub Release and update that tap's cask (RELEASE-3.1).
+- **RELEASE-6.1** WHILE the Publish switch is off THE SYSTEM SHALL leave the GitHub Release a draft and SHALL push no cask to any tap. *(Amended 2026-11-04: was keyed on `TAP_REPOSITORY` being unset.)*
+- **RELEASE-6.2** WHEN the Publish switch is on THE SYSTEM SHALL publish the GitHub Release and, when `TAP_REPOSITORY` is set, then update that tap's cask (RELEASE-3.1). *(Amended 2026-11-04: was keyed on `TAP_REPOSITORY` being set.)*
+- **RELEASE-6.4** WHILE the Publish switch is off and `TAP_REPOSITORY` is set THE SYSTEM SHALL still write the cask into a local copy of that tap and run the RELEASE-3.6 checks on it, pushing nothing. *(Added 2026-11-04.)*
 - **RELEASE-6.3** WHEN the first final release is published THE SYSTEM SHALL list in `docs/agents/project.md` release steps, in order: `cargo xtask release-check`, `git tag v<version>`, `git push origin v<version>`, and the clean-account checks of RELEASE-3.7, RELEASE-3.8 and RELEASE-4.4.
 
 ## 7. Quality attributes

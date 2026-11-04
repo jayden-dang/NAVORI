@@ -234,7 +234,7 @@ _Requirements: RELEASE-7.4, RELEASE-2.8_
 
 **Interfaces:**
 - Consumes: `cargo xtask release --tag <t> --check` (Task 2) — `version=` / `prerelease=` lines appended to `$GITHUB_OUTPUT`; `cargo xtask release --tag <t> --out dist` (Task 4); `cargo xtask ci` with the pin lint (Task 6).
-- Produces: workflow `release` — `on: push: tags: ['v*']`; job `release`, `runs-on: macos-26`, `environment: release`, `permissions: contents: write`, `concurrency: release-${{ github.ref_name }}`; secrets `SIGNING_P12`, `SIGNING_P12_PASSWORD`, `TAP_TOKEN`; variable `TAP_REPOSITORY`.
+- Produces: workflow `release` — `on: push: tags: ['v*']`; job `release`, `runs-on: macos-26`, `environment: release`, `permissions: contents: write`, `concurrency: release-${{ github.ref_name }}`; secrets `SIGNING_P12`, `SIGNING_P12_PASSWORD`, `TAP_TOKEN`; variables `TAP_REPOSITORY` and `PUBLISH_RELEASE`.
 
 **Depends-on:** Task 4, Task 6
 
@@ -243,7 +243,9 @@ _Requirements: RELEASE-7.4, RELEASE-2.8_
 - [x] **Step 3: Run** `cargo xtask ci` — expect: pass, the pin lint reading `release.yml`. Then change the pin to `@v4` locally — expect: `ci` fails naming that line; restore.
 - [x] **Step 4: Commit** `git commit -m "ci: publish a signed release and update the tap when a version tag is pushed"`
 
-_Requirements: RELEASE-1.1, RELEASE-1.2, RELEASE-1.4, RELEASE-1.9, RELEASE-1.11, RELEASE-1.12, RELEASE-3.1, RELEASE-3.6, RELEASE-6.1, RELEASE-6.2, RELEASE-7.3, RELEASE-7.5, RELEASE-7.7_
+- [ ] **Amendment (2026-11-04, operator's choice, after the first workflow runs):** add the repository variable `PUBLISH_RELEASE`. Until it is exactly `true` the Release stays a draft and no cask is pushed. While `TAP_REPOSITORY` is set the tap steps up to the local commit, `brew tap`, `brew trust`, `brew style` and `brew audit` still run; the `gh release edit --draft=false` step and the cask push run only when `PUBLISH_RELEASE` is `true`. Update `docs/agents/project.md` (release steps, setup step 5) to describe both variables. Test by reading the workflow and by Task 9 Step 3.
+
+_Requirements: RELEASE-1.1, RELEASE-1.2, RELEASE-1.4, RELEASE-1.9, RELEASE-1.11, RELEASE-1.12, RELEASE-3.1, RELEASE-3.6, RELEASE-6.1, RELEASE-6.2, RELEASE-6.4, RELEASE-7.3, RELEASE-7.5, RELEASE-7.7_
 
 ---
 
@@ -281,12 +283,12 @@ _Requirements: RELEASE-6.3, RELEASE-7.6_
 
 **Depends-on:** Task 1, Task 7, Task 8
 
-- [ ] **Step 1: Operator setup** (the operator runs these; the agent only lists them): the one-time setup of Task 8 against a **test tap** repository, `TAP_REPOSITORY` unset.
+- [ ] **Step 1: Operator setup** (the operator runs these; the agent only lists them): the one-time setup of Task 8 against a **test tap** repository, with `TAP_REPOSITORY` and `PUBLISH_RELEASE` both unset.
 - [ ] **Step 2: Draft run:** bump the workspace version to `0.1.0-rc.1` on a branch and commit; `cargo xtask release-check` — expect: `ci` and `perf` pass and it prints `v0.1.0-rc.1` with the push commands, and `git tag -l` shows no new tag; push tag `v0.1.0-rc.9` — expect: the run fails at the tag check naming `0.1.0-rc.9` and `0.1.0-rc.1`, no Release; push tag `v0.1.0-rc.1` — expect: a draft pre-release with the zip and `.sha256`, no tap change; a push to a branch without a tag starts no release run.
-- [ ] **Step 3: Tap run:** set `TAP_REPOSITORY` to the test tap, rerun the job — expect: the Release is published, the cask commit lands; rerun again — expect: no second Release, no new tap commit. Break the tap step once (wrong token) and rerun after fixing — expect: it completes.
+- [ ] **Step 3: Tap run:** (a) set `TAP_REPOSITORY` to the test tap, leave `PUBLISH_RELEASE` unset, rerun the job — expect: the cask is audited (`brew style`, `brew audit --cask` pass), the Release is still a draft and the tap has no new commit; (b) set `PUBLISH_RELEASE` to `true` (this makes a pre-release public on the public repository: the operator confirms first), rerun — expect: the Release is published, then the cask commit lands in the tap; rerun again — expect: no second Release, no new tap commit. Break the tap step once (wrong token) and rerun after fixing — expect: it completes. Afterwards set `PUBLISH_RELEASE` back to unset and turn each rc Release back into a draft or delete it.
 - [ ] **Step 4: Clean account:** on a new macOS 26 user, `brew tap`, `brew trust --cask`, `brew install --cask` from the test tap, open Navori — expect: menubar icon, no Gatekeeper dialog; install Claude Code hooks, work in a session — expect: `Navori: keeping this Mac awake` in `pmset -g assertions`.
 - [ ] **Step 5: Upgrade:** save an AI key and change a setting, push `v0.1.0-rc.2`, `brew upgrade` — expect: setting, key (no Keychain prompt) and hooks (installed, not needing repair) still there; `navori doctor` all ✓.
 - [ ] **Step 6: Uninstall:** `brew uninstall --zap --cask navori`, then a Claude Code session — expect: no hook error, the two release directories in the Trash, the dev profile's untouched.
 - [ ] **Step 7: Record** every result in `acceptance.md`, run `cargo xtask ci`, and commit `git commit -m "docs(release): record the release acceptance run"`. The test tap is then deleted or kept private; the public tap is created only when MILE-2 closes and ROAD-17 and ROAD-18 ship.
 
-_Requirements: RELEASE-3.7, RELEASE-3.8, RELEASE-4.1, RELEASE-4.2, RELEASE-4.3, RELEASE-4.4, RELEASE-4.5_
+_Requirements: RELEASE-6.4, RELEASE-3.7, RELEASE-3.8, RELEASE-4.1, RELEASE-4.2, RELEASE-4.3, RELEASE-4.4, RELEASE-4.5_
