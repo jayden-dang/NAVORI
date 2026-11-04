@@ -35,7 +35,7 @@ Persisted formats defined here, both `agent-decided` in their columns or names:
 
 ## 3. Keep the release and dev keys apart
 
-**Story:** As the author, I want to save a key in `Navori Dev.app`, run `navori ask` against `Navori.app`, and get the no-key message, so that the two Profiles never share a key.
+**Story:** As the author, I want each Profile to open its own Keychain service, so that a key saved by `Navori Dev.app` is never the key `Navori.app` reads. The demo is the test that starts a dev core and a release core and shows the service each one opens.
 
 - **ASK-3.1** THE SYSTEM SHALL open the store with service `dev.navori` for Profile `release` and `dev.navori.dev` for Profile `dev`, in `navori-ffi` — verified by a test of the mapping function and by a test that starts one core per Profile and records the service each receives when it opens its store.
 - ~~**ASK-3.2**~~ folded into ASK-3.1: a separate cross-Profile read test only proved the fake store keeps services apart, and the handoff asks for the mapping test (keychain-secrets requirements.md:123).
@@ -80,7 +80,7 @@ Persisted formats defined here, both `agent-decided` in their columns or names:
 - **ASK-7.1** IF no key is stored THEN THE SYSTEM SHALL exit 1 with "No key set. Add one in Settings → AI.", before the Shield and the audit row, because nothing was inspected or authorized (`agent-decided`).
 - **ASK-7.2** IF reading the key fails with a `SecretError` (locked Keychain, denied prompt, any backend failure) THEN THE SYSTEM SHALL exit 1 with that error's message and SHALL NOT print the no-key message.
 - **ASK-7.3** IF the provider call fails (no connection, a non-success HTTP status, a body without a first choice with text) THEN THE SYSTEM SHALL exit 1 with a message that names the kind of failure and the HTTP status when there is one, and SHALL NOT echo the request text or the key.
-- **ASK-7.6** IF the provider answers with status 401, 402, 404, 422 or 429 THEN THE SYSTEM SHALL add what the person can check: 401 the key saved in Settings → AI, 402 the provider account balance, 404 or 422 the model id given to `--model`, 429 try again shortly (`agent-decided`: the hints; the meanings of 401, 402, 422, 429 and 503 are listed at https://api-docs.deepseek.com/quick_start/error_codes, and 404 for a wrong model id is reported by a DeepSeek integration guide, so 404 and 422 hints are best-effort).
+- **ASK-7.6** IF the provider answers with status 401, 402, 404, 422 or 429 THEN THE SYSTEM SHALL add what the person can check: 401 the key saved in Settings → AI, 402 the provider account balance, 404 or 422 the model id given to `--model`, 429 try again shortly (`agent-decided`: the hints; the meanings of 401, 402, 422, 429 and 503 are listed at https://api-docs.deepseek.com/quick_start/error_codes, and 404 for a wrong model id is reported only by the integration guide at https://api-docs.deepseek.com/quick_start/agent_integrations/workbuddy, so the 404 and 422 hints are best-effort).
 - **ASK-7.4** IF the app is not running THEN THE SYSTEM SHALL exit 3 as the other commands do.
 - **ASK-7.5** THE SYSTEM SHALL map every ask failure to exit 1 and keep the codes 0, 1, 2 and 3 as they are (`agent-decided`).
 
@@ -121,7 +121,7 @@ Files this change touches, and what each guards:
 **Story:** As a stakeholder, I want measurable quality targets for this feature, so that how-well is not left implicit.
 
 - **Performance:**
-  - **ASK-10.1** WHEN `cargo xtask perf` runs after this change THE SYSTEM SHALL show no regression against the baseline measured at task start for idle CPU, wakeups, footprint, cold start and menu open (GOAL-11, `docs/standards/performance.md`), and the task SHALL report the release `.app` size and idle footprint added by `reqwest` — verified by `cargo xtask perf` on an idle machine. The baseline before this road is provisional (Open Questions).
+  - **ASK-10.1** WHEN `cargo xtask perf` runs after this change THE SYSTEM SHALL show no regression against the base commit measured in the same session as the branch for idle CPU, wakeups, footprint, cold start and menu open (GOAL-11, `docs/standards/performance.md`), and the task SHALL report the release `.app` size and idle footprint added by `reqwest` — verified by `cargo xtask perf` on an idle machine. The baseline before this road is provisional (Open Questions).
   - **ASK-10.2** WHEN the Core starts THE SYSTEM SHALL build no HTTP client, read no Keychain item and open no provider connection (ARCH-17) — verified by a test that starts the Core with a counting factory and sees zero builds.
   - **ASK-10.3** WHEN the first ask arrives THE SYSTEM SHALL build the client then and reuse it for later asks.
   - **ASK-10.4** THE SYSTEM SHALL run the blocking Keychain and `Store` calls of an ask off the async worker threads (the Core runtime has two) — verified by a test in which a second connection's `core.status` answers while an ask waits.
@@ -152,4 +152,4 @@ Files this change touches, and what each guards:
 - DeepSeek's error body shape, whether the model ids `deepseek-flash` and `deepseek-v4-pro` are current when the live test first runs, and the 404 for an unknown model — owner: author of the live test — date: when ASK-8.2 is first run — forbid-guess: fixtures may use the documented shapes (https://api-docs.deepseek.com/api/create-chat-completion, https://api-docs.deepseek.com/quick_start/error_codes) but a criterion may not assert an error body or a model id.
 - The name of the `pass` entry holding the DeepSeek key — owner: operator — date: before ASK-8.2 is first run — forbid-guess: no agent runs `pass show` or invents a name.
 - The Keychain item `llm-provider/openai-compat` is the first item any build writes to a user's login Keychain (SECRETS says none exists until ROAD-11 or ROAD-19 ships) — owner: ROAD-11 author — date: when ROAD-11 is specified — forbid-guess: ROAD-11 must keep this kind and name or migrate the item; a rename orphans the user's key.
-- Perf baseline and `.app` size before this road are provisional (`menu_open` over 80 ms from machine load, unconfirmed) — owner: operator — date: task start — forbid-guess: ASK-10.1 compares to the baseline measured at task start, not to a recorded number.
+- Perf baseline and `.app` size before this road are provisional (`menu_open` over 80 ms from machine load, unconfirmed) — owner: operator — date: Task 9 — forbid-guess: ASK-10.1 compares to the base commit and the branch measured in the same session, not to a recorded number.

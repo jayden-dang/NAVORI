@@ -182,7 +182,7 @@ Locality: `ai/llm/tests/`, `ai/context/tests/`, `crates/ffi/tests/ask.rs` (new),
 | `DEEPSEEK_BASE_URL` constant (ai/llm unit test) | unit | ASK-10.7 |
 | `navori_protocol` constants and structs (round-trip in protocol tests) | unit | ASK-4.2, 7.5, 9.2 (ipc tests unchanged and still green) |
 | `NavoriCore::start_with` + `core.ask` over the real socket with fake `AiDeps` (crates/ffi/tests/ask.rs); `context_audit` absent after start and present after the first ask | integration | ASK-5.5, 5.4, 9.1, 9.3, 10.2, 10.3, 10.4, 10.5 |
-| `NavoriCore::save_provider_key` / `remove_provider_key` with fake `AiDeps`, called from a non-tokio executor (`futures::executor::block_on`) and concurrently for the first-use race | integration | ASK-1.1, 1.2, 1.5, 1.6, 2.1, 2.2, 3.1, 8.2 |
+| `NavoriCore::save_provider_key` / `remove_provider_key` with fake `AiDeps`, called from a non-tokio executor (`futures::executor::block_on`) and concurrently for the first-use race, plus one dev core and one release core on separate homes whose store factories record the `KeychainService` they receive | integration | ASK-1.1, 1.2, 1.5, 1.6, 2.1, 2.2, 3.1, 8.2 |
 | `navori ask` process against a real `NavoriCore` with fake `AiDeps`, including a prompt of exactly `MAX_LINE_BYTES` minus the envelope and one byte over (apps/cli/tests/cli.rs) | e2e | ASK-4.3, 4.4, 4.5, 4.8, 7.4, 8.1, 9.4 |
 | Settings → AI tab, manual run of the dev app (docs/agents/verify.md) | e2e (manual) | ASK-1.3, 1.4, 1.7, 9.5 |
 | Gated live test `live_deepseek.rs` | integration (opt-in) | ASK-8.2 live half; supports ASK-4.1 |
