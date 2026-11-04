@@ -6,7 +6,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use navori_kernel::{ActionError, ModuleCtx, Request, Wake};
 use navori_macos::ProcessSource;
 
-use crate::action::PortsAction;
+use crate::action::{KillReply, Outcome, PortsAction, TargetResult};
 use crate::docker::attribute;
 use crate::infra::docker::Containers;
 use crate::place::place;
@@ -159,6 +159,10 @@ impl Ports {
     }
 
     fn on_request(ctx: &ModuleCtx<Self>, req: Request<PortsAction>) {
+        if let Err(message) = req.action.validate() {
+            req.respond::<()>(Err(ActionError::Invalid(message)));
+            return;
+        }
         match req.action {
             PortsAction::List => {
                 let state = ctx.state();
@@ -167,6 +171,17 @@ impl Ports {
             PortsAction::Open { port, address } => {
                 let reply = open_url(&ctx.state(), port, address);
                 req.respond(reply);
+            }
+            PortsAction::Kill { ref targets, .. } => {
+                let results = targets
+                    .iter()
+                    .map(|target| TargetResult {
+                        target: target.clone(),
+                        result: Outcome::Failed,
+                        reason: Some("Stopping is not wired yet.".to_owned()),
+                    })
+                    .collect();
+                req.respond(Ok(KillReply { results }));
             }
         }
     }

@@ -47,7 +47,7 @@ The inventory of code units in the repository — every Rust crate and Swift tar
 |---|---|---|
 | `navori-secrets` | `crates/secrets/` | Keychain store for tokens and API keys (landed; consumed by `navori-llm`, `navori-context` and `navori-ffi`; ROAD-11 and ROAD-19 still to come). |
 | `navori-mod-inbox` | `modules/inbox/` | Feature Module: Needs you — Decisions, To-dos, Updates (R2). |
-| `navori-mod-ports` | `modules/ports/` | Feature Module: lists the TCP ports the user's own processes listen on, grouped by project, worktree and process. Surface: `Ports`, `PortsEnv`, `OpenProcesses`, `PortsAction`, `Scanner`, `Scan`, `BackendPort`, `PortsState` and the group, entry and kind types; other units reach it through the kernel. Tests: `modules/ports/tests/` (scan, kind, place, docker, docker client, open, timing, failure, harness; `real_os.rs` is ignored). |
+| `navori-mod-ports` | `modules/ports/` | Feature Module: lists the TCP ports the user's own processes listen on, grouped by project, worktree and process. Surface: `Ports`, `PortsEnv`, `OpenProcesses`, `PortsAction`, `Selector`, `Target`, `KillReply`, `TargetResult`, `Outcome`, `Scanner`, `Scan`, `BackendPort`, `PortsState` and the group, entry and kind types; other units reach it through the kernel. Tests: `modules/ports/tests/` (scan, kind, place, docker, docker client, open, kill, timing, failure, harness; `real_os.rs` is ignored). |
 | `navori-mod-github` | `modules/github/` | Feature Module: pull requests, checks, approve/merge (R4). |
 | `navori-models`, `navori-agent`, `navori-memory` | `ai/{models,agent,memory}/` | AI runtime: model routing, agent loop and policy, memory (R2). |
 | `navori-triggers` | `ai/triggers/` | Proactive rules (R5). |

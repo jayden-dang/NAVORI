@@ -296,7 +296,8 @@ impl NavoriCore {
                 &loaded.sweep,
                 assertion_name(profile),
                 integrations.clone(),
-                PortsEnv::mac(PathBuf::from(&config.home_dir)),
+                PortsEnv::mac(PathBuf::from(&config.home_dir))
+                    .with_helper(PathBuf::from(&config.helper_path)),
             )
         });
         let config_notice = app::config_notice(

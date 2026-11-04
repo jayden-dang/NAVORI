@@ -101,12 +101,11 @@ async fn the_catalog_has_list_and_open_as_read_actions_and_the_schema_names_thei
         .kernel
         .actions()
         .into_iter()
-        .filter(|spec| spec.module == "ports")
+        .filter(|spec| spec.module == "ports" && spec.risk == Risk::Read)
         .collect();
     let mut names: Vec<_> = specs.iter().map(|spec| spec.name.as_str()).collect();
     names.sort_unstable();
     assert_eq!(names, ["list", "open"]);
-    assert!(specs.iter().all(|spec| spec.risk == Risk::Read));
     let open = specs.iter().find(|spec| spec.name == "open").unwrap();
     let mut inputs: Vec<String> = open
         .input_schema

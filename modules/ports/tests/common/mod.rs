@@ -9,8 +9,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use futures::future::BoxFuture;
 use navori_kernel::{DispatchError, Envelope, Kernel, WallClock};
-use navori_macos::fake::FakeProcesses;
-use navori_macos::{Listener, Marker, PlatformError, ProcEntry, ProcessSource, ReadError};
+use navori_macos::fake::{FakeProcesses, FakeSignals};
+use navori_macos::{Listener, Marker, PlatformError, ProcEntry, ProcessSource, ReadError, Signals};
 use navori_mod_ports::{Container, Containers, DockerError, Ports, PortsEnv};
 use navori_store::Store;
 use serde_json::Value;
@@ -204,6 +204,7 @@ pub struct Rig {
     pub kernel: Kernel,
     pub containers: Arc<FakeContainers>,
     pub processes: Arc<FakeProcesses>,
+    pub signals: Arc<FakeSignals>,
     pub gate: Arc<Gate>,
     pub clock: FakeClock,
     pub home: PathBuf,
@@ -212,21 +213,27 @@ pub struct Rig {
 
 impl Rig {
     pub fn new() -> Self {
-        Self::opening(false)
+        Self::opening(false, serde_json::Map::new())
+    }
+
+    /// A Module started with these config sections.
+    pub fn with_config(sections: serde_json::Map<String, Value>) -> Self {
+        Self::opening(false, sections)
     }
 
     /// A Module whose process source can never be opened.
     pub fn unopenable() -> Self {
-        Self::opening(true)
+        Self::opening(true, serde_json::Map::new())
     }
 
-    fn opening(refused: bool) -> Self {
+    fn opening(refused: bool, sections: serde_json::Map<String, Value>) -> Self {
         let processes = Arc::new(FakeProcesses::new(501));
         let gate = Arc::new(Gate::new(Arc::clone(&processes) as Arc<dyn ProcessSource>));
         let (guard, home) = canonical_temp_home();
         let clock = FakeClock::at(ORIGIN_MS);
         let source = Arc::clone(&gate) as Arc<dyn ProcessSource>;
         let containers = Arc::new(FakeContainers::new());
+        let signals = Arc::new(FakeSignals::new(4242, 4242));
         let env = PortsEnv {
             home: home.clone(),
             processes: Box::new(move || {
@@ -237,16 +244,20 @@ impl Rig {
                 }
             }),
             containers: Arc::clone(&containers) as Arc<dyn Containers>,
+            signals: Arc::clone(&signals) as Arc<dyn Signals>,
+            helper: None,
         };
         let kernel =
             Kernel::builder_with_clock(Store::open_in_memory().unwrap(), Arc::new(clock.clone()))
                 .pause_journal_sweep()
+                .config_sections(sections)
                 .register(Ports::new(env))
                 .start();
         Self {
             kernel,
             containers,
             processes,
+            signals,
             gate,
             clock,
             home,

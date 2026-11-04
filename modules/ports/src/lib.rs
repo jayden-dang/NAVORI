@@ -14,9 +14,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use navori_kernel::{Module, ModuleCtx, NoConfig, TrayContribution, TrayGlyph};
-use navori_macos::{MacProcesses, PlatformError, ProcessSource};
+use navori_macos::{MacProcesses, MacSignals, PlatformError, ProcessSource, Signals};
 
-pub use action::PortsAction;
+pub use action::{KillReply, Outcome, PortsAction, Selector, Target, TargetResult};
 pub use docker::attribute;
 pub use image::database_image;
 pub use infra::docker::{Container, Containers, DockerError, DockerSocket};
@@ -33,6 +33,9 @@ pub struct PortsEnv {
     pub home: PathBuf,
     pub processes: OpenProcesses,
     pub containers: Arc<dyn Containers>,
+    pub signals: Arc<dyn Signals>,
+    /// The Navori helper binary, which a stop must never signal.
+    pub helper: Option<PathBuf>,
 }
 
 impl std::fmt::Debug for PortsEnv {
@@ -51,10 +54,19 @@ impl PortsEnv {
         Self {
             home,
             containers: Arc::new(DockerSocket::new(socket)),
+            signals: Arc::new(MacSignals::new()),
+            helper: None,
             processes: Box::new(|| {
                 MacProcesses::new().map(|source| Arc::new(source) as Arc<dyn ProcessSource>)
             }),
         }
+    }
+
+    /// Names the helper binary a stop must leave alone.
+    #[must_use]
+    pub fn with_helper(mut self, helper: PathBuf) -> Self {
+        self.helper = Some(helper);
+        self
     }
 }
 
