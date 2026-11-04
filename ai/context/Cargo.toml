@@ -1,6 +1,6 @@
 [package]
 name = "navori-context"
-description = "Context gathering for AI requests."
+description = "Context Gateway: the single audited path to an LLM."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

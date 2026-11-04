@@ -1,4 +1,4 @@
-//! Context gathering for AI requests.
+//! The Context Gateway: key read, Shield pass, audit row, then send.
 
 mod gateway;
 

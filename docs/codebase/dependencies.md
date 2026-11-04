@@ -20,7 +20,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | `navori-kernel` | `navori-protocol`, `navori-redact`, `navori-store` | allowed |
 | `navori-ipc` | `navori-protocol` | allowed |
 | `navori-ffi` | every foundation crate (`config`, `ipc`, `kernel`, `protocol`, `redact`, `secrets`, `store`), `navori-mod-awake`, `navori-mod-integrations`, `navori-llm` and `navori-context` | allowed — the composition root; later also other `modules/*`, `ai/*` |
-| `navori` CLI (`navori-cli`) | `navori-config`, `navori-ipc`, `navori-protocol` | allowed — thin client; `navori-ffi` only as a dev-dependency for end-to-end tests |
+| `navori` CLI (`navori-cli`) | `navori-config`, `navori-ipc`, `navori-protocol` | allowed — thin client; dev-dependencies for end-to-end tests only: `navori-ffi`, `navori-context`, `navori-secrets` (`fake` feature), `navori-store`, `futures` and `tokio` |
 | `xtask` | — | allowed: none (tooling only) |
 | `navori-macos` | — | allowed: none — leaf |
 | `navori-procs` | `navori-macos` | allowed — through the safe traits |
