@@ -24,22 +24,34 @@ pub fn place_listener(cwd: Field<PathBuf>, exe: Field<PathBuf>, home: &Path) -> 
 /// Places a path in the nearest counted repo, or nowhere. A path that no longer exists keeps
 /// only the project of its nearest existing ancestor.
 pub fn place(path: &Path, home: &Path) -> Placement {
-    if !is_removed(path) {
-        return counted(path, home).map_or_else(Placement::default, |repo| Placement {
-            project: Some(repo.location.project),
-            worktree: repo.location.worktree,
-            branch: repo.location.branch.map(BranchName::from),
-            missing_path: None,
-        });
+    if !in_counted_area(path, home) {
+        return Placement::default();
     }
-    let Some(ancestor) = path.ancestors().find(|dir| !is_removed(dir)) else {
+    let removed = is_removed(path);
+    let probe = if removed {
+        match path.ancestors().find(|dir| !is_removed(dir)) {
+            Some(ancestor) => ancestor,
+            None => return Placement::default(),
+        }
+    } else {
+        path
+    };
+    let Some(repo) = counted(probe, home) else {
         return Placement::default();
     };
-    counted(ancestor, home).map_or_else(Placement::default, |repo| Placement {
+    if removed {
+        return Placement {
+            project: Some(repo.location.project),
+            missing_path: Some(path.to_path_buf()),
+            ..Placement::default()
+        };
+    }
+    Placement {
         project: Some(repo.location.project),
-        missing_path: Some(path.to_path_buf()),
-        ..Placement::default()
-    })
+        worktree: repo.location.worktree,
+        branch: repo.location.branch.map(BranchName::from),
+        missing_path: None,
+    }
 }
 
 fn is_removed(path: &Path) -> bool {
