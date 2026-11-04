@@ -1,7 +1,7 @@
 # Design: Port discovery
 
 Feature code: PORTS
-Status: In-progress
+Status: Implemented
 Approved by the operator ("approve", 2026-11-04 16:34 +07, typed in the conductor session after reading the review sheet for 827b756; relayed in .skills/_pending-ports/auto/operator-reply.md).
 Date: 2026-11-04
 Requirements: ./requirements.md

@@ -7,7 +7,7 @@
 > for tracking.
 
 Feature code: PORTS
-Status: In-progress
+Status: Implemented
 Approved by the operator ("approve", 2026-11-04 16:34 +07, typed in the conductor session after reading the review sheet for 827b756; relayed in .skills/_pending-ports/auto/operator-reply.md).
 Date: 2026-11-04
 Execution-mode: continuous
@@ -619,11 +619,11 @@ _Requirements: PORTS-9.3, PORTS-9.8, PORTS-10.2_
 - [x] **Step 3: Drive** `navori --profile dev dispatch ports '"list"'` 35 s after `cargo xtask run`.
   - Compare with `lsof -nP -iTCP -sTCP:LISTEN` for this UID: the same (pid, port) set.
   - Check each entry by rule against what `lsof`, the cwd and `git worktree list` say at that moment. The close package's signal 2 names are a guide to what to expect, not fixed values.
-- [ ] **Step 4: Check by hand** a listener started by each Harness, then detached.
+- [x] **Step 4: Check by hand** a listener started by each Harness, then detached.
   - Start a listener from Claude Code, from Codex and from Grok Build, and detach each.
   - Each must show that Harness. Record which marker fired.
   - A failure reopens that marker. Do not edit the marker list to pass.
-  - Handed to the operator: not run in the unattended build.
+  - Done for Claude Code on 2026-11-05: a detached Node listener (parent launchd) showed `harness: claude_code`, so `CLAUDE_CODE_CHILD_SESSION` fired. Codex and Grok Build were waived by the operator and stay unverified (`CODEX_THREAD_ID`, `GROK_AGENT`).
 - [x] **Step 5: Record** the results in the execute report. No commit unless a fix was needed.
 
 _Requirements: PORTS-3.9, PORTS-10.1_
