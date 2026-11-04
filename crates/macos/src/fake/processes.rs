@@ -6,9 +6,10 @@ use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
-use crate::{Listener, PlatformError, ProcEntry, ProcessSource, ReadError, StartTime};
+use crate::procargs::Matcher;
+use crate::{Listener, Marker, PlatformError, ProcEntry, ProcessSource, ReadError, StartTime};
 
-/// One scripted process. Argument, directory, CPU, and name reads default to denied; the socket read
+/// One scripted process. Argument, environment, directory, CPU, and name reads default to denied; the socket read
 /// defaults to no listeners.
 #[derive(Debug)]
 pub struct FakeProcess {
@@ -22,6 +23,7 @@ pub struct FakeProcess {
     pub cwd: Result<PathBuf, ReadError>,
     pub cpu: Result<Duration, ReadError>,
     pub fds: Result<Vec<Listener>, ReadError>,
+    pub env: Result<Vec<String>, ReadError>,
     pub name: Result<String, ReadError>,
 }
 
@@ -39,6 +41,7 @@ impl FakeProcess {
             cwd: Err(ReadError::Denied),
             cpu: Err(ReadError::Denied),
             fds: Ok(Vec::new()),
+            env: Err(ReadError::Denied),
             name: Err(ReadError::Denied),
         }
     }
@@ -80,6 +83,12 @@ impl FakeProcess {
     /// The socket read fails with `err`.
     pub fn fds_err(mut self, err: ReadError) -> Self {
         self.fds = Err(err);
+        self
+    }
+
+    /// Successful environment, as whole `NAME=value` entries.
+    pub fn env(mut self, entries: &[&str]) -> Self {
+        self.env = Ok(entries.iter().copied().map(str::to_owned).collect());
         self
     }
 
@@ -180,7 +189,7 @@ impl FakeProcesses {
         }
     }
 
-    /// On the next read of `kind` (`"exe"`, `"argv"`, `"cwd"`, `"cpu"`, `"fds"`, or `"name"`), apply [`Self::replace`].
+    /// On the next read of `kind` (`"exe"`, `"argv"`, `"cwd"`, `"cpu"`, `"fds"`, `"env"`, or `"name"`), apply [`Self::replace`].
     pub fn replace_on_read(&self, pid: i32, kind: &'static str, start_us: u64, ruid: u32) {
         lock(&self.state).pending.push(PendingReplace {
             pid,
@@ -190,7 +199,7 @@ impl FakeProcesses {
         });
     }
 
-    /// Pids whose executable, arguments, working directory, CPU time, sockets, or name were read, in order.
+    /// Pids whose executable, arguments, working directory, CPU time, sockets, environment, or name were read, in order.
     pub fn reads(&self) -> Vec<(i32, &'static str)> {
         lock(&self.state).reads.clone()
     }
@@ -269,6 +278,17 @@ impl ProcessSource for FakeProcesses {
 
     fn listeners(&self, pid: i32) -> Result<Vec<Listener>, ReadError> {
         self.read(pid, "fds", |process| process.fds.clone())
+    }
+
+    fn env_marker(&self, pid: i32, names: &[&str]) -> Result<Marker, ReadError> {
+        self.read(pid, "env", |process| {
+            let entries = process.env.as_ref().map_err(|err| *err)?;
+            let mut matcher = Matcher::new(names);
+            for entry in entries {
+                matcher.offer(entry.as_bytes());
+            }
+            Ok(matcher.finish())
+        })
     }
 
     fn name(&self, pid: i32) -> Result<String, ReadError> {

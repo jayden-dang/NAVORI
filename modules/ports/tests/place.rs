@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use common::canonical_temp_home;
 use navori_macos::fake::{FakeProcess, FakeProcesses};
-use navori_mod_ports::{BranchName, Placement, Scanner, place_listener};
+use navori_mod_ports::{BranchName, HarnessMemo, Placement, Scanner, place_listener};
 use navori_procs::Unavailable;
 
 fn git(dir: &Path, args: &[&str]) {
@@ -186,7 +186,10 @@ fn a_repo_that_is_the_home_directory_itself_places_nothing() {
 fn scanned_placement(home: &Path, process: FakeProcess) -> Placement {
     let source = Arc::new(FakeProcesses::new(501));
     source.add(process.listen("127.0.0.1", 3000));
-    let scan = Scanner::new(source, home.to_path_buf()).scan().unwrap();
+    let scan = Scanner::new(source, home.to_path_buf())
+        .scan(HarnessMemo::new())
+        .0
+        .unwrap();
     assert_eq!(scan.entries.len(), 1);
     scan.entries[0].place.clone()
 }

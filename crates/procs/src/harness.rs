@@ -2,8 +2,10 @@
 
 use std::path::Path;
 
-use crate::error::Field;
+use crate::error::{Field, Unavailable};
 use crate::location::{Location, resolve_location};
+use navori_macos::Marker;
+
 use crate::snapshot::{ProcId, Process, Snapshot};
 
 /// A recognized coding-agent harness.
@@ -117,6 +119,37 @@ pub(crate) fn recognize(snapshot: &Snapshot, process: &Process) -> Option<Harnes
         }
     };
     runtime_hit(argv.get(1)?)
+}
+
+/// Environment names a Harness sets for the processes it starts. Matched exactly, in this order.
+pub const MARKERS: [(&str, Harness); 3] = [
+    ("CLAUDE_CODE_CHILD_SESSION", Harness::ClaudeCode),
+    ("CODEX_THREAD_ID", Harness::Codex),
+    ("GROK_AGENT", Harness::Grok),
+];
+
+/// The Harness that started this process: the nearest recognized process in its ancestor chain,
+/// including itself, then the one marker its own environment carries. Two markers name none.
+///
+/// # Errors
+///
+/// The process is no longer the one `id` names, or its environment could not be read. Neither is
+/// a "no Harness" answer.
+pub fn started_by(snapshot: &Snapshot, id: ProcId) -> Field<Option<Harness>> {
+    let Some(process) = snapshot.get(id.pid).filter(|process| process.id == id) else {
+        return Err(Unavailable::Exited);
+    };
+    let nearest = std::iter::once(process)
+        .chain(snapshot.ancestors(id))
+        .find_map(|candidate| recognize(snapshot, candidate));
+    if nearest.is_some() {
+        return Ok(nearest);
+    }
+    let names = MARKERS.map(|(name, _)| name);
+    Ok(match snapshot.env_marker(id, &names)? {
+        Marker::One(index) => MARKERS.get(index).map(|(_, harness)| *harness),
+        Marker::None | Marker::Several => None,
+    })
 }
 
 /// Recognized harness processes, except one whose ancestor is the same harness.

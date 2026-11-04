@@ -1,13 +1,13 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::net::IpAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use navori_macos::ProcessSource;
-use navori_procs::{ProcId, ProcsError, Snapshot};
+use navori_procs::{Harness, ProcId, ProcsError, Snapshot, started_by};
 
 use crate::place::place_listener;
-use crate::state::{PortEntry, PortKind};
+use crate::state::{HarnessName, PortEntry, PortKind};
 
 /// A listener of the Docker backend, which a later stage attributes to a container.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +17,12 @@ pub struct BackendPort {
     pub port: u16,
     pub addresses: Vec<IpAddr>,
 }
+
+/// The Harness that started each listener whose environment was read to the end, by process identity.
+/// A read that failed has no entry, so the next scan reads again.
+pub type HarnessMemo = HashMap<ProcId, Option<Harness>>;
+
+const DOCKER_BACKEND: &str = "com.docker.backend";
 
 /// What one scan found.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -43,12 +49,21 @@ impl Scanner {
         Self { source, home }
     }
 
-    /// Blocking: one process list, then each process's sockets.
+    /// Blocking: one process list, then each process's sockets. `memo` goes in and comes back holding
+    /// only the listeners of this scan.
     ///
     /// # Errors
     ///
-    /// [`ProcsError::Platform`] when the process list cannot be read.
-    pub fn scan(&self) -> Result<Scan, ProcsError> {
+    /// [`ProcsError::Platform`] when the process list cannot be read. The memo comes back either way.
+    pub fn scan(&self, memo: HarnessMemo) -> (Result<Scan, ProcsError>, HarnessMemo) {
+        let mut kept = HarnessMemo::new();
+        match self.scan_with(&memo, &mut kept) {
+            Ok(scan) => (Ok(scan), kept),
+            Err(err) => (Err(err), memo),
+        }
+    }
+
+    fn scan_with(&self, memo: &HarnessMemo, kept: &mut HarnessMemo) -> Result<Scan, ProcsError> {
         let snapshot = Snapshot::take(Arc::clone(&self.source))?;
         let mut found = Vec::new();
         let mut unread = Vec::new();
@@ -69,6 +84,7 @@ impl Scanner {
             }
             let exe = process.exe.clone().ok();
             let name = name_of(&snapshot, process.id, exe.as_deref());
+            let harness = harness_for(&snapshot, process.id, exe.as_deref(), memo, kept);
             let place = place_listener(snapshot.cwd(process.id), process.exe.clone(), &self.home);
             let mut ports: BTreeMap<u16, BTreeSet<IpAddr>> = BTreeMap::new();
             for listener in listeners {
@@ -86,7 +102,7 @@ impl Scanner {
                     name: name.clone(),
                     exe: exe.clone(),
                     place: place.clone(),
-                    harness: None,
+                    harness,
                     kind: PortKind::Other,
                     container: None,
                 });
@@ -109,4 +125,32 @@ fn name_of(snapshot: &Snapshot, id: ProcId, exe: Option<&std::path::Path>) -> St
         .map(|name| name.to_string_lossy().into_owned())
         .or_else(|| snapshot.name(id).ok())
         .unwrap_or_else(|| "unknown".to_owned())
+}
+
+fn harness_for(
+    snapshot: &Snapshot,
+    id: ProcId,
+    exe: Option<&std::path::Path>,
+    memo: &HarnessMemo,
+    kept: &mut HarnessMemo,
+) -> Option<HarnessName> {
+    if exe
+        .and_then(|path| path.file_name())
+        .is_some_and(|name| name == DOCKER_BACKEND)
+    {
+        return None;
+    }
+    let found = match memo.get(&id) {
+        Some(found) => *found,
+        None => match started_by(snapshot, id) {
+            Ok(found) => found,
+            Err(_) => return None,
+        },
+    };
+    kept.insert(id, found);
+    found.map(|harness| match harness {
+        Harness::ClaudeCode => HarnessName::ClaudeCode,
+        Harness::Codex => HarnessName::Codex,
+        Harness::Grok => HarnessName::Grok,
+    })
 }

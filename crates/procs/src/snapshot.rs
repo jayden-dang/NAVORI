@@ -5,7 +5,7 @@ use std::fmt;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use navori_macos::{Listener, PlatformError, ProcessSource, ReadError, StartTime};
+use navori_macos::{Listener, Marker, PlatformError, ProcessSource, ReadError, StartTime};
 
 use crate::error::{Field, ProcsError, Unavailable};
 
@@ -162,6 +162,12 @@ impl Snapshot {
             return Err(Unavailable::Exited);
         }
         self.source.listeners(id.pid).map_err(unavailable_from)
+    }
+
+    /// Which of `names` this identity carries in its environment, read only after the live process
+    /// still matches it. The environment itself never leaves the reader.
+    pub fn env_marker(&self, id: ProcId, names: &[&str]) -> Field<Marker> {
+        self.read_verified(id, |source, pid| source.env_marker(pid, names))
     }
 
     /// Short kernel name of this identity, read only after the live process still matches it.

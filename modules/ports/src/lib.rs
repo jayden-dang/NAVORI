@@ -14,7 +14,7 @@ use navori_macos::{MacProcesses, PlatformError, ProcessSource};
 
 pub use action::PortsAction;
 pub use place::{place, place_listener};
-pub use scan::{BackendPort, Scan, Scanner};
+pub use scan::{BackendPort, HarnessMemo, Scan, Scanner};
 pub use state::*;
 
 /// Opens the process source, once, when the first scan needs it.
@@ -51,6 +51,7 @@ impl PortsEnv {
 pub struct Ports {
     env: PortsEnv,
     source: Option<Arc<dyn ProcessSource>>,
+    memo: HarnessMemo,
 }
 
 impl std::fmt::Debug for Ports {

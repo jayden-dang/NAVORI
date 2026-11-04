@@ -5,7 +5,7 @@ use navori_kernel::{ModuleCtx, Request, Wake};
 use navori_macos::ProcessSource;
 
 use crate::action::PortsAction;
-use crate::scan::Scanner;
+use crate::scan::{HarnessMemo, Scanner};
 use crate::state::{PortsState, group};
 use crate::{Ports, PortsEnv};
 
@@ -15,7 +15,11 @@ const SCAN_PROBLEM: &str = "A port scan stopped before it finished.";
 
 impl Ports {
     pub fn new(env: PortsEnv) -> Self {
-        Self { env, source: None }
+        Self {
+            env,
+            source: None,
+            memo: HarnessMemo::new(),
+        }
     }
 
     pub(crate) async fn run_loop(&mut self, ctx: &mut ModuleCtx<Self>) -> anyhow::Result<()> {
@@ -54,9 +58,14 @@ impl Ports {
         let outcome = match self.open() {
             Ok(source) => {
                 let scanner = Scanner::new(source, self.env.home.clone());
-                match tokio::task::spawn_blocking(move || scanner.scan()).await {
-                    Ok(Ok(scan)) => Ok(scan),
-                    Ok(Err(err)) => {
+                let memo = std::mem::take(&mut self.memo);
+                match tokio::task::spawn_blocking(move || scanner.scan(memo)).await {
+                    Ok((Ok(scan), memo)) => {
+                        self.memo = memo;
+                        Ok(scan)
+                    }
+                    Ok((Err(err), memo)) => {
+                        self.memo = memo;
                         tracing::warn!(error = %err, "a port scan could not read the process list");
                         Err(err.to_string())
                     }

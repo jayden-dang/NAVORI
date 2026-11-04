@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use navori_kernel::{DispatchError, Envelope, Kernel, WallClock};
 use navori_macos::fake::FakeProcesses;
-use navori_macos::{Listener, PlatformError, ProcEntry, ProcessSource, ReadError};
+use navori_macos::{Listener, Marker, PlatformError, ProcEntry, ProcessSource, ReadError};
 use navori_mod_ports::{Ports, PortsEnv};
 use navori_store::Store;
 use serde_json::Value;
@@ -49,6 +49,7 @@ pub fn canonical_temp_home() -> (tempfile::TempDir, PathBuf) {
 pub struct Gate {
     inner: Arc<dyn ProcessSource>,
     denied: AtomicBool,
+    env_denied: AtomicBool,
     panic_once: AtomicBool,
     hold: Mutex<()>,
 }
@@ -58,6 +59,7 @@ impl Gate {
         Self {
             inner,
             denied: AtomicBool::new(false),
+            env_denied: AtomicBool::new(false),
             panic_once: AtomicBool::new(false),
             hold: Mutex::new(()),
         }
@@ -65,6 +67,11 @@ impl Gate {
 
     pub fn deny(&self, denied: bool) {
         self.denied.store(denied, Ordering::SeqCst);
+    }
+
+    /// The next environment read is refused; the ones after it are not.
+    pub fn deny_env_once(&self) {
+        self.env_denied.store(true, Ordering::SeqCst);
     }
 
     pub fn panic_once(&self) {
@@ -116,6 +123,13 @@ impl ProcessSource for Gate {
 
     fn listeners(&self, pid: i32) -> Result<Vec<Listener>, ReadError> {
         self.inner.listeners(pid)
+    }
+
+    fn env_marker(&self, pid: i32, names: &[&str]) -> Result<Marker, ReadError> {
+        if self.env_denied.swap(false, Ordering::SeqCst) {
+            return Err(ReadError::Denied);
+        }
+        self.inner.env_marker(pid, names)
     }
 
     fn name(&self, pid: i32) -> Result<String, ReadError> {
