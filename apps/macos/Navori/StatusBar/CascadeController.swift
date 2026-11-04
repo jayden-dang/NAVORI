@@ -12,7 +12,7 @@ final class CascadeController {
 
     @ObservationIgnored private var state: CascadeState
     @ObservationIgnored private var hoverTimer: DispatchWorkItem?
-    @ObservationIgnored private var rowFrames: [String: CGRect] = [:]
+    @ObservationIgnored private var rowFrames = CascadeRowFrames()
     @ObservationIgnored private var panels: [Int: CascadePanel] = [:]
     @ObservationIgnored private var lastClickRow: String?
     @ObservationIgnored private var lastClickAt: CFTimeInterval = 0
@@ -61,7 +61,7 @@ final class CascadeController {
     }
 
     func setRowFrame(_ row: String, _ frameInPanel: CGRect) {
-        rowFrames[row] = screenFrame(fromSwiftUI: frameInPanel, row: row)
+        rowFrames.record(row, frameInPanel)
         if state.openPath.contains(row) {
             schedulePlace(row)
         }
@@ -210,7 +210,8 @@ final class CascadeController {
             }
         }
         let levelZero = panel?.frame ?? .zero
-        let rowFrame = rowFrames[row] ?? ancestors.last ?? levelZero
+        let rowFrame = window(containing: row).flatMap { rowFrames.screenFrame(of: row, in: $0.frame) }
+            ?? ancestors.last ?? levelZero
         let visible = panel?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
         return CascadePlacement.submenuFrame(
             levelZero: levelZero,
@@ -239,17 +240,6 @@ final class CascadeController {
               child.isVisible
         else { return nil }
         return child.frame
-    }
-
-    private func screenFrame(fromSwiftUI rect: CGRect, row: String) -> CGRect {
-        guard let owner = window(containing: row) else { return rect }
-        let windowRect = CGRect(
-            x: rect.origin.x,
-            y: owner.frame.height - rect.origin.y - rect.height,
-            width: rect.width,
-            height: rect.height
-        )
-        return owner.convertToScreen(windowRect)
     }
 
     private func window(containing row: String) -> NSWindow? {
