@@ -136,15 +136,21 @@ jobs:
         env:
           TAP_REPOSITORY: ${{ vars.TAP_REPOSITORY }}
           VERSION: ${{ steps.tag.outputs.version }}
+          PRERELEASE: ${{ steps.tag.outputs.prerelease }}
         run: |
           set -euo pipefail
+          if [ "$PRERELEASE" = "true" ]; then
+            cask=navori-rc
+          else
+            cask=navori
+          fi
           mkdir -p tap/Casks
-          cp dist/navori.rb tap/Casks/navori.rb
-          git -C tap add Casks/navori.rb
+          cp "dist/$cask.rb" "tap/Casks/$cask.rb"
+          git -C tap add "Casks/$cask.rb"
           if ! git -C tap diff --cached --quiet; then
             git -C tap -c user.name="github-actions[bot]" \
               -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-              commit -m "navori $VERSION"
+              commit -m "$cask $VERSION"
           else
             echo "The cask already names $VERSION; nothing to commit."
           fi
@@ -152,9 +158,9 @@ jobs:
           repo="${TAP_REPOSITORY##*/}"
           tap_name="$owner/${repo#homebrew-}"
           brew tap "$tap_name" "$PWD/tap"
-          brew trust --cask "$tap_name/navori"
-          brew style --cask "$tap_name/navori"
-          brew audit --cask "$tap_name/navori"
+          brew trust --cask "$tap_name/$cask"
+          brew style --cask "$tap_name/$cask"
+          brew audit --cask "$tap_name/$cask"
 
       - name: Publish the Release
         if: vars.PUBLISH_RELEASE == 'true'

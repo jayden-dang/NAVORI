@@ -23,8 +23,31 @@ pub(crate) fn is_prerelease(version: &str) -> bool {
     core.contains('-')
 }
 
-pub(crate) fn cask_text(version: &str, sha256: &str) -> String {
+/// The cask file a version publishes: release candidates have their own cask.
+pub(crate) fn cask_file(prerelease: bool) -> &'static str {
+    if prerelease {
+        "navori-rc.rb"
+    } else {
+        "navori.rb"
+    }
+}
+
+pub(crate) fn cask_text(version: &str, sha256: &str, prerelease: bool) -> String {
+    let (cask, desc_suffix, conflicts, caveat_extra) = if prerelease {
+        (
+            "navori-rc",
+            " (RC)",
+            "navori",
+            "    This is a release candidate. `brew install --cask navori` is the stable cask.\n    ",
+        )
+    } else {
+        ("navori", "", "navori-rc", "")
+    };
     include_str!("../assets/navori.rb.in")
+        .replace("    @CAVEAT_EXTRA@\n    ", caveat_extra)
+        .replace("@CASK@", cask)
+        .replace("@DESC_SUFFIX@", desc_suffix)
+        .replace("@CONFLICTS@", conflicts)
         .replace("@VERSION@", version)
         .replace("@SHA256@", sha256)
 }
@@ -162,8 +185,9 @@ pub(crate) fn run(root: &Path, tag: &str, out: Option<&Path>, check: bool) -> Re
         .split_whitespace()
         .next()
         .with_context(|| format!("{} is empty", sha_path.display()))?;
-    let cask = out.join("navori.rb");
-    std::fs::write(&cask, cask_text(version, hash))
+    let prerelease = is_prerelease(version);
+    let cask = out.join(cask_file(prerelease));
+    std::fs::write(&cask, cask_text(version, hash, prerelease))
         .with_context(|| format!("write {}", cask.display()))?;
     println!("{}", out.join(&zip_name).display());
     println!("{}", sha_path.display());
@@ -284,7 +308,7 @@ pub(crate) fn check_workflows(root: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        cask_text, designated_lines, identity_problem, is_prerelease, preflight,
+        cask_file, cask_text, designated_lines, identity_problem, is_prerelease, preflight,
         requirement_mismatch, tag_version, unpinned_actions,
     };
 
@@ -396,7 +420,72 @@ mod tests {
     }
 
     fn cask() -> String {
-        cask_text("0.1.0", &"a".repeat(64))
+        cask_text("0.1.0", &"a".repeat(64), false)
+    }
+
+    fn rc_cask() -> String {
+        cask_text("0.2.0-rc.1", &"b".repeat(64), true)
+    }
+
+    #[test]
+    fn the_final_cask_is_named_navori_and_conflicts_with_the_release_candidate_cask() {
+        let cask = cask();
+        assert!(cask.starts_with("cask \"navori\" do"), "{cask}");
+        assert!(
+            cask.contains("conflicts_with cask: \"navori-rc\""),
+            "{cask}"
+        );
+    }
+
+    #[test]
+    fn the_release_candidate_cask_is_named_navori_rc_and_conflicts_with_the_final_cask() {
+        let cask = rc_cask();
+        assert!(cask.starts_with("cask \"navori-rc\" do"), "{cask}");
+        assert!(cask.contains("conflicts_with cask: \"navori\"\n"), "{cask}");
+    }
+
+    #[test]
+    fn the_final_cask_never_mentions_release_candidates() {
+        let cask = cask();
+        assert!(!cask.contains("release candidate"), "{cask}");
+        assert_eq!(cask.matches("navori-rc").count(), 1, "{cask}");
+        assert!(
+            cask.contains("desc \"AI-first menubar cockpit for developers running coding agents\""),
+            "{cask}"
+        );
+    }
+
+    #[test]
+    fn the_release_candidate_cask_says_so_in_its_description_and_points_to_the_stable_cask() {
+        let cask = rc_cask();
+        assert!(cask.contains("running coding agents (RC)\""), "{cask}");
+        assert!(cask.contains("release candidate"), "{cask}");
+        assert!(cask.contains("brew install --cask navori"), "{cask}");
+        assert!(cask.contains("version \"0.2.0-rc.1\""), "{cask}");
+    }
+
+    #[test]
+    fn the_release_candidate_cask_keeps_everything_the_final_cask_installs() {
+        let cask = rc_cask();
+        for needle in [
+            "depends_on arch: :arm64",
+            "depends_on macos: :tahoe",
+            "app \"Navori.app\"",
+            "binary \"#{appdir}/Navori.app/Contents/Helpers/navori\"",
+            "postflight_steps do",
+            "zap trash:",
+            "self-signed and not notarized",
+            "Settings → Integrations",
+        ] {
+            assert!(cask.contains(needle), "{needle}: {cask}");
+        }
+        assert!(!cask.contains('@'), "{cask}");
+    }
+
+    #[test]
+    fn a_pre_release_cask_goes_to_navori_rc_rb_and_a_final_one_to_navori_rb() {
+        assert_eq!(cask_file(true), "navori-rc.rb");
+        assert_eq!(cask_file(false), "navori.rb");
     }
 
     #[test]

@@ -150,7 +150,8 @@ Run in order; `cut-release` executes exactly these and does not improvise.
    publishing if the audit fails. The Release is published and the cask pushed to the tap
    only when the repository variable `PUBLISH_RELEASE` is exactly `true`; otherwise the
    Release stays a draft and nothing is pushed. Pre-release tags
-   behave the same way. Build the artifacts by hand with
+   behave the same way, but their cask is `navori-rc` (`brew install --cask navori-rc`);
+   final tags use `navori`. Build the artifacts by hand with
    `cargo xtask release --tag v<version> --out <dir>` (`--check` only validates the tag).
 5. Clean-account checks (RELEASE-6.3), once the Release is published and the cask updated.
    Use a macOS 26 user account that has never run Navori:
