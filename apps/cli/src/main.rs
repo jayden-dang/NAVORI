@@ -262,7 +262,10 @@ async fn run(cli: Cli) -> Result<(), Failure> {
             println!("{v}");
         }
         Command::Ask { model, prompt } => {
-            println!("{}", ask::run(&mut client, &model, &prompt).await?);
+            println!(
+                "{}",
+                ask::printable(&ask::run(&mut client, &model, &prompt).await?)
+            );
         }
         Command::Awake { command } => match command {
             AwakeCommand::Hold { duration } => {

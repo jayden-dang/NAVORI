@@ -1262,6 +1262,53 @@ fn ask_prints_the_reply_and_exits_zero() {
         .stdout("hello back\n");
 }
 
+fn ask_stdout_for(reply: &'static str) -> Vec<u8> {
+    let (r, _vault) = running_ai_core(reply, Duration::ZERO);
+    navori(&r.home)
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(0)
+        .get_output()
+        .stdout
+        .clone()
+}
+
+#[test]
+fn ask_drops_an_osc_clipboard_write_ended_by_bel() {
+    let out = ask_stdout_for("before\x1b]52;c;aGk=\x07after");
+    assert_eq!(out, b"beforeafter\n");
+}
+
+#[test]
+fn ask_drops_a_csi_colour_sequence() {
+    let out = ask_stdout_for("a\x1b[31mred\x1b[0m b");
+    assert_eq!(out, b"ared b\n");
+}
+
+#[test]
+fn ask_drops_an_osc_ended_by_escape_backslash() {
+    let out = ask_stdout_for("x\x1b]0;title\x1b\\y");
+    assert_eq!(out, b"xy\n");
+}
+
+#[test]
+fn ask_drops_an_unterminated_osc_to_the_end() {
+    let out = ask_stdout_for("keep\x1b]52;c;aGk= and the rest");
+    assert_eq!(out, b"keep\n");
+}
+
+#[test]
+fn ask_drops_control_characters_but_keeps_layout_and_text() {
+    let out = ask_stdout_for("a\r\0b\x7fc\u{9b}d\u{85}\n\tXin chào, bạn khỏe không?");
+    assert_eq!(out, "abcd\n\tXin chào, bạn khỏe không?\n".as_bytes());
+}
+
+#[test]
+fn ask_prints_a_plain_reply_unchanged() {
+    let out = ask_stdout_for("line one\n\tline two");
+    assert_eq!(out, b"line one\n\tline two\n");
+}
+
 #[test]
 fn ask_without_model_is_a_usage_error() {
     let r = running_core();

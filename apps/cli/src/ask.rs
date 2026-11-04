@@ -51,6 +51,42 @@ pub fn check_size(model: &str, prompt: &str) -> Result<(), Failure> {
     Ok(())
 }
 
+/// A model's reply is untrusted, so the terminal only gets layout and printable text.
+pub fn printable(reply: &str) -> String {
+    let mut out = String::with_capacity(reply.len());
+    let mut chars = reply.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\x1b' => match chars.peek() {
+                Some('[') => {
+                    chars.next();
+                    for c in chars.by_ref() {
+                        if ('\x40'..='\x7e').contains(&c) {
+                            break;
+                        }
+                    }
+                }
+                Some(']') => {
+                    chars.next();
+                    while let Some(c) = chars.next() {
+                        if c == '\x07' || (c == '\x1b' && chars.next_if_eq(&'\\').is_some()) {
+                            break;
+                        }
+                    }
+                }
+                Some('\x1b') | None => {}
+                Some(_) => {
+                    chars.next();
+                }
+            },
+            '\n' | '\t' => out.push(c),
+            c if c.is_control() => {}
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 pub async fn run(client: &mut Client, model: &str, prompt: &str) -> Result<String, Failure> {
     let params = params(model, prompt)?;
     let wait = wait_limit();
