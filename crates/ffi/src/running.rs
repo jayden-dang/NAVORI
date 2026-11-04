@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -146,7 +145,7 @@ pub fn build(
             project_of(key, draft, known)
         })
         .collect();
-    projects.sort_by(project_order);
+    projects.sort_by_cached_key(project_key);
 
     let mut stop_all = Vec::new();
     let mut stop_all_ports = 0;
@@ -221,7 +220,7 @@ fn project_of(key: Key, mut draft: Draft<'_>, known: bool) -> RunningProject {
 
     draft
         .sessions
-        .sort_by_key(|(lease, _)| (lease.stopped, shown(lease), lease.pid));
+        .sort_by_cached_key(|(lease, _)| (lease.stopped, shown(lease), lease.pid));
     let sessions = draft
         .sessions
         .iter()
@@ -298,13 +297,13 @@ fn shown(lease: &LeaseView) -> String {
         .to_lowercase()
 }
 
-fn project_order(a: &RunningProject, b: &RunningProject) -> Ordering {
-    let working = |project: &RunningProject| project.state == ProjectState::Working;
-    a.is_other
-        .cmp(&b.is_other)
-        .then_with(|| working(a).cmp(&working(b)))
-        .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
-        .then_with(|| a.name.cmp(&b.name))
+fn project_key(project: &RunningProject) -> (bool, bool, String, String) {
+    (
+        project.is_other,
+        project.state == ProjectState::Working,
+        project.name.to_lowercase(),
+        project.name.clone(),
+    )
 }
 
 /// The project a label joins and the branch after it, when both sides are non-empty.
