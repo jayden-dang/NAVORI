@@ -109,6 +109,14 @@ struct StopFlowTests {
         #expect(flow == .idle)
     }
 
+    @Test func a_reply_with_no_results_ends_in_a_visible_failure() {
+        var flow = StopFlow.idle
+        flow.press(count: 2)
+        _ = flow.confirm()
+        flow.finish([])
+        #expect(flow == .failed(["Navori got no answer to the stop."]))
+    }
+
     @Test func finishing_when_not_running_changes_nothing() {
         var flow = StopFlow.idle
         flow.finish([result(.stale)])

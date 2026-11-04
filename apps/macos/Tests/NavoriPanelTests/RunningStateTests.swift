@@ -88,6 +88,47 @@ struct RunningRowStateTests {
 
 @Suite
 struct RunningSubmenuStateTests {
+    @Test func a_project_with_only_ended_sessions_and_no_ports_reads_as_nothing_running() {
+        let view = running([project("quiet", state: .idle, sessions: [ended])])
+        let row = RunningRowState(running: view)
+        let state = RunningSubmenuState(running: view)
+        #expect(row.dot == nil)
+        #expect(state.nothingRunning)
+        #expect(state.rows.isEmpty)
+        #expect(state.items.contains(.nothingRunning))
+    }
+
+    @Test func a_live_session_makes_the_dot_and_the_rows_show() {
+        let view = running([project("klynt", state: .working, sessions: [live])])
+        let state = RunningSubmenuState(running: view)
+        #expect(RunningRowState(running: view).dot == .green)
+        #expect(state.nothingRunning == false)
+        #expect(state.rows.count == 1)
+        #expect(state.items.contains(.nothingRunning) == false)
+    }
+
+    @Test func a_listed_port_with_no_session_makes_the_dot_and_the_rows_show() {
+        let view = running([project("api", state: .idle, ports: [port(3000)])])
+        #expect(RunningRowState(running: view).dot == .green)
+        #expect(RunningSubmenuState(running: view).nothingRunning == false)
+    }
+
+    @Test func an_empty_view_reads_as_nothing_running_in_both_places() {
+        let view = running([])
+        #expect(RunningRowState(running: view).dot == nil)
+        #expect(RunningSubmenuState(running: view).nothingRunning)
+    }
+
+    @Test func the_stop_control_is_spoken_with_its_port_count() {
+        let state = RunningSubmenuState(running: running([
+            project("a", state: .idle, ports: [port(1), port(2)], stoppable: 2, rowStop: "ra", childStop: "ra"),
+            project("b", state: .idle, ports: [port(3)], stoppable: 1, rowStop: "rb", childStop: "rb"),
+        ]))
+        #expect(state.rows[0].stop?.spoken == "Stop 2 ports")
+        #expect(state.rows[1].stop?.spoken == "Stop 1 port")
+        #expect(state.rows[0].childStop?.spoken == "Stop 2 ports")
+    }
+
     @Test func a_working_project_has_a_filled_dot_and_an_idle_one_a_ring() {
         let state = RunningSubmenuState(running: running([
             project("klynt", state: .working, sessions: [live], ports: [port(3000)]),

@@ -95,6 +95,10 @@ public enum StopFlow: Equatable, Sendable {
 
     public mutating func finish(_ results: [StopResult]) {
         guard self == .running else { return }
+        guard results.isEmpty == false else {
+            self = .failed(["Navori got no answer to the stop."])
+            return
+        }
         let reasons = results.filter { $0.result.clearsRow == false }.map { result in
             result.reason.flatMap { $0.isEmpty ? nil : $0 } ?? result.result.fallbackReason
         }

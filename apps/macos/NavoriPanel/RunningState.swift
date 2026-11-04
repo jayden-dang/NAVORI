@@ -118,6 +118,8 @@ public struct StopOffer: Equatable, Sendable {
         self.request = request
     }
 
+    public var spoken: String { "Stop \(count) \(count == 1 ? "port" : "ports")" }
+
     init?(count: Int, request: String?) {
         guard let request, request.isEmpty == false else { return nil }
         self.init(count: count, request: request)
@@ -191,8 +193,8 @@ public struct RunningSubmenuState: Equatable, Sendable {
 
     /// `problem` is the Awake problem text, shown only when the Core gives no reason of its own.
     public init(running: RunningInput, problem: String? = nil) {
-        rows = running.projects.map(ProjectRowState.init)
-        nothingRunning = running.projects.isEmpty
+        nothingRunning = running.isActive == false
+        rows = nothingRunning ? [] : running.projects.map(ProjectRowState.init)
         note = [running.unknownReason, problem].lazy.compactMap { $0 }.first { $0.isEmpty == false }
         stopAll = running.stopAll.isEmpty ? nil : StopAllOffer(
             requests: running.stopAll,
