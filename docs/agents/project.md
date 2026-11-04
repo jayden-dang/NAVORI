@@ -136,17 +136,42 @@ None — not deployed
 
 Run in order; `cut-release` executes exactly these and does not improvise.
 
-1. `cargo xtask ci` — the full gate.
-2. `cargo xtask perf` — the GOAL-11 budget on release code packaged as the dev identity
-   (`docs/standards/performance.md`). `--record` is not part of a release.
-3. `cargo xtask install` — builds the release bundle, signs it with `Navori Local Signing`,
+1. `cargo xtask release-check` — the local gate: tag free, tree clean, `cargo xtask ci`,
+   `cargo xtask perf` (GOAL-11 budget; `--record` is not part of a release). On success it
+   prints the tag to push. `<version>` is `[workspace.package] version` in `Cargo.toml`.
+2. `cargo xtask install` — builds the release bundle, signs it with `Navori Local Signing`,
    runs `codesign --verify --strict --deep`, installs to `/Applications/Navori.app`
    (the previous install is kept as `/Applications/Navori.app.previous`) and launches it.
-4. Smoke: `/Applications/Navori.app/Contents/Helpers/navori doctor` — every check ✓, exit 0.
-5. Tag: `git tag v<version> && git push origin v<version>` — `<version>` is
-   `[workspace.package] version` in `Cargo.toml`.
+3. Smoke: `/Applications/Navori.app/Contents/Helpers/navori doctor` — every check ✓, exit 0.
+4. Tag: `git tag v<version> && git push origin v<version>` — pushing a `v*` tag runs
+   `.github/workflows/release.yml`, which builds and signs the zip, publishes a GitHub
+   Release (a draft while `TAP_REPOSITORY` is unset) and, once the tap is configured,
+   updates the cask. Build the artifacts by hand with
+   `cargo xtask release --tag v<version> --out <dir>` (`--check` only validates the tag).
 
-No notarization or public distribution yet (no Apple Developer ID).
+No notarization (no Apple Developer ID): the app is self-signed and the cask clears the
+quarantine flag.
+
+## Release setup (one time)
+
+Do this once, before the first tag. Create nothing here from an agent session and commit
+nothing secret.
+
+1. Export the `Navori Local Signing` identity with its private key as a `.p12` (Keychain
+   Access, or `security export -t identities -f pkcs12 -o navori.p12`). Keep an OFFLINE copy
+   (encrypted drive): losing the key means a new identity and a new designated requirement
+   for every user.
+2. Create the GitHub Environment `release`, restricted to tags matching `v*`, with secrets
+   `SIGNING_P12` (`base64 < navori.p12`), `SIGNING_P12_PASSWORD` and `TAP_TOKEN`.
+3. Add a repository ruleset so only the owner can create `v*` tags.
+4. Create the tap repository (`jayden-dang/homebrew-navori`) and a fine-grained token with
+   `contents: write` on that tap ONLY. Store it as `TAP_TOKEN`; it must be non-empty before
+   `TAP_REPOSITORY` is set.
+5. Leave the repository variable `TAP_REPOSITORY` UNSET until the first public release. While
+   it is unset, tags produce draft Releases only and the tap is not touched. To go public,
+   set it to `jayden-dang/homebrew-navori`.
+6. Right before the first FINAL tag (not a pre-release), add `- **Compat obligation:**
+   External` to Project posture above; `cargo xtask release-check` enforces it.
 
 ## Paths
 
