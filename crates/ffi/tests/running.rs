@@ -269,6 +269,25 @@ fn awake_module_down() {
 }
 
 #[test]
+fn both_awake_and_ports_down_gives_no_running_view() {
+    let mut down = awake(vec![]);
+    down.problem = Some("The Awake module stopped.".into());
+    assert_eq!(build(Some(&down), None, own()), None);
+    assert_eq!(build(None, None, own()), None);
+}
+
+#[test]
+fn awake_down_with_ports_up_and_ports_down_with_awake_up_still_give_a_view() {
+    let mut down = awake(vec![]);
+    down.problem = Some("The Awake module stopped.".into());
+    assert!(build(Some(&down), Some(&dev_servers()), own()).is_some());
+    assert!(build(Some(&awake(vec![])), None, own()).is_some());
+    let mut broken = awake(vec![]);
+    broken.problem = Some("Awake cannot reach the power service.".into());
+    assert!(build(Some(&broken), None, own()).is_some());
+}
+
+#[test]
 fn tracking_agents_off() {
     let mut untracked = awake(vec![]);
     untracked.tracking = false;

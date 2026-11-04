@@ -76,6 +76,8 @@ pub struct Own {
     pub helper: Option<PathBuf>,
 }
 
+/// What the Awake view says while its Module is not running.
+pub(crate) const AWAKE_STOPPED: &str = "The Awake module stopped.";
 const OTHER: &str = "Other";
 const AWAKE_UNREADABLE: &str = "Awake cannot be read, so Stop is off.";
 const TRACKING_OFF: &str = "Tracking agents is off, so Stop is off.";
@@ -98,7 +100,8 @@ pub fn build(
     ports: Option<&PortsState>,
     own: Own,
 ) -> Option<RunningView> {
-    if awake.is_none() && ports.is_none() {
+    let awake_down = awake.is_none_or(|awake| awake.problem.as_deref() == Some(AWAKE_STOPPED));
+    if awake_down && ports.is_none() {
         return None;
     }
     let unknown_reason = unknown_reason(awake);

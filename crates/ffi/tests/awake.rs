@@ -4,7 +4,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use navori_ffi::{awake_check, awake_view};
+use navori_ffi::running::Own;
+use navori_ffi::{awake_check, awake_view, running_view};
 use navori_kernel::{DispatchError, Envelope, Kernel, ModuleState, RestartPolicy};
 use navori_macos::fake::{FakeExitsHandle, FakePower, FakeProcesses};
 use navori_macos::{PowerAssertions, ProcessSource};
@@ -188,4 +189,23 @@ async fn the_awake_row_fails_when_the_module_failed() {
     assert_ne!(row.detail, "1 Lease");
     assert_ne!(row.detail, "Awake's state could not be read.");
     kernel.shutdown().await;
+}
+
+#[tokio::test]
+async fn no_running_view_is_built_once_awake_has_stopped_and_ports_is_not_registered() {
+    let power = Arc::new(FakePower::new());
+    let kernel = kernel_with(power);
+    let own = || Own {
+        pid: 1,
+        helper: None,
+    };
+    let awake = awake_view(&kernel);
+    assert!(running_view(&kernel, awake.as_ref(), own()).is_some());
+    kernel.shutdown().await;
+    let awake = awake_view(&kernel);
+    assert_eq!(
+        awake.as_ref().and_then(|view| view.problem.as_deref()),
+        Some(STOPPED)
+    );
+    assert_eq!(running_view(&kernel, awake.as_ref(), own()), None);
 }
