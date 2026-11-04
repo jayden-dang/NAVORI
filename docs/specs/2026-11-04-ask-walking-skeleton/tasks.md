@@ -82,10 +82,10 @@ Retrieval: `blast_radius` on the mapped paths and `cluster(ASK)` ran as in /User
 
 **Depends-on:** none
 
-- [ ] **Step 1: Failing check** — add the two members to `Cargo.toml` with empty crates absent; run `cargo check --workspace` — expect: manifest not found for `ai/llm`.
-- [ ] **Step 2: Implement** — create both crates (`[package]` from the workspace, `[lints] workspace = true`, empty `lib.rs` with a one-line doc comment), `navori-context` depending on `navori-redact`, `navori-secrets`, `tokio`, `futures`, `thiserror`, `tracing`; `navori-llm` depending on `navori-secrets`, `reqwest`, `serde`, `serde_json`, `futures`, `tokio`, `thiserror`. Run `cargo check --workspace && cargo xtask check-deps` — expect: pass.
-- [ ] **Step 3: Verify the lockfile** — `git diff --stat Cargo.lock` shows added packages only; no existing version moves (SECRETS-10.2 guard). Run `cargo update` is forbidden.
-- [ ] **Step 4: Commit** — `git commit -m "build(ai): add navori-llm and navori-context crate shells and reqwest"`.
+- [x] **Step 1: Failing check** — add the two members to `Cargo.toml` with empty crates absent; run `cargo check --workspace` — expect: manifest not found for `ai/llm`.
+- [x] **Step 2: Implement** — create both crates (`[package]` from the workspace, `[lints] workspace = true`, empty `lib.rs` with a one-line doc comment), `navori-context` depending on `navori-redact`, `navori-secrets`, `tokio`, `futures`, `thiserror`, `tracing`; `navori-llm` depending on `navori-secrets`, `reqwest`, `serde`, `serde_json`, `futures`, `tokio`, `thiserror`. Run `cargo check --workspace && cargo xtask check-deps` — expect: pass.
+- [x] **Step 3: Verify the lockfile** — `git diff --stat Cargo.lock` shows added packages only; no existing version moves (SECRETS-10.2 guard). Run `cargo update` is forbidden.
+- [x] **Step 4: Commit** — `git commit -m "build(ai): add navori-llm and navori-context crate shells and reqwest"`.
 
 _Requirements: ASK-9.6, ASK-9.7_
 
