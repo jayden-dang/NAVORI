@@ -35,6 +35,7 @@ pub struct Inner {
     pub integrations: IntegrationsEnv,
     /// Set once, right after the single-instance check passes.
     pub last_unclean_exit: std::sync::OnceLock<Option<String>>,
+    pub ai: crate::ai::AiRuntime,
 }
 
 impl Inner {

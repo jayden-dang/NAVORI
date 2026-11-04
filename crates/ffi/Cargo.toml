@@ -23,12 +23,15 @@ bindgen = ["uniffi/cli"]
 anyhow.workspace = true
 futures.workspace = true
 navori-config.workspace = true
+navori-context.workspace = true
 navori-ipc.workspace = true
 navori-kernel.workspace = true
+navori-llm.workspace = true
 navori-mod-awake.workspace = true
 navori-mod-integrations.workspace = true
 navori-protocol.workspace = true
 navori-redact.workspace = true
+navori-secrets.workspace = true
 navori-store.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -42,6 +45,7 @@ uniffi.workspace = true
 
 [dev-dependencies]
 navori-macos = { workspace = true, features = ["fake"] }
+navori-secrets = { workspace = true, features = ["fake"] }
 tempfile.workspace = true
 
 # UniFFI generates `#[unsafe(no_mangle)] extern "C"` scaffolding, so this crate cannot

@@ -7,10 +7,12 @@
 //!   actor before touching UI state.
 //! - `shutdown()` blocks (bounded, ≈ 5 s worst case); call it from `applicationWillTerminate`.
 
+mod ai;
 mod app;
 mod logging;
 mod session;
 
+use std::future::Future;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
@@ -25,8 +27,10 @@ use navori_store::Store;
 use tokio::runtime::Runtime;
 use tokio_util::sync::CancellationToken;
 
+use crate::ai::AiRuntime;
 use crate::app::{Inner, IpcBridge};
 
+pub use ai::{AiDeps, service_for};
 pub use app::{awake_check, awake_view, config_notice};
 
 uniffi::setup_scaffolding!();
@@ -189,6 +193,8 @@ pub enum CoreError {
     Dispatch { message: String },
     #[error("core is shut down")]
     ShutDown,
+    #[error("{message}")]
+    Secrets { message: String },
 }
 
 /// Implemented by Swift (`CoreStore`). Called on a core worker thread.
@@ -226,13 +232,25 @@ fn startup(context: &str, e: impl std::fmt::Display) -> CoreError {
     }
 }
 
-#[uniffi::export]
 impl NavoriCore {
-    /// Boots the core: config → logging → store → kernel → IPC → session marker → pump.
-    #[uniffi::constructor]
-    pub fn start(
+    /// Runs `work` on the core runtime. A UniFFI `async fn` is polled on Swift's executor, where
+    /// tokio's blocking pool has no runtime, so the work hops over a oneshot like `dispatch`.
+    async fn on_runtime<T: Send + 'static>(
+        &self,
+        work: impl Future<Output = Result<T, CoreError>> + Send + 'static,
+    ) -> Result<T, CoreError> {
+        let (tx, rx) = futures::channel::oneshot::channel();
+        self.handle.spawn(async move {
+            let _ = tx.send(work.await);
+        });
+        rx.await.map_err(|_| CoreError::ShutDown)?
+    }
+
+    /// [`NavoriCore::start`] with the AI factories given, so tests can inject fakes.
+    pub fn start_with(
         config: CoreConfig,
         listener: Arc<dyn SnapshotListener>,
+        deps: AiDeps,
     ) -> Result<Arc<Self>, CoreError> {
         let profile = Profile::parse(&config.profile)
             .ok_or_else(|| startup("profile", format!("unknown profile {:?}", config.profile)))?;
@@ -294,6 +312,7 @@ impl NavoriCore {
             config_notice,
             integrations,
             last_unclean_exit: OnceLock::new(),
+            ai: AiRuntime::new(profile, deps),
         });
         let server = match handle.block_on(Server::bind(
             &paths.socket,
@@ -339,6 +358,18 @@ impl NavoriCore {
             })),
             shut_down: AtomicBool::new(false),
         }))
+    }
+}
+
+#[uniffi::export]
+impl NavoriCore {
+    /// Boots the core: config → logging → store → kernel → IPC → session marker → pump.
+    #[uniffi::constructor]
+    pub fn start(
+        config: CoreConfig,
+        listener: Arc<dyn SnapshotListener>,
+    ) -> Result<Arc<Self>, CoreError> {
+        Self::start_with(config, listener, AiDeps::production())
     }
 
     /// Current snapshot (also pushed to the listener on every change).
@@ -393,6 +424,26 @@ impl NavoriCore {
         serde_json::to_string(&value).map_err(|e| CoreError::InvalidJson {
             message: e.to_string(),
         })
+    }
+
+    /// Stores the pasted provider key in the Keychain, replacing any earlier one.
+    pub async fn save_provider_key(&self, key: String) -> Result<(), CoreError> {
+        if self.shut_down.load(Ordering::SeqCst) {
+            return Err(CoreError::ShutDown);
+        }
+        let inner = self.inner.clone();
+        self.on_runtime(async move { inner.ai.save_key(key).await })
+            .await
+    }
+
+    /// Deletes the provider key. `true` when one was stored, `false` when none was.
+    pub async fn remove_provider_key(&self) -> Result<bool, CoreError> {
+        if self.shut_down.load(Ordering::SeqCst) {
+            return Err(CoreError::ShutDown);
+        }
+        let inner = self.inner.clone();
+        self.on_runtime(async move { inner.ai.remove_key().await })
+            .await
     }
 
     /// Faster snapshot pushes while the menubar panel is open.
