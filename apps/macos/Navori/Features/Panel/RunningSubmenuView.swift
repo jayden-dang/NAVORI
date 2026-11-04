@@ -62,6 +62,10 @@ struct RunningSubmenuView: View {
             )
         case let .note(text):
             note(text)
+        case .problem:
+            if let problem = awake.problem {
+                AwakeProblemView(problem: problem)
+            }
         case .separator:
             RunningSeparator()
         case .nothingRunning:
@@ -78,20 +82,15 @@ struct RunningSubmenuView: View {
         }
     }
 
-    @ViewBuilder
     private func note(_ text: String) -> some View {
-        if store.running?.unknownReason == text {
-            Text(text)
-                .font(.system(size: 12))
-                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel(text)
-        } else if let problem = store.awakeSubmenu.problem {
-            AwakeProblemView(problem: problem)
-        }
+        Text(text)
+            .font(.system(size: 12))
+            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel(text)
     }
 }
 

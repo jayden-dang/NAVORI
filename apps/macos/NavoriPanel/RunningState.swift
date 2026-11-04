@@ -180,6 +180,7 @@ public enum RunningSubmenuItem: Equatable, Sendable {
     case keepAwake
     case trackingAgents
     case note(String)
+    case problem(String)
     case separator
     case nothingRunning
     case project(ProjectRowState)
@@ -192,12 +193,15 @@ public struct RunningSubmenuState: Equatable, Sendable {
     public let nothingRunning: Bool
     /// The one line in the problem line's place: why Stop is off, else the Awake problem.
     public let note: String?
+    private let noteIsProblem: Bool
 
     /// `problem` is the Awake problem text, shown only when the Core gives no reason of its own.
     public init(running: RunningInput, problem: String? = nil) {
         nothingRunning = running.isActive == false
         rows = nothingRunning ? [] : running.projects.map(ProjectRowState.init)
-        note = [running.unknownReason, problem].lazy.compactMap { $0 }.first { $0.isEmpty == false }
+        let reason = running.unknownReason.flatMap { $0.isEmpty ? nil : $0 }
+        noteIsProblem = reason == nil
+        note = reason ?? problem.flatMap { $0.isEmpty ? nil : $0 }
         stopAll = running.stopAll.isEmpty ? nil : StopAllOffer(
             requests: running.stopAll,
             ports: running.stopAllPorts,
@@ -210,7 +214,7 @@ public struct RunningSubmenuState: Equatable, Sendable {
 
     public var items: [RunningSubmenuItem] {
         var items: [RunningSubmenuItem] = [.keepAwake, .trackingAgents]
-        if let note { items.append(.note(note)) }
+        if let note { items.append(noteIsProblem ? .problem(note) : .note(note)) }
         items.append(.separator)
         items += nothingRunning ? [.nothingRunning] : rows.map(RunningSubmenuItem.project)
         if let stopAll { items += [.separator, .stopAll(stopAll)] }

@@ -243,7 +243,24 @@ struct RunningSubmenuStateTests {
             running: running([project("klynt", state: .working, sessions: [live])]),
             problem: "Awake could not read its leases."
         )
-        #expect(state.items.contains(.note("Awake could not read its leases.")))
+        #expect(state.items.contains(.problem("Awake could not read its leases.")))
+    }
+
+    @Test func the_same_text_from_each_source_keeps_its_own_kind_of_line() {
+        let text = "Tracking agents is off, so Stop is off."
+        let fromCore = RunningSubmenuState(
+            running: running([project("klynt", state: .unknown, ports: [port(1)])], unknownReason: text),
+            problem: text
+        )
+        #expect(fromCore.items.contains(.note(text)))
+        #expect(fromCore.items.contains(.problem(text)) == false)
+
+        let fromAwake = RunningSubmenuState(
+            running: running([project("klynt", state: .working, sessions: [live])]),
+            problem: text
+        )
+        #expect(fromAwake.items.contains(.problem(text)))
+        #expect(fromAwake.items.contains(.note(text)) == false)
     }
 
     @Test func stop_all_is_absent_when_no_named_project_is_idle() {
