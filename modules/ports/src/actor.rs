@@ -197,11 +197,7 @@ fn open_url(
     address: Option<IpAddr>,
 ) -> Result<serde_json::Value, ActionError> {
     let mut bound: Vec<IpAddr> = state
-        .groups
-        .iter()
-        .flat_map(|project| &project.worktrees)
-        .flat_map(|worktree| &worktree.processes)
-        .flat_map(|process| &process.entries)
+        .entries()
         .filter(|entry| entry.port == port)
         .flat_map(|entry| entry.addresses.iter().copied())
         .collect();

@@ -110,6 +110,17 @@ pub struct PortsState {
     pub problem: Option<String>,
 }
 
+impl PortsState {
+    /// Every entry of every process, in group order.
+    pub fn entries(&self) -> impl Iterator<Item = &PortEntry> {
+        self.groups
+            .iter()
+            .flat_map(|project| &project.worktrees)
+            .flat_map(|worktree| &worktree.processes)
+            .flat_map(|process| &process.entries)
+    }
+}
+
 /// Groups entries by project, then worktree, then process, in a total order.
 pub fn group(mut entries: Vec<PortEntry>) -> Vec<ProjectGroup> {
     entries.sort_by(|a, b| {

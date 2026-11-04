@@ -405,13 +405,7 @@ pub fn ports_check(down: bool, state: Option<&PortsState>) -> Check {
     if state.scanned_at_ms.is_none() {
         return check("ports", true, "not scanned yet".to_owned());
     }
-    let count: usize = state
-        .groups
-        .iter()
-        .flat_map(|project| &project.worktrees)
-        .flat_map(|worktree| &worktree.processes)
-        .map(|process| process.entries.len())
-        .sum();
+    let count = state.entries().count();
     let noun = if count == 1 { "port" } else { "ports" };
     check("ports", true, format!("{count} {noun}"))
 }
