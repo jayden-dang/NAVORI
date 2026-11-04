@@ -25,7 +25,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 
 ## Focus
 
-**Now:** ROAD-36, ROAD-13, MILE-2
+**Now:** ROAD-36, ROAD-17, ROAD-18, ROAD-13, MILE-2
 **Next:** ROAD-11, ROAD-12, ROAD-19, ROAD-20, ROAD-21, ROAD-14, ROAD-37, ROAD-38, ROAD-15, ROAD-16
 
 | ID | Milestone | Outcome | Depends-on | Commitment |
@@ -100,7 +100,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Goals:** GOAL-3
 **Members:**
 - **ROAD-17** port-discovery — After: none — Surfaces: `modules/ports/`, `crates/procs/`, `crates/macos/`
-- **ROAD-18** ports-panel-and-stop — After: ROAD-17 — Surfaces: `modules/ports/`, `apps/macos/Navori/Features/`
+- **ROAD-18** ports-panel-and-stop — After: ROAD-17 — Surfaces: `modules/ports/`, `apps/macos/Navori/Features/`, `apps/macos/NavoriPanel/`
 **Depends-on:** MILE-3
 **Commitment:** Planned
 **Closed:** None
