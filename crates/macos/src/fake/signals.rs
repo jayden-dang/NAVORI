@@ -117,6 +117,9 @@ impl Signals for FakeSignals {
                 .map(|(pid, _)| *pid)
                 .collect(),
         };
+        if reached.is_empty() && matches!(to, SignalTarget::Group(_)) {
+            return Err(SignalError::Gone);
+        }
         if reached.iter().any(|pid| state.denied.contains(pid)) {
             return Err(SignalError::Denied);
         }

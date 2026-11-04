@@ -248,7 +248,7 @@ async fn a_zombie_after_term_counts_as_gone() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn a_pid_replaced_just_before_the_kill_check_gets_no_kill() {
+async fn a_pid_replaced_as_term_is_delivered_gets_no_kill() {
     let world = world();
     listener(&world, 200, 150);
     world.signals.ignore_term(200);
@@ -410,19 +410,19 @@ fn a_leader_in_navoris_own_group_or_an_ancestors_group_is_signalled_alone() {
         "an ancestor's group"
     );
 
-    let init = world();
-    init.processes.add(FakeProcess::new(
-        1000,
+    let low = world();
+    low.processes.add(FakeProcess::new(
+        0,
         1,
         USER,
         START_US,
         "/usr/local/bin/node",
     ));
-    init.signals.set_group(1000, 1);
+    low.signals.set_group(0, 0);
     assert_eq!(
-        reach(&init, vec![dev(1000, 3000)], 1000, &[(1000, START_US)]),
+        reach(&low, vec![dev(0, 3000)], 0, &[(0, START_US)]),
         Reach::Alone,
-        "group one"
+        "a leader whose group id is not above one"
     );
 }
 
@@ -467,5 +467,186 @@ fn a_non_leader_is_signalled_alone() {
     assert_eq!(
         reach(&world, vec![dev(200, 3000)], 200, &[(200, START_US)]),
         Reach::Alone
+    );
+}
+
+fn group_leader(world: &World) {
+    listener(world, 200, 200);
+    world.signals.obeys(200, &world.processes);
+}
+
+fn group_plan() -> ProcessPlan {
+    plan(200, Reach::Group(vec![(200, START_US)]))
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_group_whose_leader_ignores_term_gets_kill_as_a_group() {
+    let world = world();
+    group_leader(&world);
+    world.signals.ignore_term(200);
+
+    let got = stop_process(
+        group_plan(),
+        world.processes.as_ref(),
+        world.signals.as_ref(),
+    )
+    .await;
+
+    assert_eq!(got, (Outcome::Stopped, None));
+    assert_eq!(
+        world.signals.sent(),
+        vec![
+            (SignalTarget::Group(200), Signal::Term),
+            (SignalTarget::Group(200), Signal::Kill),
+        ]
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_group_that_is_gone_at_term_is_already_gone() {
+    let world = world();
+    world.processes.add(FakeProcess::new(
+        200,
+        1,
+        USER,
+        START_US,
+        "/usr/local/bin/node",
+    ));
+
+    let got = stop_process(
+        group_plan(),
+        world.processes.as_ref(),
+        world.signals.as_ref(),
+    )
+    .await;
+
+    assert_eq!(got, (Outcome::AlreadyGone, None));
+    assert!(world.signals.sent().is_empty());
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_group_signal_denied_at_term_fails_with_a_fixed_sentence() {
+    let world = world();
+    group_leader(&world);
+    world.signals.deny(200);
+
+    let got = stop_process(
+        group_plan(),
+        world.processes.as_ref(),
+        world.signals.as_ref(),
+    )
+    .await;
+
+    assert_eq!(got, (Outcome::Failed, Some("The signal was refused")));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_group_signal_denied_at_kill_fails_with_a_fixed_sentence() {
+    let world = world();
+    group_leader(&world);
+    world.signals.ignore_term(200);
+    let sends = Arc::new(Mutex::new(0));
+    let signals = Arc::clone(&world.signals);
+    world.signals.before_send(Box::new(move || {
+        let mut count = sends.lock().unwrap();
+        *count += 1;
+        if *count == 2 {
+            signals.deny(200);
+        }
+    }));
+
+    let got = stop_process(
+        group_plan(),
+        world.processes.as_ref(),
+        world.signals.as_ref(),
+    )
+    .await;
+
+    assert_eq!(got, (Outcome::Failed, Some("The signal was refused")));
+    assert_eq!(
+        world.signals.sent(),
+        vec![(SignalTarget::Group(200), Signal::Term)]
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_group_that_vanishes_before_kill_is_reported_stopped() {
+    let world = world();
+    group_leader(&world);
+    world.signals.ignore_term(200);
+    let sends = Arc::new(Mutex::new(0));
+    let signals = Arc::clone(&world.signals);
+    let processes = Arc::clone(&world.processes);
+    world.signals.before_send(Box::new(move || {
+        let mut count = sends.lock().unwrap();
+        *count += 1;
+        if *count == 2 {
+            signals.set_group(200, 999);
+            processes.exit(200);
+        }
+    }));
+
+    let got = stop_process(
+        group_plan(),
+        world.processes.as_ref(),
+        world.signals.as_ref(),
+    )
+    .await;
+
+    assert_eq!(got, (Outcome::Stopped, None));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_pid_replaced_as_kill_is_delivered_is_reported_gone() {
+    let world = world();
+    listener(&world, 200, 150);
+    world.signals.ignore_term(200);
+    world.signals.obeys(200, &world.processes);
+    let sends = Arc::new(Mutex::new(0));
+    let processes = Arc::clone(&world.processes);
+    world.signals.before_send(Box::new(move || {
+        let mut count = sends.lock().unwrap();
+        *count += 1;
+        if *count == 2 {
+            processes.replace(200, OTHER_START_US, USER);
+        }
+    }));
+
+    let got = stop_process(
+        stopped_plan(200),
+        world.processes.as_ref(),
+        world.signals.as_ref(),
+    )
+    .await;
+
+    assert_eq!(got, (Outcome::StoppedAlone, None));
+    assert_eq!(world.signals.sent().len(), 2);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_check_that_cannot_be_read_after_the_term_wait_fails_and_gets_no_kill() {
+    let world = world();
+    listener(&world, 200, 150);
+    world
+        .processes
+        .fail_entry(200, navori_macos::ReadError::Denied);
+
+    let got = stop_process(
+        stopped_plan(200),
+        world.processes.as_ref(),
+        world.signals.as_ref(),
+    )
+    .await;
+
+    assert_eq!(
+        got,
+        (
+            Outcome::Failed,
+            Some("The process list could not be read in time")
+        )
+    );
+    assert_eq!(
+        world.signals.sent(),
+        vec![(SignalTarget::Process(200), Signal::Term)]
     );
 }
