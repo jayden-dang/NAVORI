@@ -1,13 +1,15 @@
 //! In-memory process list.
 
 use std::fmt;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
-use crate::{PlatformError, ProcEntry, ProcessSource, ReadError, StartTime};
+use crate::{Listener, PlatformError, ProcEntry, ProcessSource, ReadError, StartTime};
 
-/// One scripted process. Argument, directory, and CPU reads default to denied.
+/// One scripted process. Argument, directory, CPU, and name reads default to denied; the socket read
+/// defaults to no listeners.
 #[derive(Debug)]
 pub struct FakeProcess {
     pub pid: i32,
@@ -19,6 +21,8 @@ pub struct FakeProcess {
     pub argv: Result<Vec<String>, ReadError>,
     pub cwd: Result<PathBuf, ReadError>,
     pub cpu: Result<Duration, ReadError>,
+    pub fds: Result<Vec<Listener>, ReadError>,
+    pub name: Result<String, ReadError>,
 }
 
 impl FakeProcess {
@@ -34,6 +38,8 @@ impl FakeProcess {
             argv: Err(ReadError::Denied),
             cwd: Err(ReadError::Denied),
             cpu: Err(ReadError::Denied),
+            fds: Ok(Vec::new()),
+            name: Err(ReadError::Denied),
         }
     }
 
@@ -58,6 +64,28 @@ impl FakeProcess {
     /// Mark the process as a zombie.
     pub fn zombie(mut self) -> Self {
         self.zombie = true;
+        self
+    }
+
+    /// Add a listening TCP socket. An `addr` that is not an IP address makes the socket read malformed.
+    pub fn listen(mut self, addr: &str, port: u16) -> Self {
+        match (addr.parse::<IpAddr>(), self.fds.as_mut()) {
+            (Ok(addr), Ok(listeners)) => listeners.push(Listener { addr, port }),
+            (Err(_), _) => self.fds = Err(ReadError::Malformed),
+            (Ok(_), Err(_)) => {}
+        }
+        self
+    }
+
+    /// The socket read fails with `err`.
+    pub fn fds_err(mut self, err: ReadError) -> Self {
+        self.fds = Err(err);
+        self
+    }
+
+    /// Successful short name.
+    pub fn name(mut self, name: &str) -> Self {
+        self.name = Ok(name.to_owned());
         self
     }
 
@@ -152,7 +180,7 @@ impl FakeProcesses {
         }
     }
 
-    /// On the next read of `kind` (`"exe"`, `"argv"`, `"cwd"`, or `"cpu"`), apply [`Self::replace`].
+    /// On the next read of `kind` (`"exe"`, `"argv"`, `"cwd"`, `"cpu"`, `"fds"`, or `"name"`), apply [`Self::replace`].
     pub fn replace_on_read(&self, pid: i32, kind: &'static str, start_us: u64, ruid: u32) {
         lock(&self.state).pending.push(PendingReplace {
             pid,
@@ -162,7 +190,7 @@ impl FakeProcesses {
         });
     }
 
-    /// Pids whose executable, arguments, working directory, or CPU time were read, in order.
+    /// Pids whose executable, arguments, working directory, CPU time, sockets, or name were read, in order.
     pub fn reads(&self) -> Vec<(i32, &'static str)> {
         lock(&self.state).reads.clone()
     }
@@ -237,6 +265,14 @@ impl ProcessSource for FakeProcesses {
 
     fn cpu_time(&self, pid: i32) -> Result<Duration, ReadError> {
         self.read(pid, "cpu", |process| process.cpu)
+    }
+
+    fn listeners(&self, pid: i32) -> Result<Vec<Listener>, ReadError> {
+        self.read(pid, "fds", |process| process.fds.clone())
+    }
+
+    fn name(&self, pid: i32) -> Result<String, ReadError> {
+        self.read(pid, "name", |process| process.name.clone())
     }
 }
 
