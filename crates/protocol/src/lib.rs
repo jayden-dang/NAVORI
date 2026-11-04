@@ -131,6 +131,19 @@ pub struct Check {
     pub detail: String,
 }
 
+/// Params of `core.ask`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AskRequest {
+    pub model: String,
+    pub text: String,
+}
+
+/// Result of `core.ask`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AskReply {
+    pub reply: String,
+}
+
 /// JSON-RPC 2.0 over newline-delimited JSON on the local Unix socket.
 pub mod rpc {
     use super::{Deserialize, Serialize, Value};
@@ -143,6 +156,7 @@ pub mod rpc {
         pub const DISPATCH: &str = "core.dispatch";
         pub const EVENTS: &str = "core.events";
         pub const DOCTOR: &str = "core.doctor";
+        pub const ASK: &str = "core.ask";
     }
 
     /// Standard JSON-RPC error codes plus Navori-specific ones (-32000..-32099).
@@ -155,6 +169,10 @@ pub mod rpc {
         pub const UNKNOWN_MODULE: i64 = -32001;
         pub const ACTION_FAILED: i64 = -32002;
         pub const MODULE_UNAVAILABLE: i64 = -32003;
+        pub const ASK_NO_KEY: i64 = -32004;
+        pub const ASK_KEYCHAIN: i64 = -32005;
+        pub const ASK_BLOCKED: i64 = -32006;
+        pub const ASK_PROVIDER: i64 = -32007;
     }
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
