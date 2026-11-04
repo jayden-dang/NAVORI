@@ -3,6 +3,7 @@ use navori_secrets::{KeychainService, Secret};
 #[test]
 fn debug_output_of_a_secret_is_exactly_redacted_alone_and_nested() {
     #[derive(Debug)]
+    #[allow(dead_code)] // read only through the derived Debug
     struct Holder {
         token: Secret,
     }
