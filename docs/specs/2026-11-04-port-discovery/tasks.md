@@ -7,10 +7,10 @@
 > for tracking.
 
 Feature code: PORTS
-Status: Approved
+Status: In-progress
 Approved by the operator ("approve", 2026-11-04 16:34 +07, typed in the conductor session after reading the review sheet for 827b756; relayed in .skills/_pending-ports/auto/operator-reply.md).
 Date: 2026-11-04
-Execution-mode: unset
+Execution-mode: continuous
 Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
