@@ -29,7 +29,7 @@ public enum StopOutcome: String, Decodable, Equatable, Sendable {
     }
 }
 
-public enum StopTarget: Decodable, Equatable, Sendable {
+public enum StopTarget: Decodable, Hashable, Sendable {
     case process(pid: Int32, startUs: UInt64)
     case container(id: String)
 
@@ -53,6 +53,16 @@ public enum StopTarget: Decodable, Equatable, Sendable {
 }
 
 public struct StopResult: Decodable, Equatable, Sendable {
+    /// A request that got no usable reply; the empty container id is never a listed target.
+    public static func unanswered(_ reason: String) -> StopResult {
+        StopResult(target: .container(id: ""), result: .failed, reason: reason)
+    }
+
+    var shownReason: String {
+        reason.flatMap { $0.isEmpty ? nil : $0 } ?? result.fallbackReason
+    }
+
+
     public let target: StopTarget
     public let result: StopOutcome
     public let reason: String?
@@ -88,6 +98,18 @@ public enum StopFlow: Equatable, Sendable {
         return true
     }
 
+    /// The requests to send now: only the Core's non-empty ones, once, and only if the count still matches.
+    public mutating func confirm(sending requests: [String], count: Int) -> [String] {
+        guard case .asking(let asked) = self else { return [] }
+        let usable = requests.filter { $0.isEmpty == false }
+        guard asked == count, usable.isEmpty == false else {
+            self = .idle
+            return []
+        }
+        self = .running
+        return usable
+    }
+
     public mutating func dismiss() {
         if self == .running { return }
         self = .idle
@@ -99,9 +121,41 @@ public enum StopFlow: Equatable, Sendable {
             self = .failed(["Navori got no answer to the stop."])
             return
         }
-        let reasons = results.filter { $0.result.clearsRow == false }.map { result in
-            result.reason.flatMap { $0.isEmpty ? nil : $0 } ?? result.result.fallbackReason
-        }
+        let reasons = results.filter { $0.result.clearsRow == false }.map(\.shownReason)
         self = reasons.isEmpty ? .idle : .failed(reasons)
+    }
+}
+
+/// Targets a stop reply has settled, kept until a later snapshot no longer lists them.
+public struct StopProgress: Equatable, Sendable {
+    public enum Entry: Equatable, Sendable {
+        case stopping
+        case failed(String)
+    }
+
+    private var entries: [StopTarget: Entry] = [:]
+
+    public init() {}
+
+    public mutating func record(_ results: [StopResult]) {
+        for result in results {
+            entries[result.target] = result.result.clearsRow ? .stopping : .failed(result.shownReason)
+        }
+    }
+
+    public mutating func prune(listed: Set<StopTarget>) {
+        entries = entries.filter { listed.contains($0.key) }
+    }
+
+    public func entry(for target: StopTarget) -> Entry? { entries[target] }
+
+    public func isStopping(among targets: [StopTarget]) -> Bool {
+        targets.contains { entries[$0] == .stopping }
+    }
+
+    public func failures(among targets: [StopTarget]) -> [String] {
+        targets.compactMap { target in
+            if case .failed(let reason) = entries[target] { reason } else { nil }
+        }
     }
 }

@@ -31,9 +31,22 @@ final class StatusBarController: NSObject {
             },
             activate: { [weak self] id in self?.activate(id) }
         )
-        return StatusPanel(content: content, onVisibility: { [weak self] visible in
+        let panel = StatusPanel(content: content, onVisibility: { [weak self] visible in
             self?.store.setPanelVisible(visible)
         })
+        panel.cascade.interceptKey = { [weak self] key in
+            guard let store = self?.store, store.isAskingToStop else { return false }
+            switch key {
+            case .escape:
+                store.dismissAskingStops()
+                return true
+            case .return:
+                return true
+            case .up, .down, .left, .right:
+                return false
+            }
+        }
+        return panel
     }()
     #if DEBUG
     private var previewPanel: StatusPanel?
@@ -276,6 +289,8 @@ final class StatusBarController: NSObject {
 
     private func activate(_ id: String) {
         switch id {
+        case CoreStore.stopAllId:
+            if let all = store.runningSubmenu?.stopAll { store.askStop(id, count: all.ports) }
         case "settings": showSettings(.general)
         case "about": showSettings(.about)
         case "quit": NSApp.terminate(nil)

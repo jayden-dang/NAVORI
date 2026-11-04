@@ -15,11 +15,13 @@ public struct RunningPortInput: Equatable, Sendable {
     public let name: String
     /// Empty when the Core offers no Stop for this port.
     public let stopRequest: String
+    public let target: StopTarget?
 
-    public init(port: Int, name: String, stopRequest: String) {
+    public init(port: Int, name: String, stopRequest: String, target: StopTarget? = nil) {
         self.port = port
         self.name = name
         self.stopRequest = stopRequest
+        self.target = target
     }
 
     public var canStop: Bool { stopRequest.isEmpty == false }
@@ -120,6 +122,8 @@ public struct StopOffer: Equatable, Sendable {
 
     public var spoken: String { "Stop \(count) \(count == 1 ? "port" : "ports")" }
 
+    public var confirmation: String { "Stop \(count) \(count == 1 ? "port" : "ports")?" }
+
     init?(count: Int, request: String?) {
         guard let request, request.isEmpty == false else { return nil }
         self.init(count: count, request: request)
@@ -135,8 +139,10 @@ public struct ProjectRowState: Equatable, Sendable {
     public let stop: StopOffer?
     /// `Stop N ports` in the child menu. Present only when the Core sent a child request.
     public let childStop: StopOffer?
+    public let targets: [StopTarget]
 
     init(_ project: RunningProjectInput) {
+        targets = project.ports.compactMap(\.target)
         id = project.isOther ? "running.other" : "running.project.\(project.name)"
         name = project.name
         stop = StopOffer(count: project.stoppablePorts, request: project.rowStopRequest)
@@ -173,6 +179,21 @@ public struct StopAllOffer: Equatable, Sendable {
         self.inUse = inUse
         self.otherLeft = otherLeft
         self.systemHidden = systemHidden
+    }
+}
+
+extension StopAllOffer {
+    public var confirmation: String {
+        var text = "Stop \(ports) \(ports == 1 ? "port" : "ports") in \(projects) \(projects == 1 ? "project" : "projects")?"
+        var left: [String] = []
+        if inUse > 0 { left.append("\(inUse) \(inUse == 1 ? "port" : "ports") in use") }
+        if otherLeft > 0 { left.append("\(otherLeft) \(otherLeft == 1 ? "port" : "ports") in Other") }
+        if left.isEmpty == false { text += " \(left.joined(separator: " and ")) stay running." }
+        return text
+    }
+
+    public var systemNote: String? {
+        systemHidden > 0 ? "\(systemHidden) system \(systemHidden == 1 ? "port" : "ports") hidden" : nil
     }
 }
 

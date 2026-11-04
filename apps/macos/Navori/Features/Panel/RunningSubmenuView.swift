@@ -11,7 +11,7 @@ struct RunningSubmenuView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let state = store.runningSubmenu {
-                ForEach(Array(shownItems(state).enumerated()), id: \.offset) { _, item in
+                ForEach(Array(state.items.enumerated()), id: \.offset) { _, item in
                     row(item, state: state)
                 }
             }
@@ -19,15 +19,7 @@ struct RunningSubmenuView: View {
         .padding(5)
         .frame(width: 272, alignment: .topLeading)
         .fixedSize(horizontal: true, vertical: true)
-    }
-
-    private func shownItems(_ state: RunningSubmenuState) -> [RunningSubmenuItem] {
-        var items = state.items.filter { item in
-            if case .stopAll = item { return false }
-            return true
-        }
-        if case .separator = items.last { items.removeLast() }
-        return items
+        .onDisappear { store.dismissAskingStops() }
     }
 
     @ViewBuilder
@@ -76,9 +68,9 @@ struct RunningSubmenuView: View {
                 .frame(maxWidth: .infinity, minHeight: Self.rowHeight, alignment: .leading)
                 .accessibilityAddTraits(.isStaticText)
         case let .project(project):
-            ProjectRowView(state: project, cascade: cascade)
-        case .stopAll:
-            EmptyView()
+            ProjectRowView(state: project, targets: project.targets, store: store, cascade: cascade)
+        case let .stopAll(offer):
+            StopAllRowView(offer: offer, store: store, cascade: cascade)
         }
     }
 
@@ -129,5 +121,78 @@ private struct AwakeProblemView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(problem.title)
         .accessibilityValue(problem.detail ?? "")
+    }
+}
+
+private struct StopAllRowView: View {
+    let offer: StopAllOffer
+    let store: CoreStore
+    let cascade: CascadeController
+
+    var body: some View {
+        let id = CoreStore.stopAllId
+        let selected = cascade.selection == id
+        let flow = store.stopFlow(id)
+        VStack(alignment: .leading, spacing: 0) {
+            switch flow {
+            case let .asking(count):
+                InlineConfirmation(
+                    text: offer.confirmation,
+                    note: offer.systemNote,
+                    onConfirm: { store.confirmStop(id, requests: offer.requests, count: count) },
+                    onCancel: { store.dismissStop(id) }
+                )
+            case .running:
+                label("Stopping\u{2026}", selected: selected)
+            case let .failed(reasons):
+                label("Stop all ports\u{2026}", selected: selected)
+                StopFailureLines(reasons: reasons)
+            case .idle:
+                label("Stop all ports\u{2026}", selected: selected)
+            }
+        }
+        .onContinuousHover { phase in
+            switch phase {
+            case .active:
+                cascade.pointer(on: id, at: NSEvent.mouseLocation)
+            case .ended:
+                cascade.pointerLeft(id)
+            }
+        }
+        .onChange(of: selected) { _, isSelected in
+            if isSelected == false { store.dismissStop(id) }
+        }
+    }
+
+    private func label(_ title: String, selected: Bool) -> some View {
+        Button(action: { cascade.click(CoreStore.stopAllId) }) {
+            HStack(spacing: 6) {
+                Image(systemName: "stop.fill")
+                    .font(.system(size: 9))
+                    .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
+                    .frame(width: 14, height: 20)
+                Text(title)
+                    .font(.system(size: 14))
+                    .foregroundStyle(selected ? Color.white : Color(nsColor: .labelColor))
+            }
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
+                .background {
+                    if selected {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color(nsColor: .selectedContentBackgroundColor))
+                    }
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled()
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .global)
+        } action: { frame in
+            cascade.setRowFrame(CoreStore.stopAllId, frame)
+        }
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(.isButton)
     }
 }

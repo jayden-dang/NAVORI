@@ -20,6 +20,8 @@ final class CoreStore {
     @ObservationIgnored private var core: NavoriCore?
     @ObservationIgnored private let log = Logger(subsystem: "dev.navori", category: "core")
     private var awakeActionFailure: AwakeActionFailure?
+    private(set) var stopFlows: [String: StopFlow] = [:]
+    private(set) var stopProgress = StopProgress()
 
     func start() {
         guard core == nil else { return }
@@ -51,6 +53,7 @@ final class CoreStore {
     }
 
     func setPanelVisible(_ visible: Bool) {
+        if visible == false { dismissAskingStops() }
         core?.setPanelVisible(visible: visible)
     }
 
@@ -216,7 +219,101 @@ final class CoreStore {
     }
 
     var runningRowIds: [String] {
-        runningSubmenu?.rows.map(\.id) ?? []
+        guard let state = runningSubmenu else { return [] }
+        return state.rows.map(\.id) + (state.stopAll == nil ? [] : [Self.stopAllId])
+    }
+
+    static let stopAllId = "running.stopAll"
+
+    func stopFlow(_ owner: String) -> StopFlow {
+        stopFlows[owner] ?? .idle
+    }
+
+    func askStop(_ owner: String, count: Int) {
+        var flow = stopFlow(owner)
+        flow.press(count: count)
+        stopFlows[owner] = flow
+    }
+
+    func dismissStop(_ owner: String) {
+        var flow = stopFlow(owner)
+        flow.dismiss()
+        stopFlows[owner] = flow
+    }
+
+    func dismissAskingStops() {
+        for (owner, flow) in stopFlows {
+            if case .asking = flow { dismissStop(owner) }
+        }
+    }
+
+    var isAskingToStop: Bool {
+        stopFlows.values.contains { if case .asking = $0 { true } else { false } }
+    }
+
+    /// Sends the Core's own requests, only if the confirmation for `owner` is still the one the user accepted.
+    func confirmStop(_ owner: String, requests: [String], count: Int) {
+        var flow = stopFlow(owner)
+        let toSend = flow.confirm(sending: requests, count: count)
+        stopFlows[owner] = flow
+        guard toSend.isEmpty == false else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let results = await stop(toSend)
+            var flow = stopFlow(owner)
+            flow.finish(results)
+            stopFlows[owner] = flow
+            stopProgress.record(results)
+            pruneStopState()
+        }
+    }
+
+    func stop(_ requests: [String]) async -> [StopResult] {
+        let sends = requests.map { request in Task { @MainActor in await self.send(request) } }
+        var all: [StopResult] = []
+        for send in sends { all += await send.value }
+        return all
+    }
+
+    private func send(_ request: String) async -> [StopResult] {
+        do {
+            let reply = try await dispatch(module: "ports", actionJSON: request)
+            let results = try JSONDecoder().decode(KillReply.self, from: Data(reply.utf8)).results
+            return results.isEmpty ? [.unanswered("Navori got no answer to the stop.")] : results
+        } catch {
+            let message = CoreStartupBanner.menuFailure(for: error)
+            log.error("stop failed: \(message, privacy: .public)")
+            return [.unanswered(message)]
+        }
+    }
+
+    private var listedTargets: Set<StopTarget> {
+        Set(running?.projects.flatMap { $0.ports.compactMap(\.target) } ?? [])
+    }
+
+    private func pruneStopState() {
+        stopProgress.prune(listed: listedTargets)
+        let live = Set(runningRowIds)
+        let offers = runningSubmenu.map(Self.offerCounts) ?? [:]
+        for (owner, flow) in stopFlows {
+            switch flow {
+            case .failed where live.contains(owner) == false:
+                stopFlows[owner] = .idle
+            case .asking(let count) where offers[owner] != count:
+                stopFlows[owner] = .idle
+            default:
+                break
+            }
+        }
+    }
+
+    private static func offerCounts(_ state: RunningSubmenuState) -> [String: Int] {
+        var counts: [String: Int] = [:]
+        for row in state.rows {
+            if let stop = row.stop { counts[row.id] = stop.count }
+        }
+        if let all = state.stopAll { counts[stopAllId] = all.ports }
+        return counts
     }
 
     private static func input(_ state: ProjectState) -> RunningProjectState {
@@ -227,6 +324,13 @@ final class CoreStore {
         }
     }
 
+    private static func input(_ target: StopTargetView) -> StopTarget {
+        switch target {
+        case let .process(pid, startUs): .process(pid: pid, startUs: startUs)
+        case let .container(id): .container(id: id)
+        }
+    }
+
     private static func input(_ project: RunningProject) -> RunningProjectInput {
         RunningProjectInput(
             name: project.name,
@@ -234,7 +338,12 @@ final class CoreStore {
             state: Self.input(project.state),
             sessions: project.sessions.map { RunningSessionInput(stopped: $0.stopped) },
             ports: project.ports.map {
-                RunningPortInput(port: Int($0.port), name: $0.name, stopRequest: $0.stopRequest)
+                RunningPortInput(
+                    port: Int($0.port),
+                    name: $0.name,
+                    stopRequest: $0.stopRequest,
+                    target: Self.input($0.target)
+                )
             },
             stoppablePorts: Int(project.stoppablePorts),
             rowStopRequest: project.rowStopRequest,
@@ -259,6 +368,7 @@ final class CoreStore {
 
     fileprivate func apply(_ snapshot: CoreSnapshot) {
         self.snapshot = snapshot
+        pruneStopState()
         if let failure = awakeActionFailure, failure.visible(against: Self.marks(of: snapshot.awake)) == nil {
             awakeActionFailure = nil
         }
