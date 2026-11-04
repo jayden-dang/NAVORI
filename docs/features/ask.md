@@ -6,7 +6,7 @@ Send one question to DeepSeek from the terminal and print the answer. This is th
 navori ask --model <id> "<text>"
 ```
 
-`--model` is required and is DeepSeek's own model name, passed through unchanged. The prompt is one positional argument. The reply goes to stdout; every failure goes to stderr as `navori: <message>`.
+`--model` is required and is DeepSeek's own model name, passed through unchanged. The prompt is one positional argument. The reply goes to stdout with control characters and escape sequences removed (newline, tab and printable text are kept), so a reply cannot drive the terminal; every failure goes to stderr as `navori: <message>`.
 
 ## The key
 
@@ -14,7 +14,7 @@ Save the DeepSeek API key in Settings → AI (`Provider API key`, then `Save`; `
 
 ## What is sent
 
-The app, not the CLI, makes the request. The Core reads the key, runs the prompt through the Sensitive Data Shield, writes the audit row, and only then sends. The provider receives the redacted text as a single `user` message in a Chat Completions request to `https://api.deepseek.com/chat/completions`, with the key as a bearer token and `stream` off. The `--model` string is sent as given and is not shielded. The reply is printed as the provider returned it.
+The app, not the CLI, makes the request. The Core reads the key, runs the prompt through the Sensitive Data Shield, writes the audit row, and only then sends. The provider receives the redacted text as a single `user` message in a Chat Completions request to `https://api.deepseek.com/chat/completions`, with the key as a bearer token and `stream` off. The `--model` string is sent as given and is not shielded. The reply travels from the provider to the CLI as returned; only the CLI's printing removes control characters.
 
 If the Shield fails or returns a malformed result, nothing is sent. If the audit row cannot be written, nothing is sent. The client does not follow redirects, so a reply cannot move the request off the base URL.
 

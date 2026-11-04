@@ -53,6 +53,7 @@ Persisted formats defined here, both `agent-decided` in their columns or names:
 - **ASK-4.6** THE SYSTEM SHALL send no system prompt, history, tools or context fragments: one user message per ask.
 - ~~**ASK-4.7**~~ folded into ASK-10.4: keeping other IPC methods answering while an ask waits is what running the blocking calls off the worker threads means, and the test moved there.
 - **ASK-4.8** WHEN an ask has been pending for 3 seconds THE SYSTEM SHALL print `waiting for the answer…` once on stderr, never on stdout, so a first Keychain prompt or a slow provider does not look like a hang (`agent-decided`: the 3 s and the wording).
+- **ASK-4.9** THE SYSTEM SHALL print the reply on stdout with control characters and escape sequences removed, keeping newline, tab and printable text, so a reply cannot drive the person's terminal (`agent-decided`: the dropped set, which is every other C0 control, DEL, the C1 controls, carriage return, and whole CSI, OSC and two-byte ESC sequences; an unterminated OSC is dropped to the end). Only the CLI's printing changes: the reply stays unmodified over IPC.
 
 ## 5. Shield and audit every ask
 

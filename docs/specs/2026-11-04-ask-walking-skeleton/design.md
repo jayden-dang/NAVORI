@@ -127,7 +127,7 @@ Surface:
 - `enum Command` (main.rs:34-70) and its `match cli.command` in `run` (:179+): new `Ask` variant and arm — **replace** (the match is exhaustive; all existing arms stay as they are, ASK-9.4).
 - `Failure`/`From<IpcError>` (main.rs:95-101): unchanged; the `Ask` arm converts `IpcError::Rpc(e)` itself so the person sees `e.message`, not "rpc error -32004: …" — **replace** for that arm only.
 - `docs`/help text: the clap doc comment on the new variant is the help.
-Interface: `navori ask --model <ID> <PROMPT>`; stdout gets the reply and a trailing newline; stderr gets `navori: <message>`; exits 0/1/2/3 as today (ASK-7.5).
+Interface: `navori ask --model <ID> <PROMPT>`; stdout gets the reply with control characters and escape sequences removed (ASK-4.9) and a trailing newline; stderr gets `navori: <message>`; exits 0/1/2/3 as today (ASK-7.5).
 Depth: n/a — extends `navori-cli`.
 Locality: `apps/cli/src/main.rs` plus one small `ask.rs` module if the arm grows; `apps/cli/tests/cli.rs` for tests. leave `hook.rs` and every other arm.
 

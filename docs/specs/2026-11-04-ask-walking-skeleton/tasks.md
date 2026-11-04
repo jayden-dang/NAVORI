@@ -230,7 +230,7 @@ _Requirements: ASK-5.4, ASK-5.5, ASK-9.1, ASK-9.3, ASK-10.2, ASK-10.3, ASK-10.4,
 - [x] **Step 4: Gate** — `cargo fmt --all && cargo clippy -p navori-cli --all-targets -- -D warnings && cargo xtask check-deps`.
 - [x] **Step 5: Commit** — `git commit -m "feat(cli): add navori ask over core.ask"`.
 
-_Requirements: ASK-4.3, ASK-4.4, ASK-4.5, ASK-4.8, ASK-7.4, ASK-9.4_
+_Requirements: ASK-4.3, ASK-4.4, ASK-4.5, ASK-4.8, ASK-4.9, ASK-7.4, ASK-9.4_
 
 ---
 
