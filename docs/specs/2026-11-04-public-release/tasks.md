@@ -191,11 +191,11 @@ _Requirements: RELEASE-1.5, RELEASE-1.6, RELEASE-1.7, RELEASE-1.8, RELEASE-1.13,
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Write the failing tests:** `a_free_tag_on_a_clean_tree_passes` (pre-release version, empty tag lists, empty dirty, any project text); `a_tag_that_already_exists_locally_fails_naming_it`; `a_tag_that_already_exists_on_origin_fails_naming_it` (`ls-remote` line `<sha>\trefs/tags/v0.1.0`); `uncommitted_changes_fail_listing_the_files` (` M Cargo.toml` → text contains `Cargo.toml`); `a_final_version_needs_the_external_compat_line` (`0.1.0` with no line starting `- **Compat obligation:** External` → fails naming the line; with that line → passes); `a_compat_line_quoted_in_prose_does_not_count` (the text appears mid-sentence, not as a line start → fails); `a_pre_release_does_not_need_the_compat_line`.
-- [ ] **Step 2: Run** `cargo test -p xtask release::` — expect: fails (`preflight` missing).
-- [ ] **Step 3: Implement** `preflight`, `check` and the `Cmd::ReleaseCheck` arm; `check` runs no `git tag` or `git push`.
-- [ ] **Step 4: Run** `cargo test -p xtask`, then `cargo xtask release-check` on this Mac — expect: on today's tree it fails at preflight (uncommitted changes or the missing Compat line for `0.1.0`), naming the cause.
-- [ ] **Step 5: Commit** `git commit -m "feat(xtask): add release-check, the local gate that prints the tag to push"`
+- [x] **Step 1: Write the failing tests:** `a_free_tag_on_a_clean_tree_passes` (pre-release version, empty tag lists, empty dirty, any project text); `a_tag_that_already_exists_locally_fails_naming_it`; `a_tag_that_already_exists_on_origin_fails_naming_it` (`ls-remote` line `<sha>\trefs/tags/v0.1.0`); `uncommitted_changes_fail_listing_the_files` (` M Cargo.toml` → text contains `Cargo.toml`); `a_final_version_needs_the_external_compat_line` (`0.1.0` with no line starting `- **Compat obligation:** External` → fails naming the line; with that line → passes); `a_compat_line_quoted_in_prose_does_not_count` (the text appears mid-sentence, not as a line start → fails); `a_pre_release_does_not_need_the_compat_line`.
+- [x] **Step 2: Run** `cargo test -p xtask release::` — expect: fails (`preflight` missing).
+- [x] **Step 3: Implement** `preflight`, `check` and the `Cmd::ReleaseCheck` arm; `check` runs no `git tag` or `git push`.
+- [x] **Step 4: Run** `cargo test -p xtask`, then `cargo xtask release-check` on this Mac — expect: on today's tree it fails at preflight (uncommitted changes or the missing Compat line for `0.1.0`), naming the cause.
+- [x] **Step 5: Commit** `git commit -m "feat(xtask): add release-check, the local gate that prints the tag to push"`
 
 _Requirements: RELEASE-2.1, RELEASE-2.2, RELEASE-2.3, RELEASE-2.4, RELEASE-2.5, RELEASE-2.6, RELEASE-2.7, RELEASE-7.1_
 
