@@ -35,6 +35,7 @@ fn container(id: &str, working_dir: Option<&Path>, ports: &[(&str, u16)]) -> Con
         id: id.to_owned(),
         name: format!("{id}-name"),
         working_dir: working_dir.map(Path::to_path_buf),
+        image: Some("postgres".to_owned()),
         ports: ports.iter().map(|(text, port)| (ip(text), *port)).collect(),
     }
 }
@@ -84,11 +85,13 @@ fn a_container_in_a_live_worktree_is_placed_in_that_worktree() {
             worktree: Some("lane".to_owned()),
             branch: Some(BranchName::Named("lane".to_owned())),
             missing_path: None,
+            root: Some(repos.lane.clone()),
         }
     );
     let held = entry.container.as_ref().unwrap();
     assert_eq!(held.id, "db");
     assert_eq!(held.name, "db-name");
+    assert_eq!(held.image.as_deref(), Some("postgres"));
 }
 
 #[test]
@@ -107,6 +110,7 @@ fn a_container_whose_directory_was_removed_keeps_the_project_and_the_old_path() 
             worktree: None,
             branch: None,
             missing_path: Some(repos.gone.clone()),
+            root: None,
         }
     );
 }

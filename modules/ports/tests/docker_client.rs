@@ -22,6 +22,7 @@ fn expected() -> Vec<Container> {
         id: "abc123".to_owned(),
         name: "db".to_owned(),
         working_dir: Some(PathBuf::from("/work/app")),
+        image: Some("postgres".to_owned()),
         ports: vec![("127.0.0.1".parse::<IpAddr>().unwrap(), 5432)],
     }]
 }
@@ -88,6 +89,34 @@ async fn a_sized_reply_is_read_and_only_four_fields_are_kept() {
     let shown = format!("{containers:?}");
     assert!(!shown.contains("secret"), "{shown}");
     assert_eq!(served.request.await.unwrap(), REQUEST);
+}
+
+async fn image_of(listed: &str) -> Option<String> {
+    let body = format!(r#"[{{"Id":"a","Names":["/x"],"Image":"{listed}"}}]"#);
+    let served = serve(say(sized(&body)));
+    read(&served).await.unwrap().remove(0).image
+}
+
+#[tokio::test]
+async fn a_container_image_is_reduced_to_its_repository_name() {
+    assert_eq!(
+        image_of("postgres:16-alpine").await.as_deref(),
+        Some("postgres")
+    );
+    assert_eq!(
+        image_of("localhost:5000/team/db:1@sha256:abc")
+            .await
+            .as_deref(),
+        Some("localhost:5000/team/db")
+    );
+    assert_eq!(image_of("sha256:abc123").await, None);
+}
+
+#[tokio::test]
+async fn a_container_listed_without_an_image_has_none() {
+    let body = r#"[{"Id":"a","Names":["/x"]}]"#;
+    let served = serve(say(sized(body)));
+    assert_eq!(read(&served).await.unwrap()[0].image, None);
 }
 
 #[tokio::test]

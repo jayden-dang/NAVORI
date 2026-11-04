@@ -37,6 +37,7 @@ pub fn attribute(
             let held = ContainerRef {
                 id: container.id.clone(),
                 name: container.name.clone(),
+                image: container.image.clone(),
             };
             entries.push(entry(port, claimed, placed, Some(held)));
         }

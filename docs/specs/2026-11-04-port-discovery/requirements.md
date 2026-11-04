@@ -37,6 +37,7 @@ Guard walk (Step 3 of specify-behavior). Files the change touches:
 - **PORTS-1.3** WHEN `ports.list` is dispatched THE SYSTEM SHALL reply with the last published scan and SHALL NOT start a scan for that call (`agent-decided`).
 - **PORTS-1.4** THE SYSTEM SHALL return one entry per (pid, port), holding every address that process has bound for that port, so a v4 and a v6 socket on one port are one entry (`agent-decided`). PORTS-4.5 keys Docker ports differently.
 - **PORTS-1.5** THE SYSTEM SHALL put these fields on each entry: port, bound addresses, pid, process start time, process name, exe path when read, project, worktree, branch, `missing_path` (the removed working directory or `working_dir` of PORTS-2.5 and PORTS-4.6, absent otherwise), harness, kind, and for a Docker port the container id and name (`agent-decided`: the field set, including what ROAD-18 needs to act on an entry).
+  (Amended 2026-11-04 by PSTOP: entries gain `root` and a container's `image`; both additive.)
 - **PORTS-1.6** THE SYSTEM SHALL take the process name from the exe path's last part, and IF the exe cannot be read THEN from the short name the OS reports for that pid (`agent-decided`).
 - **PORTS-1.7** THE SYSTEM SHALL return entries grouped by project, then worktree, then process, in an order that is the same for the same listeners: no-project group last, then names compared case-insensitively, then pid, then port (L8; `agent-decided`: the order).
 - **PORTS-1.8** THE SYSTEM SHALL state in the reply when the scan it carries was taken (`agent-decided`).

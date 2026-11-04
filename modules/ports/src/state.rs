@@ -58,6 +58,7 @@ pub enum PortKind {
 pub struct ContainerRef {
     pub id: String,
     pub name: String,
+    pub image: Option<String>,
 }
 
 /// Whether the Docker engine could be read. The text of `Unreadable` is fixed and names no path.
@@ -77,6 +78,7 @@ pub struct Placement {
     pub worktree: Option<String>,
     pub branch: Option<BranchName>,
     pub missing_path: Option<PathBuf>,
+    pub root: Option<PathBuf>,
 }
 
 /// One port held by one process, with every address it bound.

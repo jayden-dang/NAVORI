@@ -25,6 +25,7 @@ fn project_only(project: &str) -> Placement {
         worktree: None,
         branch: None,
         missing_path: None,
+        root: None,
     }
 }
 
@@ -81,6 +82,7 @@ fn each_listener_is_placed_by_the_first_rule_that_holds() {
             worktree: None,
             branch: Some(BranchName::Named("main".to_owned())),
             missing_path: None,
+            root: Some(app.clone()),
         }
     );
 
@@ -92,6 +94,7 @@ fn each_listener_is_placed_by_the_first_rule_that_holds() {
             worktree: Some("lane".to_owned()),
             branch: Some(BranchName::Named("lane".to_owned())),
             missing_path: None,
+            root: Some(lane.clone()),
         }
     );
 
@@ -103,6 +106,7 @@ fn each_listener_is_placed_by_the_first_rule_that_holds() {
             worktree: None,
             branch: Some(BranchName::Named("main".to_owned())),
             missing_path: None,
+            root: Some(tool.clone()),
         }
     );
 
@@ -183,6 +187,7 @@ fn a_scanned_listener_is_placed_by_its_working_directory() {
         in_repo,
         Placement {
             branch: Some(BranchName::Named("main".to_owned())),
+            root: Some(app.clone()),
             ..project_only("app")
         }
     );
@@ -195,6 +200,7 @@ fn a_scanned_listener_is_placed_by_its_working_directory() {
             worktree: Some("lane".to_owned()),
             branch: Some(BranchName::Named("lane".to_owned())),
             missing_path: None,
+            root: Some(lane.clone()),
         }
     );
 }
@@ -214,6 +220,7 @@ fn a_scanned_listener_without_a_repo_by_directory_is_placed_by_its_executable() 
         placement,
         Placement {
             branch: Some(BranchName::Named("main".to_owned())),
+            root: Some(tool.clone()),
             ..project_only("cli")
         }
     );
@@ -276,4 +283,41 @@ fn a_path_outside_home_is_never_looked_at_for_a_repository() {
 
     assert_eq!(found, Placement::default());
     assert!(!logs.text().contains("unreadable git metadata"));
+}
+
+#[test]
+fn a_listener_in_a_counted_repo_carries_the_repo_root() {
+    let fx = fixture();
+    let app = fx.home.join("work").join("app");
+    init_repo(&app);
+    fs::create_dir_all(app.join("src")).unwrap();
+
+    let placement = placed(
+        Ok(&app.join("src")),
+        Ok(Path::new("/usr/local/bin/node")),
+        &fx.home,
+    );
+    assert_eq!(placement.root, Some(app));
+}
+
+#[test]
+fn a_removed_directory_carries_no_root() {
+    let fx = fixture();
+    let app = fx.home.join("work").join("app");
+    init_repo(&app);
+    let gone = app.join("removed");
+
+    let placement = placed(Ok(&gone), Ok(Path::new("/usr/local/bin/node")), &fx.home);
+    assert_eq!(placement.project.as_deref(), Some("app"));
+    assert_eq!(placement.root, None);
+}
+
+#[test]
+fn a_path_outside_the_counted_area_carries_no_root() {
+    let fx = fixture();
+    let opt = fx.outside.join("homebrew");
+    init_repo(&opt);
+
+    let placement = placed(Ok(&opt), Ok(Path::new("/usr/local/bin/node")), &fx.home);
+    assert_eq!(placement.root, None);
 }

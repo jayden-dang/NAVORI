@@ -3,6 +3,7 @@
 mod action;
 mod actor;
 mod docker;
+mod image;
 mod infra;
 mod kind;
 mod place;
@@ -17,6 +18,7 @@ use navori_macos::{MacProcesses, PlatformError, ProcessSource};
 
 pub use action::PortsAction;
 pub use docker::attribute;
+pub use image::database_image;
 pub use infra::docker::{Container, Containers, DockerError, DockerSocket};
 pub use kind::kind;
 pub use place::{place, place_listener};

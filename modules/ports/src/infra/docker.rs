@@ -39,6 +39,7 @@ pub struct Container {
     pub id: String,
     pub name: String,
     pub working_dir: Option<PathBuf>,
+    pub image: Option<String>,
     pub ports: Vec<(IpAddr, u16)>,
 }
 
@@ -343,6 +344,8 @@ struct Listed {
     id: String,
     #[serde(rename = "Names", default)]
     names: Vec<String>,
+    #[serde(rename = "Image", default)]
+    image: Option<String>,
     #[serde(rename = "Ports", default)]
     ports: Vec<Published>,
     #[serde(rename = "Labels", default)]
@@ -391,6 +394,7 @@ fn container(listed: Listed) -> Container {
         id: listed.id,
         name,
         working_dir,
+        image: listed.image.as_deref().and_then(crate::image::repository),
         ports,
     }
 }

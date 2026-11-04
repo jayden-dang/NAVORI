@@ -68,6 +68,7 @@ pub fn place(path: &Path, home: &Path) -> Placement {
         worktree: repo.location.worktree,
         branch: repo.location.branch.map(BranchName::from),
         missing_path: None,
+        root: Some(repo.root),
     }
 }
 
