@@ -244,7 +244,7 @@ itself (spike Q6: gone within 1 s after `kill -9`).
 
 ### navori-procs — snapshot
 
-Satisfies: PROCS-1.1, PROCS-1.2, PROCS-1.3, PROCS-1.4, PROCS-1.5, PROCS-1.6, PROCS-1.7, PROCS-8.4, PROCS-8.6
+Satisfies: PROCS-1.1, PROCS-1.2, PROCS-1.3, PROCS-1.4, PROCS-1.5, PROCS-1.6, PROCS-1.7, PROCS-8.4, PROCS-8.8, PROCS-8.6
 Reuse: none — new code (rung 7); no process model exists in the repo
 Security: THR-5
 Interface:
@@ -417,7 +417,8 @@ Reuse: n/a — edits existing docs. Locality: docs only.
 | `navori_procs::resolve_location` over real temp git trees (`git init`, `git worktree add`, `git submodule add`, detached checkout) | unit | PROCS-2.3 – 2.7 |
 | `navori_procs::ProcWatcher` over `FakeProcesses` + `fake::FakeExits`, incl. unwatch-then-rewatch of a reused pid with an in-flight event, and an exit between registration and re-check (exactly one event) | unit | PROCS-4.1, 4.3, 4.4, 4.6 |
 | `navori_procs` real-OS session check (`#[ignore]`, run by hand with Claude Code, Codex, Grok open) | integration | done signal 1 (PROCS-2.x on this Mac) |
-| `navori_procs` snapshot timing (real OS, normal suite — debug, the pessimistic case — median of 5 under 10 ms; the release figure is recorded once in task evidence) | integration | PROCS-8.4 |
+| `navori_procs` snapshot timing, the budget (real OS, ignored in the normal suite and run by `cargo xtask perf` on an idle machine — debug, the pessimistic case — median of 5 under 10 ms; the release figure is recorded once in task evidence) | integration | PROCS-8.4 |
+| `navori_procs` snapshot timing, the guard (real OS, normal suite — debug — median of 5 under 100 ms, on any machine load) | integration | PROCS-8.8 |
 | `tracing` capture + `Display` of every error while resolving a fake process whose argv holds a fake token | unit | PROCS-8.5 |
 | `cargo xtask check-deps` / `cargo xtask lint-probe` / `cargo xtask ci` (xtask is exempt from unit tests; verified by running; a deliberate `navori-cli → navori-macos` edge is shown to fail once, in task evidence) | build check | PROCS-7.1 – 7.8 |
 

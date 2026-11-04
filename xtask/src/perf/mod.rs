@@ -32,6 +32,7 @@ const COMMAND_TIMEOUT: Duration = Duration::from_secs(10);
 pub fn run(root: &Path, record: bool) -> Result<bool> {
     let (app, probe, build_elapsed) = build_bundle(root)?;
     emit(&format!("build {}", format_elapsed(build_elapsed)))?;
+    let snapshot_ms = measure_snapshot_ms(root)?;
 
     let exe = app.join("Contents/MacOS/Navori");
     let home = prepare_home(&exe)?;
@@ -50,7 +51,8 @@ pub fn run(root: &Path, record: bool) -> Result<bool> {
     let phase_b_elapsed = phase_b_started.elapsed();
 
     let app_size_mb = mib(bundle_bytes(&app)?);
-    let measured = measurements(&phase_a, &phase_b, app_size_mb)?;
+    let mut measured = measurements(&phase_a, &phase_b, app_size_mb)?;
+    measured.insert("snapshot_ms".to_owned(), snapshot_ms);
     let machine = Machine::current()?;
     let baseline_path = root.join("perf-baseline.json");
     let loaded = Baseline::load(&baseline_path)?;
@@ -602,6 +604,33 @@ fn join_pipe(handle: thread::JoinHandle<std::io::Result<Vec<u8>>>, which: &str) 
         .with_context(|| format!("read {which}"))
 }
 
+/// PROCS-8.4 runs as an ignored test in the process crate: its code has no place in the app bundle.
+fn measure_snapshot_ms(root: &Path) -> Result<f64> {
+    let output = super::cargo(root)
+        .args(["test", "-p", "navori-procs", "--test", "real_os", "--"])
+        .args(["--ignored", "--exact", "--nocapture"])
+        .arg("snapshot_cost_for_the_perf_gate")
+        .output()
+        .context("cannot run the snapshot timing test")?;
+    ensure!(
+        output.status.success(),
+        "the snapshot timing test failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    snapshot_median_ms(&String::from_utf8_lossy(&output.stdout))
+}
+
+fn snapshot_median_ms(output: &str) -> Result<f64> {
+    let micros: u32 = output
+        .lines()
+        .find_map(|line| line.split_once("median ")?.1.split_once(" µs"))
+        .context("the snapshot timing test printed no median")?
+        .0
+        .parse()
+        .context("the snapshot timing test printed an unreadable median")?;
+    Ok(f64::from(micros) / 1000.0)
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
@@ -610,8 +639,24 @@ mod tests {
     use super::probe::Sample;
     use super::{
         PhaseAProcess, PhaseBProcess, PhaseBWindow, finish_measured, idle_window, measurements,
+        snapshot_median_ms,
     };
     use crate::perf::launch::Launched;
+
+    #[test]
+    fn the_snapshot_median_is_read_in_milliseconds_from_the_test_output() {
+        let output = "running 1 test\nmedian 4308 µs (4.308333ms); processes 854\ntest ok\n";
+        assert_eq!(snapshot_median_ms(output).unwrap(), 4.308);
+        let same_line =
+            "test snapshot_cost_for_the_perf_gate ... median 4308 µs (4.3ms); processes 854\n";
+        assert_eq!(snapshot_median_ms(same_line).unwrap(), 4.308);
+    }
+
+    #[test]
+    fn a_test_run_that_printed_no_median_is_an_error_and_not_a_zero() {
+        let err = snapshot_median_ms("running 0 tests\n").unwrap_err();
+        assert!(err.to_string().contains("median"), "{err}");
+    }
 
     fn process(reopen: [f64; 5], submenu_open_ms: f64) -> PhaseAProcess {
         PhaseAProcess {
