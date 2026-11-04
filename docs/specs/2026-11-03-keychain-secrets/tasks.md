@@ -1093,7 +1093,7 @@ _Requirements: SECRETS-2.1, SECRETS-2.2, SECRETS-2.3, SECRETS-2.4, SECRETS-2.5, 
 
 **Depends-on:** Task 5
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 `crates/secrets/tests/keychain_real.rs`:
 
@@ -1128,11 +1128,11 @@ fn the_real_keychain_honours_the_store_contract() {
 }
 ```
 
-- [ ] **Step 2: Prove it compiles and is skipped by default; do not run it**
+- [x] **Step 2: Prove it compiles and is skipped by default; do not run it**
 
 Run: `cargo fmt --all`, then `cargo nextest run -p navori-secrets --test keychain_real` — expect: 0 tests run, 1 skipped. **Do not** pass `--ignored` or `--run-ignored` in an unattended session. Run: `cargo clippy -p navori-secrets --all-targets -- -D warnings` — expect: clean; this also proves `KeychainStore::open` compiles against the real Apple store, including the `Send + Sync` coercion.
 
-- [ ] **Step 3: Gate and commit**
+- [x] **Step 3: Gate and commit**
 
 Run: `cargo xtask ci` — expect: pass.
 `git add crates/secrets && git commit -m "test(secrets): add the manual real-Keychain contract run"`
