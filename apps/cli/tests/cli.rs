@@ -831,6 +831,21 @@ fn a_stop_cancelled_sends_stop_session() {
 }
 
 #[test]
+fn a_codex_interrupt_sends_stop_session() {
+    let server = recording_server();
+
+    let requests = server.hook(
+        r#"{"hook_event_name":"Interrupt","session_id":"s-1","turn_id":"t-1","transcript_path":null,"cwd":"/x","model":"m","permission_mode":"default"}"#,
+    );
+
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"stop_session": {"session_id": "s-1"}})
+    );
+}
+
+#[test]
 fn a_stop_failure_sends_stop_session() {
     let server = recording_server();
 
@@ -866,7 +881,7 @@ fn an_unknown_event_sends_nothing() {
 }
 
 #[test]
-fn a_payload_sends_nothing_but_the_session_id_and_pids() {
+fn a_payload_sends_nothing_but_the_session_id_pids_and_working_directory() {
     let server = recording_server();
 
     let requests = server.hook(
@@ -874,15 +889,25 @@ fn a_payload_sends_nothing_but_the_session_id_and_pids() {
     );
 
     assert_eq!(requests.len(), 1);
-    let sent = requests[0].to_string();
-    assert!(!sent.contains("SECRET-PROMPT-TEXT"));
-    assert!(!sent.contains("/private/place"));
+    assert!(!requests[0].to_string().contains("SECRET-PROMPT-TEXT"));
     let hold = dispatched_action(&requests[0])["hold_session"]
         .as_object()
         .unwrap();
     let mut keys: Vec<_> = hold.keys().map(String::as_str).collect();
     keys.sort_unstable();
-    assert_eq!(keys, ["pid", "ppid", "session_id"]);
+    assert_eq!(keys, ["cwd", "pid", "ppid", "session_id"]);
+    assert_eq!(hold["cwd"], "/private/place");
+}
+
+#[test]
+fn a_stop_does_not_send_the_working_directory() {
+    let server = recording_server();
+
+    let requests =
+        server.hook(r#"{"hook_event_name":"Stop","session_id":"s-1","cwd":"/private/place"}"#);
+
+    assert_eq!(requests.len(), 1);
+    assert!(!requests[0].to_string().contains("/private/place"));
 }
 
 #[test]

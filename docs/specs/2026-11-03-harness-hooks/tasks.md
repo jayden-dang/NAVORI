@@ -376,9 +376,9 @@ _Requirements: HOOKS-1.3, HOOKS-1.6_
 
 **Depends-on:** none
 
-- [ ] **Step 1: Documentation is done.** Nothing more to read here.
-- [ ] **Step 2: Ask the operator** for one recorded run on 0.166: a hook that sleeps longer than its `timeout`, and a hook whose command is a single-quoted path containing a space. An agent does not run Codex here.
-- [ ] **Step 3: If the unit or the shell behavior stays unconfirmed,** leave Task 13 blocked and say so in the report.
+- [x] **Step 1: Documentation is done.** Nothing more to read here.
+- [x] **Step 2: Ask the operator** for one recorded run on 0.166: a hook that sleeps longer than its `timeout`, and a hook whose command is a single-quoted path containing a space. An agent does not run Codex here. Replaced at the operator's request (2026-11-04): read from the source at tag `rust-v0.166.0`, recorded in `.skills/research/2026-11-03-codex-hook-timeout.md`. The two hooks were not run.
+- [x] **Step 3: If the unit or the shell behavior stays unconfirmed,** leave Task 13 blocked and say so in the report. Both are confirmed: whole seconds, through `$SHELL -lc`.
 
 _Requirements: HOOKS-4.5_
 
@@ -398,10 +398,10 @@ _Requirements: HOOKS-4.5_
 
 **Depends-on:** Task 6, Task 7, Task 8, Task 12
 
-- [ ] **Step 1: Write failing tests:** `installing_for_codex_adds_three_entries_with_the_verified_timeout`; `codex_repair_and_remove_behave_like_claude`; `codex_no_longer_reports_the_unverified_reason`. Run: `cargo nextest run -p navori-mod-integrations` — expect: Codex still unavailable.
-- [ ] **Step 2: Implement** the Codex branch with the key and unit from Task 12; drop the interim reason.
-- [ ] **Step 3: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 4: Commit** `git commit -m "feat(integrations): install Navori's hooks into Codex"`
+- [x] **Step 1: Write failing tests:** `installing_for_codex_adds_three_entries_with_the_verified_timeout`; `codex_repair_and_remove_behave_like_claude`; `codex_no_longer_reports_the_unverified_reason`. Run: `cargo nextest run -p navori-mod-integrations` — expect: Codex still unavailable.
+- [x] **Step 2: Implement** the Codex branch with the key and unit from Task 12; drop the interim reason. The row now carries the trust reason of HOOKS-3.13; `codex_no_longer_reports_the_unverified_reason` became `codex_offers_the_same_buttons_as_claude_and_says_the_hooks_need_trusting`.
+- [x] **Step 3: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 4: Commit** `git commit -m "feat(integrations): install Navori's hooks into Codex"`
 
 _Requirements: HOOKS-3.10, HOOKS-4.1, HOOKS-4.5_
 
@@ -521,3 +521,53 @@ Amendment from AWAKE story 17.
 - [x] **Step 4: Commit** with AWAKE Task 24.
 
 _Requirements: HOOKS-1.15, HOOKS-1.16, HOOKS-1.17_
+
+---
+
+### Task 20: Install `Interrupt` for Codex (operator amendment, 2026-11-04)
+
+**Files:**
+- Modify: `apps/cli/src/hook.rs`, `modules/integrations/src/domain/hookfile.rs`, `docs/features/integrations.md`, `docs/architecture/integrations.md`, `docs/ARCHITECTURE.md`
+- Test: `apps/cli/tests/cli.rs`, `modules/integrations/tests/install.rs`, `modules/integrations/tests/repair.rs`, `modules/integrations/tests/status.rs`, `modules/integrations/tests/common/mod.rs`
+
+**Reuse:** rung 2 — `required_events`, `desired`, `converge`, and the `stop_session` arm of `plan`.
+
+**Interfaces:**
+- Consumes: `required_events`
+- Produces: Codex's required set is `UserPromptSubmit`, `Stop`, `Interrupt`, `SessionEnd`; `Interrupt` maps to `stop_session`
+
+**Depends-on:** Task 13
+
+- [x] **Step 1: Write failing tests** for the event map, four Codex entries, a three-entry file reading Needs repair, and Repair adding only `Interrupt`.
+- [x] **Step 2: Implement** the event in `plan` and in `CODEX_EVENTS`.
+- [x] **Step 3: Update docs.**
+- [x] **Step 4: Run** `cargo xtask ci` — expect: pass.
+- [x] **Step 5: Commit** with Task 13.
+- [x] **Step 6: Operator:** Repair in Settings, trust the new hook in Codex `/hooks`, interrupt a real turn, and confirm the Lease reads stopped. Done 2026-11-04: operator reported it works; events show Repaired 13:49:37, Keeping 13:50:17, Stopped 13:50:42.
+
+_Requirements: HOOKS-1.18, HOOKS-4.18_
+
+---
+
+### Task 21: Label a Codex session by the directory it reports (operator amendment, 2026-11-04)
+
+**Files:**
+- Modify: `apps/cli/src/hook.rs`, `modules/awake/src/action.rs`, `modules/awake/src/actor.rs`, `modules/awake/src/infra/platform.rs`, `docs/features/integrations.md`
+- Test: `apps/cli/tests/cli.rs`, `modules/awake/tests/session.rs`
+
+**Reuse:** rung 2 — `resolve_open`, `place` and `resolve_location`.
+
+**Interfaces:**
+- Consumes: `cwd` from the `UserPromptSubmit` payload
+- Produces: `hold_session` takes an optional `cwd`; Claude Code and Grok labels do not use it
+
+**Depends-on:** Task 20
+
+- [x] **Step 1: Write failing tests** for a label from the reported directory, two sessions under one daemon, a relative directory, and the Claude guard.
+- [x] **Step 2: Implement** the optional `cwd`.
+- [x] **Step 3: Update docs.**
+- [x] **Step 4: Run** `cargo xtask ci` — expect: pass.
+- [ ] **Step 5: Operator:** send a prompt from a real Codex session and confirm its row sits under its own project.
+- [x] **Step 6: Commit** `git commit -m "fix(awake): label a Codex session by the directory it reports"`
+
+_Requirements: HOOKS-1.19, AWAKE-18.1, AWAKE-18.2, AWAKE-18.3_

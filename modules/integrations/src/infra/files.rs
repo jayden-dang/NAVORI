@@ -38,11 +38,6 @@ fn config_dir(home: &Path, harness: Harness) -> PathBuf {
     home.join(dir_name(harness))
 }
 
-/// Why Navori's hooks cannot be written for `harness` yet, when that is so.
-pub(crate) fn not_installable_yet(harness: Harness) -> Option<String> {
-    (harness == Harness::Codex).then(event::codex_unverified)
-}
-
 pub(crate) fn hook_file(home: &Path, harness: Harness) -> PathBuf {
     let dir = config_dir(home, harness);
     match harness {
@@ -108,8 +103,6 @@ pub(crate) enum Outcome {
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum ApplyError {
-    #[error("{0}")]
-    Unavailable(String),
     #[error("Navori does not know where its helper program is, so it cannot write a hook")]
     NoHelper,
     #[error("{} does not exist, so {} is not set up; Navori does not create it", .dir.display(), .harness)]
@@ -136,12 +129,6 @@ pub(crate) fn apply(
     harness: Harness,
     plan: Plan,
 ) -> Result<Outcome, ApplyError> {
-    if let Some(why) = not_installable_yet(harness) {
-        return Err(ApplyError::Unavailable(format!(
-            "Hooks for {} cannot be installed yet. {why}",
-            event::name(harness)
-        )));
-    }
     if env.helper.as_os_str().is_empty() {
         return Err(ApplyError::NoHelper);
     }

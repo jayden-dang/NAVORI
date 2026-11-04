@@ -316,6 +316,17 @@ Files this story touches: `modules/awake/src/` and `crates/ffi/src/` (AWAKE-12.3
 - **AWAKE-17.6** (guard) WHILE a session has no title THE SYSTEM SHALL CONTINUE TO show its branch as the name.
 - **AWAKE-17.7** (guard) WHEN a session has a title THE SYSTEM SHALL CONTINUE TO group its row by the project in its label, as AWAKE-11.13 does.
 
+## 18. Label a Codex session by its own directory
+
+**Story:** As the user, I want a Codex row under the project I opened Codex in, so that sessions served by one shared daemon are not all shown under the daemon's project.
+
+Files this story touches: `modules/awake/src/` and `apps/cli/src/hook.rs` (HOOKS-1.19).
+
+- **AWAKE-18.1** WHEN a session-hold Action for a Codex session carries an absolute `cwd` THE SYSTEM SHALL build the label from that directory. The Lease SHALL keep watching the resolved process.
+- **AWAKE-18.2** IF `cwd` is absent or not absolute THEN THE SYSTEM SHALL build the label from the process's working directory.
+- **AWAKE-18.3** (guard) WHEN a session-hold Action for Claude Code or Grok carries a `cwd` THE SYSTEM SHALL CONTINUE TO build the label from the process's working directory.
+- **AWAKE-18.4** THE SYSTEM SHALL NOT store the `cwd`, so a restored Codex Lease is labelled from the process until its next hold.
+
 ## Out of Scope
 
 - Installing hooks and `navori hook` — ROAD-9.

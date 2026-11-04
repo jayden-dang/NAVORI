@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -95,17 +96,20 @@ impl Platform {
     /// Harness for `pid`, or for `ppid` when `pid` is not running.
     ///
     /// The snapshot runs on a blocking thread. The label is the project location, or `None`
-    /// when the working directory cannot be read. `Err` from the join means that task stopped.
+    /// when the working directory cannot be read. A Codex session uses `reported`, when absolute,
+    /// instead of the process's directory. `Err` from the join means that task stopped.
     pub(crate) async fn resolve_session(
         &mut self,
         pid: i32,
         ppid: i32,
+        reported: Option<&str>,
     ) -> Result<Result<(Harness, ProcId, Option<String>), Rejected>, tokio::task::JoinError> {
         let source = match self.ensure_processes() {
             Ok(source) => source,
             Err(err) => return Ok(Err(Rejected::Platform(err))),
         };
-        tokio::task::spawn_blocking(move || resolve_open(source, pid, ppid)).await
+        let reported = reported.map(PathBuf::from);
+        tokio::task::spawn_blocking(move || resolve_open(source, pid, ppid, reported)).await
     }
 
     /// One `entry`, kept only when it is this user's live process.
@@ -242,6 +246,7 @@ fn resolve_open(
     source: Arc<dyn ProcessSource>,
     pid: i32,
     ppid: i32,
+    reported: Option<PathBuf>,
 ) -> Result<(Harness, ProcId, Option<String>), Rejected> {
     let snapshot = Snapshot::take(source).map_err(|err| match err {
         ProcsError::Platform { source } => Rejected::Platform(source),
@@ -259,7 +264,11 @@ fn resolve_open(
             HarnessLookup::NotRunning => return Err(Rejected::NotRunning),
         },
     };
-    Ok((harness, process, location_label(&snapshot, process)))
+    let label = match reported.filter(|cwd| harness == Harness::Codex && cwd.is_absolute()) {
+        Some(cwd) => Some(place(&resolve_location(&cwd))),
+        None => location_label(&snapshot, process),
+    };
+    Ok((harness, process, label))
 }
 
 fn classify_descendants(

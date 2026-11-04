@@ -3,7 +3,8 @@
 mod common;
 
 use common::{
-    CLAUDE, DEV_HELPER, FIVE, RELEASE_HELPER, Rig, THREE, command, complete, group, handler, tree,
+    CLAUDE, CODEX, DEV_HELPER, FIVE, RELEASE_HELPER, Rig, THREE, command, complete, group, handler,
+    tree,
 };
 use serde_json::{Value, json};
 
@@ -233,26 +234,38 @@ async fn both_profiles_side_by_side_are_each_read_on_their_own() {
 }
 
 #[tokio::test]
-async fn codex_reports_what_it_finds_and_offers_nothing() {
+async fn codex_offers_the_same_buttons_as_claude_and_says_the_hooks_need_trusting() {
     let rig = Rig::release();
     rig.make_dir(".codex");
     let row = rig.row("codex").await;
     assert_eq!(row["state"], "not_installed");
-    assert!(offers(&row).is_empty());
-    let reason = row["reason"].as_str().unwrap();
-    assert!(
-        reason.contains("Codex timeout unit is not verified yet"),
-        "{reason}"
-    );
+    assert_eq!(offers(&row), ["install"]);
+    assert_eq!(row["reason"], Value::Null);
 
     rig.write_json(CODEX_FILE, &complete(&release_command(), &CLAUDE));
-    assert_eq!(rig.row("codex").await["state"], "needs_repair");
+    let row = rig.row("codex").await;
+    assert_eq!(row["state"], "needs_repair");
+    assert_eq!(offers(&row), ["repair", "remove"]);
+    assert!(row["reason"].as_str().unwrap().contains("/hooks"));
 
     rig.write_json(CODEX_FILE, &complete(&release_command(), &THREE));
+    assert_eq!(rig.row("codex").await["state"], "needs_repair");
+
+    rig.write_json(CODEX_FILE, &complete(&release_command(), &CODEX));
     let row = rig.row("codex").await;
     assert_eq!(row["state"], "installed");
-    assert!(offers(&row).is_empty());
-    assert_eq!(row["reason"], reason);
+    assert_eq!(offers(&row), ["remove"]);
+    assert!(row["reason"].as_str().unwrap().contains("/hooks"));
+}
+
+#[tokio::test]
+async fn only_codex_says_its_hooks_need_trusting() {
+    let rig = Rig::release();
+    rig.write_json(CLAUDE_FILE, &complete(&release_command(), &CLAUDE));
+    rig.write_json(GROK_FILE, &complete(&release_command(), &FIVE));
+
+    assert_eq!(rig.row("claude").await["reason"], Value::Null);
+    assert_eq!(rig.row("grok").await["reason"], Value::Null);
 }
 
 #[tokio::test]

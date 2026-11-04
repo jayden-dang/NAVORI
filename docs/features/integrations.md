@@ -1,14 +1,14 @@
 # Integrations
 
-Put Navori's hooks into Claude Code and Grok Build from Settings, and turn their lifecycle events into session Leases through `navori hook`. Codex is listed but not installable yet.
+Put Navori's hooks into Claude Code, Codex and Grok Build from Settings, and turn their lifecycle events into session Leases through `navori hook`.
 
 A Harness runs `navori hook` on a lifecycle event with a JSON payload on stdin. The command reads the event name and session id, and asks the running Core for one Awake session Action. For a hold it sends its own process id and its parent process id along with the session id. Prompt text and every other payload field stay in the command.
 
 | Event | Action |
 |---|---|
-| `UserPromptSubmit` | `hold_session` |
+| `UserPromptSubmit` | `hold_session`, with `cwd` when the payload has it; only a Codex label uses it |
 | `Stop` (only when it carries no `reason`, or `reason` is `end_turn`) | `stop_session`, with `background` when its `background_tasks` list is not empty |
-| `StopCancelled`, `StopFailure` | `stop_session` |
+| `StopCancelled`, `StopFailure`, `Interrupt` | `stop_session` |
 | `SubagentStart` | `subagent_start` with the agent id and pids |
 | `SubagentStop` | `subagent_stop` with the agent id, and `background` as above |
 | `SessionEnd` | `end_session` |
@@ -32,7 +32,7 @@ Settings has a fourth tab, `Integrations`, before About. It lists Claude Code, C
 
 ## Codex
 
-The Codex row reports its state as found and offers nothing, with the reason `The Codex timeout unit is not verified yet.` The reason shows when the `~/.codex` directory exists and its Hook file is absent or parses; otherwise the row keeps its Not found or Unreadable reason. Install, Repair and Remove reply with an error for Codex. Codex hooks do not work from Navori yet.
+The Codex row offers the same buttons as the other Harnesses. Codex runs a new or changed hook only after you trust it, so after Install or Repair open Codex and run `/hooks`. An untrusted hook is skipped, and `codex exec` prints no warning. While the row reads Installed or Needs repair it says so: `Codex runs these hooks only after you trust them: open Codex and run /hooks.` Navori does not read the trust state, so the row and `navori doctor` cannot tell whether you have done this.
 
 ## Commands
 
@@ -54,10 +54,10 @@ Events: `integrations.hook_installed`, `integrations.hook_repaired`, `integratio
 Only these paths, under the home directory the Core was started with, and their Backups:
 
 - Claude Code: `~/.claude/settings.json`
-- Codex: `~/.codex/hooks.json` (never written yet)
+- Codex: `~/.codex/hooks.json`
 - Grok Build: `~/.grok/hooks/navori.json`
 
-Install adds a `UserPromptSubmit`, `Stop`, `StopFailure`, `SubagentStart`, `SubagentStop` and `SessionEnd` entry for Claude Code, and `UserPromptSubmit`, `Stop`, `StopCancelled`, `StopFailure` and `SessionEnd` for Grok. Each entry is one command handler, with the quoted absolute path of the app's `Contents/Helpers/navori` followed by ` hook` (` --profile dev hook` for the dev app), and a timeout of 2 seconds (1 for `SessionEnd`). It never uses `~/.local/bin/navori`. Install never creates `~/.claude`, `~/.codex` or `~/.grok`; for Grok it creates `~/.grok/hooks` when `~/.grok` exists.
+Install adds a `UserPromptSubmit`, `Stop`, `StopFailure`, `SubagentStart`, `SubagentStop` and `SessionEnd` entry for Claude Code, `UserPromptSubmit`, `Stop`, `Interrupt` and `SessionEnd` for Codex, and `UserPromptSubmit`, `Stop`, `StopCancelled`, `StopFailure` and `SessionEnd` for Grok. Each entry is one command handler, with the quoted absolute path of the app's `Contents/Helpers/navori` followed by ` hook` (` --profile dev hook` for the dev app), and a timeout of 2 seconds (1 for `SessionEnd`). It never uses `~/.local/bin/navori`. Install never creates `~/.claude`, `~/.codex` or `~/.grok`; for Grok it creates `~/.grok/hooks` when `~/.grok` exists.
 
 - Every other key, hook and array order stays. Whitespace may be rewritten.
 - Before changing an existing file, Navori copies it to `<name>.navori-bak-<seconds>` beside it. A file already correct, or with nothing to remove, is not touched and gets no Backup. Backups are never pruned.
@@ -71,13 +71,13 @@ Install adds a `UserPromptSubmit`, `Stop`, `StopFailure`, `SubagentStart`, `Suba
 
 None of this has run against a live Harness or a signed build. Open:
 
-- Everything this page says about what a Harness sends or does comes from its documentation and has not been observed. That includes whether real Claude Code and Codex `Stop` payloads carry no `reason`, as documented, and whether the events carry `hook_event_name` and `session_id` as documented.
-- The Codex `timeout` unit, and whether Codex runs `command` through a shell. This is why Codex is not installable.
+- Everything this page says about what Claude Code or Grok sends or does comes from its documentation and has not been observed. That includes whether real Claude Code `Stop` payloads carry no `reason`, as documented, and whether the events carry `hook_event_name` and `session_id` as documented. For Codex 0.166 the payload fields, the `timeout` unit (whole seconds) and the shell (`$SHELL -lc`) are read from its source, not from a recorded trusted session.
+- Codex 0.166 ran these hooks under its shared `app-server` daemon on this Mac. A Codex row takes its project from the directory the hook reports, but the Lease watches the daemon, which outlives a closed Codex. A normal close removed the Lease in a real run. A killed Codex with no `SessionEnd` has not been observed and may hold until the 8 hour TTL. After a Navori restart the row shows the daemon's project until the next prompt.
 - Whether you see the standard error of a Claude Code or Codex hook that exits 0 (the command prints none).
 - Whether Grok's daemon route leaves a live Harness process above the hook, so a Grok Session Lease starts at all.
 - Whether a signed build writing into `~/.claude`, `~/.codex` and `~/.grok` triggers a macOS permission prompt.
 - Claude Code's `Stop` does not run on an interrupt, and no other event fires there either, so a Lease can stay open until the next `Stop`, `SessionEnd`, the Harness exiting or the 8 hour TTL. An API error fires `StopFailure`, which Install now adds, but that has not been observed with a live Harness.
-- Codex skips a new or changed hook until you review it in `/hooks`, and every Repair changes its hash. A Codex hook reported as Installed may not run yet. Grok and Claude Code trust is a documentation read only.
+- A Codex hook reported as Installed may not run yet, because Navori does not read Codex's trust state. A Repair that changes a hook asks for trust again. Grok and Claude Code trust is a documentation read only.
 - Keyboard and VoiceOver walks of the Integrations tab.
 
 ## What it does not do

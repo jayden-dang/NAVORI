@@ -24,7 +24,7 @@ Not covered here: the internal Rust ⇄ Swift boundary (`system.md`, `runtime.md
 
 | System | Direction | Contract |
 |---|---|---|
-| Harness hooks — Codex (R1, partial) | in (events) · out (hook install) | `~/.codex/hooks.json` is listed and its state read, but Install, Repair and Remove return an error until the Codex `timeout` unit is verified. |
+| Harness hooks — Codex (R1) | in (events) · out (hook install) | `~/.codex/hooks.json`; events `UserPromptSubmit`, `Stop`, `Interrupt`, `SessionEnd`. Codex runs a hook only after the user trusts it in `/hooks`; Navori does not read that state. |
 | BSD process APIs — libproc, `sysctl`, kqueue, signals (R1, R3) | in · out | Read the process table (pid, ppid, uid, exe, argv, cwd), listening TCP sockets and process-exit events (`EVFILT_PROC/NOTE_EXIT`); stop processes with `SIGTERM` to the process group, then `SIGKILL` after 3 s. Only processes of the current UID. |
 | Cloud LLM providers (R2) | out | Four adapter families over HTTPS + SSE: `anthropic` (Messages API), `openai` (Responses API), `openai_compat` (Chat Completions — DeepSeek, xAI, OpenRouter, Groq, Mistral, Ollama/LM Studio, custom endpoints), `gemini`. One API key per provider, in the Keychain. Every request passes the Context Gateway (redaction, audit). |
 | macOS frameworks via PlatformServices (R2) | in · out | `UserNotifications` (out), `NSWorkspace` + Accessibility (frontmost app, window title, selected text), `ScreenCaptureKit` (screen capture excluding denylisted apps), `Vision` (on-device OCR), `CoreImage` (blur secrets). Each needs its macOS permission, requested on first use. |
