@@ -144,10 +144,31 @@ Run in order; `cut-release` executes exactly these and does not improvise.
    (the previous install is kept as `/Applications/Navori.app.previous`) and launches it.
 3. Smoke: `/Applications/Navori.app/Contents/Helpers/navori doctor` — every check ✓, exit 0.
 4. Tag: `git tag v<version> && git push origin v<version>` — pushing a `v*` tag runs
-   `.github/workflows/release.yml`, which builds and signs the zip, publishes a GitHub
-   Release (a draft while `TAP_REPOSITORY` is unset) and, once the tap is configured,
-   updates the cask. Build the artifacts by hand with
+   `.github/workflows/release.yml`, which builds and signs the zip. The GitHub Release is
+   published and the cask updated only when the repository variable `TAP_REPOSITORY` is
+   set; while it is unset the Release is a draft and the tap is untouched. Pre-release tags
+   behave the same way. Build the artifacts by hand with
    `cargo xtask release --tag v<version> --out <dir>` (`--check` only validates the tag).
+5. Clean-account checks (RELEASE-6.3), once the Release is published and the cask updated.
+   Use a macOS 26 user account that has never run Navori:
+   1. RELEASE-3.7: `brew tap jayden-dang/navori`, `brew trust --cask jayden-dang/navori/navori`,
+      `brew install --cask navori`, then open Navori. Expected: it opens with no Gatekeeper
+      dialog.
+   2. RELEASE-3.8: in Settings → Integrations install the Claude Code hooks, work in a
+      Claude Code session, then run `pmset -g assertions`. Expected: it lists
+      "Navori: keeping this Mac awake".
+   3. RELEASE-4.4: with two pre-releases published, install the older, set a setting, keep
+      the hooks and save an AI key, then `brew upgrade --cask navori`. Expected: settings,
+      hooks and the saved AI key survive with no Keychain prompt.
+   4. Open verification from implementation: the cask's `postflight_steps` also runs on
+      `brew upgrade` (check during step 3 that the upgraded app is not quarantined:
+      `xattr -p com.apple.quarantine /Applications/Navori.app` prints nothing, and it opens
+      without a Gatekeeper dialog).
+   5. Open verification from implementation: the Task-9 style checks (draft run with a bad
+      tag, draft pre-release, then the published run against the tap). Expected: each
+      behaves as listed in `docs/specs/2026-11-04-public-release/tasks.md` Task 9; record one
+      row per check (what was run, by whom, when, observed result, pass/fail) in
+      `docs/specs/2026-11-04-public-release/acceptance.md`.
 
 No notarization (no Apple Developer ID): the app is self-signed and the cask clears the
 quarantine flag.
@@ -157,21 +178,26 @@ quarantine flag.
 Do this once, before the first tag. Create nothing here from an agent session and commit
 nothing secret.
 
-1. Export the `Navori Local Signing` identity with its private key as a `.p12` (Keychain
-   Access, or `security export -t identities -f pkcs12 -o navori.p12`). Keep an OFFLINE copy
+1. Export the `Navori Local Signing` identity with its private key as a `.p12`: in Keychain
+   Access select that single identity, File → Export Items…, format `.p12`. Choose a
+   NON-EMPTY export passphrase and store it as `SIGNING_P12_PASSWORD`. Keep an OFFLINE copy
    (encrypted drive): losing the key means a new identity and a new designated requirement
-   for every user.
-2. Create the GitHub Environment `release`, restricted to tags matching `v*`, with secrets
-   `SIGNING_P12` (`base64 < navori.p12`), `SIGNING_P12_PASSWORD` and `TAP_TOKEN`.
-3. Add a repository ruleset so only the owner can create `v*` tags.
-4. Create the tap repository (`jayden-dang/homebrew-navori`) and a fine-grained token with
-   `contents: write` on that tap ONLY. Store it as `TAP_TOKEN`; it must be non-empty before
-   `TAP_REPOSITORY` is set.
+   for every user. (CLI alternative: `security export -k <keychain> -t identities -f pkcs12
+   -o navori.p12 -P <passphrase>` exports EVERY identity in that keychain, so use it only
+   against a keychain that holds just this identity.)
+2. Create the tap repository (`jayden-dang/homebrew-navori`) and a fine-grained token with
+   `contents: write` on that tap ONLY. Verify the token's repository access lists only the
+   tap (RELEASE-7.6).
+3. Create the GitHub Environment `release`, restricted to tags matching `v*`, with secrets
+   `SIGNING_P12` (`base64 < navori.p12`), `SIGNING_P12_PASSWORD` and `TAP_TOKEN` (the token
+   from step 2; it must be non-empty before `TAP_REPOSITORY` is set).
+4. Add a repository ruleset so only the owner can create `v*` tags.
 5. Leave the repository variable `TAP_REPOSITORY` UNSET until the first public release. While
    it is unset, tags produce draft Releases only and the tap is not touched. To go public,
    set it to `jayden-dang/homebrew-navori`.
 6. Right before the first FINAL tag (not a pre-release), add `- **Compat obligation:**
-   External` to Project posture above; `cargo xtask release-check` enforces it.
+   External` as a line of its own in the `## Project posture` bullet list (it must start
+   the line); `cargo xtask release-check` enforces it.
 
 ## Paths
 

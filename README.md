@@ -10,7 +10,7 @@ Swift (AppKit + SwiftUI) shell. Architecture: [docs/ARCHITECTURE.md](docs/ARCHIT
 
 ## Install
 
-Available from v0.1.0 (the tap does not exist yet).
+Not published yet; available once v0.1.0 is released.
 
 ```sh
 brew tap jayden-dang/navori
