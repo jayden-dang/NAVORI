@@ -104,10 +104,10 @@ _Requirements: ASK-9.6, ASK-9.7_
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1: Failing tests** — `core_ask_has_its_method_name_and_four_distinct_codes_in_the_free_range`: assert `ASK == "core.ask"`, the four codes equal the literals above, all are `< -32003` and `>= -32099`, and all differ from every existing code. `ask_params_and_reply_round_trip_through_json`: serialize `AskRequest{model:"m", text:"hi"}` and expect `{"model":"m","text":"hi"}`; parse `{"reply":"ok"}` into `AskReply`. Run `cargo test -p navori-protocol --test ask_wire` — expect: unresolved names.
-- [ ] **Step 2: Implement** the constants and structs; `navori-protocol` gains no dependency. Run the same command — expect: pass.
-- [ ] **Step 3: Guard** — run `cargo test -p navori-protocol -p navori-ipc` — expect: all existing tests pass unchanged.
-- [ ] **Step 4: Commit** — `git commit -m "feat(protocol): add the core.ask method, its codes and wire structs"`.
+- [x] **Step 1: Failing tests** — `core_ask_has_its_method_name_and_four_distinct_codes_in_the_free_range`: assert `ASK == "core.ask"`, the four codes equal the literals above, all are `< -32003` and `>= -32099`, and all differ from every existing code. `ask_params_and_reply_round_trip_through_json`: serialize `AskRequest{model:"m", text:"hi"}` and expect `{"model":"m","text":"hi"}`; parse `{"reply":"ok"}` into `AskReply`. Run `cargo test -p navori-protocol --test ask_wire` — expect: unresolved names.
+- [x] **Step 2: Implement** the constants and structs; `navori-protocol` gains no dependency. Run the same command — expect: pass.
+- [x] **Step 3: Guard** — run `cargo test -p navori-protocol -p navori-ipc` — expect: all existing tests pass unchanged.
+- [x] **Step 4: Commit** — `git commit -m "feat(protocol): add the core.ask method, its codes and wire structs"`.
 
 _Requirements: ASK-4.2, ASK-7.5, ASK-9.2_
 
