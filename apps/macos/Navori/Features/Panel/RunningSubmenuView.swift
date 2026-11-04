@@ -9,10 +9,12 @@ struct RunningSubmenuView: View {
     @Environment(CascadeController.self) private var cascade
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let state = store.runningSubmenu {
-                ForEach(Array(state.items.enumerated()), id: \.offset) { _, item in
-                    row(item, state: state)
+        CappedScroll {
+            VStack(alignment: .leading, spacing: 0) {
+                if let state = store.runningSubmenu {
+                    ForEach(Array(state.items.enumerated()), id: \.offset) { _, item in
+                        row(item, state: state)
+                    }
                 }
             }
         }
@@ -70,7 +72,21 @@ struct RunningSubmenuView: View {
         case let .project(project):
             ProjectRowView(state: project, targets: project.targets, store: store, cascade: cascade)
         case let .stopAll(offer):
-            StopAllRowView(offer: offer, store: store, cascade: cascade)
+            StopLineView(
+                id: CoreStore.stopAllId,
+                title: "Stop all ports\u{2026}",
+                confirmation: offer.confirmation,
+                note: offer.systemNote,
+                stopLabel: offer.spoken,
+                store: store,
+                cascade: cascade,
+                narrow: true,
+                onConfirm: { store.confirmStop(CoreStore.stopAllId, offer: offer) }
+            )
+        case let .commands(rows):
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                CommandRowView(row: row)
+            }
         }
     }
 
@@ -124,76 +140,29 @@ private struct AwakeProblemView: View {
     }
 }
 
-private struct StopAllRowView: View {
-    let offer: StopAllOffer
-    let store: CoreStore
-    let cascade: CascadeController
+private struct CommandRowView: View {
+    let row: HoldingRow
 
     var body: some View {
-        let id = CoreStore.stopAllId
-        let selected = cascade.selection == id
-        let flow = store.stopFlow(id)
-        VStack(alignment: .leading, spacing: 0) {
-            switch flow {
-            case .asking:
-                InlineConfirmation(
-                    text: offer.confirmation,
-                    note: offer.systemNote,
-                    stopLabel: offer.spoken,
-                    onConfirm: { store.confirmStop(id, offer: offer) },
-                    onCancel: { store.dismissStop(id) }
-                )
-            case .running:
-                label("Stopping\u{2026}", selected: selected)
-            case let .failed(reasons):
-                label("Stop all ports\u{2026}", selected: selected)
-                StopFailureLines(reasons: reasons)
-            case .idle:
-                label("Stop all ports\u{2026}", selected: selected)
-            }
+        HStack(spacing: 6) {
+            Image(systemName: "terminal")
+                .font(.system(size: 12))
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .frame(width: 14, height: 20)
+            Text(row.name)
+                .font(.system(size: 14))
+                .foregroundStyle(Color(nsColor: .labelColor))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 8)
+            Text(row.word)
+                .font(.system(size: 12))
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
         }
-        .onContinuousHover { phase in
-            switch phase {
-            case .active:
-                cascade.pointer(on: id, at: NSEvent.mouseLocation)
-            case .ended:
-                cascade.pointerLeft(id)
-            }
-        }
-        .onChange(of: selected) { _, isSelected in
-            if isSelected == false { store.dismissStop(id) }
-        }
-    }
-
-    private func label(_ title: String, selected: Bool) -> some View {
-        Button(action: { cascade.click(CoreStore.stopAllId) }) {
-            HStack(spacing: 6) {
-                Image(systemName: "stop.fill")
-                    .font(.system(size: 9))
-                    .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
-                    .frame(width: 14, height: 20)
-                Text(title)
-                    .font(.system(size: 14))
-                    .foregroundStyle(selected ? Color.white : Color(nsColor: .labelColor))
-            }
-            .padding(.horizontal, 8)
-            .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
-            .background {
-                if selected {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color(nsColor: .selectedContentBackgroundColor))
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .focusEffectDisabled()
-        .onGeometryChange(for: CGRect.self) { proxy in
-            proxy.frame(in: .global)
-        } action: { frame in
-            cascade.setRowFrame(CoreStore.stopAllId, frame)
-        }
-        .accessibilityLabel(title)
-        .accessibilityAddTraits(.isButton)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
+        .help(row.help ?? "")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(row.accessibilitySentence)
     }
 }

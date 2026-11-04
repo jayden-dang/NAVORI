@@ -160,6 +160,15 @@ public struct StopProgress: Equatable, Sendable {
         targets.contains { entries[$0] == .stopping }
     }
 
+    /// The reasons a stop reply gave that no listed target carries, such as a request nobody answered.
+    public func unattributed(_ reasons: [String], among targets: [StopTarget]) -> [String] {
+        var left = reasons
+        for reason in failures(among: targets) {
+            if let index = left.firstIndex(of: reason) { left.remove(at: index) }
+        }
+        return left
+    }
+
     public func failures(among targets: [StopTarget]) -> [String] {
         targets.compactMap { target in
             if case .failed(let reason) = entries[target] { reason } else { nil }

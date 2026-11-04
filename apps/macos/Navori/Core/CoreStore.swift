@@ -215,12 +215,42 @@ final class CoreStore {
     }
 
     var runningSubmenu: RunningSubmenuState? {
-        running.map { RunningSubmenuState(running: $0, problem: awakeSubmenu.problem?.title) }
+        running.map {
+            RunningSubmenuState(running: $0, problem: awakeSubmenu.problem?.title, commands: awakeSubmenu.commandRows)
+        }
+    }
+
+    func projectChild(id: String) -> ProjectChildState? {
+        guard let project = running?.projects.first(where: { ProjectRowState.id(of: $0) == id }) else { return nil }
+        return ProjectChildState(
+            project: project,
+            nowMs: Int64(Date().timeIntervalSince1970 * 1000),
+            home: NSHomeDirectory()
+        )
+    }
+
+    /// What the menu tree nests under `Running`: each project with its child rows, then `Stop all ports`.
+    var runningTree: [CascadeNode] {
+        guard let state = runningSubmenu else { return [] }
+        let projects = state.rows.map { row in
+            CascadeNode(
+                id: row.id,
+                isActionable: true,
+                children: row.childRowIds.map { CascadeNode(id: $0, isActionable: true) }
+            )
+        }
+        return projects + (state.stopAll == nil ? [] : [CascadeNode(id: Self.stopAllId, isActionable: true)])
+    }
+
+    /// Asks for the confirmation of the Stop a child-menu row offers. Nothing is sent here.
+    func askChildStop(_ id: String) {
+        guard let offer = runningSubmenu?.rows.lazy.compactMap({ $0.childOffers[id] }).first else { return }
+        askStop(id, count: offer.count)
     }
 
     var runningRowIds: [String] {
         guard let state = runningSubmenu else { return [] }
-        return state.rows.map(\.id) + (state.stopAll == nil ? [] : [Self.stopAllId])
+        return state.rows.flatMap { [$0.id] + $0.childRowIds } + (state.stopAll == nil ? [] : [Self.stopAllId])
     }
 
     static let stopAllId = "running.stopAll"
@@ -308,7 +338,7 @@ final class CoreStore {
             case .failed where live.contains(owner) == false:
                 stopFlows[owner] = .idle
             case .asking(let count) where offers[owner] != count:
-                stopFlows[owner] = .idle
+                        stopFlows[owner] = .idle
             default:
                 break
             }
@@ -319,6 +349,7 @@ final class CoreStore {
         var counts: [String: Int] = [:]
         for row in state.rows {
             if let stop = row.stop { counts[row.id] = stop.count }
+            for (id, offer) in row.childOffers { counts[id] = offer.count }
         }
         if let all = state.stopAll { counts[stopAllId] = all.ports }
         return counts
@@ -344,18 +375,27 @@ final class CoreStore {
             name: project.name,
             isOther: project.isOther,
             state: Self.input(project.state),
-            sessions: project.sessions.map { RunningSessionInput(stopped: $0.stopped) },
+            sessions: project.sessions.map {
+                RunningSessionInput(stopped: $0.stopped, harness: $0.harness, title: $0.title, branch: $0.branch)
+            },
             ports: project.ports.map {
                 RunningPortInput(
                     port: Int($0.port),
                     name: $0.name,
                     stopRequest: $0.stopRequest,
-                    target: Self.input($0.target)
+                    target: Self.input($0.target),
+                    kind: $0.kind,
+                    worktree: $0.worktree,
+                    harness: $0.harness,
+                    container: $0.container,
+                    protectedInGroup: $0.protectedInGroup
                 )
             },
             stoppablePorts: Int(project.stoppablePorts),
             rowStopRequest: project.rowStopRequest,
-            childStopRequest: project.childStopRequest
+            childStopRequest: project.childStopRequest,
+            path: project.path,
+            upSinceMs: project.upSinceMs
         )
     }
 

@@ -5,6 +5,7 @@ struct InlineConfirmation: View {
 
     let text: String
     var note: String?
+    var leading: CGFloat = MenuColumn.name
     let stopLabel: String
     let onConfirm: () -> Void
     let onCancel: () -> Void
@@ -30,7 +31,7 @@ struct InlineConfirmation: View {
             }
             .buttonStyle(CompactMenuButtonStyle())
         }
-        .padding(.leading, MenuColumn.name)
+        .padding(.leading, leading)
         .padding(.trailing, 8)
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -43,6 +44,7 @@ struct InlineConfirmation: View {
 
 struct StopFailureLines: View {
     let reasons: [String]
+    var leading: CGFloat = MenuColumn.name
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -53,7 +55,7 @@ struct StopFailureLines: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.leading, MenuColumn.name)
+        .padding(.leading, leading)
         .padding(.trailing, 8)
         .padding(.bottom, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -63,6 +65,8 @@ struct StopFailureLines: View {
 enum MenuColumn {
     /// Where a row's name starts: 8 pt padding, the 14 pt lead and a 6 pt gap.
     static let name: CGFloat = 28
+    /// Where a child-menu row's name starts: 8 pt padding, the 20 pt lead and a 6 pt gap.
+    static let childName: CGFloat = 34
 }
 
 struct CompactMenuButtonStyle: ButtonStyle {

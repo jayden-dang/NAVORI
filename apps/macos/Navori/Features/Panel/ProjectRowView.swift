@@ -56,7 +56,8 @@ struct ProjectRowView: View {
                 )
             }
             if case .failed(let reasons) = flow {
-                StopFailureLines(reasons: reasons)
+                let unplaced = store.stopProgress.unattributed(reasons, among: targets)
+                if unplaced.isEmpty == false { StopFailureLines(reasons: unplaced) }
             }
         }
         .onContinuousHover { phase in

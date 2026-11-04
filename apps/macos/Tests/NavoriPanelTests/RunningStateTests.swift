@@ -300,3 +300,267 @@ struct ProjectRowIdTests {
         #expect(state.rows.map(\.id) == ["running.project.Other", "running.other"])
     }
 }
+
+private func child(
+    _ name: String = "klynt",
+    state: RunningProjectState = .idle,
+    sessions: [RunningSessionInput] = [],
+    ports: [RunningPortInput] = [],
+    stoppable: Int = 0,
+    childStop: String? = nil,
+    path: String? = nil,
+    upSinceMs: Int64? = nil,
+    isOther: Bool = false,
+    nowMs: Int64 = 0,
+    home: String = "/Users/me"
+) -> ProjectChildState {
+    ProjectChildState(
+        project: RunningProjectInput(
+            name: name,
+            isOther: isOther,
+            state: state,
+            sessions: sessions,
+            ports: ports,
+            stoppablePorts: stoppable,
+            rowStopRequest: nil,
+            childStopRequest: childStop,
+            path: path,
+            upSinceMs: upSinceMs
+        ),
+        nowMs: nowMs,
+        home: home
+    )
+}
+
+private func session(
+    _ title: String?,
+    harness: String? = "Claude Code",
+    branch: String? = "dev",
+    stopped: Bool = false
+) -> RunningSessionInput {
+    RunningSessionInput(stopped: stopped, harness: harness, title: title, branch: branch)
+}
+
+private func listener(
+    _ number: Int,
+    _ name: String,
+    stop: String = "{}",
+    container: Bool = false,
+    kind: String = "dev_server",
+    worktree: String? = nil,
+    harness: String? = nil,
+    protectedInGroup: Bool = false
+) -> RunningPortInput {
+    RunningPortInput(
+        port: number,
+        name: name,
+        stopRequest: stop,
+        kind: kind,
+        worktree: worktree,
+        harness: harness,
+        container: container,
+        protectedInGroup: protectedInGroup
+    )
+}
+
+private let hour: Int64 = 3_600_000
+private let day: Int64 = 24 * hour
+
+@Suite
+struct ProjectChildStateTests {
+    @Test func the_header_shows_up_only_for_a_project_with_no_working_session() {
+        let since = Int64(1_000)
+        let idle = child(
+            state: .idle, ports: [listener(1, "node")], path: "/Users/me/Developer/klynt",
+            upSinceMs: since, nowMs: since + 2 * day + 20 * hour + 5
+        )
+        #expect(idle.header.name == "klynt")
+        #expect(idle.header.path == "~/Developer/klynt")
+        #expect(idle.header.up == "up 2d 20h")
+
+        let working = child(
+            state: .working, sessions: [session("a")], ports: [listener(1, "node")],
+            path: "/Users/me/Developer/klynt", upSinceMs: since, nowMs: since + 2 * day
+        )
+        #expect(working.header.up == nil)
+        #expect(working.header.path == "~/Developer/klynt")
+
+        let unknown = child(state: .unknown, ports: [listener(1, "node")], upSinceMs: since, nowMs: since + day)
+        #expect(unknown.header.up == nil)
+    }
+
+    @Test func up_reads_in_the_two_largest_units() {
+        func up(_ ms: Int64) -> String? {
+            child(state: .idle, ports: [listener(1, "n")], upSinceMs: 0, nowMs: ms).header.up
+        }
+        #expect(up(day + 30 * 60_000) == "up 1d 0h")
+        #expect(up(5 * hour + 12 * 60_000) == "up 5h 12m")
+        #expect(up(12 * 60_000) == "up 12m")
+        #expect(up(10_000) == "up <1m")
+    }
+
+    @Test func a_path_outside_the_home_folder_is_kept_whole() {
+        #expect(child(path: "/opt/work/klynt", home: "/Users/me").header.path == "/opt/work/klynt")
+        #expect(child(path: "/Users/me2/x", home: "/Users/me").header.path == "/Users/me2/x")
+        #expect(child(path: "/Users/me", home: "/Users/me").header.path == "~")
+        #expect(child(path: nil).header.path == nil)
+    }
+
+    @Test func a_section_with_no_rows_is_left_out() {
+        let portsOnly = child(ports: [listener(1, "node")])
+        #expect(portsOnly.sessions.isEmpty)
+        #expect(portsOnly.sections == [.ports])
+        let sessionsOnly = child(state: .working, sessions: [session("a")])
+        #expect(sessionsOnly.ports.isEmpty)
+        #expect(sessionsOnly.sections == [.sessions])
+        #expect(child(state: .working, sessions: [session("a")], ports: [listener(1, "n")]).sections == [.sessions, .ports])
+        #expect(child().sections.isEmpty)
+    }
+
+    @Test func a_working_project_still_has_stop_n_ports_in_its_child() {
+        let state = child(
+            state: .working, sessions: [session("a")], ports: [listener(1, "n"), listener(2, "m")],
+            stoppable: 2, childStop: "child-req"
+        )
+        #expect(state.stop == StopOffer(count: 2, request: "child-req"))
+        #expect(state.stop?.spoken == "Stop 2 ports")
+        #expect(child(ports: [listener(1, "n")], stoppable: 0, childStop: nil).stop == nil)
+        #expect(child(ports: [listener(1, "n")], stoppable: 1, childStop: "").stop == nil)
+    }
+
+    @Test func other_says_how_many_system_ports_are_hidden() {
+        let ports = [
+            listener(1, "node"),
+            listener(5432, "postgres", kind: "database", protectedInGroup: true),
+            listener(88, "sshd", kind: "system", protectedInGroup: true),
+        ]
+        #expect(child("Other", ports: ports, isOther: true).systemNote == "2 system ports hidden")
+        #expect(child("Other", ports: [ports[1]], isOther: true).systemNote == "1 system port hidden")
+        #expect(child("Other", ports: [ports[0]], isOther: true).systemNote == nil)
+        #expect(child("klynt", ports: ports).systemNote == nil)
+    }
+
+    @Test func every_row_reads_as_one_sentence_with_its_state_word() {
+        let state = child(
+            state: .working,
+            sessions: [
+                session("Parallel roads", branch: "dev"),
+                session("old", harness: "Codex", branch: nil, stopped: true),
+                session(nil, harness: nil, branch: nil),
+            ],
+            ports: [listener(10086, "kimi-webbridge")]
+        )
+        #expect(state.sessions[0].spoken == "Parallel roads, Claude Code, branch dev, working")
+        #expect(state.sessions[1].spoken == "old, Codex, stopped")
+        #expect(state.sessions[2].spoken == "Session, working")
+        #expect(state.sessions[0].detail == "dev \u{00B7} working")
+        #expect(state.sessions[1].detail == "stopped")
+        #expect(state.sessions.map(\.dimmed) == [false, true, false])
+        #expect(state.sessions.map(\.showsDot) == [true, false, true])
+        #expect(state.ports[0].spoken == "kimi-webbridge, port 10086, listening")
+        #expect(state.ports[0].portText == ":10086")
+    }
+
+    @Test func a_port_row_names_its_kind_and_a_container_says_docker() {
+        let state = child(ports: [
+            listener(4318, "klynt-otel", container: true, kind: "docker"),
+            listener(5432, "klynt-postgres", container: true, kind: "database"),
+            listener(3000, "node"),
+            listener(5433, "postgres", kind: "database"),
+        ])
+        #expect(state.ports.map(\.mark) == [.container, .container, .process, .database])
+        #expect(state.ports.map(\.suffix) == ["docker", "docker", nil, nil])
+    }
+
+    @Test func a_port_stop_uses_the_pid_request_for_a_process_and_the_project_request_for_a_container() {
+        let pidRequest = #"{"kill":{"selector":{"pid":412},"targets":[]}}"#
+        let projectRequest = #"{"kill":{"selector":{"project":"klynt"},"targets":[]}}"#
+        let state = child(ports: [
+            listener(3000, "node", stop: pidRequest),
+            listener(6379, "klynt-redis", stop: projectRequest, container: true, kind: "docker"),
+            listener(5432, "klynt-postgres", stop: "", container: true, kind: "database", protectedInGroup: true),
+        ])
+        #expect(state.ports[0].stop == StopOffer(count: 1, request: pidRequest))
+        #expect(state.ports[1].stop == StopOffer(count: 1, request: projectRequest))
+        #expect(state.ports[2].stop == nil)
+        #expect(state.ports[0].stop?.spoken == "Stop 1 port")
+    }
+
+    @Test func a_port_rows_tooltip_and_spoken_sentence_name_its_worktree_and_harness_and_none_for_docker() {
+        let state = child(ports: [
+            listener(3000, "next-server", worktree: "feat-x", harness: "claude_code"),
+            listener(3001, "vite", harness: "codex"),
+            listener(3002, "bun", worktree: "main"),
+            listener(6379, "klynt-redis", container: true, kind: "docker"),
+        ])
+        #expect(state.ports[0].tooltip == "worktree feat-x \u{00B7} started by Claude Code")
+        #expect(state.ports[0].spoken == "next-server, port 3000, worktree feat-x, started by Claude Code, listening")
+        #expect(state.ports[1].tooltip == "started by Codex")
+        #expect(state.ports[2].tooltip == "worktree main")
+        #expect(state.ports[3].tooltip == nil)
+        #expect(state.ports[3].spoken == "klynt-redis, docker, port 6379, listening")
+    }
+
+    @Test func a_stopping_or_failed_port_speaks_its_state_word() {
+        let row = child(ports: [listener(3000, "node")]).ports[0]
+        #expect(row.spoken(for: .stopping) == "node, port 3000, stopping")
+        #expect(row.spoken(for: .failed("The process changed.")) == "node, port 3000, stop failed, The process changed.")
+        #expect(row.spoken(for: nil) == row.spoken)
+    }
+
+    @Test func the_rows_carry_ids_under_their_project_and_the_offers_by_id() {
+        let state = RunningSubmenuState(running: running([
+            project(
+                "klynt", state: .idle,
+                ports: [port(3000, stop: "a"), port(5432, stop: "")],
+                stoppable: 1, rowStop: "r", childStop: "c"
+            ),
+        ]))
+        let row = state.rows[0]
+        #expect(row.childRowIds == ["running.project.klynt.port.3000", "running.project.klynt.port.5432", "running.project.klynt.stop"])
+        #expect(row.childOffers["running.project.klynt.port.3000"] == StopOffer(count: 1, request: "a"))
+        #expect(row.childOffers["running.project.klynt.port.5432"] == nil)
+        #expect(row.childOffers["running.project.klynt.stop"] == StopOffer(count: 1, request: "c"))
+    }
+
+    @Test func the_other_child_ends_with_the_note_and_a_session_less_project_has_no_sessions_section() {
+        let state = child("Other", ports: [listener(88, "sshd", kind: "system", protectedInGroup: true)], isOther: true)
+        #expect(state.sections == [.ports])
+        #expect(state.systemNote == "1 system port hidden")
+    }
+}
+
+@Suite
+struct RunningCommandRowsTests {
+    @Test func commands_show_as_rows_between_the_projects_and_stop_all() {
+        let commands = AwakeSubmenuState(
+            status: .on(sources: []),
+            leases: [AwakeLeaseInput(kind: .command, harness: nil, label: "make test", pid: 77, stopped: false, until: nil)],
+            displayHeld: false,
+            tracking: true
+        ).commandRows
+        #expect(commands.map(\.name) == ["make test"])
+        let state = RunningSubmenuState(
+            running: running(
+                [project("api", state: .idle, ports: [port(1, stop: "a")], stoppable: 1, rowStop: "r", childStop: "r")],
+                stopAll: ["r"], stopAllPorts: 1
+            ),
+            commands: commands
+        )
+        let kinds = state.items.map { item -> String in
+            switch item {
+            case .project: "project"
+            case .commands: "commands"
+            case .stopAll: "stopAll"
+            case .separator: "separator"
+            default: "other"
+            }
+        }
+        #expect(kinds == ["other", "other", "separator", "project", "separator", "commands", "separator", "stopAll"])
+    }
+
+    @Test func no_commands_leave_the_list_as_it_was() {
+        let state = RunningSubmenuState(running: running([project("api", state: .working, sessions: [live])]))
+        #expect(state.items.contains { if case .commands = $0 { true } else { false } } == false)
+    }
+}

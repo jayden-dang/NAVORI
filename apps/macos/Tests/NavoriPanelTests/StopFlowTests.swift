@@ -271,3 +271,28 @@ struct StopFlowTests {
         #expect(one.spoken == "Stop 1 port")
     }
 }
+
+@Suite
+struct StopProgressAttributionTests {
+    @Test func a_reason_with_no_listed_target_stays_unattributed() {
+        var progress = StopProgress()
+        let listed = StopTarget.process(pid: 1, startUs: 1)
+        progress.record([StopResult(target: listed, result: .protected, reason: "This process is protected.")])
+        #expect(progress.unattributed(["This process is protected.", "Navori got no answer to the stop."], among: [listed])
+            == ["Navori got no answer to the stop."])
+        #expect(progress.unattributed(["The stop failed.", "The stop failed."], among: [listed])
+            == ["The stop failed.", "The stop failed."])
+    }
+
+    @Test func each_attributed_failure_removes_one_matching_reason_only() {
+        var progress = StopProgress()
+        let first = StopTarget.process(pid: 1, startUs: 1)
+        let second = StopTarget.process(pid: 2, startUs: 2)
+        progress.record([
+            StopResult(target: first, result: .failed, reason: "The stop failed."),
+            StopResult(target: second, result: .failed, reason: "The stop failed."),
+        ])
+        #expect(progress.unattributed(["The stop failed.", "The stop failed.", "The stop failed."], among: [first, second])
+            == ["The stop failed."])
+    }
+}

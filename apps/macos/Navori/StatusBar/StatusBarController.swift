@@ -25,6 +25,8 @@ final class StatusBarController: NSObject {
                     return AnyView(RunningSubmenuView(store: self.store))
                 case "awake.keep":
                     return AnyView(KeepAwakeSubmenuView(store: self.store))
+                case _ where id.hasPrefix("running.project.") || id == "running.other":
+                    return AnyView(ProjectChildView(projectId: id, store: self.store))
                 default:
                     return AnyView(EmptyView())
                 }
@@ -55,7 +57,7 @@ final class StatusBarController: NSObject {
     private var didScheduleStatusMark = false
     private var didReplaceCoreTree = false
     private var runningHadSubmenu = false
-    private var runningRowIds: [String] = []
+    private var runningTree: [CascadeNode] = []
     private var motion = StatusIconMotion()
     private var drawn: (state: StatusIconState, loop: Bool)?
     private var accessibilityObserver: NSObjectProtocol?
@@ -74,7 +76,7 @@ final class StatusBarController: NSObject {
         }
         item.behavior = .terminationOnRemoval
         runningHadSubmenu = RunningRowState(running: store.running).hasSubmenu
-        runningRowIds = store.runningRowIds
+        runningTree = store.runningTree
         accessibilityObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
             object: NSWorkspace.shared,
@@ -233,7 +235,7 @@ final class StatusBarController: NSObject {
     private func observeSnapshot() {
         withObservationTracking {
             _ = store.hasSnapshot
-            _ = store.runningRowIds
+            _ = store.runningTree
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.onSnapshotChange()
@@ -244,14 +246,14 @@ final class StatusBarController: NSObject {
 
     private func onSnapshotChange() {
         let hasSubmenu = RunningRowState(running: store.running).hasSubmenu
-        let rowIds = store.runningRowIds
+        let tree = store.runningTree
         let coreArrived = store.hasSnapshot && !didReplaceCoreTree
-        let changed = hasSubmenu != runningHadSubmenu || rowIds != runningRowIds
+        let changed = hasSubmenu != runningHadSubmenu || tree != runningTree
         if coreArrived {
             didReplaceCoreTree = true
         }
         runningHadSubmenu = hasSubmenu
-        runningRowIds = rowIds
+        runningTree = tree
         guard panelBuilt, panel.isOpen, coreArrived || changed else { return }
         panel.cascade.replaceTree()
     }
@@ -265,7 +267,7 @@ final class StatusBarController: NSObject {
             coreChildren = []
         }
         let runningChildren = store.hasSnapshot && RunningRowState(running: store.running).hasSubmenu
-            ? runningCommands + store.runningRowIds.map { CascadeNode(id: $0, isActionable: true) }
+            ? runningCommands + store.runningTree
             : []
         return [
             CascadeNode(id: "running", isActionable: true, children: runningChildren),
@@ -291,6 +293,7 @@ final class StatusBarController: NSObject {
         switch id {
         case CoreStore.stopAllId:
             if let all = store.runningSubmenu?.stopAll { store.askStop(id, count: all.ports) }
+        case _ where id.hasPrefix("running."): store.askChildStop(id)
         case "settings": showSettings(.general)
         case "about": showSettings(.about)
         case "quit": NSApp.terminate(nil)
