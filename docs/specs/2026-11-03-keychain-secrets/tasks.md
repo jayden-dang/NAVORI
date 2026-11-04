@@ -336,7 +336,7 @@ _Requirements: SECRETS-1.1, SECRETS-1.2_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `crates/secrets/tests/secret.rs`:
 
@@ -366,7 +366,7 @@ fn the_release_and_dev_services_have_their_documented_names_and_differ() {
 
 Run: `cargo nextest run -p navori-secrets --test secret` — expect: compile error, `Secret` not found.
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 `secret.rs`:
 
@@ -420,11 +420,11 @@ pub use secret::*;
 
 That `Secret` has no `Display`, `Serialize` or `Clone` is not testable without a compile-fail harness; it is checked by a search in Task 9.
 
-- [ ] **Step 3: Run and gate**
+- [x] **Step 3: Run and gate**
 
 Run: `cargo fmt --all`, then `cargo nextest run -p navori-secrets --test secret` — expect: 3 passed. Run: `cargo clippy -p navori-secrets --all-targets -- -D warnings` — expect: clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 `git add crates/secrets && git commit -m "feat(secrets): add a redacting Secret and the two Keychain services"`
 
