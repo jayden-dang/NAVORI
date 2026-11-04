@@ -105,6 +105,7 @@ Create:
 - `modules/ports/src/infra/mod.rs`, `modules/ports/src/infra/docker.rs` — `Containers`, `Container`, `DockerSocket`, `DockerError`, HTTP/1.1 framing.
 - `modules/ports/tests/common/mod.rs` — `Rig`, `FakeClock` (both copied shape from `modules/awake/tests/common/mod.rs`), `Gate` (a `ProcessSource` wrapper that can deny, block or panic once), `restarts` (copied from `modules/awake/tests/restart.rs`), `canonical_temp_home`, and from Task 6 `FakeContainers`.
 - `modules/ports/tests/scan.rs`, `place.rs`, `harness.rs`, `kind.rs`, `docker.rs`, `docker_client.rs`, `open.rs`, `timing.rs`, `failure.rs`, `real_os.rs` — tests per story.
+- `xtask/src/perf/docker.rs` — the Docker status a perf run reports and when it refuses `--record` (added in the whole-branch review).
 
 Modify:
 - `crates/macos/src/process.rs` — three `ProcessSource` methods and `MacProcesses` bodies.
@@ -123,6 +124,7 @@ Modify:
 - `xtask/src/perf/mod.rs`, `xtask/src/perf/judge.rs`, `xtask/src/perf/home.rs` — `port_scan_ms`, a shared `median_ms` parser, the Docker socket link in each run's home copy.
 - `docs/standards/performance.md` — budget row, method line, floor.
 - `docs/architecture/integrations.md`, `docs/architecture/system.md`, `docs/security/threat-model.md` — reads and Ports status.
+- `CONTEXT.md`, `docs/features/status-icon.md` — glossary entries for Port, Listener and Placement, and the tray paragraph that now names Ports (added in the whole-branch review).
 - `docs/agents/verify.md`, `README.md`, `docs/codebase/modules.md`, `docs/codebase/map.md`, `docs/codebase/dependencies.md` — the `ports` row, module and crate.
 
 Not touched: `apps/macos/**` (SettingsView.swift:132's sentence is `compat` until ROAD-18), `apps/cli/**`, `crates/kernel/**`.
