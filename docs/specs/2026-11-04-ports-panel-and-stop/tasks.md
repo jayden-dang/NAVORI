@@ -585,10 +585,10 @@ _Requirements: PSTOP-3.10, PSTOP-4.19, PSTOP-8.1, PSTOP-8.2_
 
 **Depends-on:** Task 14
 
-- [ ] **Step 1: Run** `cargo xtask ci` — expect: pass (fmt, clippy `-D warnings`, tests, check-deps, Swift build).
+- [x] **Step 1: Run** `cargo xtask ci` — expect: pass (fmt, clippy `-D warnings`, tests, check-deps, Swift build).
 - [ ] **Step 2: Run** `cargo xtask perf` on an idle machine, without `--record` — expect: pass for `submenu_open_ms`, `menu_reopen_ms`, `menu_open_cpu_ms`, `port_scan_ms` and idle CPU and wake-ups (the GOAL-11 budgets). If Task 10 found that the probe cannot open the Running submenu, report PSTOP-10.1 as "not measured for Running; existing metrics unchanged", never as met, and put that line in the run report.
 - [ ] **Step 3: Drive** the dev app (Launch, Doctor, Drive, Evidence): spawn a throwaway listener in a throwaway git repo, confirm the project shows a ring, press `Stop N` and confirm, read the port released and the next state without the row; then `navori --profile dev dispatch ports '{"kill":{"selector":{"pid":<pid>},"targets":[{"process":{"pid":<pid>,"start_us":1}}]}}'` for the throwaway's pid (read from `ports.list`) returns `Stale` and leaves it running, and a dispatch naming the throwaway's own pid and start time stops it and returns `Stopped` or `StoppedAlone`. Kill-self and kill-ancestor are covered only by the fakes of Task 4: the Core holds no TCP listener, so a real dispatch naming it would answer `Stale`, and no step names a process it did not spawn.
-- [ ] **Step 4: Check** the three Open Questions of `requirements.md` are still open and unverified items are not stated as facts anywhere in the diff.
-- [ ] **Step 5: Commit** any tick-box change `git commit -m "docs(PSTOP): record the verification of the plan"`
+- [x] **Step 4: Check** the three Open Questions of `requirements.md` are still open and unverified items are not stated as facts anywhere in the diff.
+- [x] **Step 5: Commit** any tick-box change `git commit -m "docs(PSTOP): record the verification of the plan"`
 
 _Requirements: PSTOP-10.1, PSTOP-10.2, PSTOP-10.3_
