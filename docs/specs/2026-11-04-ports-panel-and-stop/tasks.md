@@ -380,6 +380,7 @@ _Requirements: PSTOP-1.17, PSTOP-1.11, PSTOP-1.12, PSTOP-1.13, PSTOP-1.14, PSTOP
 
 - [ ] **Step 1: Write the failing tests** in `crates/ffi/tests/running.rs` (pure `build` with fixture states):
   - join: `a_label_joins_the_project_before_its_first_slash` (reads the shared fixture), `a_session_lease_with_a_working_flag_makes_its_project_working`
+  - `an_unknown_state_carries_its_reason_sentence_per_case_and_none_while_known` (four cases, the sentences verbatim, the Awake problem text passed through unchanged)
   - unknown, one test each: `awake_not_registered`, `awake_state_that_did_not_deserialize` (view `None`), `awake_with_a_problem_set`, `awake_module_down`, `tracking_agents_off`, `any_live_session_lease_without_a_label`; each leaves `row_stop_request` and `child_stop_request` empty for every project
   - `a_project_with_no_working_session_is_idle`
   - `the_ports_module_down_gives_no_stop_requests` (ports `None`)
@@ -398,7 +399,7 @@ _Requirements: PSTOP-1.17, PSTOP-1.11, PSTOP-1.12, PSTOP-1.13, PSTOP-1.14, PSTOP
 - [ ] **Step 4: Wire** `snapshot()` and rebase onto `main` first (shared ffi files). Run `cargo test -p navori-ffi && cargo xtask ci` — expect: pass (it also builds the Swift shell, which must still compile with the new field unused).
 - [ ] **Step 5: Commit** `git commit -m "feat(ffi): join ports and awake into one running view"`
 
-_Requirements: PSTOP-4.1, PSTOP-4.2, PSTOP-4.3, PSTOP-4.4, PSTOP-4.5, PSTOP-4.6, PSTOP-4.7, PSTOP-4.12, PSTOP-4.20, PSTOP-7.3_
+_Requirements: PSTOP-4.1, PSTOP-4.2, PSTOP-4.3, PSTOP-4.4, PSTOP-4.5, PSTOP-4.6, PSTOP-4.7, PSTOP-4.12, PSTOP-4.20, PSTOP-4.21, PSTOP-7.3_
 
 ---
 
@@ -424,7 +425,7 @@ _Requirements: PSTOP-4.1, PSTOP-4.2, PSTOP-4.3, PSTOP-4.4, PSTOP-4.5, PSTOP-4.6,
 
 - [ ] **Step 1: Write the failing tests** (Swift Testing, `#expect`):
   - `RunningRowStateTests`: a green dot when anything runs, no dot otherwise, `Running, active` and `Running, nothing running`, no submenu when the running view is missing
-  - `RunningSubmenuStateTests`: filled dot for working, ring for idle, no dot for unknown; the spoken sentences `klynt, working` and `openklynt-main, 3 idle ports`; `Nothing running` shows no `Stop all ports…`; a project row offers `Stop N` only when the input carries a `row_stop_request` (none on a working or unknown row); the submenu order is Keep awake, Tracking agents, the problem line, a separator, the projects, a separator, `Stop all ports…`; `Stop all ports…` absent when no named project is idle
+  - `RunningSubmenuStateTests`: filled dot for working, ring for idle, no dot for unknown; the spoken sentences `klynt, working` and `openklynt-main, 3 idle ports`; `Nothing running` shows no `Stop all ports…`; the note line appears only while `unknown_reason` is set and an unknown project is spoken as `<name>, working state unknown`; a project row offers `Stop N` only when the input carries a `row_stop_request` (none on a working or unknown row); the submenu order is Keep awake, Tracking agents, the problem line, a separator, the projects, a separator, `Stop all ports…`; `Stop all ports…` absent when no named project is idle
   - `StopFlowTests`: nothing is sent before `confirm`; `dismiss` returns to idle; a second `confirm` while running is ignored; a result of stale keeps the row and carries the reason; stopped, stopped-alone and already-gone clear it
   - `LeaseLabelFixtureTests`: reads `crates/ffi/tests/fixtures/lease_labels.json` and asserts `AwakeSubmenuState`'s project for each label equals the fixture's (a null project means project `Other`)
 - [ ] **Step 2: Run** the Swift test command (Global Constraints) — expect: compile errors.
