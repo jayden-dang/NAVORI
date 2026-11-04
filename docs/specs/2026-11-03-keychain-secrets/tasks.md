@@ -89,15 +89,15 @@ Already done outside this plan: the catalog row (`docs/specs/catalog/app.md`) an
 
 **Depends-on:** none
 
-- [ ] **Step 1: Show the crate is missing**
+- [x] **Step 1: Show the crate is missing**
 
 Run: `cargo check -p navori-secrets` — expect: ``package ID specification `navori-secrets` did not match any packages``.
 
-- [ ] **Step 2: Add the workspace lines**
+- [x] **Step 2: Add the workspace lines**
 
 In `Cargo.toml`: add `"crates/secrets",` after `"crates/procs",` in `members`; add `navori-secrets = { path = "crates/secrets" }` after `navori-procs`; add `apple-native-keyring-store = { version = "1.0.2", features = ["keychain"] }` alphabetically (after `anyhow`) and `keyring-core = "1.0.1"` (between `futures` and `libc`).
 
-- [ ] **Step 3: Create the manifest and an empty library**
+- [x] **Step 3: Create the manifest and an empty library**
 
 `crates/secrets/Cargo.toml`:
 
@@ -136,11 +136,11 @@ workspace = true
 //! contains no `unsafe` code (ARCH-9).
 ```
 
-- [ ] **Step 4: Build and read the lockfile delta**
+- [x] **Step 4: Build and read the lockfile delta**
 
 Run: `cargo build -p navori-secrets` — expect: success. Run: `git diff --stat Cargo.lock` and `git diff Cargo.lock | grep '^-version'` — expect: only added packages (`navori-secrets`, `keyring-core`, `apple-native-keyring-store`, `security-framework`, `security-framework-sys`, `core-foundation`, `core-foundation-sys`) and no `-version` line. If a locked version moved, add it to `requirements.md` Open Questions (SECRETS-10.2) before going on.
 
-- [ ] **Step 5: Gate and commit**
+- [x] **Step 5: Gate and commit**
 
 Run: `cargo fmt --all`, then `cargo xtask check-deps` — expect: ok with no xtask change. Run: `cargo xtask ci` — expect: pass.
 `git add Cargo.toml Cargo.lock crates/secrets && git commit -m "build(secrets): add the navori-secrets crate to the workspace"`
