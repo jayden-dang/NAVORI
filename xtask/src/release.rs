@@ -225,11 +225,67 @@ fn build_zip(root: &Path, out: &Path, zip_name: &str, sha_path: &Path) -> Result
     Ok(())
 }
 
+pub(crate) fn unpinned_actions(workflow: &str) -> Vec<String> {
+    workflow
+        .lines()
+        .map(str::trim)
+        .filter(|line| {
+            let Some(value) = uses_value(line) else {
+                return false;
+            };
+            if value.starts_with("./") {
+                return false;
+            }
+            let pin = value.rsplit_once('@').map_or("", |(_, pin)| pin);
+            !(pin.len() == 40 && pin.bytes().all(|b| b.is_ascii_hexdigit()))
+        })
+        .map(str::to_owned)
+        .collect()
+}
+
+fn uses_value(line: &str) -> Option<&str> {
+    let rest = line.strip_prefix("- ").map_or(line, str::trim_start);
+    let rest = rest.strip_prefix("uses:")?.trim();
+    let value = match rest.chars().next()? {
+        quote @ ('"' | '\'') => rest[1..].split(quote).next()?,
+        _ => rest.split(" #").next()?.trim(),
+    };
+    Some(value)
+}
+
+pub(crate) fn check_workflows(root: &Path) -> Result<()> {
+    let dir = root.join(".github/workflows");
+    if !dir.is_dir() {
+        return Ok(());
+    }
+    let mut violations = Vec::new();
+    for entry in std::fs::read_dir(&dir).with_context(|| format!("read {}", dir.display()))? {
+        let path = entry?.path();
+        if !matches!(
+            path.extension().and_then(|e| e.to_str()),
+            Some("yml" | "yaml")
+        ) {
+            continue;
+        }
+        let text =
+            std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+        for line in unpinned_actions(&text) {
+            violations.push(format!("{}: {line}", path.display()));
+        }
+    }
+    ensure!(
+        violations.is_empty(),
+        "workflow actions must be pinned to a full commit SHA:\n  {}",
+        violations.join("\n  ")
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         cask_text, designated_lines, identity_problem, is_prerelease, preflight,
-        requirement_mismatch, tag_version,
+        requirement_mismatch, tag_version, unpinned_actions,
     };
 
     const COMPAT: &str = "# Project\n- **Compat obligation:** External\n";
@@ -427,5 +483,45 @@ mod tests {
     fn build_metadata_alone_is_not_a_pre_release() {
         assert!(!is_prerelease("1.0.0+build-1"));
         assert!(!is_prerelease("0.1.0"));
+    }
+
+    const SHA: &str = "11bd71901bbe5b1630ceea73d27597364c9af683";
+
+    #[test]
+    fn an_action_pinned_to_a_tag_is_reported() {
+        let found = unpinned_actions("steps:\n      - uses: actions/checkout@v4\n");
+        assert_eq!(found, vec!["- uses: actions/checkout@v4".to_owned()]);
+    }
+
+    #[test]
+    fn an_action_pinned_to_a_full_sha_passes() {
+        let wf = format!("steps:\n  - uses: actions/checkout@{SHA}\n");
+        assert!(unpinned_actions(&wf).is_empty());
+    }
+
+    #[test]
+    fn a_local_action_passes() {
+        assert!(unpinned_actions("      - uses: ./.github/actions/x\n").is_empty());
+    }
+
+    #[test]
+    fn a_short_sha_is_reported() {
+        assert_eq!(
+            unpinned_actions("uses: actions/checkout@11bd719\n").len(),
+            1
+        );
+    }
+
+    #[test]
+    fn quoted_uses_values_are_read() {
+        assert_eq!(unpinned_actions("uses: \"actions/checkout@v4\"\n").len(), 1);
+        let wf = format!("uses: 'actions/checkout@{SHA}'\n");
+        assert!(unpinned_actions(&wf).is_empty());
+    }
+
+    #[test]
+    fn a_sha_pin_followed_by_a_version_comment_passes() {
+        let wf = format!("uses: actions/checkout@{SHA} # v4.2.2\n");
+        assert!(unpinned_actions(&wf).is_empty());
     }
 }

@@ -1193,6 +1193,7 @@ fn ci(root: &Path) -> Result<()> {
     sh(cargo(root).args(["test", "--workspace"]))?;
     check_deps(root)?;
     lint_probe(root)?;
+    release::check_workflows(root)?;
     build_core(root, Profile::Dev.default_flavor())?;
     sh(Command::new("swift")
         .args(["build", "--arch", "arm64", "--package-path"])
