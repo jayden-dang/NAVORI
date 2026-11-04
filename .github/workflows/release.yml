@@ -1,0 +1,170 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    environment: release
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      KEYCHAIN_NAME: navori-release.keychain-db
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check the tag against the workspace version
+        id: tag
+        run: cargo xtask release --tag "$GITHUB_REF_NAME" --check | tee -a "$GITHUB_OUTPUT"
+
+      - name: Run the CI gate
+        run: cargo xtask ci
+
+      - name: Find the Release for this tag and reuse its assets
+        id: existing
+        env:
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPOSITORY/releases" --paginate > "$RUNNER_TEMP/releases.json"
+          release=$(jq -s --arg tag "$GITHUB_REF_NAME" \
+            'add | map(select(.tag_name == $tag)) | first // empty' "$RUNNER_TEMP/releases.json")
+          if [ -z "$release" ]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "reuse=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+          zip="Navori-$VERSION.zip"
+          sum="$zip.sha256"
+          zip_id=$(jq -r --arg n "$zip" '.assets[] | select(.name == $n) | .id' <<<"$release")
+          sum_id=$(jq -r --arg n "$sum" '.assets[] | select(.name == $n) | .id' <<<"$release")
+          if [ -z "$zip_id" ] || [ -z "$sum_id" ]; then
+            echo "reuse=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir -p dist
+          gh api -H "Accept: application/octet-stream" "repos/$REPOSITORY/releases/assets/$zip_id" > "dist/$zip"
+          gh api -H "Accept: application/octet-stream" "repos/$REPOSITORY/releases/assets/$sum_id" > "dist/$sum"
+          echo "reuse=true" >> "$GITHUB_OUTPUT"
+
+      - name: Import the signing identity
+        if: steps.existing.outputs.reuse != 'true'
+        env:
+          SIGNING_P12: ${{ secrets.SIGNING_P12 }}
+          SIGNING_P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$HOME/Library/Keychains/$KEYCHAIN_NAME"
+          keychain_password=$(uuidgen)
+          p12="$RUNNER_TEMP/signing.p12"
+          security list-keychains -d user | tr -d '"' | sed 's/^ *//' > "$RUNNER_TEMP/keychains.txt"
+          printf '%s' "$SIGNING_P12" | base64 --decode > "$p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$p12" -k "$keychain" -P "$SIGNING_P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "$keychain" $(cat "$RUNNER_TEMP/keychains.txt")
+          cert="$RUNNER_TEMP/signing.cer"
+          security find-certificate -c "Navori Local Signing" -p "$keychain" > "$cert"
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign -k /Library/Keychains/System.keychain "$cert"
+          rm -f "$cert"
+          echo "NAVORI_SIGN_IDENTITY=Navori Local Signing" >> "$GITHUB_ENV"
+
+      - name: Show the usable code-signing identities
+        if: steps.existing.outputs.reuse != 'true'
+        run: security find-identity -v -p codesigning
+
+      - name: Build the release artifacts
+        run: cargo xtask release --tag "$GITHUB_REF_NAME" --out dist
+
+      - name: Create the draft Release
+        if: steps.existing.outputs.exists != 'true'
+        env:
+          PRERELEASE: ${{ steps.tag.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          flags=()
+          if [ "$PRERELEASE" = "true" ]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "$GITHUB_REF_NAME" --generate-notes ${flags[@]+"${flags[@]}"}
+
+      - name: Upload the assets
+        if: steps.existing.outputs.reuse != 'true'
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: gh release upload "$GITHUB_REF_NAME" --clobber "dist/Navori-$VERSION.zip" "dist/Navori-$VERSION.zip.sha256"
+
+      - name: Check out the tap
+        if: vars.TAP_REPOSITORY != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ vars.TAP_REPOSITORY }}
+          token: ${{ secrets.TAP_TOKEN }}
+          path: tap
+
+      - name: Put the cask in the tap and audit it
+        if: vars.TAP_REPOSITORY != ''
+        env:
+          TAP_REPOSITORY: ${{ vars.TAP_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          mkdir -p tap/Casks
+          cp dist/navori.rb tap/Casks/navori.rb
+          owner="${TAP_REPOSITORY%%/*}"
+          repo="${TAP_REPOSITORY##*/}"
+          tap_name="$owner/${repo#homebrew-}"
+          echo "TAP_NAME=$tap_name" >> "$GITHUB_ENV"
+          brew trust --cask "$tap_name/navori"
+          brew tap "$tap_name" "$PWD/tap"
+          brew style --cask "$tap_name/navori"
+          brew audit --cask "$tap_name/navori"
+
+      - name: Publish the Release
+        if: vars.TAP_REPOSITORY != ''
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false
+
+      - name: Push the cask to the tap
+        if: vars.TAP_REPOSITORY != ''
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        working-directory: tap
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- Casks/navori.rb && [ -z "$(git ls-files --others --exclude-standard Casks/navori.rb)" ]; then
+            echo "The cask already names $VERSION; nothing to push."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/navori.rb
+          git commit -m "navori $VERSION"
+          git push
+
+      - name: Remove the temporary keychain
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/signing.cer"
+          if [ -f "$RUNNER_TEMP/keychains.txt" ]; then
+            # shellcheck disable=SC2046
+            security list-keychains -d user -s $(cat "$RUNNER_TEMP/keychains.txt") || true
+          fi
+          security delete-keychain "$HOME/Library/Keychains/$KEYCHAIN_NAME" || true
