@@ -25,8 +25,8 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 
 ## Focus
 
-**Now:** MILE-2
-**Next:** MILE-3
+**Now:** ROAD-36, ROAD-13, MILE-2
+**Next:** ROAD-11, ROAD-12, ROAD-19, ROAD-20, ROAD-21, ROAD-14, ROAD-37, ROAD-38, ROAD-15, ROAD-16
 
 | ID | Milestone | Outcome | Depends-on | Commitment |
 |---|---|---|---|---|
@@ -112,7 +112,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Outcome:** The user sees pull requests needing review, failing checks and conflicts counted in the menubar, and opens, approves or merges them from the submenu.
 **Goals:** GOAL-4
 **Members:**
-- **ROAD-19** github-device-auth — After: ROAD-10 — Surfaces: `modules/github/`, `crates/secrets/`, `crates/ffi/`, `apps/macos/Navori/Features/Settings/` <!-- surfaces and After: ROAD-10 edited by an agent (keychain-secrets run, 2026-11-03); approved by the operator 2026-11-04 -->
+- **ROAD-19** github-device-auth — After: ROAD-36 — Surfaces: `modules/github/`, `crates/secrets/`, `crates/ffi/`, `apps/macos/Navori/Features/Settings/` <!-- surfaces edited by an agent (keychain-secrets run, 2026-11-03); approved by the operator 2026-11-04 -->
 - **ROAD-20** pull-request-inbox — After: ROAD-19 — Surfaces: `modules/github/`, `apps/macos/Navori/Features/`
 - **ROAD-21** pull-request-actions — After: ROAD-20 — Surfaces: `modules/github/`, `apps/macos/Navori/Features/`
 **Depends-on:** MILE-3
