@@ -30,7 +30,7 @@ Paths are shown for `release`; `dev` uses `Navori Dev` in place of `Navori`. Not
 
 | Entity / store | Notes |
 |---|---|
-| Keychain items, service `dev.navori` (R2, R4) | GitHub token, AI provider API keys. Never in the database, config or logs (ARCH-8). |
+| Keychain items, service `dev.navori` for the release Profile and `dev.navori.dev` for the dev Profile (R2, R4) | GitHub token, AI provider API keys. Never in the database, config or logs (ARCH-8). |
 | `inbox_*` (R2) | Needs you: Decisions, To-dos, Updates and their outcomes. |
 | `ai_session_*`, usage (R2) | Conversations in the canonical message format, tool calls, token usage and estimated cost per turn. |
 | `memory_*` (R2) | Facts and preferences, episodic summaries, embeddings. Written only after redaction. |
