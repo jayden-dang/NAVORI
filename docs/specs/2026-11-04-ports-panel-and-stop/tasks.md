@@ -335,7 +335,7 @@ _Requirements: PSTOP-3.3, PSTOP-3.4, PSTOP-3.7, PSTOP-3.8, PSTOP-3.9_
 
 **Depends-on:** Task 3, Task 4, Task 5, Task 6
 
-- [ ] **Step 1: Write the failing tests** in `modules/ports/tests/stop_orchestration.rs` through `Rig` (paused clock, `FakeSignals`, `FakeContainers`):
+- [x] **Step 1: Write the failing tests** in `modules/ports/tests/stop_orchestration.rs` through `Rig` (paused clock, `FakeSignals`, `FakeContainers`):
   - `a_kill_request_is_answered_once_with_one_result_per_target_in_request_order`
   - `a_process_and_a_container_stop_at_the_same_time_inside_one_deadline`
   - `a_target_still_stopping_at_twenty_five_seconds_answers_still_stopping`
@@ -352,10 +352,10 @@ _Requirements: PSTOP-3.3, PSTOP-3.4, PSTOP-3.7, PSTOP-3.8, PSTOP-3.9_
   - `an_overlapping_second_request_does_not_signal_a_target_twice`
   - `no_timer_runs_while_the_menu_is_closed_and_no_stop_is_in_flight` (guard: `tests/timing.rs` assertions stay green)
   - `a_kill_in_one_profile_writes_its_event_only_to_that_profiles_journal` (guard)
-- [ ] **Step 2: Run** `cargo test -p navori-mod-ports --test stop_orchestration` — expect: failures (placeholder reply).
-- [ ] **Step 3: Implement** the `Kill` arm in the `ctx.recv()` branch of `run_loop`: record `arrival`, spawn the task, hold it in the `JoinSet`; the task body is fresh read, `resolve`, concurrent stops in a `FuturesUnordered`, result assembly, all inside the 25 s timeout. Containers are keyed by id so one `stop` per container.
-- [ ] **Step 4: Implement** the join-set branch of the `select!`: emit the Event, then rescan as above. Dropping the set on return aborts the tasks (`Request` dropped → caller sees `Unavailable`).
-- [ ] **Step 5: Run** `cargo test -p navori-mod-ports && cargo xtask check-deps` — expect: pass. Commit `git commit -m "feat(ports): carry out a kill request and rescan after it"`
+- [x] **Step 2: Run** `cargo test -p navori-mod-ports --test stop_orchestration` — expect: failures (placeholder reply).
+- [x] **Step 3: Implement** the `Kill` arm in the `ctx.recv()` branch of `run_loop`: record `arrival`, spawn the task, hold it in the `JoinSet`; the task body is fresh read, `resolve`, concurrent stops in a `FuturesUnordered`, result assembly, all inside the 25 s timeout. Containers are keyed by id so one `stop` per container.
+- [x] **Step 4: Implement** the join-set branch of the `select!`: emit the Event, then rescan as above. Dropping the set on return aborts the tasks (`Request` dropped → caller sees `Unavailable`).
+- [x] **Step 5: Run** `cargo test -p navori-mod-ports && cargo xtask check-deps` — expect: pass. Commit `git commit -m "feat(ports): carry out a kill request and rescan after it"`
 
 _Requirements: PSTOP-1.17, PSTOP-1.11, PSTOP-1.12, PSTOP-1.13, PSTOP-1.14, PSTOP-1.15, PSTOP-1.19, PSTOP-1.20, PSTOP-3.5, PSTOP-10.2_
 
