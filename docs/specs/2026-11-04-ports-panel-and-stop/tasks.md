@@ -157,15 +157,15 @@ _Requirements: PSTOP-1.16_
 
 **Depends-on:** none
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `image.rs`: `database_image` true for `postgres`, `library/postgres`, `docker.io/library/redis`, `mongo`; false for `postgres-exporter`, `bitnami/postgresql`, `minio/minio`, an empty string.
   - `place.rs`: `a_listener_in_a_counted_repo_carries_the_repo_root`, `a_removed_directory_carries_no_root`.
   - `docker.rs`/`docker_client.rs`: a list reply with `"Image":"postgres:16-alpine"` parses to image `postgres`; `"Image":"sha256:abc…"` parses to `None`; the request bytes are unchanged.
-- [ ] **Step 2: Run** `cargo test -p navori-mod-ports --test image --test place` — expect: compile errors.
-- [ ] **Step 3: Implement** the repository-name extraction (strip a `sha256:` id to `None`, strip `@digest`, strip a `:tag` after the last `/`, keep the path) and `database_image`.
-- [ ] **Step 4: Implement** `Placement.root` in `place()` and `place_listener`, `ContainerRef.image` through `attribute`, and the `Image` field on `Listed`. Fix every `Placement` and `ContainerRef` literal and `assert_eq!` in the four test files named above.
-- [ ] **Step 5: Add** a one-line amendment note on PORTS-1.5 in the PORTS `requirements.md`: "(Amended 2026-11-04 by PSTOP: entries gain `root` and a container's `image`; both additive.)"
-- [ ] **Step 6: Run** `cargo test -p navori-mod-ports && cargo test -p navori-ffi` — expect: pass (the ffi re-deserialization still round-trips). Commit `git commit -m "feat(ports): carry the checkout path and the container image"`
+- [x] **Step 2: Run** `cargo test -p navori-mod-ports --test image --test place` — expect: compile errors.
+- [x] **Step 3: Implement** the repository-name extraction (strip a `sha256:` id to `None`, strip `@digest`, strip a `:tag` after the last `/`, keep the path) and `database_image`.
+- [x] **Step 4: Implement** `Placement.root` in `place()` and `place_listener`, `ContainerRef.image` through `attribute`, and the `Image` field on `Listed`. Fix every `Placement` and `ContainerRef` literal and `assert_eq!` in the four test files named above.
+- [x] **Step 5: Add** a one-line amendment note on PORTS-1.5 in the PORTS `requirements.md`: "(Amended 2026-11-04 by PSTOP: entries gain `root` and a container's `image`; both additive.)"
+- [x] **Step 6: Run** `cargo test -p navori-mod-ports && cargo test -p navori-ffi` — expect: pass (the ffi re-deserialization still round-trips). Commit `git commit -m "feat(ports): carry the checkout path and the container image"`
 
 _Requirements: PSTOP-2.1, PSTOP-3.9, PSTOP-4.6_
 
