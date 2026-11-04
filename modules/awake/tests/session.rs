@@ -571,3 +571,123 @@ async fn a_session_and_a_command_on_one_process_unwatch_only_when_the_last_lease
     }
     rig.shutdown().await;
 }
+
+const CODEX_DAEMON: i32 = 200;
+const CODEX_HOOK: i32 = 201;
+
+fn hold_session_in(session_id: &str, pid: i32, ppid: i32, cwd: &str) -> Value {
+    json!({ "hold_session": { "session_id": session_id, "pid": pid, "ppid": ppid, "cwd": cwd } })
+}
+
+fn codex_daemon_chain(rig: &Rig, daemon_cwd: &Checkout) {
+    rig.processes.add(
+        FakeProcess::new(
+            CODEX_DAEMON,
+            1,
+            501,
+            CLAUDE_START,
+            "/Users/me/.codex/packages/app-server-daemon/bin/codex",
+        )
+        .cwd(daemon_cwd.path.clone()),
+    );
+    rig.processes.add(FakeProcess::new(
+        CODEX_HOOK,
+        CODEX_DAEMON,
+        501,
+        HOOK_START,
+        "/Applications/Navori.app/Contents/Helpers/navori",
+    ));
+}
+
+#[tokio::test]
+async fn a_codex_session_is_labelled_by_the_directory_it_reports_not_its_daemons() {
+    let daemon = Checkout::new();
+    let project = Checkout::new();
+    let rig = Rig::new();
+    codex_daemon_chain(&rig, &daemon);
+
+    let state = rig
+        .dispatch(hold_session_in(
+            SESSION,
+            CODEX_HOOK,
+            CODEX_DAEMON,
+            project.path.to_str().unwrap(),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(state["leases"][0]["harness"], "Codex");
+    assert_eq!(state["leases"][0]["label"], json!(project.label()));
+    assert_eq!(state["leases"][0]["pid"], CODEX_DAEMON);
+}
+
+#[tokio::test]
+async fn two_codex_sessions_under_one_daemon_keep_their_own_labels() {
+    let daemon = Checkout::new();
+    let first = Checkout::new();
+    let second = Checkout::new();
+    let rig = Rig::new();
+    codex_daemon_chain(&rig, &daemon);
+
+    let mut state = Value::Null;
+    for (session, project) in [("sess-1", &first), ("sess-2", &second)] {
+        state = rig
+            .dispatch(hold_session_in(
+                session,
+                CODEX_HOOK,
+                CODEX_DAEMON,
+                project.path.to_str().unwrap(),
+            ))
+            .await
+            .unwrap();
+    }
+
+    let labels: Vec<&str> = state["leases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|lease| lease["label"].as_str().unwrap())
+        .collect();
+    assert_eq!(labels.len(), 2);
+    assert!(labels.contains(&first.label().as_str()), "{labels:?}");
+    assert!(labels.contains(&second.label().as_str()), "{labels:?}");
+}
+
+#[tokio::test]
+async fn a_codex_directory_that_is_not_absolute_falls_back_to_the_process() {
+    let daemon = Checkout::new();
+    let rig = Rig::new();
+    codex_daemon_chain(&rig, &daemon);
+
+    let state = rig
+        .dispatch(hold_session_in(
+            SESSION,
+            CODEX_HOOK,
+            CODEX_DAEMON,
+            "relative/path",
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(state["leases"][0]["label"], json!(daemon.label()));
+}
+
+#[tokio::test]
+async fn a_claude_session_keeps_the_label_of_its_process_when_a_directory_is_sent() {
+    let checkout = Checkout::new();
+    let elsewhere = Checkout::new();
+    let rig = Rig::new();
+    hook_chain(&rig, &checkout);
+
+    let state = rig
+        .dispatch(hold_session_in(
+            SESSION,
+            HOOK,
+            SHELL,
+            elsewhere.path.to_str().unwrap(),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(state["leases"][0]["label"], json!(checkout.label()));
+}

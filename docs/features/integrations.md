@@ -6,9 +6,9 @@ A Harness runs `navori hook` on a lifecycle event with a JSON payload on stdin. 
 
 | Event | Action |
 |---|---|
-| `UserPromptSubmit` | `hold_session` |
+| `UserPromptSubmit` | `hold_session`, with `cwd` when the payload has it; only a Codex label uses it |
 | `Stop` (only when it carries no `reason`, or `reason` is `end_turn`) | `stop_session`, with `background` when its `background_tasks` list is not empty |
-| `StopCancelled`, `StopFailure` | `stop_session` |
+| `StopCancelled`, `StopFailure`, `Interrupt` | `stop_session` |
 | `SubagentStart` | `subagent_start` with the agent id and pids |
 | `SubagentStop` | `subagent_stop` with the agent id, and `background` as above |
 | `SessionEnd` | `end_session` |
@@ -72,7 +72,7 @@ Install adds a `UserPromptSubmit`, `Stop`, `StopFailure`, `SubagentStart`, `Suba
 None of this has run against a live Harness or a signed build. Open:
 
 - Everything this page says about what Claude Code or Grok sends or does comes from its documentation and has not been observed. That includes whether real Claude Code `Stop` payloads carry no `reason`, as documented, and whether the events carry `hook_event_name` and `session_id` as documented. For Codex 0.166 the payload fields, the `timeout` unit (whole seconds) and the shell (`$SHELL -lc`) are read from its source, not from a recorded trusted session.
-- Known issue: Codex 0.166 ran these hooks under its shared `app-server` daemon on this Mac, so the session Lease took the daemon's pid and working directory. The row can sit under the wrong project, and the daemon outlives a closed Codex, so a Lease with no `Stop`, `Interrupt` or `SessionEnd` can last until the 8 hour TTL. Whether closing Codex sends `SessionEnd` has not been observed.
+- Codex 0.166 ran these hooks under its shared `app-server` daemon on this Mac. A Codex row takes its project from the directory the hook reports, but the Lease watches the daemon, which outlives a closed Codex. A normal close removed the Lease in a real run. A killed Codex with no `SessionEnd` has not been observed and may hold until the 8 hour TTL. After a Navori restart the row shows the daemon's project until the next prompt.
 - Whether you see the standard error of a Claude Code or Codex hook that exits 0 (the command prints none).
 - Whether Grok's daemon route leaves a live Harness process above the hook, so a Grok Session Lease starts at all.
 - Whether a signed build writing into `~/.claude`, `~/.codex` and `~/.grok` triggers a macOS permission prompt.

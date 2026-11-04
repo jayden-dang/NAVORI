@@ -83,6 +83,7 @@ struct Payload {
     background_tasks: Option<Value>,
     session_title: Option<String>,
     transcript_path: Option<PathBuf>,
+    cwd: Option<String>,
 }
 
 struct TitleSource {
@@ -177,6 +178,9 @@ pub fn plan(stdin: &[u8], own_pid: u32, parent_pid: u32) -> Option<Plan> {
             let pid = i32::try_from(own_pid).ok()?;
             let ppid = i32::try_from(parent_pid).ok()?;
             let mut fields = json!({ "session_id": session_id, "pid": pid, "ppid": ppid });
+            if let Some(cwd) = payload.cwd {
+                fields["cwd"] = json!(cwd);
+            }
             add_title(&mut fields, session_title(&title_source));
             json!({ "hold_session": fields })
         }

@@ -174,9 +174,10 @@ impl Awake {
                 pid,
                 ppid,
                 title,
+                cwd,
             } => {
                 let started = self
-                    .hold_session(ctx, now, session_id.clone(), *pid, *ppid)
+                    .hold_session(ctx, now, session_id.clone(), *pid, *ppid, cwd.as_deref())
                     .await;
                 self.table.set_session_title(session_id, title.as_deref());
                 started
@@ -365,6 +366,7 @@ impl Awake {
         session_id: String,
         pid: i32,
         ppid: i32,
+        cwd: Option<&str>,
     ) -> Result<Option<Started>, ActionError> {
         if !valid_session_id(&session_id) {
             return Err(ActionError::Invalid(
@@ -384,7 +386,7 @@ impl Awake {
         }
         // First hold is this arrival, before the snapshot.
         let arrived = truncate_us(now);
-        let found = match self.platform.resolve_session(pid, ppid).await {
+        let found = match self.platform.resolve_session(pid, ppid, cwd).await {
             Ok(Ok(found)) => found,
             Ok(Err(rejected)) => return Err(rejected_hold(rejected, pid, ppid)),
             Err(err) => {
@@ -450,7 +452,7 @@ impl Awake {
             None
         } else {
             let started = self
-                .hold_session(ctx, now, session_id.to_owned(), pid, ppid)
+                .hold_session(ctx, now, session_id.to_owned(), pid, ppid, None)
                 .await?;
             self.table.stop_session(session_id, arrived, false);
             started

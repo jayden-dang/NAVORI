@@ -22,6 +22,10 @@ pub enum AwakeAction {
         /// The session's name, for the menu only. It is never stored.
         #[serde(default)]
         title: Option<String>,
+        /// The directory the harness reports. Only Codex's labels use it, because its hooks run
+        /// under a daemon shared by every Codex session.
+        #[serde(default)]
+        cwd: Option<String>,
     },
     /// Mark the harness session `session_id` as stopped. `background` says work is still in flight.
     StopSession {
@@ -110,7 +114,7 @@ impl ModuleAction for AwakeAction {
             },
             ActionDoc {
                 name: "hold_session",
-                description: "Keep this Mac awake for one harness session. The harness is resolved from `pid`, then `ppid`. A repeated hold keeps one lease, moves the deadline, and keeps the first hold.",
+                description: "Keep this Mac awake for one harness session. The harness is resolved from `pid`, then `ppid`. A repeated hold keeps one lease, moves the deadline, and keeps the first hold. `cwd`, when absolute, sets a Codex session's label.",
                 risk: Risk::Write,
             },
             ActionDoc {

@@ -546,3 +546,28 @@ _Requirements: HOOKS-1.15, HOOKS-1.16, HOOKS-1.17_
 - [x] **Step 6: Operator:** Repair in Settings, trust the new hook in Codex `/hooks`, interrupt a real turn, and confirm the Lease reads stopped. Done 2026-11-04: operator reported it works; events show Repaired 13:49:37, Keeping 13:50:17, Stopped 13:50:42.
 
 _Requirements: HOOKS-1.18, HOOKS-4.18_
+
+---
+
+### Task 21: Label a Codex session by the directory it reports (operator amendment, 2026-11-04)
+
+**Files:**
+- Modify: `apps/cli/src/hook.rs`, `modules/awake/src/action.rs`, `modules/awake/src/actor.rs`, `modules/awake/src/infra/platform.rs`, `docs/features/integrations.md`
+- Test: `apps/cli/tests/cli.rs`, `modules/awake/tests/session.rs`
+
+**Reuse:** rung 2 — `resolve_open`, `place` and `resolve_location`.
+
+**Interfaces:**
+- Consumes: `cwd` from the `UserPromptSubmit` payload
+- Produces: `hold_session` takes an optional `cwd`; Claude Code and Grok labels do not use it
+
+**Depends-on:** Task 20
+
+- [x] **Step 1: Write failing tests** for a label from the reported directory, two sessions under one daemon, a relative directory, and the Claude guard.
+- [x] **Step 2: Implement** the optional `cwd`.
+- [x] **Step 3: Update docs.**
+- [x] **Step 4: Run** `cargo xtask ci` — expect: pass.
+- [ ] **Step 5: Operator:** send a prompt from a real Codex session and confirm its row sits under its own project.
+- [x] **Step 6: Commit** `git commit -m "fix(awake): label a Codex session by the directory it reports"`
+
+_Requirements: HOOKS-1.19, AWAKE-18.1, AWAKE-18.2, AWAKE-18.3_
