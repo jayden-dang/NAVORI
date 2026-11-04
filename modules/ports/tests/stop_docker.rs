@@ -165,8 +165,18 @@ async fn docker_is_sent_no_request_other_than_list_and_stop() {
 async fn an_id_that_could_alter_the_request_is_never_sent() {
     let served = serve(say(reply("204 No Content", "")));
     let socket = DockerSocket::new(served.path.clone());
-    for id in ["", "a b", "a/../b", "a\r\nHost: x", "a?t=0"] {
-        assert_eq!(socket.stop(id).await, Err(DockerError::BadReply), "{id:?}");
+    let too_long = "a".repeat(65);
+    for id in [
+        "",
+        "a b",
+        "a/../b",
+        "a\r\nHost: x",
+        "a?t=0",
+        "my-container",
+        "xyz",
+        too_long.as_str(),
+    ] {
+        assert_eq!(socket.stop(id).await, Err(DockerError::BadId), "{id:?}");
     }
     served.request.abort();
 }

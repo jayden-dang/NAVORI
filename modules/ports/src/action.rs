@@ -2,6 +2,8 @@ use navori_kernel::{ActionDoc, ModuleAction, Risk};
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 
+use crate::infra::docker::is_container_id;
+
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PortsAction {
@@ -74,7 +76,8 @@ pub struct KillReply {
     pub results: Vec<TargetResult>,
 }
 
-const MAX_CONTAINER_ID: usize = 64;
+/// Agent-decided cap on the targets of one stop request; a real project holds far fewer ports.
+const MAX_TARGETS: usize = 256;
 
 impl PortsAction {
     /// Rejects a request that is malformed before anything is read or signalled.
@@ -85,6 +88,15 @@ impl PortsAction {
         if targets.is_empty() {
             return Err("kill needs at least one target".to_owned());
         }
+        if targets.len() > MAX_TARGETS {
+            return Err(format!("kill takes at most {MAX_TARGETS} targets"));
+        }
+        let bad_pid = targets
+            .iter()
+            .any(|target| matches!(target, Target::Process { pid, .. } if *pid <= 1));
+        if bad_pid || matches!(selector, Selector::Pid(pid) if *pid <= 1) {
+            return Err("a process target needs a pid above 1".to_owned());
+        }
         if let Selector::Pid(pid) = selector {
             let named =
                 matches!(targets.as_slice(), [Target::Process { pid: only, .. }] if only == pid);
@@ -94,11 +106,9 @@ impl PortsAction {
                 ));
             }
         }
-        let bad_id = targets.iter().any(|target| {
-            matches!(target, Target::Container { id }
-                if !(1..=MAX_CONTAINER_ID).contains(&id.len())
-                    || !id.bytes().all(|b| b.is_ascii_hexdigit()))
-        });
+        let bad_id = targets
+            .iter()
+            .any(|target| matches!(target, Target::Container { id } if !is_container_id(id)));
         if bad_id {
             return Err("a container id must be 1 to 64 hex digits".to_owned());
         }

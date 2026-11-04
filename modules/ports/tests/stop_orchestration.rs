@@ -332,6 +332,24 @@ async fn unreachable_docker_does_not_stop_the_process_targets_from_stopping() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_container_id_the_client_refuses_to_send_is_not_reported_as_a_docker_refusal() {
+    let rig = Rig::new();
+    seat(&rig);
+    docker_with(&rig, &[CONTAINER]);
+    rig.containers.reply_stop(Err(DockerError::BadId));
+
+    let reply = rig.dispatch(kill(&[container(CONTAINER)])).await.unwrap();
+
+    assert_eq!(
+        answers(&reply),
+        vec![answer_with(
+            "failed",
+            "Navori did not send that container id to Docker"
+        )]
+    );
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_container_stop_still_running_at_the_deadline_answers_still_stopping() {
     let rig = Rig::new();
     seat(&rig);

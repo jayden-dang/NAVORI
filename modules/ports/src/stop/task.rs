@@ -376,6 +376,7 @@ async fn stop_container(containers: &dyn Containers, id: &str) -> Answer {
         Err(err) => {
             tracing::warn!(error = %err, "a container stop failed");
             let why = match err {
+                DockerError::BadId => reason::CONTAINER_ID_REFUSED,
                 DockerError::Absent | DockerError::Refused | DockerError::Timeout => {
                     reason::DOCKER_UNREACHABLE
                 }

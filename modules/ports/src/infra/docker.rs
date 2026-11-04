@@ -32,6 +32,15 @@ pub enum DockerError {
     BadStatus(u16),
     #[error("Docker's answer could not be read.")]
     BadReply,
+    #[error("The container id is not one Navori sends.")]
+    BadId,
+}
+
+const MAX_CONTAINER_ID: usize = 64;
+
+/// The one rule for a container id Navori accepts or sends: 1 to 64 hex digits.
+pub(crate) fn is_container_id(id: &str) -> bool {
+    (1..=MAX_CONTAINER_ID).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 /// How a container stop ended.
@@ -87,12 +96,8 @@ impl Containers for DockerSocket {
     }
 
     fn stop(&self, id: &str) -> BoxFuture<'_, Result<Stopped, DockerError>> {
-        if id.is_empty()
-            || !id
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
-        {
-            return Box::pin(async { Err(DockerError::BadReply) });
+        if !is_container_id(id) {
+            return Box::pin(async { Err(DockerError::BadId) });
         }
         let request = format!(
             "POST /containers/{id}/stop HTTP/1.1\r\nHost: docker\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"

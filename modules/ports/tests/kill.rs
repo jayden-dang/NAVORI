@@ -111,6 +111,39 @@ async fn a_container_id_that_is_not_hex_is_rejected() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_process_target_with_a_pid_of_one_or_less_is_rejected() {
+    let rig = Rig::new();
+    for pid in [1, 0, -1, i32::MIN] {
+        let message = invalid_message(
+            rig.dispatch(kill(json!({"project": "klynt"}), json!([process(pid)])))
+                .await,
+        );
+        assert!(message.contains("pid"), "{pid}: {message}");
+        let message = invalid_message(
+            rig.dispatch(kill(json!({"pid": pid}), json!([process(pid)])))
+                .await,
+        );
+        assert!(message.contains("pid"), "{pid}: {message}");
+    }
+    assert!(rig.signals.sent().is_empty());
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_request_with_more_than_256_targets_is_rejected() {
+    let rig = Rig::new();
+    let many = |count: i32| json!((0..count).map(|at| process(1000 + at)).collect::<Vec<_>>());
+    let message = invalid_message(
+        rig.dispatch(kill(json!({"project": "klynt"}), many(257)))
+            .await,
+    );
+    assert!(message.contains("256"), "{message}");
+    let reply = rig
+        .dispatch(kill(json!({"project": "klynt"}), many(256)))
+        .await;
+    assert!(reply.is_ok(), "{reply:?}");
+}
+
+#[tokio::test(start_paused = true)]
 async fn the_catalog_lists_kill_as_destructive_and_list_and_open_unchanged() {
     let docs = PortsAction::catalog();
     let listed: Vec<(&str, Risk)> = docs.iter().map(|doc| (doc.name, doc.risk)).collect();
@@ -123,7 +156,14 @@ async fn the_catalog_lists_kill_as_destructive_and_list_and_open_unchanged() {
         ]
     );
     let kill_doc = docs.iter().find(|doc| doc.name == "kill").unwrap();
-    assert!(kill_doc.description.contains(' ') && kill_doc.description.ends_with('.'));
+    for needed in [
+        "selector",
+        "never adds targets",
+        "start time",
+        "one result per target",
+    ] {
+        assert!(kill_doc.description.contains(needed), "{needed}");
+    }
     let action: PortsAction =
         serde_json::from_value(kill(json!({"pid": 412}), json!([process(412)]))).unwrap();
     assert_eq!(action.risk(), Risk::Destructive);
