@@ -532,13 +532,19 @@ impl Write for Captured {
 }
 
 /// Collects this thread's log lines, at every level, until the guard is dropped.
+static ONE_CAPTURE_AT_A_TIME: Mutex<()> = Mutex::new(());
+
 pub struct LogCapture {
     written: Arc<Mutex<Vec<u8>>>,
     _guard: tracing::subscriber::DefaultGuard,
+    _alone: MutexGuard<'static, ()>,
 }
 
 impl LogCapture {
     pub fn start() -> Self {
+        let alone = ONE_CAPTURE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         let written = Arc::new(Mutex::new(Vec::<u8>::new()));
         let sink = Arc::clone(&written);
         let subscriber = tracing_subscriber::fmt()
@@ -550,6 +556,7 @@ impl LogCapture {
         let capture = Self {
             written,
             _guard: guard,
+            _alone: alone,
         };
         capture.refresh();
         capture
