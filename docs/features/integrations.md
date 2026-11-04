@@ -13,6 +13,8 @@ A Harness runs `navori hook` on a lifecycle event with a JSON payload on stdin. 
 | `SubagentStop` | `subagent_stop` with the agent id, and `background` as above |
 | `SessionEnd` | `end_session` |
 
+`UserPromptSubmit` and `Stop` also send the session's `title`: `session_title`, or else the latest `custom-title` or `ai-title` record in the last 128 KB of the transcript. Those records are Claude Code's own, not a documented format, so anything else sends no title. Nothing else from the transcript leaves the command.
+
 Any other event sends nothing. The same event arriving twice for one session (Grok also runs Claude's hooks) leaves one Lease.
 
 `navori hook` always exits 0 and prints nothing, so a Harness never stalls or fails on it. With no Core running it starts no Lease, writes no file and does not open the app. It waits up to 0.7 seconds for stdin to close on every event, so a payload that arrives more slowly sends nothing. It then gives up after 1.5 seconds (0.7 seconds for `SessionEnd`). It sends to the Core of the profile its own command line names (release, or dev with `--profile dev`) and ignores `NAVORI_PROFILE`. If the hook never fires, the Lease still ends when the Harness process exits or its TTL runs out.

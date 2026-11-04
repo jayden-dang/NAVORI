@@ -105,6 +105,38 @@ struct AwakeSubmenuStateTests {
         ))
     }
 
+    private static func titled(_ title: String?, label: String = "klynt/dev", pid: Int32 = 51865) -> AwakeLeaseInput {
+        AwakeLeaseInput(
+            kind: .session, harness: "Claude Code", label: label, pid: pid, stopped: false, until: nil, title: title
+        )
+    }
+
+    @Test func a_session_row_leads_with_its_title_and_keeps_its_project_group() {
+        let state = Self.state(leases: [Self.titled("Road-128 ticket shaping")])
+        #expect(state.holdingGroups.map(\.title) == ["klynt"])
+        let row = state.holdingGroups[0].rows[0]
+        #expect(row.name == "Road-128 ticket shaping")
+        #expect(row.help == "Road-128 ticket shaping · Claude Code · klynt/dev · pid 51865")
+        #expect(row.accessibilitySentence == "Road-128 ticket shaping, Claude Code, klynt/dev, working, pid 51865")
+    }
+
+    @Test func a_session_with_no_title_still_reads_its_branch() {
+        for title in [nil, ""] as [String?] {
+            let row = Self.state(leases: [Self.titled(title)]).holdingGroups[0].rows[0]
+            #expect(row.name == "dev")
+            #expect(row.help == "Claude Code · klynt/dev · pid 51865")
+            #expect(row.accessibilitySentence == "Claude Code, klynt/dev, working, pid 51865")
+        }
+    }
+
+    @Test func sessions_in_a_project_sort_by_the_name_they_show() {
+        let state = Self.state(leases: [
+            Self.titled("Zebra", pid: 1),
+            Self.titled("Alpha", pid: 2),
+        ])
+        #expect(state.holdingGroups[0].rows.map(\.name) == ["Alpha", "Zebra"])
+    }
+
     @Test func nothing_is_checked_and_the_row_has_no_value_while_no_keep_awake_lease_exists() {
         let off = Self.state(status: .off)
         #expect(off.keepValue == nil)

@@ -15,6 +15,8 @@ public struct AwakeLeaseInput: Equatable, Sendable {
     public let pid: Int32?
     public let stopped: Bool
     public let until: String?
+    /// A session's name, when it has one. The row falls back to the branch.
+    public let title: String?
 
     public init(
         kind: Kind,
@@ -22,7 +24,8 @@ public struct AwakeLeaseInput: Equatable, Sendable {
         label: String?,
         pid: Int32?,
         stopped: Bool,
-        until: String?
+        until: String?,
+        title: String? = nil
     ) {
         self.kind = kind
         self.harness = harness
@@ -30,6 +33,7 @@ public struct AwakeLeaseInput: Equatable, Sendable {
         self.pid = pid
         self.stopped = stopped
         self.until = until
+        self.title = title
     }
 }
 
@@ -172,7 +176,7 @@ public struct AwakeSubmenuState: Equatable, Sendable {
     /// Working before stopped, then by name, then by pid.
     private static func sessionOrder(_ left: AwakeLeaseInput, _ right: AwakeLeaseInput) -> Bool {
         if left.stopped != right.stopped { return right.stopped }
-        let names = place(left).name.localizedCaseInsensitiveCompare(place(right).name)
+        let names = shownName(left).localizedCaseInsensitiveCompare(shownName(right))
         if names != .orderedSame { return names == .orderedAscending }
         return (left.pid ?? 0) < (right.pid ?? 0)
     }
@@ -189,13 +193,17 @@ public struct AwakeSubmenuState: Equatable, Sendable {
         return (project, name)
     }
 
+    private static func shownName(_ lease: AwakeLeaseInput) -> String {
+        text(lease.title) ?? place(lease).name
+    }
+
     private static func sessionRow(_ lease: AwakeLeaseInput) -> HoldingRow {
         let word = lease.stopped ? "stopped" : "working"
-        let source = [text(lease.harness), text(lease.label)].compactMap { $0 }
+        let source = [text(lease.title), text(lease.harness), text(lease.label)].compactMap { $0 }
         let pid = lease.pid.map { "pid \($0)" }
         return HoldingRow(
             mark: harnessMark(lease.harness),
-            name: place(lease).name,
+            name: shownName(lease),
             word: word,
             showsDot: lease.stopped == false,
             isQuiet: lease.stopped,

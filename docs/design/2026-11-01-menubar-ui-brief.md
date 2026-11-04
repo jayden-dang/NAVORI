@@ -77,7 +77,7 @@ The inbox is **the shared decision place between the user and Navori AI** — it
 
 Locked 2026-11-04 as variant C1. The brief of record is [`docs/specs/2026-11-02-awake-leases/ui-brief.md`](../specs/2026-11-02-awake-leases/ui-brief.md).
 
-- **Layout:** `Keep awake`, opening a third level of `Indefinitely` and lengths from `5 minutes` to `5 hours`, then `Tracking agents`; a problem line only when something is wrong; then Holding, grouped by `Held by you`, `Commands` and project. No per-Lease release. No Agent sessions row and no Integrations row.
+- **Layout:** `Keep awake`, opening a third level of `Indefinitely` and lengths from `5 minutes` to `5 hours`, then `Tracking agents`; a problem line only when something is wrong; then Holding, grouped by `Held by you`, `Commands` and project, with each session named by its title or else its branch. No per-Lease release. No Agent sessions row and no Integrations row.
 - **Components:** commands are `MenuRowView` rows with an icon and a check. Holding rows are not cascade nodes.
 - **States:** off (the commands alone) · on (no status text) · system assertion refused · display assertion refused · action failed.
 - **Type & color / A11y:** as Surface 1, with monochrome Harness marks. ↑ and ↓ reach the commands, → opens `Keep awake`. VoiceOver reads each command, the problem line and each Holding row as one sentence. The problem line and Holding rows take no keyboard stop.

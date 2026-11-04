@@ -37,7 +37,8 @@ async fn an_until_off_lease_has_no_deadline_and_holds_past_any_hour() {
                 "label": "Until off",
                 "pid": null,
                 "stopped": false,
-                "ends_at_ms": null
+                "ends_at_ms": null,
+                "title": null
             }],
             "system_held": true,
             "display_held": false,

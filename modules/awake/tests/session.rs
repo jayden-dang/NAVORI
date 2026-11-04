@@ -91,7 +91,8 @@ fn session_row(label: &str, ends_at_ms: i64) -> Value {
         "label": label,
         "pid": CLAUDE,
         "stopped": false,
-        "ends_at_ms": ends_at_ms
+        "ends_at_ms": ends_at_ms,
+        "title": null
     })
 }
 

@@ -39,7 +39,8 @@ fn command_row(pid: i32) -> Value {
         "label": "sleep",
         "pid": pid,
         "stopped": false,
-        "ends_at_ms": null
+        "ends_at_ms": null,
+        "title": null
     })
 }
 

@@ -18,6 +18,7 @@ fn lease(kind: &str) -> LeaseState {
         pid: None,
         stopped: false,
         ends_at_ms: None,
+        title: None,
     }
 }
 

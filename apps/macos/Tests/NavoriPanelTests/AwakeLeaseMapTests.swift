@@ -31,6 +31,14 @@ struct AwakeLeaseMapTests {
         #expect(AwakeRowState(status: status).label == "On · Claude Code")
     }
 
+    @Test func a_session_title_reaches_the_row_input() {
+        let lease = AwakeLeaseMap.lease(
+            kind: "session", harness: "Claude Code", label: "klynt/dev", pid: 1, stopped: false, endsAtMs: nil,
+            title: "Road-128"
+        )
+        #expect(lease?.title == "Road-128")
+    }
+
     @Test func a_known_epoch_formats_as_hour_and_minute() {
         let zone = TimeZone(secondsFromGMT: 0)!
         let ms: Int64 = 1_700_000_000_000

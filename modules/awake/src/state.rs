@@ -32,4 +32,5 @@ pub struct LeaseState {
     pub pid: Option<i32>,
     pub stopped: bool,
     pub ends_at_ms: Option<i64>,
+    pub title: Option<String>,
 }

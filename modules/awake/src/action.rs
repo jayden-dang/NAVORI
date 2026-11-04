@@ -19,12 +19,18 @@ pub enum AwakeAction {
         session_id: String,
         pid: i32,
         ppid: i32,
+        /// The session's name, for the menu only. It is never stored.
+        #[serde(default)]
+        title: Option<String>,
     },
     /// Mark the harness session `session_id` as stopped. `background` says work is still in flight.
     StopSession {
         session_id: String,
         #[serde(default)]
         background: bool,
+        /// The session's name, for the menu only. It is never stored.
+        #[serde(default)]
+        title: Option<String>,
     },
     /// End the session lease for `session_id`.
     EndSession { session_id: String },
