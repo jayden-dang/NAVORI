@@ -56,6 +56,7 @@ pub struct Gate {
     panic_once: AtomicBool,
     hold: Mutex<()>,
     attempts: AtomicUsize,
+    finished: AtomicUsize,
 }
 
 impl Gate {
@@ -67,12 +68,25 @@ impl Gate {
             panic_once: AtomicBool::new(false),
             hold: Mutex::new(()),
             attempts: AtomicUsize::new(0),
+            finished: AtomicUsize::new(0),
         }
     }
 
     /// How many times the process list was asked for, whether or not it was refused.
     pub fn attempts(&self) -> usize {
         self.attempts.load(Ordering::SeqCst)
+    }
+
+    /// Waits until `count` process-list reads have returned to their callers.
+    pub async fn finished(&self, count: usize) {
+        for _ in 0..400 {
+            if self.finished.load(Ordering::SeqCst) >= count {
+                return;
+            }
+            tokio::task::yield_now().await;
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        panic!("the gate never finished {count} reads");
     }
 
     pub fn deny(&self, denied: bool) {
@@ -106,10 +120,13 @@ impl ProcessSource for Gate {
             !self.panic_once.swap(false, Ordering::SeqCst),
             "the gate was set to panic"
         );
-        if self.denied.load(Ordering::SeqCst) {
-            return Err(PlatformError::Sysctl { errno: 1 });
-        }
-        self.inner.list()
+        let listed = if self.denied.load(Ordering::SeqCst) {
+            Err(PlatformError::Sysctl { errno: 1 })
+        } else {
+            self.inner.list()
+        };
+        self.finished.fetch_add(1, Ordering::SeqCst);
+        listed
     }
 
     fn entry(&self, pid: i32) -> Result<ProcEntry, ReadError> {

@@ -159,8 +159,29 @@ async fn a_scan_in_flight_when_the_module_stops_does_not_carry_on() {
 
     rig.kernel.shutdown().await;
     drop(hold);
-    std::thread::sleep(Duration::from_millis(100));
+    rig.gate.finished(1).await;
     rig.idle().await;
 
     assert_eq!(rig.containers.calls(), 0);
+}
+
+#[tokio::test(start_paused = true)]
+async fn docker_that_stays_unreadable_is_logged_once_and_its_recovery_once() {
+    let logs = LogCapture::start();
+    let rig = Rig::new();
+    rig.processes
+        .add(FakeProcess::new(100, 1, 501, 10_100, BACKEND).listen("127.0.0.1", 5432));
+    rig.containers.reply(Err(DockerError::Timeout));
+    first_scan(&rig).await;
+    let mark = rig.gate.attempts();
+    rig.advance(Duration::from_secs(30)).await;
+    rig.settle_scan_after(mark).await;
+    assert_eq!(logs.text().matches("WARN").count(), 1, "{}", logs.text());
+
+    rig.containers.reply(Ok(Vec::new()));
+    let mark = rig.gate.attempts();
+    rig.advance(Duration::from_secs(30)).await;
+    rig.settle_scan_after(mark).await;
+    assert_eq!(logs.text().matches("WARN").count(), 1, "{}", logs.text());
+    assert_eq!(logs.text().matches("Docker reads work again").count(), 1);
 }

@@ -63,6 +63,9 @@ pub fn run(root: &Path, record: bool) -> Result<bool> {
     let verdict = judge(&measured, loaded.as_ref(), &machine);
     report(&verdict, phase_a_elapsed, phase_b_elapsed)?;
     emit(&format!("docker={}", phase_b.docker.status))?;
+    if let Some(note) = &phase_b.docker.note {
+        emit(note)?;
+    }
     if let Some(warning) = &phase_b.docker.warning {
         emit(&format!("WARNING {warning}"))?;
         if record {
@@ -70,7 +73,7 @@ pub fn run(root: &Path, record: bool) -> Result<bool> {
         }
     }
 
-    if record && verdict.passed && phase_b.docker.allows_record() {
+    if phase_b.docker.records(record, verdict.passed) {
         let baseline = Baseline::from_run(&measured, machine, git_revision(root)?, record_date()?);
         finish(&baseline_path, &verdict, record, &baseline)?;
     }
@@ -183,10 +186,7 @@ fn measure_phase_b(
         before = after;
     }
     let peak_bytes = before.peak;
-    let docker = docker_report(
-        PerfHome::docker_linked(&run_dir),
-        &ports_list(exe, &run_dir)?,
-    )?;
+    let docker = docker_report(PerfHome::docker_linked(&run_dir), ports_list(exe, &run_dir));
     finish_measured(&mut launched)?;
     Ok(PhaseBProcess {
         windows,
@@ -738,6 +738,7 @@ mod tests {
             peak_bytes: 1_048_576,
             docker: super::docker::DockerReport {
                 status: "read".to_owned(),
+                note: None,
                 warning: None,
             },
         }

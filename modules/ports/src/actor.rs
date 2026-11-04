@@ -19,6 +19,8 @@ const OPEN_PROBLEM: &str = "Ports could not read the process list.";
 const SCAN_FAILED: &str = "a port scan could not read the process list";
 const OPEN_FAILED: &str = "the process source could not be opened";
 const RECOVERED: &str = "port scans work again";
+const DOCKER_FAILED: &str = "Docker could not be read";
+const DOCKER_RECOVERED: &str = "Docker reads work again";
 const OPEN_CADENCE: Duration = Duration::from_secs(3);
 const CLOSED_CADENCE: Duration = Duration::from_secs(30);
 
@@ -38,10 +40,10 @@ impl Drop for InFlight {
     }
 }
 
-fn note(failing: &mut bool, failure: Option<&'static str>) {
+fn note(failing: &mut bool, failure: Option<&'static str>, recovered: &'static str) {
     match (failure, *failing) {
         (Some(text), false) => tracing::warn!("{text}"),
-        (None, true) => tracing::info!("{RECOVERED}"),
+        (None, true) => tracing::info!("{recovered}"),
         _ => {}
     }
     *failing = failure.is_some();
@@ -97,6 +99,7 @@ impl Ports {
         let mut deadline = Some(wait.now() + FIRST_SCAN);
         let mut in_flight: Option<InFlight> = None;
         let mut failing = false;
+        let mut docker_failing = false;
         loop {
             tokio::select! {
                 biased;
@@ -104,7 +107,19 @@ impl Ports {
                     in_flight = None;
                     let (started, outcome) = done?;
                     self.memo = outcome.memo;
-                    note(&mut failing, outcome.result.as_ref().err().map(|_| SCAN_FAILED));
+                    note(
+                        &mut failing,
+                        outcome.result.as_ref().err().map(|_| SCAN_FAILED),
+                        RECOVERED,
+                    );
+                    if let Ok((_, docker)) = &outcome.result {
+                        let unreadable = matches!(docker, DockerStatus::Unreadable(_));
+                        note(
+                            &mut docker_failing,
+                            unreadable.then_some(DOCKER_FAILED),
+                            DOCKER_RECOVERED,
+                        );
+                    }
                     publish(ctx, started, outcome.result);
                     deadline = Some(wait.now() + cadence(wait.panel_visible()));
                 }
@@ -122,7 +137,7 @@ impl Ports {
                             match self.start_scan(now) {
                                 Ok(task) => in_flight = Some(task),
                                 Err(problem) => {
-                                    note(&mut failing, Some(OPEN_FAILED));
+                                    note(&mut failing, Some(OPEN_FAILED), RECOVERED);
                                     publish(ctx, now, Err(problem));
                                     deadline = Some(now + cadence(wait.panel_visible()));
                                 }
@@ -196,10 +211,7 @@ async fn with_docker(
     }
     let (running, status) = match containers.running().await {
         Ok(containers) => (containers, DockerStatus::Read),
-        Err(err) => {
-            tracing::warn!(error = %err, "Docker could not be read");
-            (Vec::new(), DockerStatus::Unreadable(err.to_string()))
-        }
+        Err(err) => (Vec::new(), DockerStatus::Unreadable(err.to_string())),
     };
     let docker = attribute(&scan.backend, &running, |path| place(path, &home));
     scan.entries.extend(docker);
