@@ -356,7 +356,7 @@ _Requirements: PORTS-3.1, PORTS-3.2, PORTS-3.3, PORTS-3.4, PORTS-3.5, PORTS-3.6,
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Write the failing table test** `each_port_gets_the_first_kind_that_applies`. Rows, as `(exe, placed) → kind`:
+- [x] **Step 1: Write the failing table test** `each_port_gets_the_first_kind_that_applies`. Rows, as `(exe, placed) → kind`:
 
   | Exe | Placed | Kind |
   |---|---|---|
@@ -373,10 +373,10 @@ _Requirements: PORTS-3.1, PORTS-3.2, PORTS-3.3, PORTS-3.4, PORTS-3.5, PORTS-3.6,
   | unread | no | `other` |
 
   Add `system_ports_are_listed_like_any_other`.
-- [ ] **Step 2: Run** `cargo test -p navori-mod-ports --test kind` — expect: `kind` not found.
-- [ ] **Step 3: Implement** `kind.rs` per PORTS-5.1 and PORTS-5.2, and call it from `scan.rs`.
-- [ ] **Step 4: Run** `cargo test -p navori-mod-ports` — expect: pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(ports): label each port's kind"`
+- [x] **Step 2: Run** `cargo test -p navori-mod-ports --test kind` — expect: `kind` not found.
+- [x] **Step 3: Implement** `kind.rs` per PORTS-5.1 and PORTS-5.2, and call it from `scan.rs`.
+- [x] **Step 4: Run** `cargo test -p navori-mod-ports` — expect: pass.
+- [x] **Step 5: Commit** `git commit -m "feat(ports): label each port's kind"`
 
 _Requirements: PORTS-5.1, PORTS-5.2, PORTS-5.3, PORTS-5.4_
 
