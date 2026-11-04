@@ -617,10 +617,11 @@ _Requirements: PORTS-9.3, PORTS-9.8, PORTS-10.2_
 - [x] **Step 3: Drive** `navori --profile dev dispatch ports '"list"'` 35 s after `cargo xtask run`.
   - Compare with `lsof -nP -iTCP -sTCP:LISTEN` for this UID: the same (pid, port) set.
   - Check each entry by rule against what `lsof`, the cwd and `git worktree list` say at that moment. The close package's signal 2 names are a guide to what to expect, not fixed values.
-- [x] **Step 4: Check by hand** a listener started by each Harness, then detached.
+- [ ] **Step 4: Check by hand** a listener started by each Harness, then detached.
   - Start a listener from Claude Code, from Codex and from Grok Build, and detach each.
   - Each must show that Harness. Record which marker fired.
   - A failure reopens that marker. Do not edit the marker list to pass.
+  - Handed to the operator: not run in the unattended build.
 - [x] **Step 5: Record** the results in the execute report. No commit unless a fix was needed.
 
 _Requirements: PORTS-3.9, PORTS-10.1_
