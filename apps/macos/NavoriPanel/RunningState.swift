@@ -182,11 +182,11 @@ public struct ProjectRowState: Equatable, Sendable {
         name = project.name
         stop = StopOffer(count: project.stoppablePorts, request: project.rowStopRequest)
         childStop = StopOffer(count: project.stoppablePorts, request: project.childStopRequest)
-        var ids = project.ports.map { ProjectChildState.portId(project: id, port: $0.port) }
+        var ids = project.ports.map { ProjectChildState.portId(project: id, port: $0) }
         var offers: [String: StopOffer] = [:]
         for port in project.ports {
             if port.canStop {
-                offers[ProjectChildState.portId(project: id, port: port.port)] = StopOffer(count: 1, request: port.stopRequest)
+                offers[ProjectChildState.portId(project: id, port: port)] = StopOffer(count: 1, request: port.stopRequest)
             }
         }
         if let childStop {
@@ -359,7 +359,7 @@ public struct PortRowState: Equatable, Sendable {
     private let sentence: String
 
     init(_ port: RunningPortInput, projectId: String) {
-        id = ProjectChildState.portId(project: projectId, port: port.port)
+        id = ProjectChildState.portId(project: projectId, port: port)
         name = port.name
         portText = ":\(port.port)"
         suffix = port.container ? "docker" : nil
@@ -437,7 +437,13 @@ public struct ProjectChildState: Equatable, Sendable {
         (sessions.isEmpty ? [] : [.sessions]) + (ports.isEmpty ? [] : [.ports])
     }
 
-    public static func portId(project: String, port: Int) -> String { "\(project).port.\(port)" }
+    public static func portId(project: String, port: RunningPortInput) -> String {
+        switch port.target {
+        case let .process(pid, _): "\(project).port.\(port.port).\(pid)"
+        case let .container(id): "\(project).port.\(port.port).\(id)"
+        case nil: "\(project).port.\(port.port)"
+        }
+    }
 
     public static func stopId(project: String) -> String { "\(project).stop" }
 

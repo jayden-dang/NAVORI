@@ -531,6 +531,25 @@ struct ProjectChildStateTests {
 }
 
 @Suite
+struct PortRowIdTests {
+    @Test func two_listeners_on_one_port_keep_distinct_ids_and_offers() {
+        let first = RunningPortInput(port: 3000, name: "node", stopRequest: "a", target: .process(pid: 10, startUs: 1))
+        let second = RunningPortInput(port: 3000, name: "node", stopRequest: "b", target: .process(pid: 11, startUs: 2))
+        let box = RunningPortInput(port: 3000, name: "web", stopRequest: "c", target: .container(id: "abc"))
+        let state = RunningSubmenuState(running: running([
+            RunningProjectInput(
+                name: "p", isOther: false, state: .idle, sessions: [], ports: [first, second, box],
+                stoppablePorts: 3, rowStopRequest: "r", childStopRequest: "c"
+            ),
+        ]))
+        let ids = state.rows[0].childRowIds
+        #expect(Set(ids).count == ids.count)
+        #expect(state.rows[0].childOffers.count == 4)
+        #expect(ProjectChildState.portId(project: "p", port: first) != ProjectChildState.portId(project: "p", port: second))
+    }
+}
+
+@Suite
 struct RunningCommandRowsTests {
     @Test func commands_show_as_rows_between_the_projects_and_stop_all() {
         let commands = AwakeSubmenuState(

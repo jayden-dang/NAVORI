@@ -225,7 +225,7 @@ private struct PortRowView: View {
                         .truncationMode(.middle)
                     if let suffix = state.suffix {
                         Text("\u{00B7} \(suffix)")
-                            .font(.system(size: 12))
+                            .font(.system(size: 11.5))
                             .foregroundStyle(selected ? Color.white.opacity(0.8) : Color(nsColor: .secondaryLabelColor))
                             .lineLimit(1)
                             .fixedSize()
@@ -324,20 +324,30 @@ private struct PortLead: View {
     let mark: PortMark
     let selected: Bool
 
-    var body: some View {
-        Image(systemName: name)
-            .font(.system(size: 11))
-            .symbolRenderingMode(.monochrome)
-            .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
+    private var ink: Color {
+        selected ? Color.white.opacity(0.85) : Color(nsColor: .tertiaryLabelColor)
     }
 
-    private var name: String {
+    var body: some View {
         switch mark {
-        case .container: "square.inset.filled"
-        case .process: "terminal"
-        case .database: "cylinder"
-        case .system: "gearshape"
+        case .process:
+            Text("\u{203A}_")
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(ink)
+        case .container:
+            symbol("square.inset.filled", size: 9)
+        case .database:
+            symbol("cylinder", size: 10)
+        case .system:
+            symbol("gearshape", size: 10)
         }
+    }
+
+    private func symbol(_ name: String, size: CGFloat) -> some View {
+        Image(systemName: name)
+            .font(.system(size: size))
+            .symbolRenderingMode(.monochrome)
+            .foregroundStyle(ink)
     }
 }
 

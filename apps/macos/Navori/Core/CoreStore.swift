@@ -338,7 +338,7 @@ final class CoreStore {
             case .failed where live.contains(owner) == false:
                 stopFlows[owner] = .idle
             case .asking(let count) where offers[owner] != count:
-                        stopFlows[owner] = .idle
+                stopFlows[owner] = .idle
             default:
                 break
             }
