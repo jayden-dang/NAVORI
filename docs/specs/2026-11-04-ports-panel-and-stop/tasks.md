@@ -192,7 +192,7 @@ _Requirements: PSTOP-2.1, PSTOP-3.9, PSTOP-4.6_
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1: Write the failing tests** in `modules/ports/tests/kill.rs` through `rig.dispatch`:
+- [x] **Step 1: Write the failing tests** in `modules/ports/tests/kill.rs` through `rig.dispatch`:
   - `an_empty_target_list_is_rejected_and_nothing_is_signalled`
   - `the_three_selector_forms_and_both_target_forms_are_accepted`
   - `a_pid_selector_with_two_targets_is_rejected`
@@ -201,11 +201,11 @@ _Requirements: PSTOP-2.1, PSTOP-3.9, PSTOP-4.6_
   - `the_catalog_lists_kill_as_destructive_and_list_and_open_unchanged`
   - `ports_list_and_open_still_reply_from_the_last_scan_without_scanning` (guard)
   - `the_ports_module_still_accepts_every_config_file_it_accepted_before` (guard: `NoConfig`)
-- [ ] **Step 2: Run** `cargo test -p navori-mod-ports --test kill` — expect: compile errors for `Kill`, `Selector`.
-- [ ] **Step 3: Implement** the types, the `catalog()` entry (a description written for people and LLMs), validation in the `recv` arm before anything is read, and the `PortsEnv` fields. Fix both struct-literal sites (`PortsEnv::mac`, `Rig::opening` at tests/common/mod.rs:230). The `Kill` arm replies `Failed` "Stopping is not wired yet" until Task 7 (no signal path exists yet).
-- [ ] **Step 4: Wire** `crates/ffi/src/lib.rs:299` to `PortsEnv::mac(home).with_helper(helper_path)` using `CoreConfig.helper_path`.
-- [ ] **Step 5: Update** `docs/codebase/modules.md:50` with the new exports. Run `cargo test -p navori-mod-ports && cargo test -p navori-ffi` — expect: pass.
-- [ ] **Step 6: Commit** `git commit -m "feat(ports): add the destructive kill action and its request model"`
+- [x] **Step 2: Run** `cargo test -p navori-mod-ports --test kill` — expect: compile errors for `Kill`, `Selector`.
+- [x] **Step 3: Implement** the types, the `catalog()` entry (a description written for people and LLMs), validation in the `recv` arm before anything is read, and the `PortsEnv` fields. Fix both struct-literal sites (`PortsEnv::mac`, `Rig::opening` at tests/common/mod.rs:230). The `Kill` arm replies `Failed` "Stopping is not wired yet" until Task 7 (no signal path exists yet).
+- [x] **Step 4: Wire** `crates/ffi/src/lib.rs:299` to `PortsEnv::mac(home).with_helper(helper_path)` using `CoreConfig.helper_path`.
+- [x] **Step 5: Update** `docs/codebase/modules.md:50` with the new exports. Run `cargo test -p navori-mod-ports && cargo test -p navori-ffi` — expect: pass.
+- [x] **Step 6: Commit** `git commit -m "feat(ports): add the destructive kill action and its request model"`
 
 _Requirements: PSTOP-1.1, PSTOP-1.2, PSTOP-1.4, PSTOP-1.18, PSTOP-2.5, PSTOP-2.6_
 
