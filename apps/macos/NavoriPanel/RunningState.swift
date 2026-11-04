@@ -381,7 +381,7 @@ public enum PortActions {
               let reply = try? await dispatch(String(decoding: request, as: UTF8.self)),
               let url = (try? JSONDecoder().decode(OpenReply.self, from: Data(reply.utf8)))
                   .flatMap({ URL(string: $0.url) }),
-              url.scheme != nil
+              url.scheme?.lowercased() == "http"
         else { return failure }
         desktop.open(url)
         return nil

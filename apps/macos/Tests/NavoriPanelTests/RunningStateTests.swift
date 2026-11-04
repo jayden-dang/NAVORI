@@ -686,6 +686,10 @@ struct PortDesktopActionTests {
             { _ in throw Unreachable() },
             { _ in "{}" },
             { _ in #"{"url":""}"# },
+            { _ in #"{"url":"file:///etc/passwd"}"# },
+            { _ in #"{"url":"javascript:alert(1)"}"# },
+            { _ in #"{"url":"ftp://localhost:3000"}"# },
+            { _ in #"{"url":"https://localhost:3000"}"# },
         ]
         for reply in replies {
             let desktop = FakeDesktop()
@@ -693,6 +697,15 @@ struct PortDesktopActionTests {
             #expect(failure == "Could not open :3000")
             #expect(desktop.opened.isEmpty)
         }
+    }
+
+    @Test func an_upper_case_http_scheme_is_opened() async {
+        let desktop = FakeDesktop()
+        let failure = await PortActions.open(port: 3000, address: nil, desktop: desktop) { _ in
+            #"{"url":"HTTP://localhost:3000"}"#
+        }
+        #expect(failure == nil)
+        #expect(desktop.opened == [URL(string: "HTTP://localhost:3000")!])
     }
 
     @Test func a_port_outside_the_port_range_is_not_sent() async {
