@@ -575,20 +575,20 @@ _Requirements: PORTS-8.1, PORTS-8.2, PORTS-8.3, PORTS-8.4, PORTS-8.5, PORTS-8.6,
 
 **Depends-on:** Task 9
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - In `judge.rs`:
     - `within_budget` gains `port_scan_ms`.
     - The table test gains `("port_scan_ms", 5.0, Some(50.0), "≤ 50 ms")`.
     - A new assertion that `performance.md` contains `` `port_scan_ms` `` in its floors line, since `≤ 50 ms` already appears for `menu_reopen_ms`.
   - In `mod.rs`, `median_ms` parses `"median 4308 µs; listeners 20"` to 4.308.
   - In `home.rs`, `a_run_copy_links_the_docker_socket_when_it_exists` and `a_run_copy_has_no_docker_link_when_there_is_none`. Both use a fake home root in a temp dir.
-- [ ] **Step 2: Run** `cargo test -p xtask` — expect: the missing metric, `median_ms` and link fail.
-- [ ] **Step 3: Implement** the metric.
+- [x] **Step 2: Run** `cargo test -p xtask` — expect: the missing metric, `median_ms` and link fail.
+- [x] **Step 3: Implement** the metric.
   - The ignored test runs 5 `Scanner::scan` calls with no Docker read and prints the median.
   - Add `measure_port_scan_ms`, the METRICS row and the link.
   - Update the `performance.md` lines :21, :30 and :34.
-- [ ] **Step 4: Run** `cargo test -p xtask && cargo test -p navori-mod-ports --test real_os -- --ignored --nocapture && cargo test -p navori-procs --test real_os` — expect: pass, with the median printed and PROCS-8.8 still holding.
-- [ ] **Step 5: Commit** `git commit -m "feat(perf): gate the port scan at 50 ms"`
+- [x] **Step 4: Run** `cargo test -p xtask && cargo test -p navori-mod-ports --test real_os -- --ignored --nocapture && cargo test -p navori-procs --test real_os` — expect: pass, with the median printed and PROCS-8.8 still holding.
+- [x] **Step 5: Commit** `git commit -m "feat(perf): gate the port scan at 50 ms"`
 
 _Requirements: PORTS-9.3, PORTS-9.8, PORTS-10.2_
 
