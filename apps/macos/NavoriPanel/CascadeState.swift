@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 
 public struct CascadeNode: Equatable, Sendable {
     public let id: String
@@ -44,6 +45,9 @@ public struct CascadeState: Sendable {
     private var lastPoint: CGPoint?
     private var anchor: CGPoint?
 
+    private static let diagonalSegment: CGFloat = 16
+    private static let diagonalSlack: CGFloat = 26
+
     public init(root: [CascadeNode], maxDepth: Int = 3) {
         self.root = root
         self.maxDepth = maxDepth
@@ -77,7 +81,7 @@ public struct CascadeState: Sendable {
         lastPoint = point
         pendingRow = row
         var effects: [CascadeEffect] = []
-        if isInsideDiagonal(point, submenu: submenu) == false {
+        if holdsForDiagonal(row: row, point: point, submenu: submenu) == false {
             anchor = point
             effects.append(contentsOf: apply(row, shouldOpen: false))
         }
@@ -210,9 +214,20 @@ public struct CascadeState: Sendable {
         return effects
     }
 
-    private func isInsideDiagonal(_ point: CGPoint, submenu: CGRect?) -> Bool {
-        guard let submenu, let anchor, openPath.isEmpty == false else { return false }
-        return SafeDiagonal.contains(point, from: anchor, toward: submenu)
+    /// True while the pointer may be on its way to the open Submenu, so the rows it crosses stay unselected.
+    /// A row of the deepest panel is the destination, so it never waits.
+    private mutating func holdsForDiagonal(row: String, point: CGPoint, submenu: CGRect?) -> Bool {
+        guard let submenu, let anchor, openPath.isEmpty == false, ancestors(of: row) != openPath else {
+            return false
+        }
+        // Direction is read over a whole segment: one mouse event toward the Submenu can be purely vertical.
+        guard hypot(point.x - anchor.x, point.y - anchor.y) >= Self.diagonalSegment else { return true }
+        // One row of slack, so an uneven path to the Submenu's first or last row still counts.
+        let target = submenu.insetBy(dx: 0, dy: -Self.diagonalSlack)
+        guard SafeDiagonal.contains(point, from: anchor, toward: target) else { return false }
+        // The triangle follows the pointer, so a turn away from the Submenu leaves it within one segment.
+        self.anchor = point
+        return true
     }
 
     private func isActionable(_ node: CascadeNode) -> Bool {
