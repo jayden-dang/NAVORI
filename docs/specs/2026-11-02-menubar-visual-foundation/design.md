@@ -36,7 +36,7 @@ Vocabulary for every section below: **module**, **interface**, **implementation*
 
 ### Cascade logic
 
-Satisfies: MENU-4.1, MENU-4.2, MENU-4.3, MENU-4.4, MENU-4.5, MENU-4.6, MENU-4.8, MENU-5.1, MENU-5.2, MENU-5.3, MENU-5.4, MENU-5.5, MENU-5.6, MENU-9.1
+Satisfies: MENU-4.1, MENU-4.2, MENU-4.3, MENU-4.4, MENU-4.5, MENU-4.6, MENU-4.8, MENU-4.16, MENU-4.17, MENU-4.18, MENU-5.1, MENU-5.2, MENU-5.3, MENU-5.4, MENU-5.5, MENU-5.6, MENU-9.1
 Reuse: rung 7 — new code in the existing `NavoriPanel` target (rung 2 for the target and the pure-policy pattern of `StatusPanelClickPolicy`); AppKit's `NSMenu` is what ADR 0006 declined.
 Respects: ARCH-1, ARCH-16
 Interface:
@@ -247,6 +247,7 @@ A11y: not a user surface, and exempt from MENU-11.3.
 | `CoreRowState`, `ModuleDot` in `NavoriPanel` | unit | MENU-3.1, 3.2, 3.7, 3.10 |
 | `CascadePlacement.frame` in `NavoriPanel` | unit | MENU-4.5, 4.6, 4.7, 9.1 |
 | `SafeDiagonal.contains` in `NavoriPanel` | unit | MENU-4.3, 9.1 |
+| Pointer paths through `CascadeState` at the real menu's geometry, 3 pt and 1 pt steps | unit | MENU-4.16, 4.17, 4.18 |
 | `StatusPanelClickPolicy` (existing, gains `cascadeFrames`) | unit | MENU-4.9, 4.10, G3 |
 | `xtask/src/perf/judge.rs`, `logstream.rs`, `baseline.rs` (existing) | unit | MENU-8.2, 8.3, G5, G10 |
 | `cargo xtask perf` | e2e | MENU-8.1, 8.4, 11.1, 11.2, G5, G12, G13 |

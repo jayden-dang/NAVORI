@@ -575,3 +575,28 @@ _Requirements: MENU-2.3, MENU-G6_
 - [x] **Step 4: Commit** `git commit -m "feat(shell): set the menu's glass tint"`
 
 _Requirements: MENU-11.1, MENU-11.2, MENU-11.4_
+
+---
+
+### Task 21: Let the highlight follow the pointer
+
+Fix after delivery. The Safe diagonal held rows of the deepest panel and measured from a stale point.
+
+**Files:**
+- Modify: `apps/macos/NavoriPanel/CascadeState.swift`
+- Test: `apps/macos/Tests/NavoriPanelTests/CascadeHoverLagTests.swift`
+
+**Reuse:** rung 2 — `SafeDiagonal.contains`, `CascadeState`.
+
+**Interfaces:**
+- Consumes: `CascadeEvent.pointerOn`
+- Produces: no new interface. The triangle's anchor now follows the pointer in 16 pt segments, toward the Submenu grown by one row above and below.
+
+**Depends-on:** Task 20
+
+- [x] **Step 1: Write failing tests** that walk the pointer through the panels at each angle. Run: `swift test --package-path apps/macos --filter CascadeHoverLagTests` — expect: rows missed at 10 to 40 degrees.
+- [x] **Step 2: Implement** in `holdsForDiagonal`.
+- [x] **Step 3: Verify by hand** on `cargo xtask run`: move across rows right after a Submenu opens; the highlight follows, and a slow diagonal to a Submenu's last row keeps it open.
+- [x] **Step 4: Commit** `git commit -m "fix(menu): let the highlight follow the pointer in the cascade"`
+
+_Requirements: MENU-4.16, MENU-4.17, MENU-4.18_

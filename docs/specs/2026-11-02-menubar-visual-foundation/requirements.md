@@ -84,6 +84,9 @@ Terms used below:
 - **MENU-4.13** WHEN key status leaves the Cascade for anything else THE SYSTEM SHALL close the whole Cascade.
 - **MENU-4.14** WHEN the Cascade opens THE SYSTEM SHALL call `CoreStore.setPanelVisible(true)` exactly once, and opening or closing a Submenu inside it SHALL NOT call it.
 - **MENU-4.15** WHEN the whole Cascade closes THE SYSTEM SHALL call `CoreStore.setPanelVisible(false)` exactly once, and closing a Cascade that is not open SHALL NOT call it.
+- **MENU-4.16** WHEN the pointer is on a row of the deepest open panel THE SYSTEM SHALL select that row at once, whatever direction the pointer is moving. *(Added 2026-11-04: the Safe diagonal also held rows of the Submenu it leads to, so the highlight lagged behind a pointer moving away from the parent.)*
+- **MENU-4.17** WHEN the pointer turns away from the open Submenu THE SYSTEM SHALL select the parent row under it within 16 pt of travel, without waiting for the pointer to stop. *(Added 2026-11-04: the Safe diagonal measured from a stale point, so a wide triangle covered rows the pointer was not crossing on its way to the Submenu.)*
+- **MENU-4.18** (guard) WHEN the pointer travels to the open Submenu along an uneven path, to any of its rows THE SYSTEM SHALL CONTINUE TO keep the Submenu open and the parent row selected.
 
 ## 5. Drive the menu from the keyboard
 
