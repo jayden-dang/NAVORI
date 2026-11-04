@@ -298,6 +298,8 @@ impl Containers for FakeContainers {
     }
 }
 
+type EngineFor = Box<dyn FnOnce(&Arc<FakeContainers>) -> Arc<dyn Containers>>;
+
 pub struct Rig {
     pub kernel: Kernel,
     pub containers: Arc<FakeContainers>,
@@ -324,7 +326,21 @@ impl Rig {
         Self::opening(true, serde_json::Map::new())
     }
 
+    pub fn with_engine(
+        engine: impl FnOnce(&Arc<FakeContainers>) -> Arc<dyn Containers> + 'static,
+    ) -> Self {
+        Self::build(false, serde_json::Map::new(), Some(Box::new(engine)))
+    }
+
     fn opening(refused: bool, sections: serde_json::Map<String, Value>) -> Self {
+        Self::build(refused, sections, None)
+    }
+
+    fn build(
+        refused: bool,
+        sections: serde_json::Map<String, Value>,
+        engine: Option<EngineFor>,
+    ) -> Self {
         let processes = Arc::new(FakeProcesses::new(501));
         let gate = Arc::new(Gate::new(Arc::clone(&processes) as Arc<dyn ProcessSource>));
         let (guard, home) = canonical_temp_home();
@@ -332,6 +348,10 @@ impl Rig {
         let source = Arc::clone(&gate) as Arc<dyn ProcessSource>;
         let containers = Arc::new(FakeContainers::new());
         let signals = Arc::new(FakeSignals::new(4242, 4242));
+        let engine = engine.map_or_else(
+            || Arc::clone(&containers) as Arc<dyn Containers>,
+            |make| make(&containers),
+        );
         let env = PortsEnv {
             home: home.clone(),
             processes: Box::new(move || {
@@ -341,7 +361,7 @@ impl Rig {
                     Ok(Arc::clone(&source))
                 }
             }),
-            containers: Arc::clone(&containers) as Arc<dyn Containers>,
+            containers: engine,
             signals: Arc::clone(&signals) as Arc<dyn Signals>,
             helper: None,
         };

@@ -5,6 +5,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use navori_kernel::{ActionError, ModuleCtx, Request, Wake};
 use navori_macos::ProcessSource;
+use tokio::time::Instant;
 
 use crate::action::{KillReply, Outcome, PortsAction, TargetResult};
 use crate::docker::attribute;
@@ -12,6 +13,7 @@ use crate::infra::docker::Containers;
 use crate::place::place;
 use crate::scan::{HarnessMemo, Scan, Scanner};
 use crate::state::{DockerStatus, PortsState, group};
+use crate::stop::{StopEnv, StopTask, Stops, reason};
 use crate::{Ports, PortsEnv};
 
 const FIRST_SCAN: Duration = Duration::from_secs(5);
@@ -21,6 +23,7 @@ const OPEN_FAILED: &str = "the process source could not be opened";
 const RECOVERED: &str = "port scans work again";
 const DOCKER_FAILED: &str = "Docker could not be read";
 const DOCKER_RECOVERED: &str = "Docker reads work again";
+const STOPPED: &str = "ports.stopped";
 const OPEN_CADENCE: Duration = Duration::from_secs(3);
 const CLOSED_CADENCE: Duration = Duration::from_secs(30);
 
@@ -100,6 +103,8 @@ impl Ports {
         let mut in_flight: Option<InFlight> = None;
         let mut failing = false;
         let mut docker_failing = false;
+        let mut stops = Stops::default();
+        let mut rescan_after = false;
         loop {
             tokio::select! {
                 biased;
@@ -124,26 +129,51 @@ impl Ports {
                         }
                     }
                     publish(ctx, started, outcome.result);
-                    deadline = Some(wait.now() + cadence(wait.panel_visible()));
+                    let now = wait.now();
+                    deadline = Some(now + cadence(wait.panel_visible()));
+                    if std::mem::take(&mut rescan_after) {
+                        match self.begin_scan(ctx, now, &mut failing, wait.panel_visible()) {
+                            Ok(task) => {
+                                in_flight = Some(task);
+                                deadline = None;
+                            }
+                            Err(next) => deadline = Some(next),
+                        }
+                    }
+                }
+                Some(joined) = stops.next(), if !stops.is_empty() => {
+                    match joined {
+                        Ok(done) => {
+                            ctx.emit(STOPPED, done.severity(), done.summary(), done.payload());
+                        }
+                        Err(err) => tracing::warn!(error = %err, "a stop ended before it could answer"),
+                    }
+                    if in_flight.is_some() {
+                        rescan_after = true;
+                    } else {
+                        match self.begin_scan(ctx, wait.now(), &mut failing, wait.panel_visible()) {
+                            Ok(task) => {
+                                in_flight = Some(task);
+                                deadline = None;
+                            }
+                            Err(next) => deadline = Some(next),
+                        }
+                    }
                 }
                 req = ctx.recv() => {
                     let Some(req) = req else {
                         return Ok(());
                     };
-                    Self::on_request(ctx, req);
+                    self.on_request(ctx, req, &mut stops);
                 }
                 wake = wait.wait_until(deadline) => {
                     let now = wait.now();
                     match wake {
                         Wake::Due => {
                             deadline = None;
-                            match self.start_scan(now) {
+                            match self.begin_scan(ctx, now, &mut failing, wait.panel_visible()) {
                                 Ok(task) => in_flight = Some(task),
-                                Err(problem) => {
-                                    note(&mut failing, Some(OPEN_FAILED), RECOVERED);
-                                    publish(ctx, now, Err(problem));
-                                    deadline = Some(now + cadence(wait.panel_visible()));
-                                }
+                                Err(next) => deadline = Some(next),
                             }
                         }
                         Wake::PanelChanged => {
@@ -158,7 +188,21 @@ impl Ports {
         }
     }
 
-    fn on_request(ctx: &ModuleCtx<Self>, req: Request<PortsAction>) {
+    fn begin_scan(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        now: SystemTime,
+        failing: &mut bool,
+        panel_visible: bool,
+    ) -> Result<InFlight, SystemTime> {
+        self.start_scan(now).map_err(|problem| {
+            note(failing, Some(OPEN_FAILED), RECOVERED);
+            publish(ctx, now, Err(problem));
+            now + cadence(panel_visible)
+        })
+    }
+
+    fn on_request(&mut self, ctx: &ModuleCtx<Self>, req: Request<PortsAction>, stops: &mut Stops) {
         if let Err(message) = req.action.validate() {
             req.respond::<()>(Err(ActionError::Invalid(message)));
             return;
@@ -172,16 +216,32 @@ impl Ports {
                 let reply = open_url(&ctx.state(), port, address);
                 req.respond(reply);
             }
-            PortsAction::Kill { ref targets, .. } => {
-                let results = targets
-                    .iter()
-                    .map(|target| TargetResult {
-                        target: target.clone(),
-                        result: Outcome::Failed,
-                        reason: Some("Stopping is not wired yet.".to_owned()),
-                    })
-                    .collect();
-                req.respond(Ok(KillReply { results }));
+            PortsAction::Kill {
+                ref selector,
+                ref targets,
+            } => {
+                let (selector, targets) = (selector.clone(), targets.clone());
+                let arrival = Instant::now();
+                let Ok(source) = self.open() else {
+                    let results = targets
+                        .into_iter()
+                        .map(|target| TargetResult {
+                            target,
+                            result: Outcome::Failed,
+                            reason: Some(reason::PROCESS_LIST_TIMEOUT.to_owned()),
+                        })
+                        .collect();
+                    req.respond(Ok(KillReply { results }));
+                    return;
+                };
+                let env = StopEnv {
+                    source,
+                    home: self.env.home.clone(),
+                    containers: Arc::clone(&self.env.containers),
+                    signals: Arc::clone(&self.env.signals),
+                    helper: self.env.helper.clone(),
+                };
+                stops.spawn(StopTask::new(req, env, selector, targets, arrival));
             }
         }
     }

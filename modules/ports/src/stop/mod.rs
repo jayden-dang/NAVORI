@@ -2,8 +2,11 @@
 
 mod process;
 mod resolve;
+mod task;
 
 pub use process::{member_outcome, reach_for, stop_process};
+
+pub(crate) use task::{StopEnv, StopTask, Stops};
 
 pub use resolve::{
     ContainerPlan, FreshRead, Guard, Plan, ProcessPlan, Reach, Resolved, StopClass, resolve,
