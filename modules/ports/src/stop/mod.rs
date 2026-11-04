@@ -6,7 +6,7 @@ mod task;
 
 pub use process::{member_outcome, reach_for, stop_process};
 
-pub(crate) use task::{StopEnv, StopTask, Stops};
+pub(crate) use task::{StopDone, StopEnv, StopTask, Stops};
 
 pub use resolve::{
     ContainerPlan, FreshRead, Guard, Plan, ProcessPlan, Reach, Resolved, StopClass, resolve,
@@ -28,5 +28,7 @@ pub mod reason {
     pub const DOCKER_REFUSED: &str = "Docker refused the stop";
     pub const GUARD_INCOMPLETE: &str = "Navori could not check what it must not stop";
     pub const CONTAINER_ID_REFUSED: &str = "Navori did not send that container id to Docker";
+    pub const PROCESS_LIST_UNREADABLE: &str = "Navori could not read the process list";
+    pub const TARGET_UNREAD_IN_TIME: &str = "The target could not be read in time";
     pub const STILL_STOPPING: &str = "It is still stopping";
 }

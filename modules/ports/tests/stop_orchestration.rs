@@ -5,7 +5,7 @@ mod common;
 use std::sync::Arc;
 use std::time::Duration;
 
-use common::{ORIGIN_MS, Rig, serve};
+use common::{LogCapture, ORIGIN_MS, Rig, serve};
 use futures::future::BoxFuture;
 use navori_kernel::{Event, Risk, Severity};
 use navori_macos::fake::FakeProcess;
@@ -228,7 +228,7 @@ async fn a_stalled_process_read_fails_every_target_and_signals_nothing() {
     );
     drop(hold);
 
-    let reason = "The process list could not be read in time";
+    let reason = "The target could not be read in time";
     assert_eq!(
         answers(&reply.unwrap()),
         vec![answer_with("failed", reason), answer_with("failed", reason)]
@@ -637,4 +637,31 @@ async fn a_leader_with_a_group_mate_that_was_not_asked_for_is_signalled_alone() 
         vec![(SignalTarget::Process(200), Signal::Term)]
     );
     assert!(rig.processes.entry(201).is_ok());
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_kill_when_the_process_list_cannot_be_opened_fails_every_target_and_says_so() {
+    let logs = LogCapture::start();
+    let rig = Rig::unopenable();
+
+    let reply = rig
+        .dispatch(kill(&[process(200), container(CONTAINER)]))
+        .await
+        .unwrap();
+    rig.idle().await;
+
+    let reason = "Navori could not read the process list";
+    assert_eq!(
+        answers(&reply),
+        vec![answer_with("failed", reason), answer_with("failed", reason)]
+    );
+    assert!(rig.signals.sent().is_empty());
+    assert!(rig.containers.stops().is_empty());
+    let events = stopped_events(&rig);
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert_eq!(events[0].severity, Severity::Warn);
+    assert_eq!(events[0].summary, "2 failed.");
+    assert_eq!(events[0].payload["failed"], 2);
+    assert!(rig.state()["problem"].is_string(), "no rescan started");
+    assert!(logs.text().contains("WARN"), "{}", logs.text());
 }

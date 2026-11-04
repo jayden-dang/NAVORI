@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use navori_kernel::{ActionError, ModuleCtx, Request, Wake};
+use navori_kernel::{ActionError, ModuleCtx, Request, WaitHandle, Wake};
 use navori_macos::ProcessSource;
 use tokio::time::Instant;
 
@@ -13,7 +13,7 @@ use crate::infra::docker::Containers;
 use crate::place::place;
 use crate::scan::{HarnessMemo, Scan, Scanner};
 use crate::state::{DockerStatus, PortsState, group};
-use crate::stop::{StopEnv, StopTask, Stops, reason};
+use crate::stop::{StopDone, StopEnv, StopTask, Stops, reason};
 use crate::{Ports, PortsEnv};
 
 const FIRST_SCAN: Duration = Duration::from_secs(5);
@@ -148,23 +148,30 @@ impl Ports {
                         }
                         Err(err) => tracing::warn!(error = %err, "a stop ended before it could answer"),
                     }
-                    if in_flight.is_some() {
-                        rescan_after = true;
-                    } else {
-                        match self.begin_scan(ctx, wait.now(), &mut failing, wait.panel_visible()) {
-                            Ok(task) => {
-                                in_flight = Some(task);
-                                deadline = None;
-                            }
-                            Err(next) => deadline = Some(next),
-                        }
-                    }
+                    self.rescan_after_stop(
+                        ctx,
+                        &mut wait,
+                        &mut in_flight,
+                        &mut deadline,
+                        &mut failing,
+                        &mut rescan_after,
+                    );
                 }
                 req = ctx.recv() => {
                     let Some(req) = req else {
                         return Ok(());
                     };
-                    self.on_request(ctx, req, &mut stops);
+                    if let Some(done) = self.on_request(ctx, req, &mut stops) {
+                        ctx.emit(STOPPED, done.severity(), done.summary(), done.payload());
+                        self.rescan_after_stop(
+                            ctx,
+                            &mut wait,
+                            &mut in_flight,
+                            &mut deadline,
+                            &mut failing,
+                            &mut rescan_after,
+                        );
+                    }
                 }
                 wake = wait.wait_until(deadline) => {
                     let now = wait.now();
@@ -188,6 +195,28 @@ impl Ports {
         }
     }
 
+    fn rescan_after_stop(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        wait: &mut WaitHandle,
+        in_flight: &mut Option<InFlight>,
+        deadline: &mut Option<SystemTime>,
+        failing: &mut bool,
+        rescan_after: &mut bool,
+    ) {
+        if in_flight.is_some() {
+            *rescan_after = true;
+            return;
+        }
+        match self.begin_scan(ctx, wait.now(), failing, wait.panel_visible()) {
+            Ok(task) => {
+                *in_flight = Some(task);
+                *deadline = None;
+            }
+            Err(next) => *deadline = Some(next),
+        }
+    }
+
     fn begin_scan(
         &mut self,
         ctx: &ModuleCtx<Self>,
@@ -202,10 +231,15 @@ impl Ports {
         })
     }
 
-    fn on_request(&mut self, ctx: &ModuleCtx<Self>, req: Request<PortsAction>, stops: &mut Stops) {
+    fn on_request(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        req: Request<PortsAction>,
+        stops: &mut Stops,
+    ) -> Option<StopDone> {
         if let Err(message) = req.action.validate() {
             req.respond::<()>(Err(ActionError::Invalid(message)));
-            return;
+            return None;
         }
         match req.action {
             PortsAction::List => {
@@ -222,17 +256,22 @@ impl Ports {
             } => {
                 let (selector, targets) = (selector.clone(), targets.clone());
                 let arrival = Instant::now();
-                let Ok(source) = self.open() else {
-                    let results = targets
-                        .into_iter()
-                        .map(|target| TargetResult {
-                            target,
-                            result: Outcome::Failed,
-                            reason: Some(reason::PROCESS_LIST_TIMEOUT.to_owned()),
-                        })
-                        .collect();
-                    req.respond(Ok(KillReply { results }));
-                    return;
+                let source = match self.open() {
+                    Ok(source) => source,
+                    Err(err) => {
+                        tracing::warn!(error = %err, "a stop could not open the process source");
+                        let results = targets
+                            .into_iter()
+                            .map(|target| TargetResult {
+                                target,
+                                result: Outcome::Failed,
+                                reason: Some(reason::PROCESS_LIST_UNREADABLE.to_owned()),
+                            })
+                            .collect::<Vec<_>>();
+                        let done = StopDone::of(results.iter().map(|each| each.result));
+                        req.respond(Ok(KillReply { results }));
+                        return Some(done);
+                    }
                 };
                 let env = StopEnv {
                     source,
@@ -244,6 +283,7 @@ impl Ports {
                 stops.spawn(StopTask::new(req, env, selector, targets, arrival));
             }
         }
+        None
     }
 
     fn start_scan(&mut self, started: SystemTime) -> Result<InFlight, String> {

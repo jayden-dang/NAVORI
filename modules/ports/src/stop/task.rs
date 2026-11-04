@@ -65,7 +65,7 @@ pub(crate) struct StopDone {
 }
 
 impl StopDone {
-    fn of(outcomes: impl IntoIterator<Item = Outcome>) -> Self {
+    pub(crate) fn of(outcomes: impl IntoIterator<Item = Outcome>) -> Self {
         let mut counts = [0; 8];
         for outcome in outcomes {
             counts[slot(outcome)] += 1;
@@ -244,7 +244,7 @@ fn answer(slots: &[Slot], at: usize) -> Answer {
         Some(Slot::Done(done)) => *done,
         Some(Slot::Running) => (Outcome::StillStopping, Some(reason::STILL_STOPPING)),
         Some(Slot::Follows(first)) => answer(slots, *first),
-        Some(Slot::Pending) | None => (Outcome::Failed, Some(reason::PROCESS_LIST_TIMEOUT)),
+        Some(Slot::Pending) | None => (Outcome::Failed, Some(reason::TARGET_UNREAD_IN_TIME)),
     }
 }
 
