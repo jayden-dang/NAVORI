@@ -29,13 +29,12 @@ async fn a_live_deepseek_call_returns_text() {
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .output()
-        .expect("run pass");
+        .unwrap_or_else(|error| panic!("could not run pass: {:?}", error.kind()));
     assert!(output.status.success(), "pass could not show the entry");
-    let key = Secret::new(
-        String::from_utf8(output.stdout)
-            .expect("the pass entry is text")
-            .trim(),
-    );
+    let Ok(text) = String::from_utf8(output.stdout) else {
+        panic!("the pass entry is not valid UTF-8");
+    };
+    let key = Secret::new(text.trim());
 
     let request = ChatRequest {
         model,
