@@ -16,7 +16,7 @@ Requirements: ./requirements.md
 Design: ./design.md
 
 <!--
-Written in an unattended run under .skills/_pending-ports-panel/auto/charter.md. The operator has not reviewed this file. Per the charter, plan-tasks did not publish an issue (ticket #25 is the only ticket) and offers no execution route in this run.
+Written in an unattended run under .skills/_pending-ports-panel/auto/charter.md. The operator approved the spec on 2026-11-04 at 21:17 +07 (the Approved line above). The build then deviated from it, as recorded in "Amendments during the build" at the end of this file and in requirements.md; those amendments, dated 2026-11-05, are agent-made and agent-reviewed, not reviewed by the operator. Per the charter, plan-tasks did not publish an issue (ticket #25 is the only ticket) and offers no execution route in this run.
 -->
 
 **Goal:** Add a `ports.kill` Action that stops exactly the listeners it names, a Core view that joins Ports and Awake by project, and the `Running` menu with project rows, a child menu and `Stop`.
@@ -167,7 +167,7 @@ _Requirements: PSTOP-1.16_
 - [x] **Step 5: Add** a one-line amendment note on PORTS-1.5 in the PORTS `requirements.md`: "(Amended 2026-11-04 by PSTOP: entries gain `root` and a container's `image`; both additive.)"
 - [x] **Step 6: Run** `cargo test -p navori-mod-ports && cargo test -p navori-ffi` — expect: pass (the ffi re-deserialization still round-trips). Commit `git commit -m "feat(ports): carry the checkout path and the container image"`
 
-_Requirements: PSTOP-2.1, PSTOP-3.9, PSTOP-4.6_
+_Requirements: PSTOP-2.1, PSTOP-2.7, PSTOP-3.9, PSTOP-4.6_
 
 ---
 
@@ -277,7 +277,7 @@ _Requirements: PSTOP-1.3, PSTOP-1.5, PSTOP-1.6, PSTOP-2.1, PSTOP-2.2, PSTOP-2.3,
 - [x] **Step 3: Implement** `reach_for` and `stop_process` (both `pub use`d from `lib.rs` here; `reach_for` returns the `Reach` that Task 7 stores in `ProcessPlan.reach`; `stop_process` reads `plan.reach` and never recomputes it) and the sequence of design section D: `Term`, 3 s, `entry`, `Kill`, 1 s, `entry`; no await between the second `entry` and `send(Kill)`.
 - [x] **Step 4: Run** `cargo test -p navori-mod-ports` — expect: pass. Commit `git commit -m "feat(ports): stop a process with term, a wait and kill"`
 
-_Requirements: PSTOP-1.7, PSTOP-1.8, PSTOP-1.9, PSTOP-1.10, PSTOP-10.4_
+_Requirements: PSTOP-1.7, PSTOP-1.8, PSTOP-1.9, PSTOP-1.10, PSTOP-1.22, PSTOP-10.4_
 
 ---
 
@@ -357,7 +357,7 @@ _Requirements: PSTOP-3.3, PSTOP-3.4, PSTOP-3.7, PSTOP-3.8, PSTOP-3.9_
 - [x] **Step 4: Implement** the join-set branch of the `select!`: emit the Event, then rescan as above. Dropping the set on return aborts the tasks (`Request` dropped → caller sees `Unavailable`).
 - [x] **Step 5: Run** `cargo test -p navori-mod-ports && cargo xtask check-deps` — expect: pass. Commit `git commit -m "feat(ports): carry out a kill request and rescan after it"`
 
-_Requirements: PSTOP-1.17, PSTOP-1.11, PSTOP-1.12, PSTOP-1.13, PSTOP-1.14, PSTOP-1.15, PSTOP-1.19, PSTOP-1.20, PSTOP-3.5, PSTOP-10.2_
+_Requirements: PSTOP-1.17, PSTOP-1.11, PSTOP-1.12, PSTOP-1.13, PSTOP-1.14, PSTOP-1.15, PSTOP-1.19, PSTOP-1.20, PSTOP-1.21, PSTOP-3.5, PSTOP-10.2_
 
 ---
 
@@ -401,7 +401,7 @@ _Requirements: PSTOP-1.17, PSTOP-1.11, PSTOP-1.12, PSTOP-1.13, PSTOP-1.14, PSTOP
 - [x] **Step 4: Wire** `snapshot()` and rebase onto `main` first (shared ffi files). Run `cargo test -p navori-ffi && cargo xtask ci` — expect: pass (it also builds the Swift shell, which must still compile with the new field unused).
 - [x] **Step 5: Commit** `git commit -m "feat(ffi): join ports and awake into one running view"`
 
-_Requirements: PSTOP-4.1, PSTOP-4.2, PSTOP-4.3, PSTOP-4.4, PSTOP-4.5, PSTOP-4.6, PSTOP-4.7, PSTOP-4.12, PSTOP-4.20, PSTOP-4.21, PSTOP-6.9, PSTOP-7.3_
+_Requirements: PSTOP-4.1, PSTOP-4.2, PSTOP-4.3, PSTOP-4.4, PSTOP-4.5, PSTOP-4.6, PSTOP-4.7, PSTOP-4.12, PSTOP-4.20, PSTOP-4.21, PSTOP-6.9, PSTOP-6.10, PSTOP-7.3_
 
 ---
 
@@ -541,7 +541,7 @@ _Requirements: PSTOP-6.1, PSTOP-6.2, PSTOP-6.3, PSTOP-6.4, PSTOP-6.5, PSTOP-6.6,
 - [x] **Step 4: Verify** in the dev app on the throwaway listener: `Open` opens the browser at `http://localhost:<port>`; `Copy` puts `localhost:<port>` on the pasteboard and sends nothing (check `navori --profile dev events`); the path reveals in Finder.
 - [x] **Step 5: Run** `cargo xtask ci` — expect: pass. Commit `git commit -m "feat(shell): open, copy and reveal from the project menu"`
 
-_Requirements: PSTOP-9.1, PSTOP-9.2, PSTOP-9.3, PSTOP-9.4_
+_Requirements: PSTOP-9.1, PSTOP-9.2, PSTOP-9.3, PSTOP-9.4, PSTOP-9.5_
 
 ---
 
@@ -586,9 +586,21 @@ _Requirements: PSTOP-3.10, PSTOP-4.19, PSTOP-8.1, PSTOP-8.2_
 **Depends-on:** Task 14
 
 - [x] **Step 1: Run** `cargo xtask ci` — expect: pass (fmt, clippy `-D warnings`, tests, check-deps, Swift build).
-- [ ] **Step 2: Run** `cargo xtask perf` on an idle machine, without `--record` — expect: pass for `submenu_open_ms`, `menu_reopen_ms`, `menu_open_cpu_ms`, `port_scan_ms` and idle CPU and wake-ups (the GOAL-11 budgets). If Task 10 found that the probe cannot open the Running submenu, report PSTOP-10.1 as "not measured for Running; existing metrics unchanged", never as met, and put that line in the run report.
-- [ ] **Step 3: Drive** the dev app (Launch, Doctor, Drive, Evidence): spawn a throwaway listener in a throwaway git repo, confirm the project shows a ring, press `Stop N` and confirm, read the port released and the next state without the row; then `navori --profile dev dispatch ports '{"kill":{"selector":{"pid":<pid>},"targets":[{"process":{"pid":<pid>,"start_us":1}}]}}'` for the throwaway's pid (read from `ports.list`) returns `Stale` and leaves it running, and a dispatch naming the throwaway's own pid and start time stops it and returns `Stopped` or `StoppedAlone`. Kill-self and kill-ancestor are covered only by the fakes of Task 4: the Core holds no TCP listener, so a real dispatch naming it would answer `Stale`, and no step names a process it did not spawn.
+- [ ] **Step 2: Run** `cargo xtask perf` on an idle machine, without `--record` — expect: pass for `submenu_open_ms`, `menu_reopen_ms`, `menu_open_cpu_ms`, `port_scan_ms` and idle CPU and wake-ups (the GOAL-11 budgets). If Task 10 found that the probe cannot open the Running submenu, report PSTOP-10.1 as "not measured for Running; existing metrics unchanged", never as met, and put that line in the run report. **Not ticked 2026-11-05:** the run passed on a machine that was not idle (load 4 to 5 on 18 cores) and PSTOP-10.1 was not measured for the Running submenu.
+- [ ] **Step 3: Drive** the dev app (Launch, Doctor, Drive, Evidence): spawn a throwaway listener in a throwaway git repo, confirm the project shows a ring, press `Stop N` and confirm, read the port released and the next state without the row; then `navori --profile dev dispatch ports '{"kill":{"selector":{"pid":<pid>},"targets":[{"process":{"pid":<pid>,"start_us":1}}]}}'` for the throwaway's pid (read from `ports.list`) returns `Stale` and leaves it running, and a dispatch naming the throwaway's own pid and start time stops it and returns `Stopped` or `StoppedAlone`. Kill-self and kill-ancestor are covered only by the fakes of Task 4: the Core holds no TCP listener, so a real dispatch naming it would answer `Stale`, and no step names a process it did not spawn. **Not ticked 2026-11-05:** the menubar status item is not drivable with the available tools, so the ring, `Stop N`, the confirmation and the row leaving were not driven; only the CLI half (a stale dispatch, then `stopped_alone` on the throwaway) ran.
 - [x] **Step 4: Check** the three Open Questions of `requirements.md` are still open and unverified items are not stated as facts anywhere in the diff.
 - [x] **Step 5: Commit** any tick-box change `git commit -m "docs(PSTOP): record the verification of the plan"`
 
 _Requirements: PSTOP-10.1, PSTOP-10.2, PSTOP-10.3_
+
+## Amendments during the build
+
+*(2026-11-05, agent-made, reviewed by agents, not by the operator.)* The build deviated from the approved plan in the ways below. The criteria carry the amended text in requirements.md ("Amendments during the build" there) and the design records the code changes in its own section of the same name. The work was done in the Task 1 to 15 commits and in the whole-branch fix pass (7b8a6b3..d981b88) and polish pass (d981b88..ab5fc7b); no new task was planned for it.
+
+- Validation, fixed sentences, group mates, the open-failure Event and rescan, unread targets at the deadline: PSTOP-1.4, 1.7, 1.8, 1.9, 1.11, 1.14, 1.15 (Tasks 3, 4, 5, 7). New PSTOP-1.21 (overlap claims, Task 7) and PSTOP-1.22 (logging, Task 5) were added to those tasks' footers.
+- Image as its last path segment: PSTOP-2.1 and new PSTOP-2.7 (Task 2 footer).
+- No client limit of the stop request of its own: PSTOP-3.7 (Task 6).
+- Empty label sides, the both-down rule, command Lease rows, one `isActive` predicate: PSTOP-4.2, 4.10, 4.11, 4.14 (Tasks 8, 9, 10, 12). New PSTOP-6.10 (empty `stop_request`, Task 8 footer); PSTOP-6.1 and 6.4 amended (Task 12).
+- Open failure and the `http` rule: PSTOP-9.2 and new PSTOP-9.5 (Task 13 footer).
+- Task 15 Steps 2 and 3 stay unticked, with the reason beside each; PSTOP-10.1 is not measured for Running.
+- Known gaps nobody verified (keyboard and VoiceOver, live rendering of the failed and stopping states and of Open, Copy and the Finder reveal, kill-self and kill-ancestor on real processes, ARCH-5 until ROAD-37) are in requirements.md under "Known gaps".

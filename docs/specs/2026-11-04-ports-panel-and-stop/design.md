@@ -7,7 +7,7 @@ Date: 2026-11-04
 Requirements: ./requirements.md
 
 <!--
-Written in an unattended run under .skills/_pending-ports-panel/auto/charter.md. The operator has not reviewed this file. `(Weigh, card N)` marks a pick by the peer session ports-panel-interpret; `agent-decided` marks a pick by an agent session; a line with neither follows a document of record or the code, cited. The three Open Questions of requirements.md stay open here.
+Written in an unattended run under .skills/_pending-ports-panel/auto/charter.md. The operator approved the spec on 2026-11-04 at 21:17 +07 (the Approved line above). The build then deviated from it, as recorded in "Amendments during the build" below; those amendments, dated 2026-11-05, are agent-made and agent-reviewed, not reviewed by the operator. `(Weigh, card N)` marks a pick by the peer session ports-panel-interpret; `agent-decided` marks a pick by an agent session; a line with neither follows a document of record or the code, cited. The seven Open Questions of requirements.md stay open here.
 Digests: .skills/_pending-ports-panel/auto/scan.md and design-scan.md (every signature below was read from the code in those scans; line numbers are the scan's).
 -->
 
@@ -84,7 +84,7 @@ Order of checks for a process target (first hit wins): `entry(pid)`: `Gone` or a
 
 ### D. Stopping one process (`modules/ports/src/stop/process.rs`)
 
-Satisfies: PSTOP-1.7, PSTOP-1.8, PSTOP-1.9, PSTOP-1.10, PSTOP-10.4
+Satisfies: PSTOP-1.7, PSTOP-1.8, PSTOP-1.9, PSTOP-1.10, PSTOP-1.22, PSTOP-10.4
 Reuse: rung 2 — `tokio::time::sleep` (paused-clock friendly, as the cadence tests use), `ProcessSource::entry` for the identity check; signalling through section A.
 Respects: ARCH-1
 Security: THR-5
@@ -109,7 +109,7 @@ Locality: extend `infra/docker.rs`, `Containers`; the stop code logs nothing abo
 
 ### F. Stop orchestration (`modules/ports/src/actor.rs`, `stop/mod.rs`)
 
-Satisfies: PSTOP-1.11, PSTOP-1.12, PSTOP-1.13, PSTOP-1.14, PSTOP-1.15, PSTOP-1.19, PSTOP-1.20, PSTOP-3.5, PSTOP-10.2
+Satisfies: PSTOP-1.11, PSTOP-1.12, PSTOP-1.13, PSTOP-1.14, PSTOP-1.15, PSTOP-1.19, PSTOP-1.20, PSTOP-1.21, PSTOP-3.5, PSTOP-10.2
 Reuse: rung 2 — the `InFlight` abort-on-drop guard and `start_scan` (actor.rs:32-41, 174-194), `ModuleCtx::emit` (module.rs:160), `Request::respond`.
 Respects: ARCH-1, ARCH-14, ARCH-16
 Surface: `Ports::on_request` is a sync function without `&mut self` (actor.rs:161-172); the `Kill` arm cannot run there. Readers: the `ctx.recv()` arm of `run_loop` (actor.rs:104-157) → replace (it handles `Kill` before calling `on_request`); `tests/timing.rs`, `tests/open.rs`, `tests/scan.rs` read the loop's behavior for `List`/`Open`/cadence and stay as they are (guards PSTOP-1.18, 1.19).
@@ -121,7 +121,8 @@ Task body, all inside one `tokio::time::timeout_at(arrival + 25 s, …)` where `
 
 ### G. Checkout path on `Placement` and image on `ContainerRef` (`modules/ports`)
 
-Infrastructure: no `Satisfies:` line of its own; it supplies the data that section H uses for the project path (see H)
+Satisfies: PSTOP-2.7
+Infrastructure: supplies the data that section H uses for the project path (see H); only PSTOP-2.7 (the image segment) is its own
 Reuse: rung 2 — `place()` (place.rs:43-93) already holds `repo.root` inside `counted()` and discards it (scan.md; design-scan §2).
 Respects: ARCH-1
 Surface: `Placement` (state.rs:75-80, derived `Default`, serde, flattened into `PortEntry`) gains `root: Option<PathBuf>`; readers: `place()` and `place_listener` (set it) → replace; `docker.rs::attribute` (`place(path, home)` for a container's `working_dir`) → replace (same value); the `ports.list` JSON, which PORTS-1.5 pinned, gains a key, an additive change of the Implemented PORTS spec that its out-of-scope list handed to ROAD-18 (port-discovery/requirements.md:163) → replace, with an amendment note on PORTS-1.5 in the PORTS spec; struct literals and `assert_eq!` of `Placement` in modules/ports/tests/place.rs, scan.rs and docker.rs (:82, :105, :166, :180) → replace; `xtask/src/perf` reads the `ports.list` reply → leave (additive key); the FFI's re-deserialization of `PortsState` (app.rs:384) → replace (same struct). `ports.list` consumers outside the repo: none known (CLI and Navori AI read it as JSON; an added key does not break a reader that ignores unknown keys).
@@ -131,7 +132,7 @@ Locality: `place.rs`, `state.rs`, `docker.rs` (value only), tests literals.
 
 ### H. The Running view in the Core (`crates/ffi/src/running.rs`)
 
-Satisfies: PSTOP-4.1, PSTOP-4.2, PSTOP-4.3, PSTOP-4.4, PSTOP-4.21, PSTOP-4.5, PSTOP-4.6, PSTOP-4.7, PSTOP-4.12, PSTOP-4.20
+Satisfies: PSTOP-4.1, PSTOP-4.2, PSTOP-4.3, PSTOP-4.4, PSTOP-4.21, PSTOP-4.5, PSTOP-4.6, PSTOP-4.7, PSTOP-4.12, PSTOP-4.20, PSTOP-6.10
 Reuse: rung 2 — `awake_view` (app.rs:325-340) and `ports_state` (:384), `AwakeView`/`LeaseView` (lib.rs:98-107), the snapshot pump (app.rs:535-565); the Lease label rule of `AwakeSubmenuState.place` (AwakeSubmenuState.swift:185-194) ported. The join is new code: rung 7.
 Respects: ARCH-1, ARCH-3, ARCH-2
 Surface: `CoreSnapshot` gains `running: Option<RunningView>`; the only construction site is `snapshot()` (lib.rs:497-535) → replace; readers are `CoreStore.swift` (`snapshot: CoreSnapshot?`) and `crates/ffi/tests/core.rs` → replace/leave (they read other fields); Swift never constructs it. `module_is_down` and `ports_state` stay private: `running::build` takes plain inputs.
@@ -157,7 +158,7 @@ Level 0: `MenuRow(id: "running", icon: <the brief's cup icon>, title: "Running",
 
 ### J. Project rows and the stop flows (`apps/macos`)
 
-Satisfies: PSTOP-6.9, PSTOP-5.1, PSTOP-5.2, PSTOP-5.3, PSTOP-5.4, PSTOP-5.5, PSTOP-5.6, PSTOP-5.7, PSTOP-5.8, PSTOP-6.1, PSTOP-6.2, PSTOP-6.3, PSTOP-6.4, PSTOP-6.5, PSTOP-6.6, PSTOP-6.7, PSTOP-6.8, PSTOP-7.1, PSTOP-7.2, PSTOP-7.3, PSTOP-7.4, PSTOP-7.5, PSTOP-9.1, PSTOP-9.2, PSTOP-9.3, PSTOP-9.4
+Satisfies: PSTOP-6.9, PSTOP-5.1, PSTOP-5.2, PSTOP-5.3, PSTOP-5.4, PSTOP-5.5, PSTOP-5.6, PSTOP-5.7, PSTOP-5.8, PSTOP-6.1, PSTOP-6.2, PSTOP-6.3, PSTOP-6.4, PSTOP-6.5, PSTOP-6.6, PSTOP-6.7, PSTOP-6.8, PSTOP-7.1, PSTOP-7.2, PSTOP-7.3, PSTOP-7.4, PSTOP-7.5, PSTOP-9.1, PSTOP-9.2, PSTOP-9.3, PSTOP-9.4, PSTOP-9.5
 Reuse: rung 2 — `CoreStore.dispatch(module:actionJSON:)` (CoreStore.swift:73) and its failure pattern (`perform`, `AwakeActionFailure`, `CoreStartupBanner.menuFailure`); `HarnessMarkImage`; the cascade hover selection. `NSWorkspace` (platform, rung 4) opens the URL and reveals the folder; `NSPasteboard` copies.
 Respects: ARCH-1, ARCH-2
 Surface: no existing reader changes beyond section I (new views and store members).
@@ -232,10 +233,27 @@ A11y: focus lands on `Cancel`; VoiceOver reads the full sentence (`agent-decided
 
 New seams: `Signals` (the one new seam in the Core) and `running::build` (one pure function). Everything else uses an existing seam (`Rig`, the `fake` feature, `NavoriPanelTests`).
 
+*(Amended 2026-11-05, agent-made, supersedes "the one new seam in the Core" above: the build also made `resolve`, `reach_for`, `member_outcome` and `stop_process` seams. All four are `pub` in modules/ports/src/lib.rs and the integration tests under modules/ports/tests/ (stop_resolve, stop_process, stop_orchestration, stop_docker, stop_log, real_os) call them directly, with `Guard`, `FreshRead`, `Plan`, `ProcessPlan`, `ContainerPlan`, `Reach`, `Resolved`, `StopClass`, `stop_class`, `reason` and `database_image` around them. The `pub use` is wider than those seams need; narrowing it is a follow-up, not done here. The signal-log tests live in their own binary, modules/ports/tests/stop_log.rs, because a callsite shared with non-capturing tests raced the log capture.)*
+
+## Amendments during the build
+
+*(2026-11-05, agent-made, reviewed by agents, not by the operator. Each item supersedes the approved text it names where they differ; the approved text above stays as written. Requirement amendments are in requirements.md under the same date.)*
+
+- **B, Validation.** `validate` also rejects a Process target, or a `Pid` selector, with pid 1 or lower and a list longer than 256 (`MAX_TARGETS`, `agent-decided`). One predicate, `is_container_id` (1 to 64 hex digits, infra/docker.rs), serves `validate` and `DockerSocket::stop`, which returns `DockerError::BadId` for anything else; the old stop rule also let `_`, `.`, `-` and non-hex letters through, and names are not ids.
+- **C, Interface.** `Resolved::Refused` carries `Option<&'static str>`: `AlreadyGone` has no sentence. A guard that could not read an ancestor refuses every process target `Failed` with `Navori could not check what it must not stop` (fail closed). `ContainerPlan.ports` and `ProcessPlan.members` no longer exist.
+- **D, Group reach.** `reach_for(plan, fresh, signals, guard, confirmed)` takes the confirmed targets of the request and returns `Reach::Group(members)` with the leader first, or `Alone` with a logged fixed reason. A group mate that is itself a target is answered by `member_outcome(pid, start_us, source)`, not by the leader's signals. If the leader is gone after the 3 s wait, no SIGKILL goes to the group, so a surviving mate answers `Failed` with `It is still running`. A group signal also reaches members that hold no port (a wrapper shell, say).
+- **D, Logging.** Every signal sent is logged with pid, start_us, signal, scope and result; every fallback to the pid alone with a fixed reason (guard_incomplete, reserved_pid, not_group_leader, own_group, ancestor_in_group, group_unreadable, group_mate_unconfirmed, group_mate_protected); every refused target and container stop with its pid and start time or container id and result. Never a path, process name, container name or environment value (PSTOP-1.22).
+- **E.** The stop has no client limit of its own; the remaining budget of the 25 s deadline bounds it. A `BadId` is mapped to the fixed sentence `Navori did not send that container id to Docker`, not to `Docker refused the stop`.
+- **F, Orchestration.** The stop task, the claim registry and the `StopDone` counts live in modules/ports/src/stop/task.rs (`Stops`, `StopTask`, `Claim`), not only in actor.rs and stop/mod.rs. Claims are kept per join-set task id, so a panicked task still releases them; a request naming a claimed target answers it `StillStopping` (PSTOP-1.21). A target whose fresh read had not finished at the deadline answers `Failed` with `The target could not be read in time`, in place of the `process list could not be read in time` wording above; `StillStopping` is left for targets whose stop began. When the process source cannot be opened the arm answers every target `Failed` with `Navori could not read the process list`, and the loop then emits the one Event and starts the rescan through the same `rescan_after_stop` as the normal path. The Event carries the eight outcome counters and no name.
+- **G.** `ContainerRef.image` is the last path segment of the image reference only: registry, namespace, tag and digest are all removed, and a bare image id gives none (PSTOP-2.7). `database_image` matches that segment.
+- **H, Interface.** `RunningProject` has `row_stop_request` and `child_stop_request` (both `Option<String>`), not one `stop_request`; `RunningPort.target` is one `StopTargetView`, not `targets`. `running::build` returns `None` only when Awake is down (`None`, or the `The Awake module stopped.` problem) and Ports is `None`; Awake-only down keeps the view with every project Unknown and the problem as `unknown_reason` (PSTOP-4.10). The rule "a database port is stoppable one at a time" holds for processes of kind `Database` or `System`; a container whose image is a database image gets an empty `stop_request`, as does any port while the state is Unknown or any port in the never-set (PSTOP-6.10). `hidden_system_ports` counts every group-protected port, database-image containers included. A Lease label with an empty side (`/main`, `klynt/`) is not split (`split_label` in running.rs).
+- **I.** The Running submenu also lists command Leases as their own rows between the project rows and `Stop all ports…` (PSTOP-4.11), and `RunningSubmenuState` takes `problem` and `commands`. One predicate, `isActive` (a live session or a listed port), decides the level-0 dot and `Nothing running`; when it is false no project rows are listed (PSTOP-4.14). `PerfProbe` opens only the Core submenu, so PSTOP-10.1 is not measured for Running.
+- **J.** `StopFlow.press(count:)` takes the count and `confirm(sending:count:)` returns the non-empty requests to send, once, and none if the count asked no longer matches the offer shown now; `CoreStore.openPort(row:port:address:)` records a failure per row as `Could not open :PORT` and `PortActions.open` accepts only an `http` URL (PSTOP-9.5). A port bound to several distinct addresses cannot be opened: the Shell sends no address.
+
 ## Upstream sync-back
 
 Three requirement texts change, all made in requirements.md and re-surfaced for approval with this design: (1) PSTOP-1.5 gains "or which is no longer a listener in a fresh scan" under `Stale` (decision 11): the fresh scan lists only listeners, so a process that closed its port but is alive has no readable kind or placement; nothing is signalled and the user's goal is met. (2) PSTOP-4.4 gains "or Tracking agents is off" as an Unknown case (decision 12), from the independent review: with tracking off Awake publishes no session Lease, so every project would read Idle and offer `Stop N` where an agent is working (the scan had flagged this, scan.md blindspot 14). (3) After review, PSTOP-2.1 protects a container whose image is a database image (decision 13), PSTOP-7.1, 7.2 and 7.4 exclude `Other` from `Stop all ports…` (decision 14), and the Open Questions say what is left: container databases not named by the list, and `Other` not reached by `Stop all`. No other requirement is contradicted by the code.
 
 ## Coverage check
 
-Every ID of requirements.md appears in exactly one `Satisfies:` line above: 1.1-1.4, 1.17, 1.18 (B); 1.5, 1.6 (C); 1.7-1.10 (D); 1.11-1.15, 1.19, 1.20 (F); 1.16 (A); 2.1-2.4 (C); 2.5, 2.6 (B); 3.1, 3.2 (C); 3.3, 3.4, 3.6-3.9 (E); 3.5 (F); 3.10 (K); 4.1-4.7, 4.12, 4.20 (H); 4.8-4.11, 4.13-4.18 (I); 4.19 (K); 5.1-5.8, 6.1-6.8, 7.1-7.5, 9.1-9.4 (J); 8.1, 8.2 (K); 10.1, 10.5 (I); 10.2 (F); 10.3 (C); 10.4 (D). Section G is infrastructure for 4.6 and carries no `Satisfies:` line of its own. No ID is deliberately unmapped.
+Every ID of requirements.md appears in exactly one `Satisfies:` line above: 1.1-1.4, 1.17, 1.18 (B); 1.5, 1.6 (C); 1.7-1.10 (D); 1.11-1.15, 1.19, 1.20 (F); 1.16 (A); 2.1-2.4 (C); 2.5, 2.6 (B); 3.1, 3.2 (C); 3.3, 3.4, 3.6-3.9 (E); 3.5 (F); 3.10 (K); 4.1-4.7, 4.12, 4.20 (H); 4.8-4.11, 4.13-4.18 (I); 4.19 (K); 5.1-5.8, 6.1-6.8, 7.1-7.5, 9.1-9.4 (J); 8.1, 8.2 (K); 10.1, 10.5 (I); 10.2 (F); 10.3 (C); 10.4 (D). Section G is infrastructure for 4.6 and carries a `Satisfies:` line only for 2.7. Amended 2026-11-05: 1.21 (F), 1.22 (D), 2.7 (G), 6.10 (H) and 9.5 (J) were added to the lines above. No ID is deliberately unmapped.
