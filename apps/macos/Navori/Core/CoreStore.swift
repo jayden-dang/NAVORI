@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import NavoriBanner
 import NavoriCore
@@ -306,6 +307,20 @@ final class CoreStore {
         }
     }
 
+    func openPort(_ port: UInt16, address: String = "") async {
+        var action: [String: Any] = ["port": port]
+        if address.isEmpty == false { action["address"] = address }
+        do {
+            let json = try JSONSerialization.data(withJSONObject: ["open": action])
+            let reply = try await dispatch(module: "ports", actionJSON: String(decoding: json, as: UTF8.self))
+            let url = try JSONDecoder().decode(OpenReply.self, from: Data(reply.utf8)).url
+            guard let target = URL(string: url) else { return }
+            NSWorkspace.shared.open(target)
+        } catch {
+            log.error("open port failed: \(CoreStartupBanner.menuFailure(for: error), privacy: .public)")
+        }
+    }
+
     func stop(_ requests: [String]) async -> [StopResult] {
         let sends = requests.map { request in Task { @MainActor in await self.send(request) } }
         var all: [StopResult] = []
@@ -388,6 +403,7 @@ final class CoreStore {
                     worktree: $0.worktree,
                     harness: $0.harness,
                     container: $0.container,
+                    openable: $0.openable,
                     protectedInGroup: $0.protectedInGroup
                 )
             },
@@ -466,4 +482,8 @@ final class SnapshotRelay: SnapshotListener, @unchecked Sendable {
             store?.apply(snapshot)
         }
     }
+}
+
+private struct OpenReply: Decodable {
+    let url: String
 }

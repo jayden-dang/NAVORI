@@ -81,22 +81,41 @@ struct ProjectChildView: View {
                         .lineLimit(1)
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel([header.name, header.up].compactMap { $0 }.joined(separator: ", "))
+            .accessibilityAddTraits(.isHeader)
             if let path = header.path {
-                Text(path)
-                    .font(.system(size: 11.5, design: .monospaced))
-                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                pathLine(path, reveal: header.revealPath)
             }
         }
         .padding(.horizontal, 8)
         .padding(.top, 5)
         .padding(.bottom, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel([header.name, header.up].compactMap { $0 }.joined(separator: ", "))
-        .accessibilityValue(header.path ?? "")
-        .accessibilityAddTraits(.isHeader)
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private func pathLine(_ path: String, reveal: String?) -> some View {
+        let text = Text(path)
+            .font(.system(size: 11.5, design: .monospaced))
+            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+            .lineLimit(1)
+            .truncationMode(.middle)
+        if let reveal {
+            Button(action: {
+                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: reveal)])
+            }) {
+                text
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Reveal in Finder")
+            .accessibilityLabel("Reveal \(path) in Finder")
+        } else {
+            text
+        }
     }
 }
 
@@ -289,7 +308,7 @@ private struct PortRowView: View {
     }
 
     private func showsPort(selected: Bool, flow: StopFlow, stopping: Bool) -> Bool {
-        stopping == false && (selected == false || state.stop == nil || isAsking(flow))
+        stopping == false && (selected == false || isAsking(flow))
     }
 
     @ViewBuilder
@@ -300,19 +319,36 @@ private struct PortRowView: View {
                 .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
                 .padding(.trailing, 8)
                 .accessibilityHidden(true)
-        } else if selected, let stop = state.stop, isAsking(flow) == false {
-            Button(action: { store.askStop(state.id, count: stop.count) }) {
-                Text("Stop")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(Color.white.opacity(0.22)))
+        } else if selected, isAsking(flow) == false {
+            HStack(spacing: 4) {
+                if state.offersOpen {
+                    capsule("Open", label: "Open \(state.name) in the browser") {
+                        Task { await store.openPort(UInt16(state.port)) }
+                    }
+                }
+                capsule("Copy", label: "Copy \(state.copyText)") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(state.copyText, forType: .string)
+                }
+                if let stop = state.stop {
+                    capsule("Stop", label: "Stop \(state.name)") { store.askStop(state.id, count: stop.count) }
+                }
             }
-            .buttonStyle(.plain)
             .padding(.trailing, 6)
-            .accessibilityLabel("Stop \(state.name)")
         }
+    }
+
+    private func capsule(_ title: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2)
+                .background(Capsule().fill(Color.white.opacity(0.22)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 
     private func isAsking(_ flow: StopFlow) -> Bool {

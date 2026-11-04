@@ -583,3 +583,59 @@ struct RunningCommandRowsTests {
         #expect(state.items.contains { if case .commands = $0 { true } else { false } } == false)
     }
 }
+
+@Suite
+struct PortActionsTests {
+    private func child(_ ports: [RunningPortInput]) -> ProjectChildState {
+        ProjectChildState(
+            project: RunningProjectInput(
+                name: "api",
+                isOther: false,
+                state: .idle,
+                sessions: [],
+                ports: ports,
+                stoppablePorts: 0,
+                rowStopRequest: nil,
+                childStopRequest: nil
+            ),
+            nowMs: 0,
+            home: "/Users/me"
+        )
+    }
+
+    @Test func open_is_offered_only_where_the_core_says_the_port_is_openable() {
+        let state = child([
+            RunningPortInput(port: 3000, name: "node", stopRequest: "", openable: true),
+            RunningPortInput(port: 5432, name: "postgres", stopRequest: "", openable: false),
+        ])
+        #expect(state.ports.map(\.offersOpen) == [true, false])
+        #expect(PortActions.hasOpen(RunningPortInput(port: 1, name: "a", stopRequest: "", openable: true)))
+        #expect(PortActions.hasOpen(RunningPortInput(port: 1, name: "a", stopRequest: "", openable: false)) == false)
+    }
+
+    @Test func copy_text_is_localhost_and_the_port() {
+        #expect(PortActions.copyText(3000) == "localhost:3000")
+        let state = child([RunningPortInput(port: 8080, name: "node", stopRequest: "")])
+        #expect(state.ports[0].copyText == "localhost:8080")
+    }
+
+    @Test func the_header_reveals_the_full_path_while_showing_it_abbreviated() {
+        let state = ProjectChildState(
+            project: RunningProjectInput(
+                name: "api",
+                isOther: false,
+                state: .idle,
+                sessions: [],
+                ports: [],
+                stoppablePorts: 0,
+                rowStopRequest: nil,
+                childStopRequest: nil,
+                path: "/Users/me/dev/api"
+            ),
+            nowMs: 0,
+            home: "/Users/me"
+        )
+        #expect(state.header.path == "~/dev/api")
+        #expect(state.header.revealPath == "/Users/me/dev/api")
+    }
+}

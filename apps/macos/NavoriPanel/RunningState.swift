@@ -26,6 +26,7 @@ public struct RunningPortInput: Equatable, Sendable {
     public let worktree: String?
     public let harness: String?
     public let container: Bool
+    public let openable: Bool
     public let protectedInGroup: Bool
 
     public init(
@@ -37,6 +38,7 @@ public struct RunningPortInput: Equatable, Sendable {
         worktree: String? = nil,
         harness: String? = nil,
         container: Bool = false,
+        openable: Bool = false,
         protectedInGroup: Bool = false
     ) {
         self.port = port
@@ -47,6 +49,7 @@ public struct RunningPortInput: Equatable, Sendable {
         self.worktree = worktree
         self.harness = harness
         self.container = container
+        self.openable = openable
         self.protectedInGroup = protectedInGroup
     }
 
@@ -310,6 +313,7 @@ public enum ProjectChildSection: Equatable, Sendable {
 public struct ProjectChildHeader: Equatable, Sendable {
     public let name: String
     public let path: String?
+    public let revealPath: String?
     public let up: String?
 }
 
@@ -346,8 +350,17 @@ public struct SessionRowState: Equatable, Sendable {
     }
 }
 
+public enum PortActions {
+    public static func copyText(_ port: Int) -> String { "localhost:\(port)" }
+
+    public static func hasOpen(_ port: RunningPortInput) -> Bool { port.openable }
+}
+
 public struct PortRowState: Equatable, Sendable {
     public let id: String
+    public let port: Int
+    public let offersOpen: Bool
+    public let copyText: String
     public let mark: PortMark
     public let name: String
     public let suffix: String?
@@ -360,6 +373,9 @@ public struct PortRowState: Equatable, Sendable {
 
     init(_ port: RunningPortInput, projectId: String) {
         id = ProjectChildState.portId(project: projectId, port: port)
+        self.port = port.port
+        offersOpen = PortActions.hasOpen(port)
+        copyText = PortActions.copyText(port.port)
         name = port.name
         portText = ":\(port.port)"
         suffix = port.container ? "docker" : nil
@@ -422,6 +438,7 @@ public struct ProjectChildState: Equatable, Sendable {
         header = ProjectChildHeader(
             name: project.name,
             path: project.path.flatMap { $0.isEmpty ? nil : Self.abbreviated($0, home: home) },
+            revealPath: project.path.flatMap { $0.isEmpty ? nil : $0 },
             up: project.state == .idle ? project.upSinceMs.map { Self.up(nowMs - $0) } : nil
         )
         sessions = project.sessions.map(SessionRowState.init)
