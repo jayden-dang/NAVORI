@@ -12,6 +12,7 @@ use anyhow::{Context, Result, bail, ensure};
 use clap::{Parser, Subcommand, ValueEnum};
 
 mod perf;
+mod release;
 
 const SIGNING_IDENTITY: &str = "Navori Local Signing";
 const MIN_MACOS: &str = "26.0";
@@ -56,6 +57,18 @@ enum Cmd {
         /// Write perf-baseline.json when every metric passes.
         #[arg(long)]
         record: bool,
+    },
+    /// Check a release tag against the workspace version, or build the release artifacts.
+    Release {
+        /// The release tag, e.g. v0.1.0.
+        #[arg(long)]
+        tag: String,
+        /// Directory to write the release artifacts to.
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Only check the tag and print version and pre-release status.
+        #[arg(long)]
+        check: bool,
     },
 }
 
@@ -143,6 +156,7 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
+        Cmd::Release { tag, out, check } => release::run(&root, &tag, out.as_deref(), check),
     }
 }
 
