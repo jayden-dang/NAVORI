@@ -246,6 +246,30 @@ impl Rig {
         panic!("no scan finished: {}", self.state());
     }
 
+    /// Waits until the published scan carries this time.
+    pub async fn settle_at(&self, scanned_at_ms: u64) {
+        for _ in 0..200 {
+            self.idle().await;
+            if self.state()["scanned_at_ms"] == scanned_at_ms {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        panic!("no scan at {scanned_at_ms}: {}", self.state());
+    }
+
+    /// Lets a crashed Module restart, which publishes the not-scanned state.
+    pub async fn settle_restart(&self) {
+        for _ in 0..200 {
+            self.advance(Duration::from_secs(1)).await;
+            if self.state()["scanned_at_ms"].is_null() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        panic!("the module did not restart: {}", self.state());
+    }
+
     pub fn state(&self) -> Value {
         self.kernel.state("ports").unwrap()
     }

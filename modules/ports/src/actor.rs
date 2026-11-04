@@ -16,7 +16,53 @@ use crate::{Ports, PortsEnv};
 
 const FIRST_SCAN: Duration = Duration::from_secs(5);
 const OPEN_PROBLEM: &str = "Ports could not read the process list.";
-const SCAN_PROBLEM: &str = "A port scan stopped before it finished.";
+const OPEN_CADENCE: Duration = Duration::from_secs(3);
+const CLOSED_CADENCE: Duration = Duration::from_secs(30);
+
+struct Finished {
+    memo: HarnessMemo,
+    result: Result<(Scan, DockerStatus), String>,
+}
+
+struct InFlight {
+    started: SystemTime,
+    task: tokio::task::JoinHandle<Result<Finished, tokio::task::JoinError>>,
+}
+
+async fn finished(in_flight: &mut Option<InFlight>) -> anyhow::Result<(SystemTime, Finished)> {
+    match in_flight {
+        Some(flight) => {
+            let outcome = (&mut flight.task).await??;
+            Ok((flight.started, outcome))
+        }
+        None => std::future::pending().await,
+    }
+}
+
+fn cadence(panel_visible: bool) -> Duration {
+    if panel_visible {
+        OPEN_CADENCE
+    } else {
+        CLOSED_CADENCE
+    }
+}
+
+fn publish(
+    ctx: &ModuleCtx<Ports>,
+    started: SystemTime,
+    result: Result<(Scan, DockerStatus), String>,
+) {
+    ctx.update_state(|state| match result {
+        Ok((scan, docker)) => {
+            state.scanned_at_ms = Some(millis(started));
+            state.docker = docker;
+            state.groups = group(scan.entries);
+            state.skipped = scan.skipped;
+            state.problem = None;
+        }
+        Err(problem) => state.problem = Some(problem),
+    });
+}
 
 impl Ports {
     pub fn new(env: PortsEnv) -> Self {
@@ -31,9 +77,17 @@ impl Ports {
         ctx.update_state(|state| *state = PortsState::default());
         let mut wait = ctx.wait_handle();
         let mut deadline = Some(wait.now() + FIRST_SCAN);
+        let mut in_flight: Option<InFlight> = None;
         loop {
             tokio::select! {
                 biased;
+                done = finished(&mut in_flight) => {
+                    in_flight = None;
+                    let (started, outcome) = done?;
+                    self.memo = outcome.memo;
+                    publish(ctx, started, outcome.result);
+                    deadline = Some(wait.now() + cadence(wait.panel_visible()));
+                }
                 req = ctx.recv() => {
                     let Some(req) = req else {
                         return Ok(());
@@ -41,9 +95,24 @@ impl Ports {
                     Self::on_request(ctx, req);
                 }
                 wake = wait.wait_until(deadline) => {
-                    if wake == Wake::Due {
-                        deadline = None;
-                        self.scan(ctx, wait.now()).await;
+                    let now = wait.now();
+                    match wake {
+                        Wake::Due => {
+                            deadline = None;
+                            match self.start_scan(now) {
+                                Ok(task) => in_flight = Some(task),
+                                Err(problem) => {
+                                    publish(ctx, now, Err(problem));
+                                    deadline = Some(now + cadence(wait.panel_visible()));
+                                }
+                            }
+                        }
+                        Wake::PanelChanged => {
+                            if wait.panel_visible() && in_flight.is_none() {
+                                let soonest = now + OPEN_CADENCE;
+                                deadline = Some(deadline.map_or(soonest, |due| due.min(soonest)));
+                            }
+                        }
                     }
                 }
             }
@@ -63,44 +132,29 @@ impl Ports {
         }
     }
 
-    async fn scan(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime) {
-        let outcome = match self.open() {
-            Ok(source) => {
-                let scanner = Scanner::new(source, self.env.home.clone());
-                let memo = std::mem::take(&mut self.memo);
-                match tokio::task::spawn_blocking(move || scanner.scan(memo)).await {
-                    Ok((Ok(scan), memo)) => {
-                        self.memo = memo;
-                        Ok(with_docker(
-                            Arc::clone(&self.env.containers),
-                            self.env.home.clone(),
-                            scan,
-                        )
-                        .await)
-                    }
-                    Ok((Err(err), memo)) => {
-                        self.memo = memo;
-                        tracing::warn!(error = %err, "a port scan could not read the process list");
-                        Err(err.to_string())
-                    }
-                    Err(_) => {
-                        tracing::warn!("a port scan stopped before it finished");
-                        Err(SCAN_PROBLEM.to_owned())
-                    }
+    fn start_scan(&mut self, started: SystemTime) -> Result<InFlight, String> {
+        let source = self.open()?;
+        let scanner = Scanner::new(source, self.env.home.clone());
+        let memo = std::mem::take(&mut self.memo);
+        let containers = Arc::clone(&self.env.containers);
+        let home = self.env.home.clone();
+        let task = tokio::spawn(async move {
+            match tokio::task::spawn_blocking(move || scanner.scan(memo)).await {
+                Ok((Ok(scan), memo)) => Ok(Finished {
+                    memo,
+                    result: Ok(with_docker(containers, home, scan).await),
+                }),
+                Ok((Err(err), memo)) => {
+                    tracing::warn!(error = %err, "a port scan could not read the process list");
+                    Ok(Finished {
+                        memo,
+                        result: Err(err.to_string()),
+                    })
                 }
+                Err(err) => Err(err),
             }
-            Err(problem) => Err(problem),
-        };
-        ctx.update_state(|state| match outcome {
-            Ok((scan, docker)) => {
-                state.scanned_at_ms = Some(millis(now));
-                state.docker = docker;
-                state.groups = group(scan.entries);
-                state.skipped = scan.skipped;
-                state.problem = None;
-            }
-            Err(problem) => state.problem = Some(problem),
         });
+        Ok(InFlight { started, task })
     }
 
     fn open(&mut self) -> Result<Arc<dyn ProcessSource>, String> {
