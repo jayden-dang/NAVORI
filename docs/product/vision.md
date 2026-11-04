@@ -11,7 +11,7 @@ Everyday work on a Mac — including coding with several Harnesses in parallel a
 
 One user: the author — a developer on macOS (Apple Silicon) who runs multiple agentic harnesses (Claude Code, Codex, Grok Build) side by side, reads Vietnamese and English, and builds Navori from source. Navori is both this user's **AI assistant** and their **personal utility app**.
 
-Later, when open-sourced, other developers may install it themselves for their own personal use (`brew install --cask` or a download page). They are users of their own copy, not a second persona Navori is designed around today.
+Other developers may install it themselves for their own personal use with `brew install --cask` from the Navori tap (MILE-9). They are users of their own copy, not a second persona Navori is designed around: their upgrades must keep their data, but features are still chosen for the author.
 
 ## Goals
 
@@ -36,13 +36,12 @@ Later, when open-sourced, other developers may install it themselves for their o
 - Keeping the Mac running with the lid closed (needs a privileged root helper).
 - Letting the AI perform a `Destructive` action without approval.
 - Telemetry, analytics, or any Navori-owned account or server — the only network calls go to GitHub, the AI providers the user configures and the external services the user explicitly connects (a Connected account or an MCP server).
-- Distributing builds to other people for now.
 
 ## Scope boundaries
 
 - **In scope now:** releases R1–R6 (Awake, AI Assistant, Ports, GitHub, Proactive, MCP) on macOS 26+ / Apple Silicon for one user; R0 Foundation has shipped.
 - **Deferred:**
-  - Open source: choose a license (the workspace is `UNLICENSED` today), Developer ID signing + notarization, a Homebrew cask, a download page, auto-update.
+  - Developer ID signing + notarization, a download page, auto-update inside the app, and the official `homebrew/cask` (public self-signed releases through a personal tap are in scope: MILE-9, ADR 0007; the code is MIT, see `LICENSE`).
   - "Life" utility modules beyond the developer workflow (calendar, notes, clipboard…) — each must pass a check against this vision before it is planned.
   - Multiple GitHub accounts.
   - Connected accounts beyond GitHub (Gmail, Slack, Telegram…): direction accepted in ADR 0005, not yet scheduled. Reach each service through the MCP client (R6) first; build a native Module only when the service must be counted in the menubar or trigger proactively.
@@ -51,4 +50,4 @@ Later, when open-sourced, other developers may install it themselves for their o
   - Navori's secrets live only in the macOS Keychain.
   - The GOAL-11 performance budget applies to every feature.
   - No App Sandbox (Navori needs process inspection, kill and IOKit power assertions).
-  - Self-signed code signing with a stable identity until open-sourcing.
+  - Self-signed code signing with one stable identity, also for public releases, until a Developer ID replaces it (ADR 0004, ADR 0007).

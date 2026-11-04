@@ -26,18 +26,19 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 ## Focus
 
 **Now:** ROAD-12, ROAD-17, ROAD-18, ROAD-13, MILE-2
-**Next:** ROAD-11, ROAD-19, ROAD-20, ROAD-21, ROAD-14, ROAD-37, ROAD-38, ROAD-15, ROAD-16
+**Next:** ROAD-27, ROAD-11, ROAD-19, ROAD-20, ROAD-21, ROAD-14, ROAD-37, ROAD-38, ROAD-15, ROAD-16
 
 | ID | Milestone | Outcome | Depends-on | Commitment |
 |---|---|---|---|---|
 | MILE-1 | Foundation (R0) | The user installs Navori with one command, it starts at login as a menubar icon, and `navori doctor` reports every check green. | none | Closed |
 | MILE-2 | Awake (R1) | The Mac stays awake while any Claude Code, Codex or Grok session is working and goes back to normal sleep after they stop, with no manual action. | MILE-1 | Planned |
 | MILE-3 | AI Assistant (R2) | The user asks Navori AI anything from the menubar, a hotkey or the terminal with any configured model, and answers its Decisions in Needs you before anything destructive runs. | MILE-2 | Planned |
-| MILE-4 | Ports (R3) | The user sees every listening port grouped by project, worktree and harness, and frees a whole group in at most 2 actions. | MILE-3 | Planned |
+| MILE-4 | Ports (R3) | The user sees every listening port grouped by project, worktree and harness, and frees a whole group in at most 2 actions. | MILE-2 | Planned |
 | MILE-5 | GitHub (R4) | The user sees pull requests needing review, failing checks and conflicts counted in the menubar, and opens, approves or merges them from the submenu. | MILE-3 | Planned |
 | MILE-6 | Proactive (R5) | Navori AI tells the user on its own, within a daily budget and quiet hours, when CI fails, a review arrives, an Agent session finishes or a port conflicts. | MILE-4, MILE-5 | Planned |
 | MILE-7 | MCP (R6) | Claude Code, Codex and Grok call Navori's tools over MCP under the same approval policy, and Navori AI uses tools from external MCP servers. | MILE-3 | Planned |
 | MILE-8 | Auto Review | When someone directly requests the user's review on a pull request in a repository the user enabled, that pull request gets a started comment, then findings and an approval or a change request by a fixed severity rule with no action from the user, and a re-request on new commits reviews it again. | MILE-5, MILE-6 | Planned |
+| MILE-9 | Public release | Anyone on an Apple Silicon Mac with macOS 26 installs Navori with `brew install --cask` from the Navori tap, and every later release reaches them through `brew upgrade` with their config, database, hooks and Keychain access intact. | MILE-2, MILE-4 | Planned |
 
 ## MILE-1 — Foundation (R0)
 
@@ -51,7 +52,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Depends-on:** none
 **Commitment:** Closed 2026-11-01
 **Closed:** 5e66b16a85d2776ca98afbf0606c9c1f73a366b7 (assessment: `assessments/MILE-1.md` Assessment 2, achieved)
-**Deferred:** ROAD-27 open-source-distribution → unscheduled (2026-11-01, vision defers open source: license, Developer ID + notarization, Homebrew cask, download page, auto-update)
+**Deferred:** None
 **Blockers:** None
 
 ## MILE-2 — Awake (R1)
@@ -101,7 +102,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Members:**
 - **ROAD-17** port-discovery — After: none — Surfaces: `modules/ports/`, `crates/procs/`, `crates/macos/`
 - **ROAD-18** ports-panel-and-stop — After: ROAD-17 — Surfaces: `modules/ports/`, `apps/macos/Navori/Features/`, `apps/macos/NavoriPanel/`
-**Depends-on:** MILE-3
+**Depends-on:** MILE-2
 **Commitment:** Planned
 **Closed:** None
 **Deferred:** None
@@ -162,6 +163,18 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Closed:** None
 **Deferred:** None
 **Blockers:** ROAD-30 to ROAD-33 wait on ROAD-29: approving without a human conflicts with GOAL-1, ARCH-5 and the vision's non-goal on `Destructive` actions, and needs a decision of record.
+
+## MILE-9 — Public release
+
+**Outcome:** Anyone on an Apple Silicon Mac with macOS 26 installs Navori with `brew install --cask` from the Navori tap, and every later release reaches them through `brew upgrade` with their config, database, hooks and Keychain access intact.
+**Goals:** GOAL-8, GOAL-11
+**Members:**
+- **ROAD-27** open-source-distribution — After: none — Surfaces: `xtask/`, `.github/workflows/`, `modules/integrations/`, `docs/adr/`, `docs/agents/project.md`, external repo `jayden-dang/homebrew-navori` — A self-signed release built and published by GitHub Actions on a `v*` tag that matches the workspace version, a zip and sha256 on the NAVORI GitHub Release, and a cask in the personal tap; a local `cargo xtask release-check` (ci, perf, version) before tagging; a hook command that does nothing once the app is gone. Un-deferred from MILE-1 on 2026-11-04.
+**Depends-on:** MILE-2, MILE-4
+**Commitment:** Planned
+**Closed:** None
+**Deferred:** None
+**Blockers:** None
 
 ## Goal dispositions
 
