@@ -96,7 +96,7 @@ Persisted formats defined here, both `agent-decided` in their columns or names:
 Files this change touches, and what each guards:
 - `crates/protocol/src/lib.rs` — existing methods and error codes: guard ASK-9.1.
 - `crates/ipc/src/lib.rs` — framing and limits: guard ASK-9.2.
-- `crates/ffi/src/app.rs`, `crates/ffi/src/lib.rs`, `crates/ffi/Cargo.toml` — existing IPC arms, `NavoriCore` methods and startup: guards ASK-9.1, 11.3.
+- `crates/ffi/src/app.rs`, `crates/ffi/src/lib.rs`, `crates/ffi/Cargo.toml` — existing IPC arms, `NavoriCore` methods and startup: guards ASK-9.1, 9.3.
 - `apps/cli/src/main.rs` — existing subcommands and exit codes: guard ASK-9.4.
 - `apps/macos/Navori/Features/Settings/SettingsView.swift` and `CoreStore.swift` — existing tabs: guard ASK-9.5.
 - `Cargo.toml` (workspace) and `Cargo.lock` — dependency declarations: guard ASK-9.6.
