@@ -57,6 +57,18 @@ impl SecretKey {
             name: name.to_owned(),
         })
     }
+
+    pub(crate) fn account(&self) -> String {
+        format!("{}/{}", self.kind, self.name)
+    }
+
+    pub(crate) fn kind(&self) -> &str {
+        &self.kind
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 fn check(part: KeyPart, text: &str) -> Result<(), KeyError> {

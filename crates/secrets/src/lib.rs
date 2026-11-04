@@ -8,3 +8,10 @@ pub use key::*;
 
 mod secret;
 pub use secret::*;
+
+mod error;
+#[cfg(feature = "fake")]
+pub mod fake;
+mod store;
+pub use error::*;
+pub use store::*;
