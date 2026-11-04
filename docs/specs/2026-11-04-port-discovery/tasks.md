@@ -403,7 +403,7 @@ _Requirements: PORTS-5.1, PORTS-5.2, PORTS-5.3, PORTS-5.4_
 
 **Depends-on:** Task 5
 
-- [ ] **Step 1: Write the failing `attribute` table test** in `modules/ports/tests/docker.rs`:
+- [x] **Step 1: Write the failing `attribute` table test** in `modules/ports/tests/docker.rs`:
   - A container on `127.0.0.1:5432` with a live worktree `working_dir` gives that worktree.
   - A removed `working_dir` gives the project, no worktree and `missing_path`.
   - Two containers publishing 5432 on `127.0.0.1` and `127.0.0.2` give two entries.
@@ -411,13 +411,13 @@ _Requirements: PORTS-5.1, PORTS-5.2, PORTS-5.3, PORTS-5.4_
   - An unmatched port keeps `docker` with no project.
   - One container publishing `0.0.0.0:5432` and `:::5432`, with the backend bound to both, gives one entry with two addresses.
   - The same container with the backend bound only to `:::5432` gives one entry.
-- [ ] **Step 2: Write the failing Rig tests.**
+- [x] **Step 2: Write the failing Rig tests.**
   - No backend listener: `FakeContainers::calls()` stays 0.
   - With a backend, one call per scan.
   - `Timeout` keeps `docker` with no project, and `docker` is `Unreadable`, with no `problem`.
   - `each_scan_publishes_once`: `Kernel::revision()` moves by 1 per scan, with the Docker result in that one publish.
   - `no_working_directory_or_container_path_reaches_a_log_or_event`: captured tracing output and `recent_events` hold no fixture path.
-- [ ] **Step 3: Write the client tests** in `modules/ports/tests/docker_client.rs`, against a `tokio::net::UnixListener` in a short `/tmp` temp dir. Replies to serve:
+- [x] **Step 3: Write the client tests** in `modules/ports/tests/docker_client.rs`, against a `tokio::net::UnixListener` in a short `/tmp` temp dir. Replies to serve:
   - a `Content-Length` reply;
   - a chunked reply with trailers;
   - a reply closed at EOF;
@@ -429,13 +429,13 @@ _Requirements: PORTS-5.1, PORTS-5.2, PORTS-5.3, PORTS-5.4_
   Also assert:
   - The request line is exactly `GET /containers/json HTTP/1.1`.
   - A reply whose JSON holds `"Command"` and `"Mounts"` yields only the 4 kept fields.
-- [ ] **Step 4: Run** `cargo test -p navori-mod-ports --test docker --test docker_client` — expect: compile errors.
-- [ ] **Step 5: Implement** per the design section "modules/ports: Docker read".
+- [x] **Step 4: Run** `cargo test -p navori-mod-ports --test docker --test docker_client` — expect: compile errors.
+- [x] **Step 5: Implement** per the design section "modules/ports: Docker read".
   - `PortsEnv::mac` builds `DockerSocket::new(home.join(".docker/run/docker.sock"))`.
   - Zero the body buffer before dropping it.
   - Update `integrations.md:34` and add the threat-model line.
-- [ ] **Step 6: Run** `cargo test -p navori-mod-ports` — expect: pass.
-- [ ] **Step 7: Commit** `git commit -m "feat(ports): attribute Docker ports to their containers"`
+- [x] **Step 6: Run** `cargo test -p navori-mod-ports` — expect: pass.
+- [x] **Step 7: Commit** `git commit -m "feat(ports): attribute Docker ports to their containers"`
 
 _Requirements: PORTS-4.1, PORTS-4.2, PORTS-4.3, PORTS-4.4, PORTS-4.5, PORTS-4.6, PORTS-4.7, PORTS-4.8, PORTS-4.9, PORTS-10.4_
 
