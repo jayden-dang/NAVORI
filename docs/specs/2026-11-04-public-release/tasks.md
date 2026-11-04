@@ -140,11 +140,11 @@ _Requirements: RELEASE-1.3, RELEASE-1.10_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Write the failing tests:** `the_cask_names_the_version_and_the_zip_hash` (`cask_text("0.1.0", "<64 × a>")` contains `version "0.1.0"` and `sha256 "aaaa…"`, and no `@`); `the_cask_needs_an_arm64_mac_on_macos_26` (`depends_on arch: :arm64`, `depends_on macos: :tahoe`); `the_cask_installs_the_app_and_links_the_cli` (`app "Navori.app"`, `binary "#{appdir}/Navori.app/Contents/Helpers/navori"`); `the_cask_clears_quarantine_after_install` (postflight with `/usr/bin/xattr`, `-dr`, `com.apple.quarantine`); `zap_moves_only_the_release_profiles_directories_to_the_trash` (both release paths present, `Navori Dev` absent); `the_caveats_say_self_signed_not_notarized_and_how_to_remove_hooks`.
-- [ ] **Step 2: Run** `cargo test -p xtask release::` — expect: fails (`cask_text` missing).
-- [ ] **Step 3: Implement** the template file and `cask_text`.
-- [ ] **Step 4: Run** `cargo test -p xtask` — expect: pass. Then write `cask_text("0.1.0", <64 × a>)` to `Casks/navori.rb` in a temporary git repo, `brew tap local/navori-check <that repo>`, `brew trust --cask local/navori-check/navori` and `brew style --cask local/navori-check/navori` — expect: no offenses (adjust the template until clean); a copy with `depends_on arch: :bogus` — expect: an error; `brew untap local/navori-check`.
-- [ ] **Step 5: Commit** `git commit -m "feat(xtask): generate the Homebrew cask for a release"`
+- [x] **Step 1: Write the failing tests:** `the_cask_names_the_version_and_the_zip_hash` (`cask_text("0.1.0", "<64 × a>")` contains `version "0.1.0"` and `sha256 "aaaa…"`, and no `@`); `the_cask_needs_an_arm64_mac_on_macos_26` (`depends_on arch: :arm64`, `depends_on macos: :tahoe`); `the_cask_installs_the_app_and_links_the_cli` (`app "Navori.app"`, `binary "#{appdir}/Navori.app/Contents/Helpers/navori"`); `the_cask_clears_quarantine_after_install` (postflight with `/usr/bin/xattr`, `-dr`, `com.apple.quarantine`); `zap_moves_only_the_release_profiles_directories_to_the_trash` (both release paths present, `Navori Dev` absent); `the_caveats_say_self_signed_not_notarized_and_how_to_remove_hooks`.
+- [x] **Step 2: Run** `cargo test -p xtask release::` — expect: fails (`cask_text` missing).
+- [x] **Step 3: Implement** the template file and `cask_text`.
+- [x] **Step 4: Run** `cargo test -p xtask` — expect: pass. Then write `cask_text("0.1.0", <64 × a>)` to `Casks/navori.rb` in a temporary git repo, `brew tap local/navori-check <that repo>`, `brew trust --cask local/navori-check/navori` and `brew style --cask local/navori-check/navori` — expect: no offenses (adjust the template until clean); a copy with `depends_on arch: :bogus` — expect: an error; `brew untap local/navori-check`.
+- [x] **Step 5: Commit** `git commit -m "feat(xtask): generate the Homebrew cask for a release"`
 
 _Requirements: RELEASE-3.2, RELEASE-3.3, RELEASE-3.4, RELEASE-3.5, RELEASE-5.5_
 
