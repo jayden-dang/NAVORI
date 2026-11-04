@@ -2,6 +2,7 @@
 
 mod action;
 mod actor;
+mod place;
 mod scan;
 mod state;
 
@@ -12,6 +13,7 @@ use navori_kernel::{Module, ModuleCtx, NoConfig};
 use navori_macos::{MacProcesses, PlatformError, ProcessSource};
 
 pub use action::PortsAction;
+pub use place::{place, place_listener};
 pub use scan::{BackendPort, Scan, Scanner};
 pub use state::*;
 

@@ -142,6 +142,18 @@ fn a_spawned_child_has_its_executable_and_working_directory() {
 }
 
 #[test]
+#[ignore = "reads a real process's removed working directory"]
+fn a_removed_working_directory_is_still_read_as_its_old_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let expected = dir.path().canonicalize().unwrap();
+    let child = ChildTree::spawn("sleep", &["5"], Some(&expected));
+    let procs = source();
+    assert_eq!(procs.cwd(child.id()).unwrap(), expected);
+    std::fs::remove_dir(&expected).unwrap();
+    assert_eq!(procs.cwd(child.id()).unwrap(), expected);
+}
+
+#[test]
 fn cpu_time_of_a_busy_child_is_close_to_its_wall_time() {
     let shell = ChildTree::spawn("sh", &["-c", "yes > /dev/null"], None);
     let procs = source();

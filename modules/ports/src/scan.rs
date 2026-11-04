@@ -6,7 +6,8 @@ use std::sync::Arc;
 use navori_macos::ProcessSource;
 use navori_procs::{ProcId, ProcsError, Snapshot};
 
-use crate::state::{Placement, PortEntry, PortKind};
+use crate::place::place_listener;
+use crate::state::{PortEntry, PortKind};
 
 /// A listener of the Docker backend, which a later stage attributes to a container.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,6 +29,7 @@ pub struct Scan {
 /// Reads the user's listening ports from a process source.
 pub struct Scanner {
     source: Arc<dyn ProcessSource>,
+    home: PathBuf,
 }
 
 impl std::fmt::Debug for Scanner {
@@ -37,8 +39,8 @@ impl std::fmt::Debug for Scanner {
 }
 
 impl Scanner {
-    pub fn new(source: Arc<dyn ProcessSource>, _home: PathBuf) -> Self {
-        Self { source }
+    pub fn new(source: Arc<dyn ProcessSource>, home: PathBuf) -> Self {
+        Self { source, home }
     }
 
     /// Blocking: one process list, then each process's sockets.
@@ -67,6 +69,7 @@ impl Scanner {
             }
             let exe = process.exe.clone().ok();
             let name = name_of(&snapshot, process.id, exe.as_deref());
+            let place = place_listener(snapshot.cwd(process.id), process.exe.clone(), &self.home);
             let mut ports: BTreeMap<u16, BTreeSet<IpAddr>> = BTreeMap::new();
             for listener in listeners {
                 ports
@@ -82,7 +85,7 @@ impl Scanner {
                     start_us: process.id.start.0,
                     name: name.clone(),
                     exe: exe.clone(),
-                    place: Placement::default(),
+                    place: place.clone(),
                     harness: None,
                     kind: PortKind::Other,
                     container: None,
