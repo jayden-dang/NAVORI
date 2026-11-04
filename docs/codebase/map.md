@@ -30,6 +30,7 @@ Where things live in this repository and where new code belongs. Covers the top-
 | `ai/context/` | `navori-context` — Context Gateway: Shield pass, audit hand-off and the `Sender` trait. |
 | `modules/awake/` | `navori-mod-awake` — feature Module: Leases and the power assertion. |
 | `modules/integrations/` | `navori-mod-integrations` — feature Module: Navori's hooks in each Harness's config. |
+| `modules/ports/` | `navori-mod-ports` — feature Module: the TCP ports the user's own processes listen on. |
 | `docs/` | Product (`product/`), architecture (`architecture/`, `ARCHITECTURE.md`), codebase (`codebase/`), standards (`standards/`), UI briefs (`design/`), specs (`specs/`), ADRs (`adr/`), agent config (`agents/`). |
 | `docs/features/` | One short user-facing note per shipped feature. |
 | Root files | `Cargo.toml` (workspace, dependencies, lints), `rust-toolchain.toml`, `.cargo/config.toml` (xtask alias, deployment target), `clippy.toml`, `AGENTS.md`, `CONTEXT.md`, `README.md`. |
@@ -39,7 +40,7 @@ Where things live in this repository and where new code belongs. Covers the top-
 | Path | Purpose |
 |---|---|
 | `crates/secrets/` | `navori-secrets` — Keychain (landed; consumed by `navori-llm`, `navori-context` and `navori-ffi`; ROAD-11 and ROAD-19 still to come). |
-| `modules/` | Remaining feature modules: `inbox/` (R2), `ports/` (R3), `github/` (R4). |
+| `modules/` | Remaining feature modules: `inbox/` (R2), `github/` (R4). |
 | `ai/` | Remaining AI runtime crates: `models/`, `agent/`, `memory/` (R2), `triggers/` (R5), `mcp/` (R6). |
 | `integrations/` | Files Navori installs into other tools: `claude-code/`, `codex/`, `grok/` hook and MCP snippets (R1, R6). |
 

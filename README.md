@@ -30,6 +30,7 @@ navori actions     # every action modules accept, with risk level
 navori awake       # hold, release-all, status, run
 navori ask --model <id> "..."   # one question to DeepSeek; key in Settings → AI
 navori dispatch system '"ping"'
+navori dispatch ports '"list"'   # TCP ports your processes listen on, from the last scan
 ```
 
 ## Where things live

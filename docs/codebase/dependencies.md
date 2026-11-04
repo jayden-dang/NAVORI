@@ -19,7 +19,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | `navori-store` | `navori-protocol`, `navori-redact` | allowed — the Journal redacts on write |
 | `navori-kernel` | `navori-protocol`, `navori-redact`, `navori-store` | allowed |
 | `navori-ipc` | `navori-protocol` | allowed |
-| `navori-ffi` | every foundation crate (`config`, `ipc`, `kernel`, `protocol`, `redact`, `secrets`, `store`), `navori-mod-awake`, `navori-mod-integrations`, `navori-llm` and `navori-context` | allowed — the composition root; later also other `modules/*`, `ai/*` |
+| `navori-ffi` | every foundation crate (`config`, `ipc`, `kernel`, `protocol`, `redact`, `secrets`, `store`), `navori-mod-awake`, `navori-mod-integrations`, `navori-mod-ports`, `navori-llm` and `navori-context` | allowed — the composition root; later also other `modules/*`, `ai/*` |
 | `navori` CLI (`navori-cli`) | `navori-config`, `navori-ipc`, `navori-protocol` | allowed — thin client; dev-dependencies for end-to-end tests only: `navori-ffi`, `navori-context`, `navori-secrets` (`fake` feature), `navori-store`, `futures` and `tokio` |
 | `xtask` | — | allowed: none (tooling only) |
 | `navori-macos` | — | allowed: none — leaf |
@@ -28,6 +28,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | `navori-llm` | `navori-secrets` | allowed — provider-neutral LLM client; takes only the `Secret` type from `navori-secrets`; no edge to `navori-context` or any Module |
 | `navori-context` | `navori-redact`, `navori-secrets` | allowed — Context Gateway; `redact` is required (nothing reaches an LLM unredacted, ARCH-6); no edge to `navori-llm` (the `Sender` trait is wired in `navori-ffi`) |
 | `navori-mod-awake` | `navori-kernel`, `navori-macos`, `navori-procs`, `navori-store` | allowed — feature Module; depends on no other Module |
+| `navori-mod-ports` | `navori-kernel`, `navori-macos`, `navori-procs` | allowed — feature Module; depends on no other Module |
 | `navori-mod-integrations` | `navori-kernel` | allowed — feature Module; depends on no other Module, and not on `navori-macos`, `navori-procs` or `navori-store` (the last only as a dev-dependency) |
 | Swift `Navori` target | `NavoriCore` (generated) → `NavoriCoreFFI` (xcframework) | allowed — only `CoreStore` imports `NavoriCore` (ARCH-2) |
 

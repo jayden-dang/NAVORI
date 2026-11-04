@@ -22,6 +22,7 @@ use navori_config::{Paths, Profile};
 use navori_ipc::{IpcError, Server};
 use navori_kernel::{DispatchError, Envelope, Risk, Severity};
 use navori_mod_integrations::IntegrationsEnv;
+use navori_mod_ports::PortsEnv;
 use navori_protocol::{TrayGlyph, TrayState};
 use navori_store::Store;
 use tokio::runtime::Runtime;
@@ -295,6 +296,7 @@ impl NavoriCore {
                 &loaded.sweep,
                 assertion_name(profile),
                 integrations.clone(),
+                PortsEnv::mac(PathBuf::from(&config.home_dir)),
             )
         });
         let config_notice = app::config_notice(

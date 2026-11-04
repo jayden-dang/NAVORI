@@ -17,6 +17,7 @@ use navori_mod_awake::{Awake, AwakeState, LeaseState, Platform, Timing};
 use navori_mod_integrations::{
     Harness, Integrations, IntegrationsEnv, IntegrationsState, State, inspect,
 };
+use navori_mod_ports::{Ports, PortsEnv};
 use navori_protocol::{
     AskReply, AskRequest, Check, CoreStatus, Envelope, Event, ModuleInfo, Severity, rpc,
 };
@@ -253,6 +254,7 @@ pub fn build_kernel(
     sweep: &JournalSweep,
     name: &str,
     integrations: IntegrationsEnv,
+    ports: PortsEnv,
 ) -> Kernel {
     let builder = match sweep {
         JournalSweep::KeepDays(days) => Kernel::builder(store).journal_retention_days(*days),
@@ -262,6 +264,7 @@ pub fn build_kernel(
         .config_sections(sections)
         .register(Awake::new(Platform::mac(), name, Timing::FIXED))
         .register(Integrations::new(integrations))
+        .register(Ports::new(ports))
         .start()
 }
 
