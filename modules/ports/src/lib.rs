@@ -2,6 +2,8 @@
 
 mod action;
 mod actor;
+mod docker;
+mod infra;
 mod kind;
 mod place;
 mod scan;
@@ -14,6 +16,8 @@ use navori_kernel::{Module, ModuleCtx, NoConfig};
 use navori_macos::{MacProcesses, PlatformError, ProcessSource};
 
 pub use action::PortsAction;
+pub use docker::attribute;
+pub use infra::docker::{Container, Containers, DockerError, DockerSocket};
 pub use kind::kind;
 pub use place::{place, place_listener};
 pub use scan::{BackendPort, HarnessMemo, Scan, Scanner};
@@ -26,6 +30,7 @@ pub type OpenProcesses = Box<dyn FnMut() -> Result<Arc<dyn ProcessSource>, Platf
 pub struct PortsEnv {
     pub home: PathBuf,
     pub processes: OpenProcesses,
+    pub containers: Arc<dyn Containers>,
 }
 
 impl std::fmt::Debug for PortsEnv {
@@ -40,8 +45,10 @@ impl PortsEnv {
     /// The real machine. `home` is canonicalized once.
     pub fn mac(home: PathBuf) -> Self {
         let home = std::fs::canonicalize(&home).unwrap_or(home);
+        let socket = home.join(".docker/run/docker.sock");
         Self {
             home,
+            containers: Arc::new(DockerSocket::new(socket)),
             processes: Box::new(|| {
                 MacProcesses::new().map(|source| Arc::new(source) as Arc<dyn ProcessSource>)
             }),

@@ -186,7 +186,9 @@ fn docker_backend_ports_have_no_harness_and_their_environment_is_not_read() {
 
     let (scan, memo) = scanner.scan(HarnessMemo::new());
 
-    assert_eq!(harness(&scan.unwrap()), vec![None]);
+    let scan = scan.unwrap();
+    assert!(scan.entries.is_empty());
+    assert_eq!(scan.backend.len(), 1);
     assert!(memo.is_empty());
     assert!(fake.reads().iter().all(|(_, kind)| *kind != "env"));
 }

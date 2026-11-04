@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::state::PortKind;
 
-const DOCKER_BACKEND: &str = "com.docker.backend";
+pub(crate) const DOCKER_BACKEND: &str = "com.docker.backend";
 const DATABASES: [&str; 6] = [
     "postgres",
     "mysqld",
@@ -17,7 +17,7 @@ const NOT_SYSTEM: &str = "/System/Volumes/Data/";
 /// The kind of thing holding a port, from its executable and whether it runs under a project.
 pub fn kind(exe: Option<&Path>, placed: bool) -> PortKind {
     let name = exe.and_then(Path::file_name);
-    if name.is_some_and(|name| name == DOCKER_BACKEND) {
+    if is_docker_backend(exe) {
         return PortKind::Docker;
     }
     if name.is_some_and(|name| DATABASES.iter().any(|database| name == *database)) {
@@ -31,6 +31,11 @@ pub fn kind(exe: Option<&Path>, placed: bool) -> PortKind {
     } else {
         PortKind::Other
     }
+}
+
+pub(crate) fn is_docker_backend(exe: Option<&Path>) -> bool {
+    exe.and_then(Path::file_name)
+        .is_some_and(|name| name == DOCKER_BACKEND)
 }
 
 fn is_system(exe: &Path) -> bool {

@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -5,8 +6,11 @@ use navori_kernel::{ModuleCtx, Request, Wake};
 use navori_macos::ProcessSource;
 
 use crate::action::PortsAction;
-use crate::scan::{HarnessMemo, Scanner};
-use crate::state::{PortsState, group};
+use crate::docker::attribute;
+use crate::infra::docker::Containers;
+use crate::place::place;
+use crate::scan::{HarnessMemo, Scan, Scanner};
+use crate::state::{DockerStatus, PortsState, group};
 use crate::{Ports, PortsEnv};
 
 const FIRST_SCAN: Duration = Duration::from_secs(5);
@@ -62,7 +66,12 @@ impl Ports {
                 match tokio::task::spawn_blocking(move || scanner.scan(memo)).await {
                     Ok((Ok(scan), memo)) => {
                         self.memo = memo;
-                        Ok(scan)
+                        Ok(with_docker(
+                            Arc::clone(&self.env.containers),
+                            self.env.home.clone(),
+                            scan,
+                        )
+                        .await)
                     }
                     Ok((Err(err), memo)) => {
                         self.memo = memo;
@@ -78,8 +87,9 @@ impl Ports {
             Err(problem) => Err(problem),
         };
         ctx.update_state(|state| match outcome {
-            Ok(scan) => {
+            Ok((scan, docker)) => {
                 state.scanned_at_ms = Some(millis(now));
+                state.docker = docker;
                 state.groups = group(scan.entries);
                 state.skipped = scan.skipped;
                 state.problem = None;
@@ -100,6 +110,26 @@ impl Ports {
             }
         }
     }
+}
+
+async fn with_docker(
+    containers: Arc<dyn Containers>,
+    home: PathBuf,
+    mut scan: Scan,
+) -> (Scan, DockerStatus) {
+    if scan.backend.is_empty() {
+        return (scan, DockerStatus::NotSeen);
+    }
+    let (running, status) = match containers.running().await {
+        Ok(containers) => (containers, DockerStatus::Read),
+        Err(err) => {
+            tracing::warn!(error = %err, "Docker could not be read");
+            (Vec::new(), DockerStatus::Unreadable(err.to_string()))
+        }
+    };
+    let docker = attribute(&scan.backend, &running, |path| place(path, &home));
+    scan.entries.extend(docker);
+    (scan, status)
 }
 
 fn millis(time: SystemTime) -> u64 {

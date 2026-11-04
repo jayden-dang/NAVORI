@@ -1,14 +1,15 @@
 #![allow(dead_code, clippy::unwrap_used)]
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use futures::future::BoxFuture;
 use navori_kernel::{DispatchError, Envelope, Kernel, WallClock};
 use navori_macos::fake::FakeProcesses;
 use navori_macos::{Listener, Marker, PlatformError, ProcEntry, ProcessSource, ReadError};
-use navori_mod_ports::{Ports, PortsEnv};
+use navori_mod_ports::{Container, Containers, DockerError, Ports, PortsEnv};
 use navori_store::Store;
 use serde_json::Value;
 
@@ -137,8 +138,44 @@ impl ProcessSource for Gate {
     }
 }
 
+/// A Docker engine that answers from a script and counts the reads.
+pub struct FakeContainers {
+    reply: Mutex<Result<Vec<Container>, DockerError>>,
+    calls: AtomicUsize,
+}
+
+impl FakeContainers {
+    pub fn new() -> Self {
+        Self {
+            reply: Mutex::new(Ok(Vec::new())),
+            calls: AtomicUsize::new(0),
+        }
+    }
+
+    pub fn reply(&self, reply: Result<Vec<Container>, DockerError>) {
+        *self.reply.lock().unwrap_or_else(PoisonError::into_inner) = reply;
+    }
+
+    pub fn calls(&self) -> usize {
+        self.calls.load(Ordering::SeqCst)
+    }
+}
+
+impl Containers for FakeContainers {
+    fn running(&self) -> BoxFuture<'_, Result<Vec<Container>, DockerError>> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        let reply = self
+            .reply
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        Box::pin(async move { reply })
+    }
+}
+
 pub struct Rig {
     pub kernel: Kernel,
+    pub containers: Arc<FakeContainers>,
     pub processes: Arc<FakeProcesses>,
     pub gate: Arc<Gate>,
     pub clock: FakeClock,
@@ -153,9 +190,11 @@ impl Rig {
         let (guard, home) = canonical_temp_home();
         let clock = FakeClock::at(ORIGIN_MS);
         let source = Arc::clone(&gate) as Arc<dyn ProcessSource>;
+        let containers = Arc::new(FakeContainers::new());
         let env = PortsEnv {
             home: home.clone(),
             processes: Box::new(move || Ok(Arc::clone(&source))),
+            containers: Arc::clone(&containers) as Arc<dyn Containers>,
         };
         let kernel =
             Kernel::builder_with_clock(Store::open_in_memory().unwrap(), Arc::new(clock.clone()))
@@ -164,6 +203,7 @@ impl Rig {
                 .start();
         Self {
             kernel,
+            containers,
             processes,
             gate,
             clock,
