@@ -128,3 +128,24 @@ async fn open_connects_to_nothing() {
     let error = listener.accept().unwrap_err();
     assert_eq!(error.kind(), std::io::ErrorKind::WouldBlock);
 }
+
+#[tokio::test(start_paused = true)]
+async fn identical_urls_need_no_choice_even_when_a_different_address_sits_between() {
+    let rig = Rig::new();
+    scanned_with(
+        &rig,
+        &[("127.0.0.1", 3000), ("192.168.1.5", 3000), ("::1", 3000)],
+    )
+    .await;
+    let message = invalid_message(rig.dispatch(json!({"open": {"port": 3000}})).await);
+    assert!(message.contains("192.168.1.5"), "{message}");
+
+    let rig = Rig::new();
+    scanned_with(
+        &rig,
+        &[("127.0.0.1", 3000), ("::1", 3000), ("0.0.0.0", 3000)],
+    )
+    .await;
+    let reply = rig.dispatch(json!({"open": {"port": 3000}})).await.unwrap();
+    assert_eq!(reply, json!({"url": "http://localhost:3000"}));
+}
