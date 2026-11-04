@@ -5,6 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::ai::ask_error_to_rpc;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use navori_config::{
@@ -16,7 +17,9 @@ use navori_mod_awake::{Awake, AwakeState, LeaseState, Platform, Timing};
 use navori_mod_integrations::{
     Harness, Integrations, IntegrationsEnv, IntegrationsState, State, inspect,
 };
-use navori_protocol::{Check, CoreStatus, Envelope, Event, ModuleInfo, Severity, rpc};
+use navori_protocol::{
+    AskReply, AskRequest, Check, CoreStatus, Envelope, Event, ModuleInfo, Severity, rpc,
+};
 use navori_store::Store;
 use serde_json::{Value, json};
 use tokio::sync::broadcast::error::RecvError;
@@ -422,6 +425,16 @@ impl Handler for IpcBridge {
                         .dispatch(envelope)
                         .await
                         .map_err(dispatch_to_rpc)
+                }
+                rpc::method::ASK => {
+                    let request: AskRequest = serde_json::from_value(params)
+                        .map_err(|e| rpc_err(rpc::code::INVALID_PARAMS, e))?;
+                    let gateway = inner.ai.gateway().await.map_err(ask_error_to_rpc)?;
+                    let reply = gateway
+                        .ask(&request.model, &request.text)
+                        .await
+                        .map_err(ask_error_to_rpc)?;
+                    to_json(&AskReply { reply })
                 }
                 other => Err(rpc_err(
                     rpc::code::METHOD_NOT_FOUND,

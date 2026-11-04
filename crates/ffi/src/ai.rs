@@ -2,14 +2,23 @@
 //! Profile-to-service mapping.
 
 use std::fmt;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 
 use futures::future::BoxFuture;
 use navori_config::Profile;
-use navori_context::{SendError, Sender};
+use navori_context::{
+    AskError, AuditError, AuditRow, AuditSink, Gateway, Outcome, SendError, Sender,
+};
+use navori_llm::{
+    ChatRequest, DEEPSEEK_BASE_URL, DEEPSEEK_PROVIDER, LlmProvider, Message, OpenAiCompat, Role,
+};
+use navori_protocol::rpc;
+use navori_redact::redact_text;
 use navori_secrets::{
     Deleted, KeychainService, KeychainStore, OpenError, Secret, SecretKey, SecretStore,
 };
+use navori_store::{Migration, Store};
 use tokio::sync::OnceCell;
 
 use crate::CoreError;
@@ -38,22 +47,131 @@ impl AiDeps {
                 let store: Arc<dyn SecretStore> = Arc::new(KeychainStore::open(service)?);
                 Ok(store)
             }),
-            make_sender: Arc::new(|| Arc::new(Unwired)),
+            make_sender: Arc::new(|| {
+                Arc::new(LlmSender::new(OpenAiCompat::new(DEEPSEEK_BASE_URL)))
+            }),
         }
     }
 }
 
-/// Stands in for the provider client until the Gateway is wired to it.
-struct Unwired;
+#[derive(Debug)]
+pub struct LlmSender {
+    provider: OpenAiCompat,
+}
 
-impl Sender for Unwired {
+impl LlmSender {
+    pub fn new(provider: OpenAiCompat) -> Self {
+        Self { provider }
+    }
+}
+
+impl Sender for LlmSender {
     fn send<'a>(
         &'a self,
-        _: &'a Secret,
-        _: &'a str,
-        _: &'a str,
+        key: &'a Secret,
+        model: &'a str,
+        text: &'a str,
     ) -> BoxFuture<'a, Result<String, SendError>> {
-        Box::pin(async { Err(SendError("no provider is connected yet".to_owned())) })
+        Box::pin(async move {
+            let request = ChatRequest {
+                model: model.to_owned(),
+                messages: vec![Message {
+                    role: Role::User,
+                    text: text.to_owned(),
+                }],
+            };
+            self.provider
+                .complete(request, key)
+                .await
+                .map(|reply| reply.text)
+                .map_err(|error| SendError(error.to_string()))
+        })
+    }
+}
+
+const AUDIT_OWNER: &str = "context";
+
+const AUDIT_MIGRATIONS: &[Migration] = &[Migration {
+    version: 1,
+    name: "context_audit",
+    sql: "
+        CREATE TABLE context_audit (
+          id              INTEGER PRIMARY KEY AUTOINCREMENT,
+          ts_ms           INTEGER NOT NULL,
+          provider        TEXT NOT NULL,
+          kinds           TEXT NOT NULL,
+          redacted_count  INTEGER NOT NULL,
+          outcome         TEXT NOT NULL CHECK (outcome IN ('authorized','blocked'))
+        );
+    ",
+}];
+
+#[derive(Debug)]
+pub struct StoreAudit {
+    store: Store,
+    migrated: std::sync::Mutex<bool>,
+}
+
+impl StoreAudit {
+    pub fn new(store: Store) -> Self {
+        Self {
+            store,
+            migrated: std::sync::Mutex::new(false),
+        }
+    }
+
+    fn ensure_table(&self) -> Result<(), AuditError> {
+        let mut migrated = self
+            .migrated
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !*migrated {
+            self.store
+                .migrate(AUDIT_OWNER, AUDIT_MIGRATIONS)
+                .map_err(|_| AuditError)?;
+            *migrated = true;
+        }
+        Ok(())
+    }
+}
+
+impl AuditSink for StoreAudit {
+    fn record(&self, row: AuditRow) -> Result<(), AuditError> {
+        self.ensure_table()?;
+        let (provider, kinds) = catch_unwind(AssertUnwindSafe(|| {
+            (
+                redact_text(&row.provider).text,
+                redact_text(&row.kinds.join(",")).text,
+            )
+        }))
+        .map_err(|_| AuditError)?;
+        let outcome = match row.outcome {
+            Outcome::Authorized => "authorized",
+            Outcome::Blocked => "blocked",
+        };
+        self.store
+            .with_conn(|conn| {
+                conn.execute(
+                    "INSERT INTO context_audit (ts_ms, provider, kinds, redacted_count, outcome) VALUES (?1, ?2, ?3, ?4, ?5)",
+                    (row.ts_ms, provider, kinds, row.redacted_count, outcome),
+                )
+            })
+            .map(|_| ())
+            .map_err(|_| AuditError)
+    }
+}
+
+pub fn ask_error_to_rpc(err: AskError) -> rpc::Error {
+    let code = match &err {
+        AskError::NoKey => rpc::code::ASK_NO_KEY,
+        AskError::Keychain(_) => rpc::code::ASK_KEYCHAIN,
+        AskError::Shield | AskError::Audit => rpc::code::ASK_BLOCKED,
+        AskError::Send(_) => rpc::code::ASK_PROVIDER,
+    };
+    rpc::Error {
+        code,
+        message: err.to_string(),
+        data: None,
     }
 }
 
@@ -67,7 +185,9 @@ pub fn service_for(profile: Profile) -> KeychainService {
 pub(crate) struct AiRuntime {
     profile: Profile,
     deps: AiDeps,
+    store: Store,
     secrets: OnceCell<Arc<dyn SecretStore>>,
+    gateway: OnceCell<Arc<Gateway>>,
 }
 
 impl fmt::Debug for AiRuntime {
@@ -89,12 +209,35 @@ fn did_not_finish(_: tokio::task::JoinError) -> CoreError {
 }
 
 impl AiRuntime {
-    pub(crate) fn new(profile: Profile, deps: AiDeps) -> Self {
+    pub(crate) fn new(profile: Profile, deps: AiDeps, store: Store) -> Self {
         Self {
             profile,
             deps,
+            store,
             secrets: OnceCell::new(),
+            gateway: OnceCell::new(),
         }
+    }
+
+    pub(crate) async fn gateway(&self) -> Result<Arc<Gateway>, AskError> {
+        self.gateway
+            .get_or_try_init(|| async {
+                let secrets = self
+                    .secrets()
+                    .await
+                    .map_err(|error| AskError::Keychain(error.to_string()))?;
+                let sender = (self.deps.make_sender)();
+                let audit = Arc::new(StoreAudit::new(self.store.clone()));
+                Ok(Arc::new(Gateway::new(
+                    secrets,
+                    slot().map_err(|error| AskError::Keychain(error.to_string()))?,
+                    sender,
+                    audit,
+                    DEEPSEEK_PROVIDER,
+                )))
+            })
+            .await
+            .cloned()
     }
 
     /// Opens the Keychain on first use. A failed open is not remembered, so the next call retries.
@@ -138,7 +281,7 @@ impl AiRuntime {
 }
 
 fn slot() -> Result<SecretKey, CoreError> {
-    SecretKey::new("llm-provider", navori_llm::DEEPSEEK_PROVIDER).map_err(secrets_error_key)
+    SecretKey::new("llm-provider", DEEPSEEK_PROVIDER).map_err(secrets_error_key)
 }
 
 fn secrets_error_key(_: navori_secrets::KeyError) -> CoreError {

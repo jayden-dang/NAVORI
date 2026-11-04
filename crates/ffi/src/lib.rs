@@ -30,7 +30,7 @@ use tokio_util::sync::CancellationToken;
 use crate::ai::AiRuntime;
 use crate::app::{Inner, IpcBridge};
 
-pub use ai::{AiDeps, service_for};
+pub use ai::{AiDeps, LlmSender, StoreAudit, ask_error_to_rpc, service_for};
 pub use app::{awake_check, awake_view, config_notice};
 
 uniffi::setup_scaffolding!();
@@ -304,7 +304,7 @@ impl NavoriCore {
         let pid = std::process::id();
         let inner = Arc::new(Inner {
             kernel,
-            store,
+            store: store.clone(),
             paths: paths.clone(),
             profile,
             version: config.app_version.clone(),
@@ -312,7 +312,7 @@ impl NavoriCore {
             config_notice,
             integrations,
             last_unclean_exit: OnceLock::new(),
-            ai: AiRuntime::new(profile, deps),
+            ai: AiRuntime::new(profile, deps, store),
         });
         let server = match handle.block_on(Server::bind(
             &paths.socket,
