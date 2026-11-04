@@ -1,6 +1,8 @@
 #![allow(dead_code, clippy::unwrap_used)]
 
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -277,4 +279,89 @@ impl Rig {
 
 pub fn under(home: &Path, rest: &str) -> PathBuf {
     home.join(rest)
+}
+
+/// Runs git in `dir` with no config from the machine and no `GIT_*` variable from the caller.
+pub fn git(dir: &Path, args: &[&str]) {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(dir)
+        .args([
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@example.com",
+            "-c",
+            "commit.gpgsign=false",
+        ])
+        .args(args);
+    for (key, _) in std::env::vars() {
+        if key.starts_with("GIT_") {
+            cmd.env_remove(key);
+        }
+    }
+    cmd.env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_SYSTEM", "/dev/null")
+        .env("GIT_AUTHOR_NAME", "t")
+        .env("GIT_AUTHOR_EMAIL", "t@example.com")
+        .env("GIT_COMMITTER_NAME", "t")
+        .env("GIT_COMMITTER_EMAIL", "t@example.com");
+    let out = cmd.output().unwrap();
+    assert!(out.status.success(), "git {args:?}: {out:?}");
+}
+
+pub fn init_repo(dir: &Path) {
+    std::fs::create_dir_all(dir).unwrap();
+    git(dir, &["init", "-b", "main"]);
+    git(dir, &["commit", "--allow-empty", "-m", "init"]);
+}
+
+pub struct Captured(Arc<Mutex<Vec<u8>>>);
+
+impl Write for Captured {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// Collects this thread's log lines, at every level, until the guard is dropped.
+pub struct LogCapture {
+    written: Arc<Mutex<Vec<u8>>>,
+    _guard: tracing::subscriber::DefaultGuard,
+}
+
+impl LogCapture {
+    pub fn start() -> Self {
+        let written = Arc::new(Mutex::new(Vec::<u8>::new()));
+        let sink = Arc::clone(&written);
+        let subscriber = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_ansi(false)
+            .with_writer(move || Captured(Arc::clone(&sink)))
+            .finish();
+        let guard = tracing::subscriber::set_default(subscriber);
+        let capture = Self {
+            written,
+            _guard: guard,
+        };
+        capture.refresh();
+        capture
+    }
+
+    /// Makes call sites that other tests already hit report to this capture too.
+    pub fn refresh(&self) {
+        tracing::callsite::rebuild_interest_cache();
+    }
+
+    pub fn text(&self) -> String {
+        let bytes = self.written.lock().unwrap_or_else(PoisonError::into_inner);
+        String::from_utf8_lossy(&bytes).into_owned()
+    }
 }

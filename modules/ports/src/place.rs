@@ -47,11 +47,14 @@ fn is_removed(path: &Path) -> bool {
 }
 
 fn counted(path: &Path, home: &Path) -> Option<Repo> {
+    if !in_counted_area(path, home) {
+        return None;
+    }
     find_repo(path).filter(|repo| in_counted_area(&repo.root, home))
 }
 
-fn in_counted_area(root: &Path, home: &Path) -> bool {
-    let Ok(rest) = root.strip_prefix(home) else {
+fn in_counted_area(dir: &Path, home: &Path) -> bool {
+    let Ok(rest) = dir.strip_prefix(home) else {
         return false;
     };
     match rest.components().next() {

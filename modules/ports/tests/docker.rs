@@ -2,15 +2,11 @@
 
 mod common;
 
-use std::fs;
-use std::io::Write;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
-use common::{Rig, canonical_temp_home};
+use common::{LogCapture, Rig, canonical_temp_home, git, init_repo};
 use navori_macos::fake::FakeProcess;
 use navori_mod_ports::{
     BackendPort, BranchName, Container, DockerError, Placement, PortEntry, PortKind, attribute,
@@ -19,33 +15,6 @@ use navori_mod_ports::{
 use serde_json::{Value, json};
 
 const FIXTURE_DIR: &str = "navori-fixture-compose-dir";
-
-fn git(dir: &Path, args: &[&str]) {
-    let mut cmd = Command::new("git");
-    cmd.current_dir(dir)
-        .args([
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@example.com",
-            "-c",
-            "commit.gpgsign=false",
-        ])
-        .args(args);
-    for (key, _) in std::env::vars() {
-        if key.starts_with("GIT_") {
-            cmd.env_remove(key);
-        }
-    }
-    let out = cmd.output().unwrap();
-    assert!(out.status.success(), "git {args:?}: {out:?}");
-}
-
-fn init_repo(dir: &Path) {
-    fs::create_dir_all(dir).unwrap();
-    git(dir, &["init", "-b", "main"]);
-    git(dir, &["commit", "--allow-empty", "-m", "init"]);
-}
 
 fn ip(text: &str) -> IpAddr {
     text.parse().unwrap()
@@ -323,32 +292,9 @@ async fn each_scan_publishes_once_with_its_docker_result() {
     assert_eq!(rig.state()["docker"], json!("read"));
 }
 
-struct Captured(Arc<Mutex<Vec<u8>>>);
-
-impl Write for Captured {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
 #[tokio::test(start_paused = true)]
 async fn no_working_directory_or_container_path_reaches_a_log_or_event() {
-    let writer = Arc::new(Mutex::new(Vec::<u8>::new()));
-    let captured = Arc::clone(&writer);
-    let subscriber = tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::TRACE)
-        .with_ansi(false)
-        .with_writer(move || Captured(Arc::clone(&captured)))
-        .finish();
-    let _guard = tracing::subscriber::set_default(subscriber);
+    let logs = LogCapture::start();
 
     let rig = Rig::new();
     rig.processes.add(docker_process());
@@ -362,14 +308,14 @@ async fn no_working_directory_or_container_path_reaches_a_log_or_event() {
     let failing = Rig::new();
     failing.processes.add(docker_process());
     failing.containers.reply(Err(DockerError::BadReply));
-    tracing::callsite::rebuild_interest_cache();
+    logs.refresh();
     let state = first_scan(&failing).await;
     assert_eq!(
         state["docker"],
         json!({"unreadable": "Docker's answer could not be read."})
     );
 
-    let logged = String::from_utf8(writer.lock().unwrap().clone()).unwrap();
+    let logged = logs.text();
     assert!(logged.contains("Docker could not be read"), "{logged}");
     assert!(!logged.contains(FIXTURE_DIR), "{logged}");
     assert!(!logged.contains("db-name"), "{logged}");

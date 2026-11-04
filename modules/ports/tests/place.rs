@@ -4,40 +4,12 @@ mod common;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::Arc;
 
-use common::canonical_temp_home;
+use common::{LogCapture, canonical_temp_home, git, init_repo};
 use navori_macos::fake::{FakeProcess, FakeProcesses};
 use navori_mod_ports::{BranchName, HarnessMemo, Placement, Scanner, place_listener};
 use navori_procs::Unavailable;
-
-fn git(dir: &Path, args: &[&str]) {
-    let mut cmd = Command::new("git");
-    cmd.current_dir(dir)
-        .args([
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@example.com",
-            "-c",
-            "commit.gpgsign=false",
-        ])
-        .args(args);
-    for (key, _) in std::env::vars() {
-        if key.starts_with("GIT_") {
-            cmd.env_remove(key);
-        }
-    }
-    let out = cmd.output().unwrap();
-    assert!(out.status.success(), "git {args:?}: {out:?}");
-}
-
-fn init_repo(dir: &Path) {
-    fs::create_dir_all(dir).unwrap();
-    git(dir, &["init", "-b", "main"]);
-    git(dir, &["commit", "--allow-empty", "-m", "init"]);
-}
 
 fn placed(
     cwd: Result<&Path, Unavailable>,
@@ -290,4 +262,18 @@ fn a_removed_executable_directory_is_placed_by_its_nearest_existing_ancestor_and
     assert_eq!(placement.worktree, None);
     assert_eq!(placement.branch, None);
     assert_eq!(placement.missing_path, None);
+}
+
+#[test]
+fn a_path_outside_home_is_never_looked_at_for_a_repository() {
+    let fx = fixture();
+    let file = fx.outside.join("file");
+    fs::write(&file, "").unwrap();
+    let below_a_file = file.join("child");
+    let logs = LogCapture::start();
+
+    let found = placed(Ok(&below_a_file), Err(Unavailable::Exited), &fx.home);
+
+    assert_eq!(found, Placement::default());
+    assert!(!logs.text().contains("unreadable git metadata"));
 }
