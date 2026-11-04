@@ -100,6 +100,13 @@ Modify:
 - `docs/specs/2026-11-04-port-discovery/requirements.md`, `design.md` — notes on PORTS-1.5 and the read-only-Docker lines.
 - `docs/codebase/modules.md`, `docs/agents/verify.md` — Ports surface and the stale "no screen yet" gotcha.
 
+Added during the build (not in the first plan; found by the task reviews, the whole-branch review and its fix pass, and recorded under the Amendments section; each is part of this feature):
+- `modules/ports/src/stop/task.rs` — the stop orchestration split out of `actor.rs` (Task 7 deviation).
+- `modules/ports/tests/stop_log.rs`, `modules/ports/tests/real_os.rs` — the signal-log tests and an ignored real-OS guard test (whole-branch fix pass); `modules/ports/tests/open.rs` — the catalog assertion narrowed when `kill` joined it (Task 3).
+- `crates/ffi/tests/awake.rs`, `crates/ffi/tests/integrations.rs` — the both-modules-down view and the Settings sentence test.
+- `apps/macos/Navori/Features/Panel/MenuRowView.swift`, `apps/macos/Navori/StatusBar/CascadeController.swift`, `apps/macos/NavoriPanel/AwakeSubmenuState.swift` — the Running row, the cascade focus fix and the Holding list leaving the Awake submenu (Tasks 10 to 12).
+- `docs/ARCHITECTURE.md`, `docs/security/threat-model.md`, `docs/features/ports.md`, `CONTEXT.md` — the documentation the whole-branch review found missing (kill request shape, the Docker stop in the threat model, the user-facing page, the new terms).
+
 Not touched: `crates/kernel/**` (its `running::` use is grepped in Task 8), `crates/protocol/**`, `crates/procs/**`, `crates/store/**`, `apps/cli/**`, `modules/awake/**`, `xtask/**` (read-only: Task 10 and Task 15 read `xtask/src/perf`).
 
 Order: Tasks 3, 4, 5, 6, 7 share `modules/ports/src/actor.rs`, `action.rs` and `tests/common/mod.rs`; Tasks 9 to 13 share Swift files. Edges below are what the tasks need.
