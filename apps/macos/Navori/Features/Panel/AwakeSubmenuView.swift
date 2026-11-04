@@ -6,47 +6,30 @@ struct AwakeSubmenuView: View {
     let store: CoreStore
     @Environment(CascadeController.self) private var cascade
 
-    private var state: AwakeSubmenuState {
-        AwakeSubmenuState(
-            status: store.awakeStatus,
-            leases: store.awakeLeases,
-            displayHeld: store.displayHeld,
-            actionFailure: store.awakeActionMessage
-        )
-    }
-
     var body: some View {
-        let state = state
+        let state = store.awakeSubmenu
         VStack(alignment: .leading, spacing: 0) {
             MenuRowView(
-                row: command(
-                    "awake.hold_hour",
-                    "clock",
-                    "Keep awake for 1 hour",
-                    value: state.hourUntil,
-                    checked: state.hourChecked
+                row: MenuRow(
+                    id: "awake.keep",
+                    icon: "timer",
+                    title: "Keep awake",
+                    value: state.keepValue,
+                    dot: nil,
+                    opensSubmenu: true,
+                    shortcut: nil
                 ),
                 cascade: cascade
             )
             MenuRowView(
-                row: command(
-                    "awake.hold_until_off",
-                    "infinity",
-                    "Keep awake until I turn it off",
-                    checked: state.untilOffChecked
-                ),
-                cascade: cascade
-            )
-            MenuRowView(
-                row: command("awake.display", "display", "Display on", checked: state.displayChecked),
-                cascade: cascade
-            )
-            MenuRowView(
-                row: command(
-                    "awake.release_all",
-                    "xmark.circle",
-                    "Release all",
-                    dimmed: state.releaseAllEnabled == false
+                row: MenuRow(
+                    id: "awake.tracking",
+                    icon: "sparkles",
+                    title: "Tracking agents",
+                    value: state.trackingValue,
+                    dot: state.trackingDot,
+                    opensSubmenu: false,
+                    shortcut: nil
                 ),
                 cascade: cascade
             )
@@ -63,26 +46,35 @@ struct AwakeSubmenuView: View {
         .frame(width: 360, alignment: .topLeading)
         .fixedSize(horizontal: true, vertical: true)
     }
+}
 
-    private func command(
-        _ id: String,
-        _ icon: String,
-        _ title: String,
-        value: String? = nil,
-        checked: Bool = false,
-        dimmed: Bool = false
-    ) -> MenuRow {
-        MenuRow(
-            id: id,
-            icon: icon,
-            title: title,
-            value: value,
-            dot: nil,
-            opensSubmenu: false,
-            shortcut: nil,
-            isDimmed: dimmed,
-            isChecked: checked
-        )
+/// The third level: how long to keep the Mac awake.
+struct KeepAwakeSubmenuView: View {
+    let store: CoreStore
+    @Environment(CascadeController.self) private var cascade
+
+    var body: some View {
+        let state = store.awakeSubmenu
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(KeepAwakeChoice.all, id: \.id) { choice in
+                MenuRowView(
+                    row: MenuRow(
+                        id: choice.id,
+                        icon: nil,
+                        title: choice.title,
+                        value: nil,
+                        dot: nil,
+                        opensSubmenu: false,
+                        shortcut: nil,
+                        isChecked: state.isChecked(choice)
+                    ),
+                    cascade: cascade
+                )
+            }
+        }
+        .padding(5)
+        .frame(width: 180, alignment: .topLeading)
+        .fixedSize(horizontal: true, vertical: true)
     }
 }
 

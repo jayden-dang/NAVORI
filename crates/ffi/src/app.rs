@@ -292,6 +292,7 @@ impl From<AwakeState> for crate::AwakeView {
             display_held,
             since_ms,
             problem,
+            tracking,
         } = state;
         Self {
             leases: leases.into_iter().map(crate::LeaseView::from).collect(),
@@ -299,6 +300,7 @@ impl From<AwakeState> for crate::AwakeView {
             display_held,
             since_ms,
             problem,
+            tracking,
         }
     }
 }

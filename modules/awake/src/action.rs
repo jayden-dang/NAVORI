@@ -26,6 +26,14 @@ pub enum AwakeAction {
     EndSession { session_id: String },
     /// End every lease Navori is holding.
     ReleaseAll,
+    /// The menu's Keep awake choice: only a duration lease of `seconds`.
+    KeepFor { seconds: u64 },
+    /// The menu's Keep awake choice: only a display lease, with no end time.
+    KeepIndefinitely,
+    /// End every Keep awake lease and no other lease.
+    KeepOff,
+    /// Turn Tracking agents on or off.
+    Tracking { on: bool },
 }
 
 impl ModuleAction for AwakeAction {
@@ -39,7 +47,11 @@ impl ModuleAction for AwakeAction {
             | Self::HoldSession { .. }
             | Self::StopSession { .. }
             | Self::EndSession { .. }
-            | Self::ReleaseAll => Risk::Write,
+            | Self::ReleaseAll
+            | Self::KeepFor { .. }
+            | Self::KeepIndefinitely
+            | Self::KeepOff
+            | Self::Tracking { .. } => Risk::Write,
         }
     }
 
@@ -88,6 +100,26 @@ impl ModuleAction for AwakeAction {
             ActionDoc {
                 name: "release_all",
                 description: "End every lease Navori is holding.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "keep_for",
+                description: "Make a duration lease of `seconds` the only Keep awake lease, replacing a duration, until-off or display lease.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "keep_indefinitely",
+                description: "Make a display lease the only Keep awake lease, replacing a duration or until-off lease, so the display stays on until it is turned off.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "keep_off",
+                description: "End every duration, until-off and display lease. Command and session leases stay.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "tracking",
+                description: "Turn Tracking agents on or off, and store the setting. While it is off, sessions are still followed but keep nothing awake, and they are left out of the published leases. Turning it on counts them again at once.",
                 risk: Risk::Write,
             },
         ]

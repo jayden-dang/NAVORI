@@ -16,9 +16,16 @@ struct AwakeSubmenuStateTests {
         status: AwakeStatus = .on(sources: []),
         leases: [AwakeLeaseInput] = [],
         displayHeld: Bool = false,
+        tracking: Bool = true,
         actionFailure: String? = nil
     ) -> AwakeSubmenuState {
-        AwakeSubmenuState(status: status, leases: leases, displayHeld: displayHeld, actionFailure: actionFailure)
+        AwakeSubmenuState(
+            status: status,
+            leases: leases,
+            displayHeld: displayHeld,
+            tracking: tracking,
+            actionFailure: actionFailure
+        )
     }
 
     private static let hour = AwakeLeaseInput(
@@ -34,8 +41,27 @@ struct AwakeSubmenuStateTests {
         kind: .command, harness: nil, label: "cargo", pid: 23719, stopped: false, until: nil
     )
 
-    @Test func the_menu_hold_is_one_hour() {
-        #expect(AwakeSubmenuState.menuHoldSeconds == 3600)
+    private static func length(_ seconds: Int) -> KeepAwakeChoice {
+        guard let choice = KeepAwakeChoice.all.first(where: { $0.seconds == seconds }) else {
+            preconditionFailure("no menu length of \(seconds) seconds")
+        }
+        return choice
+    }
+
+    @Test func keep_awake_offers_indefinitely_then_each_length_in_order() {
+        #expect(KeepAwakeChoice.all.map(\.title) == [
+            "Indefinitely", "5 minutes", "10 minutes", "15 minutes",
+            "30 minutes", "1 hour", "2 hours", "5 hours",
+        ])
+        #expect(KeepAwakeChoice.all.map(\.seconds) == [nil, 300, 600, 900, 1800, 3600, 7200, 18000])
+    }
+
+    @Test func a_choice_is_found_again_by_its_row_id() {
+        for choice in KeepAwakeChoice.all {
+            #expect(KeepAwakeChoice(id: choice.id) == choice)
+        }
+        #expect(KeepAwakeChoice(id: "awake.tracking") == nil)
+        #expect(KeepAwakeChoice(id: "awake.keep") == nil)
     }
 
     @Test func nothing_wrong_means_no_status_text() {
@@ -79,24 +105,72 @@ struct AwakeSubmenuStateTests {
         ))
     }
 
-    @Test func commands_are_checked_by_the_lease_they_made() {
+    @Test func nothing_is_checked_and_the_row_has_no_value_while_no_keep_awake_lease_exists() {
         let off = Self.state(status: .off)
-        #expect(off.hourChecked == false)
-        #expect(off.hourUntil == nil)
-        #expect(off.untilOffChecked == false)
-        #expect(off.displayChecked == false)
-        #expect(off.releaseAllEnabled == false)
+        #expect(off.keepValue == nil)
+        #expect(KeepAwakeChoice.all.allSatisfy { off.isChecked($0) == false })
 
+        let onlySession = Self.state(leases: [Self.session("Codex", "a/b", pid: 1), Self.command])
+        #expect(onlySession.keepValue == nil)
+        #expect(KeepAwakeChoice.all.allSatisfy { onlySession.isChecked($0) == false })
+    }
+
+    @Test func a_duration_lease_checks_its_length_and_shows_its_end_time() {
         let hour = Self.state(leases: [Self.hour])
-        #expect(hour.hourChecked)
-        #expect(hour.hourUntil == "until 11:38")
-        #expect(hour.untilOffChecked == false)
-        #expect(hour.releaseAllEnabled)
+        #expect(hour.keepValue == "until 11:38")
+        #expect(hour.isChecked(Self.length(3600)))
+        #expect(hour.isChecked(Self.length(300)) == false)
+        #expect(hour.isChecked(.indefinitely) == false)
+    }
 
-        let rest = Self.state(leases: [Self.untilOff, Self.display], displayHeld: true)
-        #expect(rest.hourChecked == false)
-        #expect(rest.untilOffChecked)
-        #expect(rest.displayChecked)
+    @Test func a_display_or_until_off_lease_checks_indefinitely() {
+        for lease in [Self.display, Self.untilOff] {
+            let state = Self.state(leases: [lease], displayHeld: true)
+            #expect(state.keepValue == "Indefinitely")
+            #expect(state.isChecked(.indefinitely))
+            #expect(state.isChecked(Self.length(3600)) == false)
+        }
+    }
+
+    @Test func a_length_the_menu_does_not_offer_checks_nothing_but_still_shows_its_end_time() {
+        let ninety = AwakeLeaseInput(
+            kind: .duration, harness: nil, label: "90 minutes", pid: nil, stopped: false, until: "12:08"
+        )
+        let state = Self.state(leases: [ninety])
+        #expect(state.keepValue == "until 12:08")
+        #expect(KeepAwakeChoice.all.allSatisfy { state.isChecked($0) == false })
+    }
+
+    @Test func picking_an_unchecked_choice_asks_for_it() {
+        let state = Self.state(leases: [Self.hour])
+        #expect(state.command(picking: Self.length(300)) == .keepFor(seconds: 300))
+        #expect(state.command(picking: .indefinitely) == .keepIndefinitely)
+    }
+
+    @Test func picking_the_checked_choice_turns_keep_awake_off() {
+        #expect(Self.state(leases: [Self.hour]).command(picking: Self.length(3600)) == .keepOff)
+        #expect(Self.state(leases: [Self.display]).command(picking: .indefinitely) == .keepOff)
+        #expect(Self.state(leases: [Self.untilOff]).command(picking: .indefinitely) == .keepOff)
+    }
+
+    @Test func tracking_agents_reads_on_with_a_green_dot_or_off_with_none() {
+        let on = Self.state(status: .off, tracking: true)
+        #expect(on.trackingOn)
+        #expect(on.trackingValue == "On")
+        #expect(on.trackingDot == .green)
+
+        let off = Self.state(status: .off, tracking: false)
+        #expect(off.trackingOn == false)
+        #expect(off.trackingValue == "Off")
+        #expect(off.trackingDot == nil)
+    }
+
+    @Test func commands_become_the_actions_the_module_reads() {
+        #expect(AwakeCommand.keepFor(seconds: 300).actionJSON == "{\"keep_for\":{\"seconds\":300}}")
+        #expect(AwakeCommand.keepIndefinitely.actionJSON == "\"keep_indefinitely\"")
+        #expect(AwakeCommand.keepOff.actionJSON == "\"keep_off\"")
+        #expect(AwakeCommand.tracking(false).actionJSON == "{\"tracking\":{\"on\":false}}")
+        #expect(AwakeCommand.tracking(true).actionJSON == "{\"tracking\":{\"on\":true}}")
     }
 
     @Test func holding_groups_run_held_by_you_then_commands_then_projects_alphabetically() {

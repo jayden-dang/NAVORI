@@ -46,10 +46,11 @@ struct AwakeLeaseMapTests {
         let state = AwakeSubmenuState(
             status: .on(sources: ["1 hour"]),
             leases: [lease].compactMap { $0 },
-            displayHeld: false
+            displayHeld: false,
+            tracking: true
         )
         #expect(lease?.until == "22:13")
-        #expect(state.hourUntil == "until 22:13")
+        #expect(state.keepValue == "until 22:13")
         #expect(AwakeLeaseMap.clockText(ms, timeZone: zone) == "22:13")
     }
 }

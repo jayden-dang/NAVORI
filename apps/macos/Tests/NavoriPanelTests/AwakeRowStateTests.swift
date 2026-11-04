@@ -105,105 +105,68 @@ struct AwakeRowStateTests {
         #expect(status == .off)
     }
 
+    private static func marks(
+        durationEndsAtMs: Int64? = nil,
+        hasUntilOff: Bool = false,
+        hasDisplay: Bool = false,
+        tracking: Bool = true
+    ) -> AwakeHeldMarks {
+        AwakeHeldMarks(
+            durationEndsAtMs: durationEndsAtMs,
+            hasUntilOff: hasUntilOff,
+            hasDisplay: hasDisplay,
+            tracking: tracking
+        )
+    }
+
     @Test func a_failed_menu_action_stays_on_the_row_until_the_snapshot_achieves_it() {
-        let marks = AwakeHeldMarks(
-            durationEndsAtMs: nil,
-            hasUntilOff: false,
-            hasDisplay: false,
-            hasLease: false
-        )
+        let before = Self.marks()
         let failure = AwakeActionFailure(
-            request: .untilOff,
+            request: .keepIndefinitely,
             message: "The Navori core is not running.",
-            marks: marks
+            marks: before
         )
-        let shown = failure.visible(against: marks)
+        let shown = failure.visible(against: before)
         #expect(shown == "The Navori core is not running.")
         let row = AwakeRowState(status: .off, actionFailure: shown)
         #expect(row.label == "Needs attention")
         #expect(row.dot == nil)
         #expect(AwakeRowState(status: .on(sources: ["1 hour"]), actionFailure: shown).dot == .green)
 
-        let achieved = AwakeHeldMarks(
-            durationEndsAtMs: nil,
-            hasUntilOff: true,
-            hasDisplay: false,
-            hasLease: true
-        )
-        #expect(failure.visible(against: achieved) == nil)
+        #expect(failure.visible(against: Self.marks(hasDisplay: true)) == nil)
     }
 
-    @Test func a_failed_duration_request_stays_until_the_deadline_changes() {
-        let before = AwakeHeldMarks(
-            durationEndsAtMs: 1_700_000_000_000,
-            hasUntilOff: false,
-            hasDisplay: false,
-            hasLease: true
-        )
+    @Test func a_failed_length_stays_until_the_deadline_changes() {
+        let before = Self.marks(durationEndsAtMs: 1_700_000_000_000)
         let failure = AwakeActionFailure(
-            request: .duration,
+            request: .keepFor(seconds: 300),
             message: "duration must be from 1 second through 7 days, not 0 seconds",
             marks: before
         )
         #expect(failure.visible(against: before) == failure.message)
-        let sameMinute = AwakeHeldMarks(
-            durationEndsAtMs: 1_700_003_600_000,
-            hasUntilOff: false,
-            hasDisplay: false,
-            hasLease: true
-        )
-        #expect(failure.visible(against: sameMinute) == nil)
+        #expect(failure.visible(against: Self.marks(durationEndsAtMs: 1_700_003_600_000)) == nil)
     }
 
-    @Test func release_all_failure_stays_while_a_lease_remains() {
-        let before = AwakeHeldMarks(
-            durationEndsAtMs: 11,
-            hasUntilOff: false,
-            hasDisplay: false,
-            hasLease: true
-        )
+    @Test func a_failed_keep_off_stays_while_a_keep_awake_lease_remains() {
+        let before = Self.marks(hasDisplay: true)
         let failure = AwakeActionFailure(
-            request: .releaseAll,
-            message: "stored leases could not be deleted, so nothing was released",
+            request: .keepOff,
+            message: "The Navori core is not running.",
             marks: before
         )
         #expect(failure.visible(against: before) == failure.message)
-        let cleared = AwakeHeldMarks(
-            durationEndsAtMs: nil,
-            hasUntilOff: false,
-            hasDisplay: false,
-            hasLease: false
-        )
-        #expect(failure.visible(against: cleared) == nil)
+        #expect(failure.visible(against: Self.marks(hasUntilOff: true)) == failure.message)
+        #expect(failure.visible(against: Self.marks()) == nil)
     }
 
-    @Test func a_display_failure_clears_only_when_the_display_lease_matches_the_request() {
-        let off = AwakeHeldMarks(
-            durationEndsAtMs: nil,
-            hasUntilOff: false,
-            hasDisplay: false,
-            hasLease: false
-        )
-        let on = AwakeHeldMarks(
-            durationEndsAtMs: nil,
-            hasUntilOff: false,
-            hasDisplay: true,
-            hasLease: true
-        )
-        let turnOn = AwakeActionFailure(
-            request: .display(true),
-            message: "macOS refused to keep the display on. Navori keeps trying.",
-            marks: off
-        )
-        #expect(turnOn.visible(against: off) == turnOn.message)
-        #expect(turnOn.visible(against: on) == nil)
-
+    @Test func a_failed_tracking_change_stays_until_the_setting_matches_the_request() {
+        let on = Self.marks(tracking: true)
         let turnOff = AwakeActionFailure(
-            request: .display(false),
-            message: "The Navori core is not running.",
+            request: .tracking(false),
+            message: "the Tracking agents setting could not be saved, so it did not change",
             marks: on
         )
         #expect(turnOff.visible(against: on) == turnOff.message)
-        #expect(turnOff.visible(against: off) == nil)
+        #expect(turnOff.visible(against: Self.marks(tracking: false)) == nil)
     }
 }

@@ -28,6 +28,7 @@ fn state(leases: Vec<LeaseState>, system_held: bool, problem: Option<&str>) -> A
         display_held: false,
         since_ms: None,
         problem: problem.map(str::to_owned),
+        tracking: true,
     }
 }
 

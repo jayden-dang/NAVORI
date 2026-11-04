@@ -119,6 +119,11 @@ A request to keep the Mac awake from one source (manual, timer, Agent session…
 awake while at least one Lease is held.
 _Avoid_: hold, keep-awake request, assertion (that is the IOKit mechanism)
 
+**Tracking agents**:
+The on/off setting that decides whether **Agent session** **Leases** keep the Mac awake. While it
+is off, Navori still follows each session, and turning it on holds for them at once.
+_Avoid_: pause, sleep mode
+
 **Integration**:
 Navori's entries installed into another tool's config — today a Harness's hooks, later its
 MCP server entry — installed, repaired and removed from Settings → Integrations.

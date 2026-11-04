@@ -11,7 +11,7 @@ use crate::domain::{
     self, DisplayChange, EndReason, Ended, Held, Lease, LeaseKey, LeaseSource, LeaseTable,
     Reconciler, Timing,
 };
-use crate::event::{self, LEASE_ENDED, LEASE_STARTED};
+use crate::event::{self, LEASE_ENDED, LEASE_STARTED, TRACKING_CHANGED};
 use crate::infra::stored::{self, StoredKind, StoredLease};
 use crate::infra::{ExecutableName, Platform, ProcessClass, Rejected};
 use crate::state::AwakeState;
@@ -89,6 +89,7 @@ impl Awake {
     pub(crate) async fn run_loop(&mut self, ctx: &mut ModuleCtx<Self>) -> anyhow::Result<()> {
         let mut wait = ctx.wait_handle();
         stored::migrate(&ctx.store)?;
+        self.load_tracking(ctx);
         self.restore_if_needed(ctx, wait.now()).await;
         loop {
             let now = wait.now();
@@ -122,6 +123,16 @@ impl Awake {
                     }
                 }
             }
+        }
+    }
+
+    /// Runs on every entry, so a restart repairs itself. A read failure keeps the current
+    /// value: on at the first entry, which leaves the Mac awake rather than asleep mid-run.
+    fn load_tracking(&mut self, ctx: &ModuleCtx<Self>) {
+        match stored::load_tracking(&ctx.store) {
+            Ok(Some(on)) => self.table.set_tracking(on),
+            Ok(None) => {}
+            Err(err) => tracing::warn!(error = %err, "the tracking setting could not be read"),
         }
     }
 
@@ -171,6 +182,14 @@ impl Awake {
             }
             AwakeAction::EndSession { session_id } => self.end_session(ctx, session_id, now),
             AwakeAction::ReleaseAll => self.release_all(ctx),
+            AwakeAction::KeepFor { seconds } => self.keep_for(ctx, now, *seconds),
+            AwakeAction::KeepIndefinitely => Ok(self.keep_indefinitely(ctx, now)),
+            AwakeAction::KeepOff => {
+                let ended = self.table.keep_off();
+                self.emit_ended(ctx, &ended);
+                Ok(None)
+            }
+            AwakeAction::Tracking { on } => self.set_tracking(ctx, *on),
         };
         match started {
             Ok(started) => {
@@ -182,6 +201,52 @@ impl Awake {
             }
             Err(err) => req.respond::<AwakeState>(Err(err)),
         }
+    }
+
+    fn keep_for(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        now: SystemTime,
+        seconds: u64,
+    ) -> Result<Option<Started>, ActionError> {
+        let replaced = self.hold_for(now, seconds)?;
+        if let Some(ended) = replaced {
+            self.emit_ended(ctx, std::slice::from_ref(&ended));
+        }
+        self.display(ctx, false, now);
+        Ok(Some(Started::Duration(seconds)))
+    }
+
+    fn keep_indefinitely(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime) -> Option<Started> {
+        if let Some(ended) = self.table.end_manual() {
+            self.emit_ended(ctx, std::slice::from_ref(&ended));
+        }
+        self.display(ctx, true, now)
+    }
+
+    /// Stores first, so a failure changes nothing, as Release all does.
+    fn set_tracking(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        on: bool,
+    ) -> Result<Option<Started>, ActionError> {
+        if self.table.tracking() == on {
+            return Ok(None);
+        }
+        if let Err(err) = stored::save_tracking(&ctx.store, on) {
+            tracing::warn!(error = %err, "the tracking setting could not be stored");
+            return Err(ActionError::Failed(
+                "the Tracking agents setting could not be saved, so it did not change".to_owned(),
+            ));
+        }
+        self.table.set_tracking(on);
+        ctx.emit(
+            TRACKING_CHANGED,
+            Severity::Info,
+            event::tracking_changed(on).to_owned(),
+            json!({ "on": on }),
+        );
+        Ok(None)
     }
 
     fn hold_until_off(&mut self, now: SystemTime) -> Option<Ended> {
@@ -559,6 +624,9 @@ impl Awake {
     }
 
     fn emit_started(&self, ctx: &ModuleCtx<Self>, started: Started) {
+        if !self.table.tracking() && matches!(started, Started::Session { .. }) {
+            return;
+        }
         let (key, source, kind) = match started {
             Started::Duration(seconds) => (
                 "manual".to_owned(),
@@ -588,7 +656,11 @@ impl Awake {
 
     fn emit_ended(&self, ctx: &ModuleCtx<Self>, ended: &[Ended]) {
         let mut released = false;
-        for end in ended {
+        // A session followed while tracking is off holds nothing, so its end is no news.
+        let visible = ended.iter().filter(|end| {
+            self.table.tracking() || !matches!(end.lease.source, LeaseSource::Session { .. })
+        });
+        for end in visible {
             match end.reason {
                 EndReason::Deadline => ctx.emit(
                     LEASE_ENDED,

@@ -152,8 +152,8 @@ Index:
   1. `"$CLI" --profile dev awake hold --for 1h` then `"$CLI" --profile dev awake status --json`.
   2. `"$CLI" --profile dev awake release-all`.
   3. `"$CLI" --profile dev awake run -- sleep 5` — the command's exit code, even 3; with the Core off the command still runs.
-- **Gotchas:** no flag on `hold` means until turned off. `Display on` has no CLI verb; dispatch `{"display":{"on":true}}`. Session hold is `dispatch`, not a CLI verb.
-- **Persist check:** a command or session lease is still listed after quit and relaunch if the process is still the same; a duration or until-off lease is not.
+- **Gotchas:** no flag on `hold` means until turned off. `Display on` has no CLI verb; dispatch `{"display":{"on":true}}`. Session hold is `dispatch`, not a CLI verb. Tracking agents is `dispatch` too: `{"tracking":{"on":false}}`. While it is off, `status` lists no session, though Navori still follows them.
+- **Persist check:** a command or session lease is still listed after quit and relaunch if the process is still the same; a duration or until-off lease is not. Tracking agents reads the same after relaunch.
 
 ### Integrations
 

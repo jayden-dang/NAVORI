@@ -31,8 +31,18 @@ public enum CascadePlacement {
         size: CGSize,
         visible: CGRect
     ) -> CGRect {
-        frame(
-            parent: ancestorFrames.last ?? levelZero,
+        let parent = ancestorFrames.last ?? levelZero
+        // Once the cascade has turned left it stays left, or this panel would cover its grandparent.
+        if !ancestorFrames.isEmpty {
+            let grandparent = ancestorFrames.dropLast().last ?? levelZero
+            let left = parent.minX - gap - size.width
+            if parent.minX < grandparent.minX, left >= visible.minX {
+                let placed = frame(parent: parent, row: row, size: size, visible: visible)
+                return CGRect(x: left, y: placed.minY, width: placed.width, height: placed.height)
+            }
+        }
+        return frame(
+            parent: parent,
             row: row,
             size: size,
             visible: visible

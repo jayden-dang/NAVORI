@@ -84,6 +84,37 @@ struct CascadePlacementTests {
         #expect(third != againstLevelZero)
     }
 
+    @Test func a_third_panel_keeps_opening_left_once_its_parent_opened_left() {
+        let visible = CGRect(x: 0, y: 0, width: 1512, height: 900)
+        let levelZero = CGRect(x: 1100, y: 600, width: 360, height: 200)
+        let parent = CGRect(x: 736, y: 650, width: 360, height: 120)
+        let row = CGRect(x: 736, y: 742, width: 360, height: 26)
+        let third = CascadePlacement.submenuFrame(
+            levelZero: levelZero,
+            ancestorFrames: [parent],
+            row: row,
+            size: CGSize(width: 180, height: 218),
+            visible: visible
+        )
+        #expect(third == CGRect(x: 552, y: 550, width: 180, height: 218))
+        #expect(third.intersects(levelZero) == false)
+    }
+
+    @Test func a_third_panel_with_no_room_on_the_left_opens_on_the_right() {
+        let visible = CGRect(x: 0, y: 0, width: 1000, height: 900)
+        let levelZero = CGRect(x: 400, y: 600, width: 360, height: 200)
+        let parent = CGRect(x: 36, y: 650, width: 360, height: 120)
+        let row = CGRect(x: 36, y: 742, width: 360, height: 26)
+        let third = CascadePlacement.submenuFrame(
+            levelZero: levelZero,
+            ancestorFrames: [parent],
+            row: row,
+            size: CGSize(width: 180, height: 218),
+            visible: visible
+        )
+        #expect(third.minX == parent.maxX + CascadePlacement.gap)
+    }
+
     @Test func a_level_zero_panel_that_fits_keeps_its_fitting_height() {
         #expect(CascadePlacement.levelZeroHeight(fitting: 180, visibleHeight: 900) == 180)
     }

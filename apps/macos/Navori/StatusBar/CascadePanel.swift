@@ -103,7 +103,8 @@ final class CascadePanel: NSPanel {
         measuring = true
         defer { measuring = false }
         layoutDocument()
-        return CGSize(width: 360, height: max(hosting.fittingSize.height, 1))
+        let fitting = hosting.fittingSize
+        return CGSize(width: max(fitting.width, 1), height: max(fitting.height, 1))
     }
 
     func show(frame: CGRect, onFirstFrame: (@MainActor () -> Void)? = nil) {
@@ -129,8 +130,8 @@ final class CascadePanel: NSPanel {
     private func layoutDocument() {
         hosting.invalidateIntrinsicContentSize()
         hosting.layoutSubtreeIfNeeded()
-        let height = max(hosting.fittingSize.height, 1)
-        hosting.frame = NSRect(x: 0, y: 0, width: 360, height: height)
+        let fitting = hosting.fittingSize
+        hosting.frame = NSRect(x: 0, y: 0, width: max(fitting.width, 1), height: max(fitting.height, 1))
     }
 
     private func armFrameLink() {

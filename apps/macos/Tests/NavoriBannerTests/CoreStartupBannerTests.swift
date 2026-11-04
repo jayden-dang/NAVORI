@@ -23,6 +23,7 @@ import Testing
         status: .off,
         leases: [],
         displayHeld: false,
+        tracking: true,
         actionFailure: shown
     )
     #expect(row.label == "Needs attention")

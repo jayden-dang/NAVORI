@@ -23,6 +23,8 @@ final class StatusBarController: NSObject {
                     return AnyView(CoreSubmenuView(store: self.store))
                 case "awake":
                     return AnyView(AwakeSubmenuView(store: self.store))
+                case "awake.keep":
+                    return AnyView(KeepAwakeSubmenuView(store: self.store))
                 default:
                     return AnyView(EmptyView())
                 }
@@ -258,10 +260,12 @@ final class StatusBarController: NSObject {
 
     private var awakeCommands: [CascadeNode] {
         [
-            CascadeNode(id: "awake.hold_hour", isActionable: true),
-            CascadeNode(id: "awake.hold_until_off", isActionable: true),
-            CascadeNode(id: "awake.display", isActionable: true),
-            CascadeNode(id: "awake.release_all", isActionable: true),
+            CascadeNode(
+                id: "awake.keep",
+                isActionable: true,
+                children: KeepAwakeChoice.all.map { CascadeNode(id: $0.id, isActionable: true) }
+            ),
+            CascadeNode(id: "awake.tracking", isActionable: true),
         ]
     }
 
@@ -270,17 +274,13 @@ final class StatusBarController: NSObject {
         case "settings": showSettings(.general)
         case "about": showSettings(.about)
         case "quit": NSApp.terminate(nil)
-        case "awake.hold_hour":
-            Task { [store] in await store.holdOneHour() }
-        case "awake.hold_until_off":
-            Task { [store] in await store.holdUntilOff() }
-        case "awake.display":
-            let turnOn = store.displayWanted == false
-            Task { [store] in await store.setDisplay(on: turnOn) }
-        case "awake.release_all":
-            guard store.awakeLeases.isEmpty == false else { return }
-            Task { [store] in await store.releaseAll() }
-        default: break
+        case "awake.tracking":
+            let command = AwakeCommand.tracking(store.awakeSubmenu.trackingOn == false)
+            Task { [store] in await store.perform(command) }
+        default:
+            guard let choice = KeepAwakeChoice(id: id) else { return }
+            let command = store.awakeSubmenu.command(picking: choice)
+            Task { [store] in await store.perform(command) }
         }
     }
 

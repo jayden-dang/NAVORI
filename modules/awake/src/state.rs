@@ -7,6 +7,7 @@ pub struct AwakeState {
     pub display_held: bool,
     pub since_ms: Option<i64>,
     pub problem: Option<String>,
+    pub tracking: bool,
 }
 
 impl AwakeState {
@@ -17,6 +18,7 @@ impl AwakeState {
             display_held: false,
             since_ms: None,
             problem: None,
+            tracking: true,
         }
     }
 }

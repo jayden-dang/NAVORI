@@ -162,6 +162,8 @@ pub struct LeaseTable {
     display: Option<SystemTime>,
     commands: Vec<CommandLease>,
     sessions: Vec<SessionLease>,
+    /// While false, `sessions` are followed but keep nothing awake and are not published.
+    tracking: bool,
 }
 
 impl LeaseTable {
@@ -172,7 +174,16 @@ impl LeaseTable {
             display: None,
             commands: Vec::new(),
             sessions: Vec::new(),
+            tracking: true,
         }
+    }
+
+    pub(crate) fn tracking(&self) -> bool {
+        self.tracking
+    }
+
+    pub(crate) fn set_tracking(&mut self, on: bool) {
+        self.tracking = on;
     }
 
     pub fn timing(&self) -> Timing {
@@ -437,6 +448,23 @@ impl LeaseTable {
         })
     }
 
+    pub(crate) fn end_manual(&mut self) -> Option<Ended> {
+        self.manual.take().map(|lease| Ended {
+            lease: to_lease(&lease),
+            reason: EndReason::Replaced,
+        })
+    }
+
+    /// Ends the duration, until-off and display leases, and no other.
+    pub(crate) fn keep_off(&mut self) -> Vec<Ended> {
+        let manual = self.end_manual();
+        let display = self.display.take().map(|_| Ended {
+            lease: display_as_lease(),
+            reason: EndReason::Replaced,
+        });
+        manual.into_iter().chain(display).collect()
+    }
+
     pub(crate) fn release_all(&mut self) -> Vec<Ended> {
         let mut ended: Vec<Ended> = self
             .manual
@@ -516,7 +544,7 @@ impl LeaseTable {
             system: self.manual.is_some()
                 || self.display.is_some()
                 || !self.commands.is_empty()
-                || !self.sessions.is_empty(),
+                || (self.tracking && !self.sessions.is_empty()),
             display: self.display.is_some(),
         }
     }
@@ -544,8 +572,10 @@ impl LeaseTable {
         for lease in &self.commands {
             leases.push(command_state(lease));
         }
-        for lease in &self.sessions {
-            leases.push(session_state(lease));
+        if self.tracking {
+            for lease in &self.sessions {
+                leases.push(session_state(lease));
+            }
         }
         AwakeState {
             leases,
@@ -553,6 +583,7 @@ impl LeaseTable {
             display_held,
             since_ms: self.earliest_start().map(wall_ms),
             problem: None,
+            tracking: self.tracking,
         }
     }
 
@@ -566,7 +597,12 @@ impl LeaseTable {
             .map(|lease| lease.started)
             .filter(|started| *started != UNIX_EPOCH)
             .min();
-        let session = self.sessions.iter().map(|lease| lease.first_hold).min();
+        let session = self
+            .sessions
+            .iter()
+            .filter(|_| self.tracking)
+            .map(|lease| lease.first_hold)
+            .min();
         [manual, display, command, session]
             .into_iter()
             .flatten()
