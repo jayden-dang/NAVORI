@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::net::IpAddr;
 use std::path::PathBuf;
 
+use navori_procs::{Branch, Harness};
 use serde::{Deserialize, Serialize};
 
 /// Which Harness started a process.
@@ -13,12 +14,31 @@ pub enum HarnessName {
     Grok,
 }
 
+impl From<Harness> for HarnessName {
+    fn from(harness: Harness) -> Self {
+        match harness {
+            Harness::ClaudeCode => Self::ClaudeCode,
+            Harness::Codex => Self::Codex,
+            Harness::Grok => Self::Grok,
+        }
+    }
+}
+
 /// The branch checked out where a process runs, or the commit when none is.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BranchName {
     Named(String),
     Detached(String),
+}
+
+impl From<Branch> for BranchName {
+    fn from(branch: Branch) -> Self {
+        match branch {
+            Branch::Named(name) => Self::Named(name),
+            Branch::Detached { abbrev } => Self::Detached(abbrev),
+        }
+    }
 }
 
 /// What kind of thing holds a port.

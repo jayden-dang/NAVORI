@@ -153,9 +153,5 @@ fn harness_for(
         },
     };
     kept.insert(id, found);
-    found.map(|harness| match harness {
-        Harness::ClaudeCode => HarnessName::ClaudeCode,
-        Harness::Codex => HarnessName::Codex,
-        Harness::Grok => HarnessName::Grok,
-    })
+    found.map(HarnessName::from)
 }

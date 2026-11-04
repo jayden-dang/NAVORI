@@ -1,6 +1,6 @@
 use std::path::{Component, Path, PathBuf};
 
-use navori_procs::{Branch, Field, Repo, find_repo};
+use navori_procs::{Field, Repo, find_repo};
 
 use crate::state::{BranchName, Placement};
 
@@ -28,7 +28,7 @@ pub fn place(path: &Path, home: &Path) -> Placement {
         return counted(path, home).map_or_else(Placement::default, |repo| Placement {
             project: Some(repo.location.project),
             worktree: repo.location.worktree,
-            branch: repo.location.branch.map(branch_name),
+            branch: repo.location.branch.map(BranchName::from),
             missing_path: None,
         });
     }
@@ -60,12 +60,5 @@ fn in_counted_area(dir: &Path, home: &Path) -> bool {
     match rest.components().next() {
         Some(Component::Normal(first)) => !first.to_string_lossy().starts_with('.'),
         _ => false,
-    }
-}
-
-fn branch_name(branch: Branch) -> BranchName {
-    match branch {
-        Branch::Named(name) => BranchName::Named(name),
-        Branch::Detached { abbrev } => BranchName::Detached(abbrev),
     }
 }
