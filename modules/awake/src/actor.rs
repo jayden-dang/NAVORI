@@ -177,9 +177,10 @@ impl Awake {
                 self.hold_session(ctx, now, session_id.clone(), *pid, *ppid)
                     .await
             }
-            AwakeAction::StopSession { session_id } => {
-                self.stop_session(ctx, session_id, truncate_us(now))
-            }
+            AwakeAction::StopSession {
+                session_id,
+                background,
+            } => self.stop_session(ctx, session_id, truncate_us(now), *background),
             AwakeAction::EndSession { session_id } => self.end_session(ctx, session_id, now),
             AwakeAction::ReleaseAll => self.release_all(ctx),
             AwakeAction::KeepFor { seconds } => self.keep_for(ctx, now, *seconds),
@@ -190,6 +191,20 @@ impl Awake {
                 Ok(None)
             }
             AwakeAction::Tracking { on } => self.set_tracking(ctx, *on),
+            AwakeAction::SubagentStart {
+                session_id,
+                agent_id,
+                pid,
+                ppid,
+            } => {
+                self.subagent_start(ctx, now, session_id, agent_id, *pid, *ppid)
+                    .await
+            }
+            AwakeAction::SubagentStop {
+                session_id,
+                agent_id,
+                background,
+            } => self.subagent_stop(now, session_id, agent_id, *background),
         };
         match started {
             Ok(started) => {
@@ -403,6 +418,52 @@ impl Awake {
         }))
     }
 
+    async fn subagent_start(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        now: SystemTime,
+        session_id: &str,
+        agent_id: &str,
+        pid: i32,
+        ppid: i32,
+    ) -> Result<Option<Started>, ActionError> {
+        check_subagent_ids(session_id, agent_id)?;
+        let arrived = truncate_us(now);
+        let Some(deadline) = arrived.checked_add(self.table.timing().session_ttl) else {
+            return Err(ActionError::Invalid(
+                "session ttl does not fit on the clock; retry the hold".to_owned(),
+            ));
+        };
+        let deadline = truncate_us(deadline);
+        // A session with a lease needs no process read. One with none gets a Stop mark: its
+        // main turn may be over, so no `Stop` may ever come, and grace must end it.
+        let started = if self.table.session_process(session_id).is_some() {
+            None
+        } else {
+            let started = self
+                .hold_session(ctx, now, session_id.to_owned(), pid, ppid)
+                .await?;
+            self.table.stop_session(session_id, arrived, false);
+            started
+        };
+        self.table.subagent_started(session_id, agent_id, deadline);
+        self.save_session(ctx, now, session_id);
+        Ok(started)
+    }
+
+    fn subagent_stop(
+        &mut self,
+        now: SystemTime,
+        session_id: &str,
+        agent_id: &str,
+        background: bool,
+    ) -> Result<Option<Started>, ActionError> {
+        check_subagent_ids(session_id, agent_id)?;
+        self.table
+            .subagent_stopped(session_id, agent_id, now, background);
+        Ok(None)
+    }
+
     fn end_session(
         &mut self,
         ctx: &ModuleCtx<Self>,
@@ -430,6 +491,7 @@ impl Awake {
         ctx: &ModuleCtx<Self>,
         session_id: &str,
         now: SystemTime,
+        background: bool,
     ) -> Result<Option<Started>, ActionError> {
         if !valid_session_id(session_id) {
             return Err(ActionError::Invalid(
@@ -437,7 +499,7 @@ impl Awake {
                     .to_owned(),
             ));
         }
-        self.table.stop_session(session_id, now);
+        self.table.stop_session(session_id, now, background);
         self.save_session(ctx, now, session_id);
         Ok(None)
     }
@@ -1004,7 +1066,7 @@ impl Awake {
                     label,
                 );
                 if let Some(mark) = row.stop_mark {
-                    self.table.stop_session(&session_id, mark);
+                    self.table.stop_session(&session_id, mark, false);
                 }
                 true
             }
@@ -1105,6 +1167,16 @@ fn process_of(lease: &Lease) -> Option<ProcId> {
         LeaseSource::Command { process } | LeaseSource::Session { process, .. } => Some(process),
         LeaseSource::Duration { .. } | LeaseSource::UntilOff | LeaseSource::Display => None,
     }
+}
+
+fn check_subagent_ids(session_id: &str, agent_id: &str) -> Result<(), ActionError> {
+    if valid_session_id(session_id) && valid_session_id(agent_id) {
+        return Ok(());
+    }
+    Err(ActionError::Invalid(
+        "session_id and agent_id must be 1 to 128 bytes of letters, digits, '.', '_', ':', or '-'"
+            .to_owned(),
+    ))
 }
 
 fn valid_session_id(session_id: &str) -> bool {

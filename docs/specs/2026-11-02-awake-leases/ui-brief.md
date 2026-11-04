@@ -54,7 +54,7 @@ The Harness mark leads each one-line row under its project: which agent, where, 
 
 1. The four commands move above everything else.
 2. No status text unless something is wrong. This removes the Lease count, `since`, and `idle sleep blocked` from the normal state (amends AWAKE-11.5).
-3. `stopped` replaces `stopped · background work`. A session reads as stopped from `Stop` onward, including the 120 seconds before Navori checks for child processes, so "background" would claim work that may not exist.
+3. `stopped` replaces `stopped · background work`. A session reads as stopped from `Stop` onward, including the 120 seconds before Navori checks for child processes, so "background" would claim work that may not exist. Amended 2026-11-04 (AWAKE-16.5): once a reading finds a New descendant, or while a subagent runs, the row reads `working` again, because the work is then known.
 4. Harness marks are monochrome, per amendment 3 of the menubar brief.
 5. A command shows a check while its Lease exists, and `Display on` keeps its name rather than flipping to `Display off`.
 6. The level-0 row shows a green dot or nothing, with no text and no orange dot (user, 2026-11-04, after the first build). A problem is stated in the Submenu and by the tray icon.

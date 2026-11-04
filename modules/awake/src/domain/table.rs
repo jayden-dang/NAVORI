@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use navori_procs::{Harness, ProcId};
@@ -153,7 +154,27 @@ struct SessionLease {
     stop_mark: Option<SystemTime>,
     next_check: Option<SystemTime>,
     label: Option<String>,
+    /// Running subagents, from hooks. Not stored: after a reopen the descendant reading decides.
+    agents: BTreeSet<String>,
+    /// The Harness's latest `Stop` or `SubagentStop` listed work still in flight.
+    background: bool,
+    /// The latest reading since the Stop mark found a New descendant.
+    found_work: bool,
 }
+
+impl SessionLease {
+    /// The Harness says work runs, so no process needs reading.
+    fn has_reported_work(&self) -> bool {
+        self.background || !self.agents.is_empty()
+    }
+
+    fn stopped(&self) -> bool {
+        self.stop_mark.is_some() && !self.has_reported_work() && !self.found_work
+    }
+}
+
+/// A lost `SubagentStop` is bounded by the Cap; this bounds forged starts (THR-6).
+const MAX_AGENTS: usize = 64;
 
 #[derive(Debug, Clone)]
 pub struct LeaseTable {
@@ -267,6 +288,8 @@ impl LeaseTable {
             existing.label = label;
             existing.stop_mark = None;
             existing.next_check = None;
+            existing.background = false;
+            existing.found_work = false;
             return false;
         }
         self.sessions.push(SessionLease {
@@ -278,6 +301,9 @@ impl LeaseTable {
             stop_mark: None,
             next_check: None,
             label,
+            agents: BTreeSet::new(),
+            background: false,
+            found_work: false,
         });
         true
     }
@@ -314,7 +340,8 @@ impl LeaseTable {
         self.commands.iter().map(|lease| lease.process).collect()
     }
 
-    pub(crate) fn stop_session(&mut self, session_id: &str, now: SystemTime) {
+    pub(crate) fn stop_session(&mut self, session_id: &str, now: SystemTime, background: bool) {
+        let grace = self.timing.grace;
         let Some(lease) = self
             .sessions
             .iter_mut()
@@ -322,11 +349,71 @@ impl LeaseTable {
         else {
             return;
         };
-        if lease.stop_mark.is_some() {
+        let had_work = lease.has_reported_work();
+        lease.background = background;
+        if lease.stop_mark.is_none() {
+            lease.stop_mark = Some(now);
+            lease.found_work = false;
+            lease.next_check = if lease.has_reported_work() {
+                None
+            } else {
+                now.checked_add(grace)
+            };
             return;
         }
-        lease.stop_mark = Some(now);
-        lease.next_check = now.checked_add(self.timing.grace);
+        Self::after_report(lease, had_work, now, grace);
+    }
+
+    /// Reported work needs no timer but the Cap's. When the last of it ends, grace runs again.
+    fn after_report(lease: &mut SessionLease, had_work: bool, now: SystemTime, grace: Duration) {
+        if lease.has_reported_work() {
+            lease.next_check = None;
+        } else if had_work && lease.stop_mark.is_some() {
+            lease.found_work = false;
+            lease.next_check = now.checked_add(grace);
+        }
+    }
+
+    /// While a subagent runs no reading is needed, so the session needs no timer but the Cap's.
+    pub(crate) fn subagent_started(
+        &mut self,
+        session_id: &str,
+        agent_id: &str,
+        deadline: SystemTime,
+    ) {
+        let Some(lease) = self
+            .sessions
+            .iter_mut()
+            .find(|lease| lease.session_id == session_id)
+        else {
+            return;
+        };
+        lease.deadline = deadline;
+        if lease.agents.len() < MAX_AGENTS {
+            lease.agents.insert(agent_id.to_owned());
+            lease.next_check = None;
+        }
+    }
+
+    pub(crate) fn subagent_stopped(
+        &mut self,
+        session_id: &str,
+        agent_id: &str,
+        now: SystemTime,
+        background: bool,
+    ) {
+        let grace = self.timing.grace;
+        let Some(lease) = self
+            .sessions
+            .iter_mut()
+            .find(|lease| lease.session_id == session_id)
+        else {
+            return;
+        };
+        let had_work = lease.has_reported_work();
+        lease.agents.remove(agent_id);
+        lease.background = background;
+        Self::after_report(lease, had_work, now, grace);
     }
 
     pub(crate) fn resolve_check(
@@ -352,6 +439,11 @@ impl LeaseTable {
                 reason: EndReason::Cap,
             });
         }
+        if self.sessions[index].has_reported_work() {
+            // The Harness reported work while the reading was on its way.
+            self.sessions[index].next_check = None;
+            return None;
+        }
         match reading {
             Reading::NoNewDescendant => {
                 let lease = self.sessions.remove(index);
@@ -361,6 +453,9 @@ impl LeaseTable {
                 })
             }
             Reading::NewDescendant | Reading::Unknown => {
+                if reading == Reading::NewDescendant {
+                    self.sessions[index].found_work = true;
+                }
                 self.sessions[index].next_check = now.checked_add(recheck);
                 None
             }
@@ -717,7 +812,7 @@ fn session_state(lease: &SessionLease) -> LeaseState {
         harness: Some(harness_name(lease.harness).to_owned()),
         label: lease.label.clone(),
         pid: Some(lease.process.pid),
-        stopped: lease.stop_mark.is_some(),
+        stopped: lease.stopped(),
         ends_at_ms: Some(wall_ms(lease.deadline)),
     }
 }

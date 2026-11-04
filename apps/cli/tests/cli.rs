@@ -560,6 +560,111 @@ fn a_prompt_submit_sends_hold_session_with_its_own_pids() {
 }
 
 #[test]
+fn a_subagent_start_sends_its_ids_and_own_pids() {
+    let server = recording_server();
+
+    let requests = server.hook(
+        r#"{"hook_event_name":"SubagentStart","session_id":"s-1","agent_id":"a-1","agent_type":"secret-type","cwd":"/secret"}"#,
+    );
+
+    assert_eq!(requests.len(), 1);
+    let start = &dispatched_action(&requests[0])["subagent_start"];
+    assert_eq!(start["session_id"], "s-1");
+    assert_eq!(start["agent_id"], "a-1");
+    assert!(start["pid"].as_i64().unwrap() > 0);
+    assert_eq!(
+        start["ppid"].as_i64().unwrap(),
+        i64::from(std::process::id())
+    );
+    assert!(!requests[0].to_string().contains("secret"));
+}
+
+#[test]
+fn a_subagent_stop_sends_only_its_ids() {
+    let server = recording_server();
+
+    let requests = server.hook(
+        r#"{"hook_event_name":"SubagentStop","session_id":"s-1","agent_id":"a-1","last_assistant_message":"secret"}"#,
+    );
+
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"subagent_stop": {"session_id": "s-1", "agent_id": "a-1"}})
+    );
+}
+
+#[test]
+fn a_stop_with_background_tasks_says_so_and_sends_none_of_them() {
+    let server = recording_server();
+
+    let requests = server.hook(
+        r#"{"hook_event_name":"Stop","session_id":"s-1","background_tasks":[{"id":"a1","type":"subagent","status":"running","description":"secret"}]}"#,
+    );
+
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"stop_session": {"session_id": "s-1", "background": true}})
+    );
+    assert!(!requests[0].to_string().contains("secret"));
+}
+
+#[test]
+fn a_stop_with_an_empty_background_list_reads_as_none() {
+    let server = recording_server();
+
+    let requests =
+        server.hook(r#"{"hook_event_name":"Stop","session_id":"s-1","background_tasks":[]}"#);
+
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"stop_session": {"session_id": "s-1"}})
+    );
+}
+
+#[test]
+fn a_background_list_of_another_shape_does_not_lose_the_event() {
+    let server = recording_server();
+
+    let requests =
+        server.hook(r#"{"hook_event_name":"Stop","session_id":"s-1","background_tasks":"odd"}"#);
+
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"stop_session": {"session_id": "s-1"}})
+    );
+}
+
+#[test]
+fn a_subagent_stop_with_background_tasks_says_so() {
+    let server = recording_server();
+
+    let requests = server.hook(
+        r#"{"hook_event_name":"SubagentStop","session_id":"s-1","agent_id":"a-1","background_tasks":[{"id":"a-1"}]}"#,
+    );
+
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"subagent_stop": {"session_id": "s-1", "agent_id": "a-1", "background": true}})
+    );
+}
+
+#[test]
+fn a_subagent_event_with_no_agent_id_sends_nothing() {
+    let server = recording_server();
+    assert!(
+        server
+            .hook(r#"{"hook_event_name":"SubagentStart","session_id":"s-1"}"#)
+            .is_empty()
+    );
+    assert!(
+        server
+            .hook(r#"{"hook_event_name":"SubagentStop","session_id":"s-1"}"#)
+            .is_empty()
+    );
+}
+
+#[test]
 fn a_stop_without_a_reason_sends_stop_session() {
     let server = recording_server();
 

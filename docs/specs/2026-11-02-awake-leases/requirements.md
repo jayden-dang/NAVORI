@@ -187,7 +187,7 @@ It changes three things in MENU's spec: MENU-1.2 gains the Awake row before the 
 - **AWAKE-11.12** IF the System assertion or the Display assertion is refused, a menu action fails, or Awake records a problem THEN THE SYSTEM SHALL state that problem between the commands and the Holding rows.
 - **AWAKE-11.13** THE SYSTEM SHALL group Holding rows in this order: `Held by you`, `Commands`, then one group per session project in case-insensitive name order, where the project is the Lease label before its first `/`.
 - **AWAKE-11.14** THE SYSTEM SHALL lead a session's Holding row with the monochrome mark of its Harness, for Claude Code, Codex and Grok, and with a terminal symbol for any other Harness.
-- **AWAKE-11.15** THE SYSTEM SHALL show a working session with a green dot and the word `working`, and a stopped session dimmed with the word `stopped`.
+- **AWAKE-11.15** THE SYSTEM SHALL show a working session with a green dot and the word `working`, and a stopped session dimmed with the word `stopped`. *(Amended 2026-11-04: AWAKE-16.5 says which sessions read as working.)*
 - ~~**AWAKE-11.16**~~ superseded by AWAKE-14.4 and AWAKE-14.5.
 - **AWAKE-11.17** WHEN one source holds more than one Lease THE SYSTEM SHALL have VoiceOver name it once on the Awake row with its count, as `Claude Code ×8`. *(Amended 2026-11-04: the row shows a dot and no text.)*
 - **AWAKE-11.18** IF a menu action fails or Awake records a problem other than a refused System assertion or a stopped Module THEN THE SYSTEM SHALL have VoiceOver read `Needs attention` on the Awake row. *(Amended 2026-11-04: the row shows a dot and no text.)*
@@ -284,6 +284,24 @@ Files this story and story 15 touch: `modules/awake/src/` (guards below), `crate
 - **AWAKE-15.15** (guard) WHILE Tracking agents is on THE SYSTEM SHALL CONTINUE TO hold for sessions as in stories 4 and 5, including a new Lease on the next `UserPromptSubmit` after Release all (HOOKS-1.10).
 - **AWAKE-15.16** (guard) WHEN Release all runs while Tracking agents is off THE SYSTEM SHALL CONTINUE TO end every Lease, including followed Session Leases, and leave Tracking agents off.
 
+## 16. Keep a session with running work held and labelled working
+
+**Story:** As the user, I want a session whose main turn ended but whose subagents or background work still run to read `working` and keep the Mac awake, so that the menu tells the truth about what is running.
+
+Files this story touches: `modules/awake/src/` (guards below), `apps/cli/src/hook.rs` and `modules/integrations/src/domain/hookfile.rs` (HOOKS-1.11 to HOOKS-1.13, HOOKS-4.17), docs (no behavior to guard). The Shell does not change: it reads `stopped`.
+
+- **AWAKE-16.1** WHEN the subagent-start Action arrives for a session THE SYSTEM SHALL record that subagent as running and move the session's deadline to a new Session TTL from now.
+- **AWAKE-16.2** WHEN the subagent-start Action arrives for a `session_id` with no Lease THE SYSTEM SHALL make a Session Lease with its Stop mark set, resolving the Harness as AWAKE-4.1 does, so that grace can end it if no `Stop` ever comes.
+- **AWAKE-16.3** WHILE a session with a Stop mark has a running subagent, or its latest session-stop or subagent-stop Action said background work is in flight, THE SYSTEM SHALL keep its Lease and read no process for it.
+- **AWAKE-16.4** WHEN that stops being true for a session with a Stop mark THE SYSTEM SHALL start a new grace period from that moment, after which AWAKE-5.4 to AWAKE-5.6 apply.
+- **AWAKE-16.5** THE SYSTEM SHALL report a session as stopped only while it has a Stop mark, AWAKE-16.3 does not hold, and the latest reading since that Stop mark found no New descendant. An unreadable process list is not a New descendant for this purpose.
+- **AWAKE-16.6** THE SYSTEM SHALL count a `caffeinate` child like any other New descendant, because Claude Code was seen to run one only while busy (2026-11-04: idle sessions had none).
+- **AWAKE-16.7** THE SYSTEM SHALL keep at most 64 running subagents per session, ignoring further starts, and SHALL NOT store them or the in-flight report, so that after an app reopen the reading decides (THR-6). A session held only by work with no child process therefore ends at grace after a reopen.
+- **AWAKE-16.8** IF `agent_id` is not 1 to 128 bytes of `[A-Za-z0-9._:-]` THEN THE SYSTEM SHALL answer `Invalid` and change nothing.
+- **AWAKE-16.9** (guard) WHEN a Session Lease has a Stop mark THE SYSTEM SHALL CONTINUE TO end it at the Cap, whatever work was reported, so that a lost `SubagentStop` or a report that never clears cannot hold the Mac past the Cap.
+- **AWAKE-16.10** (guard) WHEN a session has no reported work and no New descendant at the end of grace THE SYSTEM SHALL CONTINUE TO end its Lease.
+- **AWAKE-16.11** (guard) WHEN a session-stop Action has no `background` field, as from any Harness that sends no background list, THE SYSTEM SHALL CONTINUE TO treat it as AWAKE-5.1 and AWAKE-5.2 do.
+
 ## Out of Scope
 
 - Installing hooks and `navori hook` — ROAD-9.
@@ -304,7 +322,7 @@ Recorded so that nobody reads these as requirements.
 - Release all does not kill the command.
 - Grok's `Stop` and `StopCancelled` stay in the hook command.
 - The right-aligned time text on the menu.
-- Heavy work only in a process born before the First hold, spawning no child, is missed by the busy rule.
+- Heavy work only in a process born before the First hold, spawning no child, is missed by the busy rule. A subagent is no longer missed this way (story 16), for a Harness whose subagent hooks are installed.
 - A turn over 8 hours raises only the Session TTL.
 - After ROAD-9, the next prompt makes a new Lease; Release all does not block it.
 - Release all in the status block or among the quick commands.
@@ -321,7 +339,7 @@ These are not known facts. No requirement here assumes them unless it says how i
 - Recovery time after an app reopen.
 - A Lease sleeping through its deadline.
 - Timers during dark wake.
-- A real `Stop` trace through this flow, and `caffeinate` at `Stop`.
+- A real `Stop` trace through this flow, and `caffeinate` at `Stop`. *(Seen 2026-11-04 on Claude Code 2.1.318: a busy session runs `caffeinate -i -t 300`, restarted about every 4 minutes; idle sessions had none; AWAKE-16.6. What it does right after `Stop` is still unmeasured.)*
 - Background work after `Stop`.
 - `watch` across an app reopen, and `kill -9` on the CLI.
 - Whether the real session ids of Claude Code, Codex and Grok fit `[A-Za-z0-9._:-]`, 1 to 128 bytes.

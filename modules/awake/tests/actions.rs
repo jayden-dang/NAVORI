@@ -45,6 +45,10 @@ fn sample(name: &str) -> Value {
         "keep_indefinitely" => json!("keep_indefinitely"),
         "keep_off" => json!("keep_off"),
         "tracking" => json!({ "tracking": { "on": true } }),
+        "subagent_start" => {
+            json!({ "subagent_start": { "session_id": "s", "agent_id": "a", "pid": 1, "ppid": 1 } })
+        }
+        "subagent_stop" => json!({ "subagent_stop": { "session_id": "s", "agent_id": "a" } }),
         other => panic!("no sample payload for catalog name {other}"),
     }
 }
@@ -314,6 +318,8 @@ async fn every_action_has_a_description_a_schema_and_a_risk() {
             "keep_indefinitely",
             "keep_off",
             "tracking",
+            "subagent_start",
+            "subagent_stop",
         ]
     );
     for spec in &specs {

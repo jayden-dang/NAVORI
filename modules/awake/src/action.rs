@@ -20,8 +20,12 @@ pub enum AwakeAction {
         pid: i32,
         ppid: i32,
     },
-    /// Mark the harness session `session_id` as stopped.
-    StopSession { session_id: String },
+    /// Mark the harness session `session_id` as stopped. `background` says work is still in flight.
+    StopSession {
+        session_id: String,
+        #[serde(default)]
+        background: bool,
+    },
     /// End the session lease for `session_id`.
     EndSession { session_id: String },
     /// End every lease Navori is holding.
@@ -34,6 +38,20 @@ pub enum AwakeAction {
     KeepOff,
     /// Turn Tracking agents on or off.
     Tracking { on: bool },
+    /// A subagent of the harness session `session_id` started.
+    SubagentStart {
+        session_id: String,
+        agent_id: String,
+        pid: i32,
+        ppid: i32,
+    },
+    /// A subagent of the harness session `session_id` stopped.
+    SubagentStop {
+        session_id: String,
+        agent_id: String,
+        #[serde(default)]
+        background: bool,
+    },
 }
 
 impl ModuleAction for AwakeAction {
@@ -51,7 +69,9 @@ impl ModuleAction for AwakeAction {
             | Self::KeepFor { .. }
             | Self::KeepIndefinitely
             | Self::KeepOff
-            | Self::Tracking { .. } => Risk::Write,
+            | Self::Tracking { .. }
+            | Self::SubagentStart { .. }
+            | Self::SubagentStop { .. } => Risk::Write,
         }
     }
 
@@ -89,7 +109,7 @@ impl ModuleAction for AwakeAction {
             },
             ActionDoc {
                 name: "stop_session",
-                description: "Mark a harness session as stopped. The lease stays through grace while a new descendant is running, and it ends at the cap.",
+                description: "Mark a harness session as stopped. The lease stays while `background` says work is in flight, or through grace while a new descendant is running, and it ends at the cap.",
                 risk: Risk::Write,
             },
             ActionDoc {
@@ -120,6 +140,16 @@ impl ModuleAction for AwakeAction {
             ActionDoc {
                 name: "tracking",
                 description: "Turn Tracking agents on or off, and store the setting. While it is off, sessions are still followed but keep nothing awake, and they are left out of the published leases. Turning it on counts them again at once.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "subagent_start",
+                description: "Record a running subagent of one harness session, making a session lease if it has none. The lease stays while a subagent runs, up to the cap.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "subagent_stop",
+                description: "Record that a subagent of one harness session stopped. After the last one, a stopped session with nothing in flight gets a new grace period.",
                 risk: Risk::Write,
             },
         ]

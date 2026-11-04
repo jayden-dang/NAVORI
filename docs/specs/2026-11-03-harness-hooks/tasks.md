@@ -474,3 +474,27 @@ _Requirements: HOOKS-1.1, HOOKS-2.2, HOOKS-10.7_
 - [x] **Step 5: Commit** `git commit -m "feat(integrations): install StopFailure for Claude Code"`
 
 _Requirements: HOOKS-4.16_
+
+### Task 18: Send and install Claude Code's subagent events
+
+Amendment from AWAKE story 16.
+
+**Files:**
+- Modify: `apps/cli/src/hook.rs`, `modules/integrations/src/domain/hookfile.rs`, `docs/features/integrations.md`
+- Test: `apps/cli/tests/cli.rs`, `modules/integrations/tests/install.rs`, `modules/integrations/tests/common/mod.rs`, `modules/integrations/tests/fixtures/claude_installed.json`, `modules/integrations/tests/fixtures/claude_both_profiles.json`
+
+**Reuse:** rung 2 — `plan`, `required_events`.
+
+**Interfaces:**
+- Consumes: Awake Actions `subagent_start`, `subagent_stop`
+- Produces: Claude Code's required set gains `SubagentStart` and `SubagentStop`.
+
+**Depends-on:** AWAKE Task 23
+
+- [x] **Step 1: Write failing tests** for the two payloads, a missing agent id, and six Claude entries.
+- [x] **Step 2: Implement** the mapping and the event list.
+- [x] **Step 3: Verify** `cargo xtask ci` — expect: pass.
+- [ ] **Step 4: Repair** the installed Claude hooks after `cargo xtask install`.
+- [x] **Step 5: Commit** with AWAKE Task 23.
+
+_Requirements: HOOKS-1.11, HOOKS-1.12, HOOKS-1.13, HOOKS-1.14, HOOKS-4.17_

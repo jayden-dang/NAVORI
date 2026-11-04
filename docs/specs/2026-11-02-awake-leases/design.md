@@ -44,6 +44,8 @@ Added 2026-11-04 by stories 14 and 15, each chosen by the user:
 18. **Tracking off touches only Session Leases.** Manual and Command Leases stay, so turning it off does not end a night of music.
 19. **The setting is one `kv` row, `awake/tracking`, written before the table changes.** A failed write answers `Failed` and changes nothing, as Decision 10 does. Nothing stored, or a value that is not a bool, reads as on. A failed read keeps the current value, which is on at first entry, leaving the Mac awake rather than asleep mid-run.
 20. **While off, a session's lease Events are not emitted.** "Keeping this Mac awake: Claude Code" would be false. One `awake.tracking_changed` Event marks each change.
+21. **Reported work is state on the Lease, not a hold.** A subagent start does not clear the Stop mark, because a subagent can outlive the main turn and then no later `Stop` would ever come, leaving the Lease to the 8-hour TTL. Rejected: treating `SubagentStart` as another `hold_session`, for that reason; and `PreToolUse`, which would start a process on every tool call. A real run on Claude Code 2.1.318 showed `SubagentStop` fires per subagent turn, while the same payload's `background_tasks` still lists that subagent as running, so the set alone would release too early. `stop_session` and `subagent_stop` therefore carry a `background` flag from that list, and the latest one wins. While either says work runs, the Lease has no `next_check`, so it costs no timer and no process read. The Cap stays as the bound for a report that never clears.
+22. **The `working` label needs evidence after grace.** `stopped` stays true through grace and turns false only on a `Reading::NewDescendant`. `Reading::Unknown` keeps the Lease but keeps the label, because nothing was found. So a session can read `working`, `stopped` for up to 120 seconds, then `working` again.
 
 No ADR: none of these is hard to reverse, and `docs/architecture/data.md:33` already leaves the row to this design.
 
@@ -130,7 +132,7 @@ Locality: `modules/awake/src/infra/platform.rs`, new. leave: `crates/procs`, `cr
 
 ### Actor
 
-Satisfies: AWAKE-1.4, AWAKE-1.6, AWAKE-2.7, AWAKE-4.10, AWAKE-5.10, AWAKE-5.13, AWAKE-9.1, AWAKE-9.2, AWAKE-9.3, AWAKE-9.4, AWAKE-9.5, AWAKE-13.2, AWAKE-13.3, AWAKE-13.4, AWAKE-13.5, AWAKE-13.7, AWAKE-13.8, AWAKE-13.9, AWAKE-13.11, AWAKE-14.2, AWAKE-14.3, AWAKE-14.6, AWAKE-14.9, AWAKE-14.10, AWAKE-15.3, AWAKE-15.4, AWAKE-15.5, AWAKE-15.6, AWAKE-15.7, AWAKE-15.8, AWAKE-15.9, AWAKE-15.10, AWAKE-15.11, AWAKE-15.14, AWAKE-15.15, AWAKE-15.16
+Satisfies: AWAKE-1.4, AWAKE-1.6, AWAKE-2.7, AWAKE-4.10, AWAKE-5.10, AWAKE-5.13, AWAKE-9.1, AWAKE-9.2, AWAKE-9.3, AWAKE-9.4, AWAKE-9.5, AWAKE-13.2, AWAKE-13.3, AWAKE-13.4, AWAKE-13.5, AWAKE-13.7, AWAKE-13.8, AWAKE-13.9, AWAKE-13.11, AWAKE-14.2, AWAKE-14.3, AWAKE-14.6, AWAKE-14.9, AWAKE-14.10, AWAKE-15.3, AWAKE-15.4, AWAKE-15.5, AWAKE-15.6, AWAKE-15.7, AWAKE-15.8, AWAKE-15.9, AWAKE-15.10, AWAKE-15.11, AWAKE-15.14, AWAKE-15.15, AWAKE-15.16, AWAKE-16.1, AWAKE-16.2, AWAKE-16.3, AWAKE-16.4, AWAKE-16.5, AWAKE-16.6, AWAKE-16.7, AWAKE-16.8, AWAKE-16.9, AWAKE-16.10, AWAKE-16.11
 Reuse: rung 2 — `Module` and the `select!` shape of `System` (`crates/kernel/src/system.rs:107-138`), `WaitHandle`, `ctx.emit`.
 Respects: ARCH-3, ARCH-4, ARCH-5, ARCH-10, ARCH-16
 Security: THR-6
@@ -147,13 +149,15 @@ pub enum AwakeAction {
     Display { on: bool },
     HoldCommand { pid: i32 },
     HoldSession { session_id: String, pid: i32, ppid: i32 },
-    StopSession { session_id: String },
+    StopSession { session_id: String, background: bool },   // `background` defaults to false
     EndSession { session_id: String },
     ReleaseAll,
     KeepFor { seconds: u64 },                       // the menu's choices, Decision 16
     KeepIndefinitely,
     KeepOff,
     Tracking { on: bool },
+    SubagentStart { session_id: String, agent_id: String, pid: i32, ppid: i32 },
+    SubagentStop { session_id: String, agent_id: String, background: bool },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
@@ -323,7 +327,7 @@ New seams: one, the `Platform` test constructor.
 | Fakes' own tests in `crates/macos` | unit | AWAKE-12.12 |
 | `cargo xtask perf` | gate | AWAKE-13.1 |
 | Diff review | manual | AWAKE-2.6, 2.7, 10.5, 13.11 |
-| `modules/awake/tests/keep.rs`, `tracking.rs`, through the same Kernel seam | integration | AWAKE-14.2, 14.3, 14.6, 14.9, 14.10, 15.3–15.11, 15.14–15.16 |
+| `modules/awake/tests/keep.rs`, `tracking.rs`, `subagent.rs`, through the same Kernel seam | integration | AWAKE-14.2, 14.3, 14.6, 14.9, 14.10, 15.3–15.11, 15.14–15.16, 16.1–16.11 |
 | `AwakeRowState`, `AwakeSubmenuState`, `KeepAwakeChoice`, `CascadeState` in `NavoriPanelTests` | unit | AWAKE-14.1, 14.4, 14.5, 14.11, 15.2, 11.2, 11.3, 11.4, 11.7, 11.8, 11.9, 11.11, 11.12, 11.13, 11.14, 11.15, 11.17, 11.18 |
 | Hand walk with VoiceOver, per `docs/agents/verify.md` | manual | AWAKE-14.7, 14.8, 15.1, 11.1, 11.6, 11.10, 11.21, 12.7–12.9, 13.10 |
 

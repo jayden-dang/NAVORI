@@ -76,12 +76,28 @@ struct Payload {
     hook_event_name: Option<String>,
     session_id: Option<String>,
     reason: Option<String>,
+    agent_id: Option<String>,
+    background_tasks: Option<Value>,
+}
+
+/// Only whether work is in flight leaves the command, never what the work is.
+fn with_background(mut fields: Value, background: bool, action: &str) -> Value {
+    if background {
+        fields["background"] = json!(true);
+    }
+    json!({ action: fields })
 }
 
 pub fn plan(stdin: &[u8], own_pid: u32, parent_pid: u32) -> Option<Plan> {
     let payload: Payload = serde_json::from_slice(stdin).ok()?;
     let session_id = payload.session_id?;
     let event = payload.hook_event_name?;
+    // A list of any other shape must not lose the event itself.
+    let background = payload
+        .background_tasks
+        .as_ref()
+        .and_then(Value::as_array)
+        .is_some_and(|tasks| !tasks.is_empty());
     let action = match event.as_str() {
         "UserPromptSubmit" => {
             let pid = i32::try_from(own_pid).ok()?;
@@ -92,7 +108,27 @@ pub fn plan(stdin: &[u8], own_pid: u32, parent_pid: u32) -> Option<Plan> {
         name @ ("Stop" | "StopCancelled" | "StopFailure")
             if name != "Stop" || matches!(payload.reason.as_deref(), None | Some("end_turn")) =>
         {
-            json!({ "stop_session": { "session_id": session_id } })
+            with_background(
+                json!({ "session_id": session_id }),
+                background,
+                "stop_session",
+            )
+        }
+        "SubagentStart" => {
+            let pid = i32::try_from(own_pid).ok()?;
+            let ppid = i32::try_from(parent_pid).ok()?;
+            let agent_id = payload.agent_id?;
+            json!({ "subagent_start": {
+                "session_id": session_id, "agent_id": agent_id, "pid": pid, "ppid": ppid
+            } })
+        }
+        "SubagentStop" => {
+            let agent_id = payload.agent_id?;
+            with_background(
+                json!({ "session_id": session_id, "agent_id": agent_id }),
+                background,
+                "subagent_stop",
+            )
         }
         "SessionEnd" => {
             return Some(Plan {
