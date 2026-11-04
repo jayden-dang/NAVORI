@@ -11,9 +11,12 @@ use futures::future::BoxFuture;
 use navori_kernel::{DispatchError, Envelope, Kernel, WallClock};
 use navori_macos::fake::{FakeProcesses, FakeSignals};
 use navori_macos::{Listener, Marker, PlatformError, ProcEntry, ProcessSource, ReadError, Signals};
-use navori_mod_ports::{Container, Containers, DockerError, Ports, PortsEnv};
+use navori_mod_ports::{Container, Containers, DockerError, Ports, PortsEnv, Stopped};
 use navori_store::Store;
 use serde_json::Value;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::UnixListener;
+use tokio::task::JoinHandle;
 
 pub const ORIGIN_MS: u64 = 1_700_000_000_000;
 
@@ -165,10 +168,60 @@ impl ProcessSource for Gate {
     }
 }
 
+/// A Unix-socket server that records the request head, then lets `reply` answer.
+pub struct Served {
+    pub _dir: tempfile::TempDir,
+    pub path: PathBuf,
+    pub request: JoinHandle<String>,
+}
+
+pub fn serve(
+    reply: impl FnOnce(tokio::net::UnixStream) -> JoinHandle<()> + Send + 'static,
+) -> Served {
+    let guard = tempfile::Builder::new()
+        .prefix("nv")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let path = std::fs::canonicalize(guard.path()).unwrap().join("d.sock");
+    let listener = UnixListener::bind(&path).unwrap();
+    let request = tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut head = Vec::new();
+        let mut byte = [0u8; 1];
+        while !head.ends_with(b"\r\n\r\n") {
+            if stream.read(&mut byte).await.unwrap() == 0 {
+                break;
+            }
+            head.push(byte[0]);
+        }
+        let _ = reply(stream).await;
+        String::from_utf8(head).unwrap()
+    });
+    Served {
+        _dir: guard,
+        path,
+        request,
+    }
+}
+
+pub fn say(
+    bytes: Vec<u8>,
+) -> impl FnOnce(tokio::net::UnixStream) -> JoinHandle<()> + Send + 'static {
+    move |mut stream| {
+        tokio::spawn(async move {
+            let _ = stream.write_all(&bytes).await;
+            let _ = stream.shutdown().await;
+        })
+    }
+}
+
 /// A Docker engine that answers from a script and counts the reads.
 pub struct FakeContainers {
     reply: Mutex<Result<Vec<Container>, DockerError>>,
     calls: AtomicUsize,
+    stop_reply: Mutex<Result<Stopped, DockerError>>,
+    stop_delay: Mutex<Duration>,
+    stopped: Mutex<Vec<String>>,
 }
 
 impl FakeContainers {
@@ -176,7 +229,31 @@ impl FakeContainers {
         Self {
             reply: Mutex::new(Ok(Vec::new())),
             calls: AtomicUsize::new(0),
+            stop_reply: Mutex::new(Ok(Stopped::Stopped)),
+            stop_delay: Mutex::new(Duration::ZERO),
+            stopped: Mutex::new(Vec::new()),
         }
+    }
+
+    pub fn reply_stop(&self, reply: Result<Stopped, DockerError>) {
+        *self
+            .stop_reply
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = reply;
+    }
+
+    pub fn delay_stop(&self, delay: Duration) {
+        *self
+            .stop_delay
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = delay;
+    }
+
+    pub fn stops(&self) -> Vec<String> {
+        self.stopped
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 
     pub fn reply(&self, reply: Result<Vec<Container>, DockerError>) {
@@ -197,6 +274,27 @@ impl Containers for FakeContainers {
             .unwrap_or_else(PoisonError::into_inner)
             .clone();
         Box::pin(async move { reply })
+    }
+
+    fn stop(&self, id: &str) -> BoxFuture<'_, Result<Stopped, DockerError>> {
+        self.stopped
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(id.to_owned());
+        let reply = *self
+            .stop_reply
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let delay = *self
+            .stop_delay
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        Box::pin(async move {
+            if !delay.is_zero() {
+                tokio::time::sleep(delay).await;
+            }
+            reply
+        })
     }
 }
 

@@ -9,6 +9,7 @@ use tokio::net::UnixStream;
 
 const REQUEST: &[u8] =
     b"GET /containers/json HTTP/1.1\r\nHost: docker\r\nConnection: close\r\n\r\n";
+const STOP_STATUSES: &[u16] = &[204, 304, 404];
 const LIMIT: Duration = Duration::from_secs(2);
 const MAX_HEAD: usize = 16 * 1024;
 const MAX_BODY: usize = 1024 * 1024;
@@ -33,6 +34,13 @@ pub enum DockerError {
     BadReply,
 }
 
+/// How a container stop ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Stopped {
+    Stopped,
+    AlreadyGone,
+}
+
 /// A running container, reduced to what placing its ports needs.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Container {
@@ -51,9 +59,10 @@ impl std::fmt::Debug for Container {
     }
 }
 
-/// Lists the running containers.
+/// Lists the running containers and stops one.
 pub trait Containers: Send + Sync {
     fn running(&self) -> BoxFuture<'_, Result<Vec<Container>, DockerError>>;
+    fn stop(&self, id: &str) -> BoxFuture<'_, Result<Stopped, DockerError>>;
 }
 
 /// The Docker Engine's Unix socket.
@@ -71,9 +80,30 @@ impl DockerSocket {
 impl Containers for DockerSocket {
     fn running(&self) -> BoxFuture<'_, Result<Vec<Container>, DockerError>> {
         Box::pin(async move {
-            tokio::time::timeout(LIMIT, exchange(&self.path))
+            tokio::time::timeout(LIMIT, list(&self.path))
                 .await
                 .unwrap_or(Err(DockerError::Timeout))
+        })
+    }
+
+    fn stop(&self, id: &str) -> BoxFuture<'_, Result<Stopped, DockerError>> {
+        if id.is_empty()
+            || !id
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
+        {
+            return Box::pin(async { Err(DockerError::BadReply) });
+        }
+        let request = format!(
+            "POST /containers/{id}/stop HTTP/1.1\r\nHost: docker\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        );
+        Box::pin(async move {
+            let reply = exchange(&self.path, request.as_bytes(), STOP_STATUSES).await?;
+            Ok(if reply.status == 204 {
+                Stopped::Stopped
+            } else {
+                Stopped::AlreadyGone
+            })
         })
     }
 }
@@ -94,11 +124,31 @@ enum Framing {
 }
 
 struct Head {
+    status: u16,
     end: usize,
     framing: Framing,
 }
 
-async fn exchange(path: &Path) -> Result<Vec<Container>, DockerError> {
+struct Reply {
+    status: u16,
+    raw: Wiped,
+    body: Body,
+}
+
+impl Reply {
+    fn bytes(&self) -> &[u8] {
+        match &self.body {
+            Body::Raw(range) => self.raw.0.get(range.clone()).unwrap_or_default(),
+            Body::Owned(body) => &body.0,
+        }
+    }
+}
+
+async fn list(path: &Path) -> Result<Vec<Container>, DockerError> {
+    containers(exchange(path, REQUEST, &[200]).await?.bytes())
+}
+
+async fn exchange(path: &Path, request: &[u8], accepted: &[u16]) -> Result<Reply, DockerError> {
     let mut stream = UnixStream::connect(path).await.map_err(|err| {
         if err.kind() == std::io::ErrorKind::NotFound {
             DockerError::Absent
@@ -107,7 +157,7 @@ async fn exchange(path: &Path) -> Result<Vec<Container>, DockerError> {
         }
     })?;
     stream
-        .write_all(REQUEST)
+        .write_all(request)
         .await
         .map_err(|_| DockerError::Refused)?;
     let mut raw = Wiped(Vec::with_capacity(RAW_CAP));
@@ -120,15 +170,16 @@ async fn exchange(path: &Path) -> Result<Vec<Container>, DockerError> {
             .map_err(|_| DockerError::BadReply)?;
         let ended = read == 0;
         if head.is_none() {
-            head = parse_head(&raw.0)?;
+            head = parse_head(&raw.0, accepted)?;
         }
         if let Some(head) = &head
             && let Some(body) = body(&raw.0, head, &mut cursor, ended)?
         {
-            return match body {
-                Body::Raw(range) => containers(raw.0.get(range).unwrap_or_default()),
-                Body::Owned(body) => containers(&body.0),
-            };
+            return Ok(Reply {
+                status: head.status,
+                raw,
+                body,
+            });
         }
         if ended {
             return Err(DockerError::BadReply);
@@ -139,7 +190,7 @@ async fn exchange(path: &Path) -> Result<Vec<Container>, DockerError> {
     }
 }
 
-fn parse_head(raw: &[u8]) -> Result<Option<Head>, DockerError> {
+fn parse_head(raw: &[u8], accepted: &[u16]) -> Result<Option<Head>, DockerError> {
     let Some(at) = find(raw, b"\r\n\r\n") else {
         return if raw.len() > MAX_HEAD {
             Err(DockerError::BadReply)
@@ -155,7 +206,7 @@ fn parse_head(raw: &[u8]) -> Result<Option<Head>, DockerError> {
         .map_err(|_| DockerError::BadReply)?;
     let mut lines = text.split("\r\n");
     let status = lines.next().and_then(status).ok_or(DockerError::BadReply)?;
-    if status != 200 {
+    if !accepted.contains(&status) {
         return Err(DockerError::BadStatus(status));
     }
     let mut framing = Framing::ToEnd;
@@ -178,7 +229,11 @@ fn parse_head(raw: &[u8]) -> Result<Option<Head>, DockerError> {
     if chunked {
         framing = Framing::Chunked;
     }
-    Ok(Some(Head { end, framing }))
+    Ok(Some(Head {
+        status,
+        end,
+        framing,
+    }))
 }
 
 fn length(value: &str) -> Result<usize, DockerError> {
@@ -216,6 +271,9 @@ fn body(
     ended: bool,
 ) -> Result<Option<Body>, DockerError> {
     let rest = raw.get(head.end..).unwrap_or_default();
+    if matches!(head.status, 204 | 304) {
+        return Ok(Some(Body::Raw(head.end..head.end)));
+    }
     match head.framing {
         Framing::Length(length) if length > MAX_BODY => Err(DockerError::TooLarge),
         Framing::Length(length) if rest.len() >= length => {

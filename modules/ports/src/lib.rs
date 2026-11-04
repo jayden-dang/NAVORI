@@ -20,7 +20,7 @@ use navori_macos::{MacProcesses, MacSignals, PlatformError, ProcessSource, Signa
 pub use action::{KillReply, Outcome, PortsAction, Selector, Target, TargetResult};
 pub use docker::attribute;
 pub use image::database_image;
-pub use infra::docker::{Container, Containers, DockerError, DockerSocket};
+pub use infra::docker::{Container, Containers, DockerError, DockerSocket, Stopped};
 pub use kind::{is_docker_backend, kind};
 pub use place::{place, place_listener};
 pub use scan::{BackendPort, HarnessMemo, Scan, Scanner};

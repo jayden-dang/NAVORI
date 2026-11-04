@@ -8,11 +8,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use common::canonical_temp_home;
+use common::{Served, canonical_temp_home, say, serve};
 use navori_mod_ports::{Container, Containers, DockerError, DockerSocket};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use tokio::net::UnixListener;
-use tokio::task::JoinHandle;
 
 const REQUEST: &str = "GET /containers/json HTTP/1.1\r\nHost: docker\r\nConnection: close\r\n\r\n";
 const BODY: &str = r#"[{"Id":"abc123","Names":["/db"],"Image":"postgres","Command":"secret-command","Ports":[{"IP":"127.0.0.1","PrivatePort":5432,"PublicPort":5432,"Type":"tcp"},{"PrivatePort":9000,"Type":"tcp"}],"Labels":{"com.docker.compose.project.working_dir":"/work/app","other":"secret-label"},"Mounts":[{"Source":"/secret/mount"}]}]"#;
@@ -25,48 +24,6 @@ fn expected() -> Vec<Container> {
         image: Some("postgres".to_owned()),
         ports: vec![("127.0.0.1".parse::<IpAddr>().unwrap(), 5432)],
     }]
-}
-
-struct Served {
-    _dir: tempfile::TempDir,
-    path: PathBuf,
-    request: JoinHandle<String>,
-}
-
-fn serve(reply: impl FnOnce(tokio::net::UnixStream) -> JoinHandle<()> + Send + 'static) -> Served {
-    let guard = tempfile::Builder::new()
-        .prefix("nv")
-        .tempdir_in("/tmp")
-        .unwrap();
-    let path = std::fs::canonicalize(guard.path()).unwrap().join("d.sock");
-    let listener = UnixListener::bind(&path).unwrap();
-    let request = tokio::spawn(async move {
-        let (mut stream, _) = listener.accept().await.unwrap();
-        let mut head = Vec::new();
-        let mut byte = [0u8; 1];
-        while !head.ends_with(b"\r\n\r\n") {
-            if stream.read(&mut byte).await.unwrap() == 0 {
-                break;
-            }
-            head.push(byte[0]);
-        }
-        let _ = reply(stream).await;
-        String::from_utf8(head).unwrap()
-    });
-    Served {
-        _dir: guard,
-        path,
-        request,
-    }
-}
-
-fn say(bytes: Vec<u8>) -> impl FnOnce(tokio::net::UnixStream) -> JoinHandle<()> + Send + 'static {
-    move |mut stream| {
-        tokio::spawn(async move {
-            let _ = stream.write_all(&bytes).await;
-            let _ = stream.shutdown().await;
-        })
-    }
 }
 
 fn sized(body: &str) -> Vec<u8> {
