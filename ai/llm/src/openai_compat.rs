@@ -68,18 +68,15 @@ impl OpenAiCompat {
             .json(&body)
             .send()
             .await
-            .map_err(transport_error)?;
+            .map_err(|e| classify(&e, LlmError::Network))?;
         let status = response.status();
         if !status.is_success() {
             return Err(LlmError::Status(status.as_u16()));
         }
-        let parsed: WireReply = response.json().await.map_err(|e| {
-            if e.is_timeout() {
-                LlmError::Timeout
-            } else {
-                LlmError::Malformed
-            }
-        })?;
+        let parsed: WireReply = response
+            .json()
+            .await
+            .map_err(|e| classify(&e, LlmError::Malformed))?;
         parsed
             .choices
             .into_iter()
@@ -91,11 +88,12 @@ impl OpenAiCompat {
     }
 }
 
-fn transport_error(error: reqwest::Error) -> LlmError {
+/// A timeout is `Timeout`; anything else is `otherwise`. The error text is dropped on purpose.
+fn classify(error: &reqwest::Error, otherwise: LlmError) -> LlmError {
     if error.is_timeout() {
         LlmError::Timeout
     } else {
-        LlmError::Network
+        otherwise
     }
 }
 
