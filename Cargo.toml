@@ -11,6 +11,8 @@ members = [
     "crates/procs",
     "crates/secrets",
     "crates/ffi",
+    "ai/llm",
+    "ai/context",
     "apps/cli",
     "xtask",
     "modules/awake",
@@ -34,6 +36,8 @@ navori-ipc = { path = "crates/ipc" }
 navori-macos = { path = "crates/macos" }
 navori-procs = { path = "crates/procs" }
 navori-secrets = { path = "crates/secrets" }
+navori-llm = { path = "ai/llm" }
+navori-context = { path = "ai/context" }
 navori-mod-awake = { path = "modules/awake" }
 navori-mod-integrations = { path = "modules/integrations" }
 
@@ -49,6 +53,7 @@ objc2-core-foundation = { version = "0.3.2", default-features = false, features 
 objc2-io-kit = { version = "0.3.2", default-features = false, features = ["std", "pwr_mgt", "libc"] }
 predicates = "3.1.4"
 regex = "1.13.1"
+reqwest = { version = "0.13.5", features = ["json"] }
 rusqlite = { version = "0.41.1", features = ["bundled", "backup"] }
 schemars = "1.2.3"
 serde = { version = "1.0.229", features = ["derive"] }

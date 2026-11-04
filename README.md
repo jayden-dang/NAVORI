@@ -28,6 +28,7 @@ navori doctor      # config, database, IPC, modules, logs, awake, integrations
 navori events      # journal, newest first
 navori actions     # every action modules accept, with risk level
 navori awake       # hold, release-all, status, run
+navori ask --model <id> "..."   # one question to DeepSeek; key in Settings → AI
 navori dispatch system '"ping"'
 ```
 

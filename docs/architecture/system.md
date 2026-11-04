@@ -55,20 +55,20 @@ Status: **Built** = in the tree at R0 · **Built (Rn)** = in the tree since that
 | Config | Built | Profiles (`release`/`dev`), filesystem layout, `config.toml`. | `crates/config` |
 | IPC | Built | JSON-RPC 2.0 over a user-private Unix socket; doubles as the single-instance lock. | `crates/ipc` |
 | Protocol | Built | Wire types shared by every layer (Envelope, ActionSpec, Event, status, RPC frames). | `crates/protocol` |
-| `navori` CLI | Built | `status`, `doctor`, `events`, `actions`, `dispatch`, `awake`; later `hook`, `ask`, `mcp`. | `apps/cli` |
+| `navori` CLI | Built | `status`, `doctor`, `events`, `actions`, `dispatch`, `awake`, `hook`, `ask`; later `mcp`. | `apps/cli` |
 | xtask | Built | Build core + bindings, bundle, sign, install, CI gate, dependency rules. | `xtask` |
 | Scheduler | Built | Periodic work for all modules: fast while the menu is open, slow in the background, a timer parks on uptime, and an overdue timer may fire during dark wake (ARCH-16). | `crates/kernel` |
 | Platform FFI | Built (R1) | Safe traits `ProcessSource`, `ExitSource` and `PowerAssertions` (`MacProcesses`, `KqueueExits`, `MacPower`). The only hand-written `unsafe` (ARCH-9). | `crates/macos` |
 | Process model | Built (R1) | Snapshot, project/worktree location, Harness table, child activity and process-exit watcher. No `unsafe`. Uses `ProcessSource` and `ExitSource`. | `crates/procs` |
-| Secrets | Built (R2) — library only, no consumer yet; ROAD-11 and ROAD-19 consume it | Keychain storage for tokens and API keys (ARCH-8). | `crates/secrets` |
+| Secrets | Built (R2) — consumed by `navori-llm`, `navori-context` and `navori-ffi`; ROAD-11 and ROAD-19 still to come | Keychain storage for tokens and API keys (ARCH-8). | `crates/secrets` |
 | Awake module | Built (R1) | Leases → at most one power assertion per kind; harness-session tracking. | `modules/awake` |
 | Ports module | Planned (R3) | Listening ports by project/worktree/harness; stop with approval. | `modules/ports` |
 | GitHub module | Planned (R4) | PR inbox, checks, approve/merge; OAuth device flow (ADR 0002). | `modules/github` |
 | Needs you inbox | Planned (R2) | Decisions, To-dos and Updates between the user and Navori AI; approvals for Destructive Actions. | proposed `modules/inbox` |
 | PlatformServices | Planned (R2) | Swift-implemented services the Core calls: notifications, frontmost app/AX, screen capture + OCR + blur, permissions. | `apps/macos/Navori/Platform/` |
-| LLM providers | Planned (R2) | Canonical chat/tool/stream format; adapters `anthropic`, `openai`, `openai_compat`, `gemini`. | `ai/llm` |
+| LLM providers | Partial (R2) — text-only `openai_compat` for DeepSeek exists; no tools, streaming or other adapters yet | Canonical chat/tool/stream format; adapters `anthropic`, `openai`, `openai_compat`, `gemini`. | `ai/llm` |
 | Model router | Planned (R2) | Model catalog, roles (`chat`, `fast`, `vision`, `embedding`), fallback, usage and budget. | `ai/models` |
-| Context Engine + Gateway | Planned (R2) | Assembles the current situation; the only path to an LLM, redacted and audited (ARCH-7). | `ai/context` |
+| Context Engine + Gateway | Partial (R2) — the Context Gateway exists (key read, Shield pass, audit row, send); the Context Engine does not | Assembles the current situation; the only path to an LLM, redacted and audited (ARCH-7). | `ai/context` |
 | Agent runtime | Planned (R2) | Agent loop; tool registry built from every module's ActionSpecs; Risk policy and approvals. | `ai/agent` |
 | Memory | Planned (R2) | Facts, episodic summaries, embeddings. | `ai/memory` |
 | Triggers | Planned (R5) | Proactive rules on the Event bus, within a token budget and quiet hours. | `ai/triggers` |

@@ -6,7 +6,11 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use assert_cmd::Command;
-use navori_ffi::{CoreConfig, CoreSnapshot, NavoriCore, SnapshotListener};
+use futures::future::BoxFuture;
+use navori_context::{SendError, Sender};
+use navori_ffi::{AiDeps, CoreConfig, CoreSnapshot, NavoriCore, SnapshotListener};
+use navori_secrets::fake::{FakeKeychain, MemoryStore};
+use navori_secrets::{Secret, SecretStore};
 use predicates::prelude::*;
 use serde_json::Value;
 
@@ -48,23 +52,67 @@ fn start_core(config_toml: Option<&str>) -> Running {
         std::fs::create_dir_all(&data).unwrap();
         std::fs::write(data.join("config.toml"), body).unwrap();
     }
-    let core = NavoriCore::start(
-        CoreConfig {
-            profile: "dev".into(),
-            home_dir: home.path().to_string_lossy().into_owned(),
-            uid: std::fs::metadata(home.path()).unwrap().uid(),
-            app_version: "9.9.9-test".into(),
-            log_to_file: false,
-            helper_path: home
-                .path()
-                .join("Navori Dev.app/Contents/Helpers/navori")
-                .to_string_lossy()
-                .into_owned(),
-        },
-        Arc::new(Ignore),
-    )
-    .unwrap();
+    let core = NavoriCore::start(core_config(&home), Arc::new(Ignore)).unwrap();
     Running { home, core }
+}
+
+fn core_config(home: &tempfile::TempDir) -> CoreConfig {
+    CoreConfig {
+        profile: "dev".into(),
+        home_dir: home.path().to_string_lossy().into_owned(),
+        uid: std::fs::metadata(home.path()).unwrap().uid(),
+        app_version: "9.9.9-test".into(),
+        log_to_file: false,
+        helper_path: home
+            .path()
+            .join("Navori Dev.app/Contents/Helpers/navori")
+            .to_string_lossy()
+            .into_owned(),
+    }
+}
+
+fn start_core_with(deps: AiDeps) -> Running {
+    let home = short_home();
+    let core = NavoriCore::start_with(core_config(&home), Arc::new(Ignore), deps).unwrap();
+    Running { home, core }
+}
+
+struct StubSender {
+    delay: Duration,
+    reply: &'static str,
+}
+
+impl Sender for StubSender {
+    fn send<'a>(
+        &'a self,
+        _: &'a Secret,
+        _: &'a str,
+        _: &'a str,
+    ) -> BoxFuture<'a, Result<String, SendError>> {
+        Box::pin(async move {
+            tokio::time::sleep(self.delay).await;
+            Ok(self.reply.to_owned())
+        })
+    }
+}
+
+fn ai_deps(vault: &FakeKeychain, sender: StubSender) -> AiDeps {
+    let vault = vault.clone();
+    let sender = Arc::new(sender);
+    AiDeps {
+        open_secrets: Arc::new(move |service| {
+            let store: Arc<dyn SecretStore> = Arc::new(MemoryStore::new(service, &vault));
+            Ok(store)
+        }),
+        make_sender: Arc::new(move || sender.clone()),
+    }
+}
+
+fn running_ai_core(reply: &'static str, delay: Duration) -> (Running, FakeKeychain) {
+    let vault = FakeKeychain::new();
+    let running = start_core_with(ai_deps(&vault, StubSender { delay, reply }));
+    futures::executor::block_on(running.core.save_provider_key("k1".into())).unwrap();
+    (running, vault)
 }
 
 fn navori(home: &tempfile::TempDir) -> Command {
@@ -1202,4 +1250,234 @@ fn a_hook_dispatch_is_a_single_awake_call_per_event() {
         dispatched_action(&requests[0])["hold_session"]["session_id"],
         "s-1"
     );
+}
+
+#[test]
+fn ask_prints_the_reply_and_exits_zero() {
+    let (r, _vault) = running_ai_core("hello back", Duration::ZERO);
+    navori(&r.home)
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(0)
+        .stdout("hello back\n");
+}
+
+fn ask_stdout_for(reply: &'static str) -> Vec<u8> {
+    let (r, _vault) = running_ai_core(reply, Duration::ZERO);
+    navori(&r.home)
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(0)
+        .get_output()
+        .stdout
+        .clone()
+}
+
+#[test]
+fn ask_drops_an_osc_clipboard_write_ended_by_bel() {
+    let out = ask_stdout_for("before\x1b]52;c;aGk=\x07after");
+    assert_eq!(out, b"beforeafter\n");
+}
+
+#[test]
+fn ask_drops_a_csi_colour_sequence() {
+    let out = ask_stdout_for("a\x1b[31mred\x1b[0m b");
+    assert_eq!(out, b"ared b\n");
+}
+
+#[test]
+fn ask_drops_an_osc_ended_by_escape_backslash() {
+    let out = ask_stdout_for("x\x1b]0;title\x1b\\y");
+    assert_eq!(out, b"xy\n");
+}
+
+#[test]
+fn ask_drops_an_unterminated_osc_to_the_end() {
+    let out = ask_stdout_for("keep\x1b]52;c;aGk= and the rest");
+    assert_eq!(out, b"keep\n");
+}
+
+#[test]
+fn ask_drops_control_characters_but_keeps_layout_and_text() {
+    let out = ask_stdout_for("a\r\0b\x7fc\u{9b}d\u{85}\n\tXin chào, bạn khỏe không?");
+    assert_eq!(out, "abcd\n\tXin chào, bạn khỏe không?\n".as_bytes());
+}
+
+#[test]
+fn ask_prints_a_plain_reply_unchanged() {
+    let out = ask_stdout_for("line one\n\tline two");
+    assert_eq!(out, b"line one\n\tline two\n");
+}
+
+#[test]
+fn ask_without_model_is_a_usage_error() {
+    let r = running_core();
+    navori(&r.home).args(["ask", "hi"]).assert().code(2);
+}
+
+#[test]
+fn ask_help_describes_the_model_id() {
+    let r = running_core();
+    navori(&r.home)
+        .args(["ask", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("provider's own model name"))
+        .stdout(predicate::str::contains("deepseek-flash"));
+}
+
+#[test]
+fn ask_with_no_key_prints_the_sentence_and_exits_one() {
+    let vault = FakeKeychain::new();
+    let r = start_core_with(ai_deps(
+        &vault,
+        StubSender {
+            delay: Duration::ZERO,
+            reply: "unused",
+        },
+    ));
+    navori(&r.home)
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr("navori: No key set. Add one in Settings → AI.\n");
+}
+
+#[test]
+fn ask_reports_a_keychain_failure_without_the_no_key_sentence() {
+    let (r, vault) = running_ai_core("unused", Duration::ZERO);
+    vault.fail_next(navori_secrets::Operation::Get);
+    navori(&r.home)
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::starts_with("navori: get failed"))
+        .stderr(predicate::str::contains("No key set").not())
+        .stderr(predicate::str::contains("rpc error").not());
+}
+
+#[test]
+fn ask_reports_an_audit_refusal_as_a_message_with_exit_one() {
+    let (r, _vault) = running_ai_core("never sent", Duration::ZERO);
+    let data = r.home.path().join("Library/Application Support/Navori Dev");
+    let store = navori_store::Store::open(&data.join("navori.db"), &data.join("backups")).unwrap();
+    store.with_conn(|conn| {
+        conn.execute_batch("CREATE TABLE context_audit (blocking INTEGER)")
+            .unwrap();
+    });
+    navori(&r.home)
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr("navori: The audit log could not be recorded, so nothing was sent.\n");
+}
+
+#[test]
+fn ask_when_the_app_is_not_running_exits_three() {
+    let home = short_home();
+    navori(&home)
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("not running"));
+}
+
+#[test]
+fn ask_prints_a_waiting_notice_on_stderr_when_slow() {
+    let (r, _vault) = running_ai_core("late reply", Duration::from_millis(3500));
+    navori(&r.home)
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(0)
+        .stdout("late reply\n")
+        .stderr("waiting for the answer…\n");
+}
+
+#[test]
+fn ask_gives_up_when_the_app_does_not_answer() {
+    let server = recording_server_replying(Reply::Never);
+    let started = Instant::now();
+    navori(&server.home)
+        .env("NAVORI_ASK_WAIT_MS", "200")
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::contains("did not answer within 0.2 s"))
+        .stderr(predicate::str::contains("may still finish"));
+    assert!(started.elapsed() < Duration::from_secs(10));
+}
+
+fn counting_server(home: &std::path::Path) -> Arc<std::sync::atomic::AtomicUsize> {
+    let uid = std::fs::metadata(home).unwrap().uid();
+    let socket = navori_config::Paths::new(navori_config::Profile::Dev, home, uid).socket;
+    std::fs::create_dir_all(socket.parent().unwrap()).unwrap();
+    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+    let connections = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counted = Arc::clone(&connections);
+    std::thread::spawn(move || {
+        let mut held = Vec::new();
+        for stream in listener.incoming().flatten() {
+            counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            held.push(stream);
+        }
+    });
+    connections
+}
+
+fn ask_line_length(prompt: &str) -> usize {
+    let params = serde_json::json!({ "model": "m", "text": prompt });
+    let request = navori_protocol::rpc::Request::new(1, navori_protocol::rpc::method::ASK, params);
+    serde_json::to_string(&request).unwrap().len()
+}
+
+fn prompt_for_line_of(len: usize) -> String {
+    let prompt = "a".repeat(len - ask_line_length(""));
+    assert_eq!(ask_line_length(&prompt), len);
+    prompt
+}
+
+#[test]
+fn ask_refuses_a_request_line_over_the_limit_before_connecting() {
+    let home = short_home();
+    let connections = counting_server(home.path());
+    let prompt = prompt_for_line_of(501);
+    navori(&home)
+        .env("NAVORI_ASK_MAX_BYTES", "500")
+        .env("NAVORI_ASK_WAIT_MS", "200")
+        .args(["ask", "--model", "m", &prompt])
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::contains(
+            "the request would be 501 bytes and the limit is 500",
+        ));
+    assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
+
+#[test]
+fn ask_sends_a_request_line_of_exactly_the_limit_and_refuses_one_byte_more() {
+    let server = recording_server_replying(Reply::Never);
+    navori(&server.home)
+        .env("NAVORI_ASK_MAX_BYTES", "500")
+        .env("NAVORI_ASK_WAIT_MS", "200")
+        .args(["ask", "--model", "m", &prompt_for_line_of(500)])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("did not answer"));
+    assert_eq!(server.requests.lock().unwrap().len(), 1);
+
+    let over = short_home();
+    let connections = counting_server(over.path());
+    navori(&over)
+        .env("NAVORI_ASK_MAX_BYTES", "500")
+        .env("NAVORI_ASK_WAIT_MS", "200")
+        .args(["ask", "--model", "m", &prompt_for_line_of(501)])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("the limit is 500"));
+    assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 0);
 }

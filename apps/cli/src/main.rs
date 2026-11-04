@@ -17,6 +17,7 @@ use navori_protocol::rpc::method;
 use navori_protocol::{ActionSpec, Check, CoreStatus, Event, ModuleState};
 use serde_json::{Value, json};
 
+mod ask;
 mod hook;
 
 #[derive(Debug, Parser)]
@@ -62,6 +63,13 @@ enum Command {
     },
     /// Read a Harness hook payload on stdin and update session Leases.
     Hook,
+    /// Ask the AI provider one question and print the answer.
+    Ask {
+        /// The provider's own model name, for example `deepseek-flash`.
+        #[arg(long)]
+        model: String,
+        prompt: String,
+    },
     /// Keep this Mac awake.
     Awake {
         #[command(subcommand)]
@@ -195,6 +203,10 @@ async fn run(cli: Cli) -> Result<(), Failure> {
         let _ = awake_hold_action(duration.as_deref())?;
     }
 
+    if let Command::Ask { model, prompt } = &cli.command {
+        ask::check_size(model, prompt)?;
+    }
+
     let mut client = Client::connect(&socket).await?;
     match cli.command {
         Command::Status { json } => {
@@ -248,6 +260,12 @@ async fn run(cli: Cli) -> Result<(), Failure> {
                 )
                 .await?;
             println!("{v}");
+        }
+        Command::Ask { model, prompt } => {
+            println!(
+                "{}",
+                ask::printable(&ask::run(&mut client, &model, &prompt).await?)
+            );
         }
         Command::Awake { command } => match command {
             AwakeCommand::Hold { duration } => {

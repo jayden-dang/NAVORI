@@ -19,12 +19,14 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | `navori-store` | `navori-protocol`, `navori-redact` | allowed — the Journal redacts on write |
 | `navori-kernel` | `navori-protocol`, `navori-redact`, `navori-store` | allowed |
 | `navori-ipc` | `navori-protocol` | allowed |
-| `navori-ffi` | every foundation crate (`config`, `ipc`, `kernel`, `protocol`, `redact`, `store`), `navori-mod-awake` and `navori-mod-integrations` | allowed — the composition root; later also other `modules/*`, `ai/*` |
-| `navori` CLI (`navori-cli`) | `navori-config`, `navori-ipc`, `navori-protocol` | allowed — thin client; `navori-ffi` only as a dev-dependency for end-to-end tests |
+| `navori-ffi` | every foundation crate (`config`, `ipc`, `kernel`, `protocol`, `redact`, `secrets`, `store`), `navori-mod-awake`, `navori-mod-integrations`, `navori-llm` and `navori-context` | allowed — the composition root; later also other `modules/*`, `ai/*` |
+| `navori` CLI (`navori-cli`) | `navori-config`, `navori-ipc`, `navori-protocol` | allowed — thin client; dev-dependencies for end-to-end tests only: `navori-ffi`, `navori-context`, `navori-secrets` (`fake` feature), `navori-store`, `futures` and `tokio` |
 | `xtask` | — | allowed: none (tooling only) |
 | `navori-macos` | — | allowed: none — leaf |
 | `navori-procs` | `navori-macos` | allowed — through the safe traits |
 | `navori-secrets` | — | allowed: none — leaf; consumed by `modules/*` and `ai/*` (rows below) and may be opened by the composition root `navori-ffi` (it may depend on any foundation crate) |
+| `navori-llm` | `navori-secrets` | allowed — provider-neutral LLM client; takes only the `Secret` type from `navori-secrets`; no edge to `navori-context` or any Module |
+| `navori-context` | `navori-redact`, `navori-secrets` | allowed — Context Gateway; `redact` is required (nothing reaches an LLM unredacted, ARCH-6); no edge to `navori-llm` (the `Sender` trait is wired in `navori-ffi`) |
 | `navori-mod-awake` | `navori-kernel`, `navori-macos`, `navori-procs`, `navori-store` | allowed — feature Module; depends on no other Module |
 | `navori-mod-integrations` | `navori-kernel` | allowed — feature Module; depends on no other Module, and not on `navori-macos`, `navori-procs` or `navori-store` (the last only as a dev-dependency) |
 | Swift `Navori` target | `NavoriCore` (generated) → `NavoriCoreFFI` (xcframework) | allowed — only `CoreStore` imports `NavoriCore` (ARCH-2) |
@@ -37,7 +39,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 |---|---|---|
 | `modules/*` | `kernel`, `protocol`, `store`, `config`, `redact`, `procs`, `secrets` | allowed |
 | `ai/agent` | `ai/llm`, `ai/models`, `ai/context`, `ai/memory`, `ai/mcp`, `kernel`, `protocol` | allowed |
-| `ai/context`, `ai/memory` | `navori-redact` | required — nothing reaches an LLM or memory unredacted (ARCH-6) |
+| `ai/memory` | `navori-redact` | required — nothing reaches memory unredacted (ARCH-6) |
 | `ai/*` | `navori-secrets` | allowed — provider keys from the Keychain |
 
 ## Forbidden edges
@@ -69,7 +71,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | FFI | `uniffi` 0.32, `libc`, `objc2-io-kit`, `objc2-core-foundation` | — |
 | CLI | `clap` | — |
 | Secrets | `keyring-core`, `apple-native-keyring-store` (feature `keychain`) | — |
-| HTTP, SSE | — | `reqwest` (rustls), `eventsource-stream` (R2) |
+| HTTP, SSE | `reqwest` 0.13.5 (default features and `json`; rustls TLS by default; used by `navori-llm`) | `eventsource-stream` (R2) |
 | GitHub | — | `graphql_client` (R4) |
 | MCP | — | `rmcp` (R6) |
 | Runtime files | `tempfile` (atomic writes in the integrations Module) | — |

@@ -20,7 +20,8 @@ let package = Package(
             name: "NavoriCore",
             dependencies: ["NavoriCoreFFI"],
             path: "Generated/NavoriCore",
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v5)],
+            linkerSettings: [.linkedFramework("SystemConfiguration")]
         ),
         .target(
             name: "NavoriBanner",

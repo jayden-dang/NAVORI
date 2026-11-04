@@ -75,6 +75,16 @@ final class CoreStore {
         return try await core.dispatch(module: module, actionJson: actionJSON)
     }
 
+    func saveProviderKey(_ key: String) async throws {
+        guard let core else { throw StoreError.notRunning }
+        try await core.saveProviderKey(key: key)
+    }
+
+    func removeProviderKey() async throws -> Bool {
+        guard let core else { throw StoreError.notRunning }
+        return try await core.removeProviderKey()
+    }
+
     var moduleCount: Int {
         snapshot?.modules.count(where: { $0.state == "running" }) ?? 0
     }
@@ -212,7 +222,12 @@ final class CoreStore {
 
     enum StoreError: LocalizedError {
         case notRunning
-        var errorDescription: String? { "The Navori core is not running." }
+
+        var errorDescription: String? {
+            switch self {
+            case .notRunning: "The Navori core is not running."
+            }
+        }
     }
 }
 

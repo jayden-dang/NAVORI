@@ -15,6 +15,8 @@ public enum CoreStartupBanner {
             return "invalid JSON: \(message)"
         case .Dispatch(let message):
             return message
+        case .Secrets(let message):
+            return message
         case .ShutDown:
             return "core is shut down"
         }

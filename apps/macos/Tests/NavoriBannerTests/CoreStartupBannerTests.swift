@@ -30,3 +30,8 @@ import Testing
     #expect(menu.problem?.title == sentence)
         #expect(menu.problem?.title.contains("CoreError") == false)
 }
+
+@Test func a_keychain_failure_shows_the_core_message_unchanged() {
+    let error: Error = CoreError.Secrets(message: "keychain is locked")
+    #expect(CoreStartupBanner.message(for: error) == "keychain is locked")
+}
