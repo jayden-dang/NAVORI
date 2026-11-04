@@ -83,6 +83,7 @@ pub fn stop_class(entry: &PortEntry, own_pid: i32, helper: Option<&Path>) -> Sto
 pub struct Guard {
     own_pid: i32,
     ancestors: BTreeSet<i32>,
+    complete: bool,
     source: Arc<dyn ProcessSource>,
     helper: Option<PathBuf>,
 }
@@ -103,16 +104,25 @@ impl Guard {
     ) -> Self {
         let own_pid = signals.own_pid();
         let mut ancestors = BTreeSet::new();
-        let mut next = source.entry(own_pid).map(|entry| entry.ppid);
-        while let Ok(pid) = next {
-            if pid <= 0 || ancestors.len() >= MAX_ANCESTORS || !ancestors.insert(pid) {
+        let mut complete = false;
+        let mut at = own_pid;
+        for _ in 0..=MAX_ANCESTORS {
+            let Ok(parent) = source.entry(at).map(|entry| entry.ppid) else {
+                break;
+            };
+            if parent <= 0 {
+                complete = true;
                 break;
             }
-            next = source.entry(pid).map(|entry| entry.ppid);
+            if !ancestors.insert(parent) {
+                break;
+            }
+            at = parent;
         }
         Self {
             own_pid,
             ancestors,
+            complete,
             source,
             helper,
         }
@@ -147,11 +157,11 @@ pub struct ContainerPlan {
     pub ports: Vec<u16>,
 }
 
-/// The verdict for one target. A refusal that has no sentence of its own carries an empty one.
+/// The verdict for one target. `AlreadyGone` is refused without a sentence.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Resolved {
     Go(Plan),
-    Refused(Outcome, &'static str),
+    Refused(Outcome, Option<&'static str>),
 }
 
 /// Judges each target against the fresh read, in request order. The selector only checks; it adds nothing.
@@ -179,15 +189,18 @@ fn resolve_process(
     pid: i32,
     start_us: u64,
 ) -> Resolved {
+    if !guard.complete {
+        return Resolved::Refused(Outcome::Failed, Some(reason::GUARD_INCOMPLETE));
+    }
     let current = match guard.source.entry(pid) {
         Ok(current) if !current.zombie => current,
-        Ok(_) | Err(ReadError::Gone) => return Resolved::Refused(Outcome::AlreadyGone, ""),
+        Ok(_) | Err(ReadError::Gone) => return Resolved::Refused(Outcome::AlreadyGone, None),
         Err(_) => {
-            return Resolved::Refused(Outcome::Failed, reason::PROCESS_LIST_TIMEOUT);
+            return Resolved::Refused(Outcome::Failed, Some(reason::PROCESS_LIST_TIMEOUT));
         }
     };
     if current.start.0 != start_us || current.ruid != guard.source.current_uid() {
-        return Resolved::Refused(Outcome::Stale, reason::PROCESS_CHANGED);
+        return Resolved::Refused(Outcome::Stale, Some(reason::PROCESS_CHANGED));
     }
     let held: Vec<&PortEntry> = fresh
         .entries
@@ -195,20 +208,20 @@ fn resolve_process(
         .filter(|entry| entry.pid == pid && entry.start_us == start_us)
         .collect();
     let Some(first) = held.first() else {
-        return Resolved::Refused(Outcome::Stale, reason::PORT_CLOSED);
+        return Resolved::Refused(Outcome::Stale, Some(reason::PORT_CLOSED));
     };
     if guard.ancestors.contains(&pid) || held.iter().any(|entry| never(entry, guard)) {
-        return Resolved::Refused(Outcome::Protected, reason::PROCESS_PROTECTED);
+        return Resolved::Refused(Outcome::Protected, Some(reason::PROCESS_PROTECTED));
     }
     let grouped_out = !matches!(selector, Selector::Pid(_))
         && held.iter().any(|entry| {
             stop_class(entry, guard.own_pid, guard.helper.as_deref()) != StopClass::Free
         });
     if grouped_out {
-        return Resolved::Refused(Outcome::Protected, reason::NOT_STOPPED_WITH_GROUP);
+        return Resolved::Refused(Outcome::Protected, Some(reason::NOT_STOPPED_WITH_GROUP));
     }
     if !within(selector, first) {
-        return Resolved::Refused(Outcome::OutsideSelector, reason::NOT_IN_PROJECT);
+        return Resolved::Refused(Outcome::OutsideSelector, Some(reason::NOT_IN_PROJECT));
     }
     Resolved::Go(Plan::Process(ProcessPlan {
         pid,
@@ -225,7 +238,7 @@ fn never(entry: &PortEntry, guard: &Guard) -> bool {
 
 fn resolve_container(fresh: &FreshRead, guard: &Guard, selector: &Selector, id: &str) -> Resolved {
     if fresh.docker != DockerStatus::Read {
-        return Resolved::Refused(Outcome::Failed, reason::DOCKER_UNREACHABLE);
+        return Resolved::Refused(Outcome::Failed, Some(reason::DOCKER_UNREACHABLE));
     }
     let held: Vec<&PortEntry> = fresh
         .entries
@@ -238,17 +251,19 @@ fn resolve_container(fresh: &FreshRead, guard: &Guard, selector: &Selector, id: 
         })
         .collect();
     let Some(first) = held.first() else {
-        return Resolved::Refused(Outcome::Stale, reason::CONTAINER_NOT_RUNNING);
+        return Resolved::Refused(Outcome::Stale, Some(reason::CONTAINER_NOT_RUNNING));
     };
-    let grouped_out = !matches!(selector, Selector::Pid(_))
-        && held.iter().any(|entry| {
-            stop_class(entry, guard.own_pid, guard.helper.as_deref()) != StopClass::Free
-        });
-    if grouped_out {
-        return Resolved::Refused(Outcome::Protected, reason::NOT_STOPPED_WITH_GROUP);
+    let class = |entry: &&PortEntry| stop_class(entry, guard.own_pid, guard.helper.as_deref());
+    if held.iter().any(|entry| class(entry) == StopClass::Never) {
+        return Resolved::Refused(Outcome::Protected, Some(reason::PROCESS_PROTECTED));
+    }
+    if !matches!(selector, Selector::Pid(_))
+        && held.iter().any(|entry| class(entry) != StopClass::Free)
+    {
+        return Resolved::Refused(Outcome::Protected, Some(reason::NOT_STOPPED_WITH_GROUP));
     }
     if !within(selector, first) {
-        return Resolved::Refused(Outcome::OutsideSelector, reason::NOT_IN_PROJECT);
+        return Resolved::Refused(Outcome::OutsideSelector, Some(reason::NOT_IN_PROJECT));
     }
     let ports: BTreeSet<u16> = held.iter().map(|entry| entry.port).collect();
     Resolved::Go(Plan::Container(ContainerPlan {

@@ -5,6 +5,7 @@ mod common;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use navori_macos::ReadError;
 use navori_macos::fake::{FakeProcess, FakeProcesses, FakeSignals};
 use navori_mod_ports::{
     ContainerPlan, DockerStatus, FreshRead, Guard, Outcome, Placement, Plan, PortEntry, PortKind,
@@ -112,7 +113,7 @@ fn one(resolved: Vec<Resolved>) -> Resolved {
 }
 
 fn refused(outcome: Outcome, reason: &'static str) -> Resolved {
-    Resolved::Refused(outcome, reason)
+    Resolved::Refused(outcome, Some(reason))
 }
 
 fn go_process(pid: i32) -> Resolved {
@@ -134,7 +135,7 @@ fn a_gone_pid_is_already_gone() {
         &Selector::Pid(200),
         &[process(200)],
     ));
-    assert_eq!(got, refused(Outcome::AlreadyGone, ""));
+    assert_eq!(got, Resolved::Refused(Outcome::AlreadyGone, None));
 }
 
 #[test]
@@ -150,7 +151,7 @@ fn a_zombie_is_already_gone() {
         &Selector::Pid(200),
         &[process(200)],
     ));
-    assert_eq!(got, refused(Outcome::AlreadyGone, ""));
+    assert_eq!(got, Resolved::Refused(Outcome::AlreadyGone, None));
 }
 
 #[test]
@@ -618,4 +619,108 @@ async fn a_fresh_read_lists_the_listeners_again_and_leaves_docker_unseen_without
     assert_eq!(ports, vec![3000]);
     assert_eq!(read.docker, DockerStatus::NotSeen);
     assert_eq!(containers.calls(), 0);
+}
+
+fn guarded(processes: &Arc<FakeProcesses>) -> Guard {
+    Guard::new(
+        Arc::new(FakeSignals::new(OWN, OWN)),
+        Arc::clone(processes) as Arc<dyn navori_macos::ProcessSource>,
+        None,
+    )
+}
+
+fn every_selector() -> Vec<Selector> {
+    vec![
+        Selector::Pid(200),
+        Selector::Worktree {
+            project: "klynt".to_owned(),
+            worktree: "main".to_owned(),
+        },
+        project("klynt"),
+    ]
+}
+
+fn assert_unchecked(processes: &Arc<FakeProcesses>) {
+    processes.add(FakeProcess::new(
+        200,
+        1,
+        USER,
+        START_US,
+        "/usr/local/bin/node",
+    ));
+    let guard = guarded(processes);
+    let read = fresh(vec![dev(200, 3000)]);
+    for selector in every_selector() {
+        let got = one(resolve(&read, &guard, &selector, &[process(200)]));
+        assert_eq!(
+            got,
+            refused(
+                Outcome::Failed,
+                "Navori could not check what it must not stop"
+            ),
+            "{selector:?}"
+        );
+    }
+}
+
+#[test]
+fn an_unreadable_own_process_fails_every_process_target() {
+    let processes = Arc::new(FakeProcesses::new(USER));
+    processes.add(FakeProcess::new(OWN, PARENT, USER, START_US, "/navori"));
+    processes.fail_entry(OWN, ReadError::Denied);
+    assert_unchecked(&processes);
+}
+
+#[test]
+fn an_unreadable_middle_ancestor_fails_every_process_target() {
+    let processes = Arc::new(FakeProcesses::new(USER));
+    processes.add(FakeProcess::new(1, 0, 0, START_US, "/sbin/launchd"));
+    processes.add(FakeProcess::new(80, 1, USER, START_US, "/bin/login"));
+    processes.add(FakeProcess::new(PARENT, 80, USER, START_US, "/bin/zsh"));
+    processes.add(FakeProcess::new(OWN, PARENT, USER, START_US, "/navori"));
+    processes.fail_entry(PARENT, ReadError::Denied);
+    assert_unchecked(&processes);
+}
+
+#[test]
+fn an_ancestry_deeper_than_the_walk_allows_fails_every_process_target() {
+    let processes = Arc::new(FakeProcesses::new(USER));
+    processes.add(FakeProcess::new(1, 0, 0, START_US, "/sbin/launchd"));
+    let mut parent = 1;
+    for pid in 1000..1070 {
+        processes.add(FakeProcess::new(pid, parent, USER, START_US, "/bin/sh"));
+        parent = pid;
+    }
+    processes.add(FakeProcess::new(OWN, parent, USER, START_US, "/navori"));
+    assert_unchecked(&processes);
+}
+
+#[test]
+fn an_ancestry_that_loops_fails_every_process_target() {
+    let processes = Arc::new(FakeProcesses::new(USER));
+    processes.add(FakeProcess::new(PARENT, 80, USER, START_US, "/bin/zsh"));
+    processes.add(FakeProcess::new(80, PARENT, USER, START_US, "/bin/login"));
+    processes.add(FakeProcess::new(OWN, PARENT, USER, START_US, "/navori"));
+    assert_unchecked(&processes);
+}
+
+#[test]
+fn a_container_entry_held_by_navori_itself_is_protected_under_every_selector() {
+    let world = world();
+    let mut held = container_entry(CONTAINER, 8080, "nginx", Some("klynt"));
+    held.pid = OWN;
+    let read = fresh(vec![held]);
+    for selector in [Selector::Pid(OWN), project("klynt")] {
+        let got = one(resolve(
+            &read,
+            &world.guard,
+            &selector,
+            &[container(CONTAINER)],
+        ));
+        assert_eq!(
+            got,
+            refused(Outcome::Protected, "This process is protected"),
+            "{selector:?}"
+        );
+    }
 }

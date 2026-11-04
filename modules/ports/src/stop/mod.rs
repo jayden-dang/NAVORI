@@ -20,5 +20,6 @@ pub mod reason {
     pub const STILL_RUNNING: &str = "It is still running";
     pub const PROCESS_LIST_TIMEOUT: &str = "The process list could not be read in time";
     pub const DOCKER_REFUSED: &str = "Docker refused the stop";
+    pub const GUARD_INCOMPLETE: &str = "Navori could not check what it must not stop";
     pub const STILL_STOPPING: &str = "It is still stopping";
 }
