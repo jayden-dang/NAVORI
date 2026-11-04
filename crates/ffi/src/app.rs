@@ -339,6 +339,20 @@ pub fn awake_view(kernel: &Kernel) -> Option<crate::AwakeView> {
     Some(view)
 }
 
+/// The Running view; Ports counts as absent while its Module is down, so no stop is offered.
+pub fn running_view(
+    kernel: &Kernel,
+    awake: Option<&crate::AwakeView>,
+    own: crate::running::Own,
+) -> Option<crate::running::RunningView> {
+    let ports = if module_is_down(kernel, Ports::ID) {
+        None
+    } else {
+        ports_state(kernel)
+    };
+    crate::running::build(awake, ports.as_ref(), own)
+}
+
 fn module_is_down(kernel: &Kernel, id: &str) -> bool {
     kernel.modules().into_iter().any(|module| {
         module.id == id

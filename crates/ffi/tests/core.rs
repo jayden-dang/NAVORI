@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use navori_config::{ConfigReport, JournalSweep, Paths, Profile, WholeFileReason};
+use navori_ffi::running::ProjectState;
 use navori_ffi::{
     CheckView, ConfigNotice, CoreConfig, CoreError, CoreSnapshot, NavoriCore, SnapshotListener,
     TrayGlyphView, ports_check,
@@ -1095,5 +1096,30 @@ fn the_ports_row_passes_before_the_first_scan() {
         .unwrap();
     assert!(row.ok);
     assert_eq!(row.detail, "not scanned yet");
+    core.shutdown();
+}
+
+#[test]
+fn the_snapshot_carries_a_running_view_once_ports_has_scanned() {
+    let home = home();
+    let (core, _) = start(&home);
+    core.set_panel_visible(true);
+    let deadline = Instant::now() + Duration::from_secs(12);
+    while core
+        .doctor()
+        .iter()
+        .any(|check| check.name == "ports" && check.detail == "not scanned yet")
+    {
+        assert!(Instant::now() < deadline, "ports did not scan in time");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let running = core.status().running.unwrap();
+    assert_eq!(running.unknown_reason, None);
+    assert!(
+        running
+            .projects
+            .iter()
+            .all(|project| project.state == ProjectState::Idle)
+    );
     core.shutdown();
 }
