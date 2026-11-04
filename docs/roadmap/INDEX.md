@@ -1,6 +1,6 @@
 # Roadmap: Navori
 
-Status: Approved
+Status: Draft
 Date: 2026-11-04
 
 <!--
@@ -25,8 +25,8 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 
 ## Focus
 
-**Now:** ROAD-36, ROAD-17, ROAD-18, ROAD-13, MILE-2
-**Next:** ROAD-11, ROAD-12, ROAD-19, ROAD-20, ROAD-21, ROAD-14, ROAD-37, ROAD-38, ROAD-15, ROAD-16
+**Now:** ROAD-12, ROAD-17, ROAD-18, ROAD-13, MILE-2
+**Next:** ROAD-11, ROAD-19, ROAD-20, ROAD-21, ROAD-14, ROAD-37, ROAD-38, ROAD-15, ROAD-16
 
 | ID | Milestone | Outcome | Depends-on | Commitment |
 |---|---|---|---|---|
