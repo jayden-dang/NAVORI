@@ -36,6 +36,7 @@ R0 baseline (debug build, 2026-11-01): 0.0% CPU, 0 wake-ups/s, 21 MB footprint, 
 - `cargo xtask perf --record` writes `perf-baseline.json` (machine model, macOS version, git revision, date, and each measured metric's median and floor) only when the run passes. Without `--record`, or when the run fails, the file is left unchanged.
 - Baseline-only metrics have no budget and are still regression-checked: `peak_footprint_mb`, `idle_disk_writes_kb`, `menu_open_cpu_ms`, `thread_count`.
 - Perf runs use the same `dev.navori.app.debug` preferences domain as `cargo xtask run`.
+- Perf runs link the user's Docker socket into each run home and print `docker=<status>` from `ports.list`; a run that linked the socket but did not read Docker prints a warning and refuses `--record`, so a baseline needs the same Docker state as the runs it is compared with.
 
 ## Design rules (from the architecture spine)
 

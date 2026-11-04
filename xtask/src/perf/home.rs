@@ -62,6 +62,11 @@ impl PerfHome {
         Ok(dest)
     }
 
+    /// Whether the user's Docker socket was linked into this run directory.
+    pub fn docker_linked(run: &Path) -> bool {
+        fs::symlink_metadata(run.join(".docker/run/docker.sock")).is_ok()
+    }
+
     pub fn record_pid(&self, pid: u32) -> Result<()> {
         let path = self.root.join("pids");
         let mut file = fs::OpenOptions::new()
@@ -620,6 +625,7 @@ mod tests {
         let link = run.join(".docker/run/docker.sock");
         assert_eq!(fs::read_link(&link).unwrap(), socket);
         assert!(!home.template().join(".docker").exists());
+        assert!(PerfHome::docker_linked(&run));
     }
 
     #[test]
@@ -632,6 +638,7 @@ mod tests {
         let run = home.fresh_run_linking(1, real_home.path()).unwrap();
 
         assert!(!run.join(".docker").exists());
+        assert!(!PerfHome::docker_linked(&run));
     }
 
     const SOCKET_SUFFIX: &str = "Library/Application Support/Navori Dev/run/navori.sock";

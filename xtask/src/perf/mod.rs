@@ -1,4 +1,5 @@
 mod baseline;
+mod docker;
 mod home;
 mod judge;
 mod launch;
@@ -15,6 +16,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result, bail, ensure};
 
 use baseline::{Baseline, Machine, finish};
+use docker::{DockerReport, report as docker_report};
 use home::{PerfHome, check_socket_len, current_uid};
 use judge::{Measurements, judge, median};
 use launch::Launched;
@@ -60,8 +62,15 @@ pub fn run(root: &Path, record: bool) -> Result<bool> {
     let loaded = Baseline::load(&baseline_path)?;
     let verdict = judge(&measured, loaded.as_ref(), &machine);
     report(&verdict, phase_a_elapsed, phase_b_elapsed)?;
+    emit(&format!("docker={}", phase_b.docker.status))?;
+    if let Some(warning) = &phase_b.docker.warning {
+        emit(&format!("WARNING {warning}"))?;
+        if record {
+            emit("not recording a baseline from this run")?;
+        }
+    }
 
-    if record && verdict.passed {
+    if record && verdict.passed && phase_b.docker.allows_record() {
         let baseline = Baseline::from_run(&measured, machine, git_revision(root)?, record_date()?);
         finish(&baseline_path, &verdict, record, &baseline)?;
     }
@@ -174,11 +183,38 @@ fn measure_phase_b(
         before = after;
     }
     let peak_bytes = before.peak;
+    let docker = docker_report(
+        PerfHome::docker_linked(&run_dir),
+        &ports_list(exe, &run_dir)?,
+    )?;
     finish_measured(&mut launched)?;
     Ok(PhaseBProcess {
         windows,
         peak_bytes,
+        docker,
     })
+}
+
+fn ports_list(exe: &Path, run_dir: &Path) -> Result<String> {
+    let helper = exe
+        .parent()
+        .and_then(Path::parent)
+        .context("the app executable has no bundle")?
+        .join("Helpers/navori");
+    let home = format!("HOME={}", path_str(run_dir)?);
+    command_stdout(
+        "/usr/bin/env",
+        &[
+            &home,
+            path_str(&helper)?,
+            "--profile",
+            "dev",
+            "dispatch",
+            "ports",
+            "\"list\"",
+        ],
+        None,
+    )
 }
 
 fn measurements(
@@ -291,6 +327,7 @@ struct PhaseBWindow {
 struct PhaseBProcess {
     windows: Vec<PhaseBWindow>,
     peak_bytes: u64,
+    docker: DockerReport,
 }
 
 struct MenuOpen {
@@ -699,6 +736,10 @@ mod tests {
                 threads: 4.0,
             }],
             peak_bytes: 1_048_576,
+            docker: super::docker::DockerReport {
+                status: "read".to_owned(),
+                warning: None,
+            },
         }
     }
 
