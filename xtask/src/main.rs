@@ -667,6 +667,18 @@ fn check_deps(root: &Path) -> Result<()> {
             .map(|(n, _)| *n)
             .collect();
 
+        for d in p["dependencies"].as_array().into_iter().flatten() {
+            let features: Vec<&str> = d["features"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(serde_json::Value::as_str)
+                .collect();
+            let dep_name = d["name"].as_str().unwrap_or_default();
+            let kind = d["kind"].as_str().unwrap_or("normal");
+            violations.extend(fake_feature_violation(name, dep_name, kind, &features));
+        }
+
         let is_module = path.contains("/modules/");
         let is_ai = path.contains("/ai/");
         for dep in &internal {
@@ -743,6 +755,19 @@ fn check_deps(root: &Path) -> Result<()> {
     } else {
         bail!("dependency rule violations:\n  {}", violations.join("\n  "))
     }
+}
+
+/// Crates whose `fake` feature switches on unencrypted in-memory test doubles (ARCH-8).
+const FAKE_GUARDED: [&str; 2] = ["navori-macos", "navori-secrets"];
+
+/// Reports `fake` enabled for a guarded crate through a non-dev dependency edge.
+fn fake_feature_violation(krate: &str, dep: &str, kind: &str, features: &[&str]) -> Option<String> {
+    (FAKE_GUARDED.contains(&dep) && kind != "dev" && features.contains(&"fake")).then(|| {
+        format!(
+            "{krate} → {dep}: the `fake` feature is test-only (ARCH-8) and may be enabled only \
+             through a dev-dependency, not a {kind} dependency"
+        )
+    })
 }
 
 fn read_manifest(path: &str) -> Result<toml::Table> {
@@ -1043,6 +1068,84 @@ mod tests {
         assert!(
             buf.contains("xcframework successfully written out to:"),
             "piped tool stdout was empty: {buf:?}"
+        );
+    }
+
+    use super::fake_feature_violation;
+
+    #[test]
+    fn fake_through_a_normal_dependency_on_macos_is_rejected() {
+        let v = fake_feature_violation("navori-procs", "navori-macos", "normal", &["fake"])
+            .expect("fake on a normal dependency must be rejected");
+        assert!(v.contains("navori-procs"), "{v}");
+        assert!(v.contains("navori-macos"), "{v}");
+        assert!(v.contains("fake"), "{v}");
+    }
+
+    #[test]
+    fn fake_through_a_normal_dependency_on_secrets_is_rejected() {
+        let v = fake_feature_violation("navori-ffi", "navori-secrets", "normal", &["fake"])
+            .expect("fake on a normal dependency must be rejected");
+        assert!(v.contains("navori-ffi"), "{v}");
+        assert!(v.contains("navori-secrets"), "{v}");
+        assert!(v.contains("fake"), "{v}");
+    }
+
+    #[test]
+    fn fake_through_a_build_dependency_is_rejected() {
+        assert!(
+            fake_feature_violation("navori-ffi", "navori-secrets", "build", &["fake"]).is_some()
+        );
+        assert!(fake_feature_violation("navori-ffi", "navori-macos", "build", &["fake"]).is_some());
+    }
+
+    /// `cargo metadata` reports a `[target.*.dependencies]` entry with kind `normal`
+    /// (the platform is carried separately), so it is the same edge kind.
+    #[test]
+    fn fake_through_a_target_specific_normal_dependency_is_rejected() {
+        assert!(
+            fake_feature_violation("navori-ffi", "navori-macos", "normal", &["x", "fake"])
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn fake_through_a_dev_dependency_passes() {
+        assert_eq!(
+            fake_feature_violation("navori-procs", "navori-macos", "dev", &["fake"]),
+            None
+        );
+        assert_eq!(
+            fake_feature_violation("navori-ffi", "navori-secrets", "dev", &["fake"]),
+            None
+        );
+    }
+
+    #[test]
+    fn secrets_self_dev_dependency_passes() {
+        assert_eq!(
+            fake_feature_violation("navori-secrets", "navori-secrets", "dev", &["fake"]),
+            None
+        );
+    }
+
+    #[test]
+    fn normal_dependency_without_fake_passes() {
+        assert_eq!(
+            fake_feature_violation("navori-ffi", "navori-macos", "normal", &[]),
+            None
+        );
+        assert_eq!(
+            fake_feature_violation("navori-ffi", "navori-secrets", "normal", &["other"]),
+            None
+        );
+    }
+
+    #[test]
+    fn fake_on_an_unguarded_dependency_is_out_of_scope() {
+        assert_eq!(
+            fake_feature_violation("navori-ffi", "navori-config", "normal", &["fake"]),
+            None
         );
     }
 }
