@@ -251,8 +251,8 @@ Locality: `apps/cli/src/main.rs`. extend. Deps stay `config`, `ipc`, `protocol`.
 Grounding: the user's locks, then `docs/design/2026-11-01-menubar-ui-brief.md` Surfaces 1 and 3, then `feat/menu`'s glass and `MenuRow` system. Story 11 is a native surface, not a browser one; the section is filled because MENU's design set that precedent. Tokens are the AppKit semantic colors MENU uses. The Awake sample in `Features/Preview/PreviewMenu.swift`, which the user judged in the Preview, sets the row's icon and the Submenu's shape.
 
 Respects: ARCH-1, ARCH-2
-Satisfies: AWAKE-1.8, AWAKE-11.1, AWAKE-11.2, AWAKE-11.3, AWAKE-11.4, AWAKE-11.5, AWAKE-11.6, AWAKE-11.7, AWAKE-11.8, AWAKE-11.9, AWAKE-11.10, AWAKE-12.7, AWAKE-12.8, AWAKE-12.9, AWAKE-13.10
-Reuse: rung 2 — `MenuRow`, `CascadeNode`, `CascadeContent`, `CoreRowState` pattern, `CoreStore.dispatch`; new (rung 7): `AwakeRowState` in `NavoriPanel`, `AwakeSubmenuView`, `StatusBlockView`.
+Satisfies: AWAKE-1.8, AWAKE-11.1, AWAKE-11.2, AWAKE-11.3, AWAKE-11.4, AWAKE-11.5, AWAKE-11.6, AWAKE-11.7, AWAKE-11.8, AWAKE-11.9, AWAKE-11.10, AWAKE-11.11, AWAKE-11.12, AWAKE-11.13, AWAKE-11.14, AWAKE-11.15, AWAKE-11.16, AWAKE-11.17, AWAKE-11.18, AWAKE-11.19, AWAKE-11.20, AWAKE-12.7, AWAKE-12.8, AWAKE-12.9, AWAKE-13.10
+Reuse: rung 2 — `MenuRow`, `CascadeNode`, `CascadeContent`, `CoreRowState` pattern, `CoreStore.dispatch`; new (rung 7): `AwakeRowState` in `NavoriPanel`, `AwakeSubmenuView`, `HoldingList`, `HarnessMarkImage`.
 Surface:
 - MENU-1.2 and MENU-1.4 in MENU's `requirements.md`, and MENU's "Comes back if" line — `replace`: amended as story 11 states.
 - MENU Task 18's grep for `"Awake"` (`tasks.md:527`) — `frozen`: built around; a closed task's record of what was true at delivery, not a live gate.
@@ -263,24 +263,26 @@ Surface:
 - The perf probe's `open("core")` — `frozen`: built around, the Core row keeps its id.
 Interface: `CoreStore.awakeStatus: AwakeStatus`, and plain `AwakeLeaseInput` for the Submenu, so no generated types pass `CoreStore`.
 Depth: If `AwakeRowState` vanished, callers would still need only a status enum; the label, dot and submenu rules are hidden and tested.
-Locality: wave 2 only. new: `NavoriPanel/AwakeRowState.swift`, `NavoriPanel/AwakeSubmenuState.swift`, `Features/Panel/AwakeSubmenuView.swift`. extend: `PanelView.swift`, `MenuRowView.swift`, `StatusBarController.swift`, `CoreStore.swift`. leave: `CascadeState`, `CascadeController`, `Features/Preview/`.
+Locality: wave 2 only. new: `NavoriPanel/AwakeRowState.swift`, `NavoriPanel/AwakeSubmenuState.swift`, `Features/Panel/AwakeSubmenuView.swift`, `Features/Panel/HarnessMarkImage.swift`. extend: `PanelView.swift`, `MenuRowView.swift`, `StatusBarController.swift`, `CoreStore.swift`. leave: `CascadeState`, `CascadeController`, `Features/Preview/`.
 
 ### Awake row (level 0)
 
 Layout: one `MenuRow` directly above the Core row, with icon `cup.and.saucer`, title `Awake` and a chevron.
 Components: rung 2 — `MenuRow`; new — `AwakeRowState`, tested like `CoreRowState`.
-States: no Lease → `Off`, no dot · held → green dot, `On · <sources>` · a Lease with System not held → orange dot, `Not held` · Awake record missing or Module failed → `Unavailable`, no Submenu.
+States: no Lease → `Off`, no dot · held → green dot, `On · <sources>`, each source once with a count when it holds several (`On · Claude Code ×8, 1 hour`) · a Lease with System not held → orange dot, `Not held` · a failed menu action or another recorded problem → orange dot, `Needs attention`, with the text in the Submenu · Awake record missing or Module failed → `Unavailable`, no Submenu.
 Type & color: as the Core row; color only in the dot.
-A11y: `MenuRowView` reads title then value as one sentence, for example `Awake, On · Claude Code, 1 hour`.
+A11y: `MenuRowView` reads title then value as one sentence, for example `Awake, On · Claude Code ×8`.
 
 ### Awake Submenu (level 1)
 
-Layout: `Keep awake for 1 hour`, `Keep awake until I turn it off`, then the status block, `Display on`, `Release all`, then a `Holding` header and rows. The commands are `MenuRowView` rows, as in the Preview, because the cascade's selection and keyboard work on rows; the brief's inline buttons would need a second selection path.
-Components: rung 2 — `MenuRowView` for commands, gaining `MenuRow.isDimmed`; `SectionTitle` for `Holding`; new — `StatusBlockView` (brief Surface 3, as drawn in the Preview), a plain Holding row. The tree holds the four command ids (`awake.hold_hour`, `awake.hold_until_off`, `awake.display`, `awake.release_all`) and is static, so a changing Holding list needs no `replaceTree`. `awake` has children whenever `store.hasSnapshot`, as `core` does, and the row's `hasSubmenu` flipping calls `replaceTree`.
-States: off → `Awake off` / `No Leases`, with `Release all` shown dimmed and doing nothing · on → `Awake · since 11:38` / `2 Leases · idle sleep blocked`, plus `· display kept on` with a `display` Lease · not held → `Can't hold this Mac awake` / `macOS refused the request. Navori keeps trying.` · display refused → `Display not held` · `Display on` pressed → reads `Display off`.
-Holding rows: Manual → `1 hour` / `Until off` / `Display`, right-aligned `until 11:38` when it has an end · Command → `<exe name>`, `running · pid 23719` · Session → `Claude Code · NAVORI/main`, `working · pid 23719`, or `stopped · background work · pid 23719` when stopped.
-Type & color: as MENU; secondary text for line two.
-A11y: ↑ and ↓ reach every command, per MENU-5.1; Holding rows and the status block are read by VoiceOver as one sentence each, and carry no keyboard stop; focus follows MENU's rules.
+Lifted from `ui-brief.md` (locked 2026-11-04, variant C1).
+
+Layout: the four commands on top: `Keep awake for 1 hour`, `Keep awake until I turn it off`, `Display on`, `Release all`. Then a separator and a problem line, only when something is wrong. Then a separator and the Holding list, grouped: `Held by you`, `Commands`, then projects in case-insensitive name order. Within a project, working sessions first, then by name, then by pid, so a group does not move when a session's state changes. The list is 26 pt per title and per row, and scrolls past 344 pt. The commands are `MenuRowView` rows, because the cascade's selection and keyboard work on rows.
+Components: rung 2 — `MenuRowView` for commands, gaining `MenuRow.isChecked` beside `isDimmed`; new (rung 7) — `AwakeProblemView`, `HoldingList`, `HoldingLine`, `HoldingMarkView`, reason: no existing row has a mark, a dot and a right-aligned word without selection; new (rung 7) — `HarnessMarkImage`, reason: SF Symbols has no harness logos, and SVG template images need no resource bundle. The tree holds the four command ids (`awake.hold_hour`, `awake.hold_until_off`, `awake.display`, `awake.release_all`) and is static, so a changing Holding list needs no `replaceTree`. `awake` has children whenever `store.hasSnapshot`, as `core` does, and the row's `hasSubmenu` flipping calls `replaceTree`.
+States: off → the commands alone, with `Release all` dimmed and doing nothing · on → the commands and the list, with no status text · a command's Lease exists → a check on that command, plus `until 11:38` on the hour · not held → `Can't hold this Mac awake` / `macOS refused the request. Navori keeps trying.` · display refused → `Display not held` / `2 Leases · idle sleep blocked` · a failed action or a recorded problem → its text, under the refusal title if there is one.
+Holding rows: session → Harness mark, branch, green dot and `working`, or dimmed with `stopped` · Command → `terminal`, `<exe name>`, `running` · Manual → `clock` `1 hour` `until 11:38`, `infinity` `Until off`, `display` `Display`, dimmed while not held. The Harness and pid stay in the tooltip and VoiceOver: `Claude Code · NAVORI/main · pid 23719`.
+Type & color: as MENU; names 14 pt, words 12 pt, project titles 12 pt semibold in `secondaryLabelColor`. A stopped row is `secondaryLabelColor` throughout. Marks are monochrome template images; color only in the dots.
+A11y: ↑ and ↓ reach every command, per MENU-5.1; a held command adds the selected trait; the problem line and each Holding row are read by VoiceOver as one sentence, for example `Claude Code, NAVORI/main, working, pid 23719`, and carry no keyboard stop; focus follows MENU's rules.
 
 ## Seams for testing
 
@@ -298,8 +300,8 @@ New seams: one, the `Platform` test constructor.
 | Fakes' own tests in `crates/macos` | unit | AWAKE-12.12 |
 | `cargo xtask perf` | gate | AWAKE-13.1 |
 | Diff review | manual | AWAKE-2.6, 2.7, 10.5, 13.11 |
-| `AwakeRowState`, `AwakeSubmenuState` in `NavoriPanelTests` | unit | AWAKE-1.8, 11.2, 11.3, 11.4, 11.7, 11.8, 11.9 |
-| Hand walk with VoiceOver, per `docs/agents/verify.md` | manual | AWAKE-11.1, 11.5, 11.6, 11.10, 12.7–12.9, 13.10 |
+| `AwakeRowState`, `AwakeSubmenuState` in `NavoriPanelTests` | unit | AWAKE-1.8, 11.2, 11.3, 11.4, 11.7, 11.8, 11.9, 11.11, 11.12, 11.13, 11.14, 11.15, 11.16, 11.17, 11.18 |
+| Hand walk with VoiceOver, per `docs/agents/verify.md` | manual | AWAKE-11.1, 11.5, 11.6, 11.10, 11.19, 11.20, 12.7–12.9, 13.10 |
 
 ## Coverage check
 

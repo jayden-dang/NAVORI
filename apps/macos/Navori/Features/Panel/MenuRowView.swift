@@ -11,6 +11,7 @@ struct MenuRow {
     let opensSubmenu: Bool
     let shortcut: KeyEquivalent?
     var isDimmed: Bool = false
+    var isChecked: Bool = false
 }
 
 struct MenuRowView: View {
@@ -58,6 +59,12 @@ struct MenuRowView: View {
                         .font(.system(size: 13))
                         .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
                 }
+                if row.isChecked {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
+                }
                 if row.opensSubmenu {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
@@ -95,7 +102,7 @@ struct MenuRowView: View {
         .accessibilityLabel(row.title)
         .accessibilityValue(row.value ?? "")
         .accessibilityHint(row.opensSubmenu ? "Opens a submenu" : "")
-        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(row.isChecked ? [.isButton, .isSelected] : .isButton)
     }
 
     @ViewBuilder

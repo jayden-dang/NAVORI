@@ -1,9 +1,4 @@
-public enum AwakeBlockStatus: Equatable, Sendable {
-    case off
-    case on(since: String)
-    case notHeld
-    case unavailable
-}
+import Foundation
 
 public struct AwakeLeaseInput: Equatable, Sendable {
     public enum Kind: Equatable, Sendable {
@@ -38,110 +33,214 @@ public struct AwakeLeaseInput: Equatable, Sendable {
     }
 }
 
-public struct HoldingRow: Equatable, Sendable {
-    public let line1: String
-    public let line2: String
-    public let accessibilitySentence: String
+public enum HoldingMark: Equatable, Sendable {
+    case claude
+    case codex
+    case grok
+    case terminal
+    case clock
+    case infinity
+    case display
+}
 
-    public init(line1: String, line2: String, accessibilitySentence: String) {
-        self.line1 = line1
-        self.line2 = line2
-        self.accessibilitySentence = accessibilitySentence
+public struct HoldingRow: Equatable, Sendable {
+    public let mark: HoldingMark
+    public let name: String
+    public let word: String
+    public let showsDot: Bool
+    public let isQuiet: Bool
+    public let help: String?
+    public let accessibilitySentence: String
+}
+
+public struct HoldingGroup: Equatable, Sendable {
+    public let title: String
+    public let rows: [HoldingRow]
+}
+
+/// The only status text the Submenu shows: something is wrong.
+public struct AwakeProblem: Equatable, Sendable {
+    public let title: String
+    public let detail: String?
+
+    public init(title: String, detail: String?) {
+        self.title = title
+        self.detail = detail
     }
 }
 
 public struct AwakeSubmenuState: Equatable, Sendable {
     public static let menuHoldSeconds = 3600
 
-    public let statusTitle: String
-    public let statusDetail: String
+    public let problem: AwakeProblem?
     public let releaseAllEnabled: Bool
-    public let displayLabel: String
-    public let holdingRows: [HoldingRow]
+    public let hourChecked: Bool
+    public let hourUntil: String?
+    public let untilOffChecked: Bool
+    public let displayChecked: Bool
+    public let holdingGroups: [HoldingGroup]
 
     public init(
-        status: AwakeBlockStatus,
+        status: AwakeStatus,
         leases: [AwakeLeaseInput],
         displayHeld: Bool,
-        displayWanted: Bool,
         actionFailure: String? = nil
     ) {
-        let counted = Self.leaseDetail(leases.count)
-        var detail: String
-        switch status {
-        case .off:
-            statusTitle = "Awake off"
-            detail = "No Leases"
-        case .on(let since):
-            if displayWanted, displayHeld == false {
-                statusTitle = "Display not held"
-                detail = counted
-            } else {
-                statusTitle = since.isEmpty ? "Awake" : "Awake · since \(since)"
-                detail = displayWanted && displayHeld ? "\(counted) · display kept on" : counted
-            }
-        case .notHeld:
-            statusTitle = "Can't hold this Mac awake"
-            detail = "macOS refused the request. Navori keeps trying."
-        case .unavailable:
-            statusTitle = "Unavailable"
-            detail = ""
-        }
-        if let actionFailure, actionFailure.isEmpty == false {
-            detail = actionFailure
-        }
-        statusDetail = detail
+        let hour = leases.first { $0.kind == .duration }
+        let displayChecked = leases.contains { $0.kind == .display }
+        let base = Self.statusProblem(
+            status,
+            displayRefused: displayChecked && displayHeld == false,
+            leaseCount: leases.count
+        )
+        problem = Self.withFailure(base, actionFailure)
         releaseAllEnabled = leases.isEmpty == false
-        displayLabel = displayWanted ? "Display off" : "Display on"
-        holdingRows = leases.map(Self.holdingRow)
+        hourChecked = hour != nil
+        hourUntil = hour?.until.map { "until \($0)" }
+        untilOffChecked = leases.contains { $0.kind == .untilOff }
+        self.displayChecked = displayChecked
+        holdingGroups = Self.groups(leases, systemHeld: status != .notHeld)
     }
 
-    private static func leaseDetail(_ count: Int) -> String {
-        let noun = count == 1 ? "Lease" : "Leases"
-        return "\(count) \(noun) · idle sleep blocked"
+    private static func statusProblem(
+        _ status: AwakeStatus,
+        displayRefused: Bool,
+        leaseCount: Int
+    ) -> AwakeProblem? {
+        switch status {
+        case .notHeld:
+            return AwakeProblem(
+                title: "Can't hold this Mac awake",
+                detail: "macOS refused the request. Navori keeps trying."
+            )
+        case .problem(let text):
+            return AwakeProblem(title: text, detail: nil)
+        case .unavailable:
+            return AwakeProblem(title: "Unavailable", detail: nil)
+        case .on:
+            guard displayRefused else { return nil }
+            let noun = leaseCount == 1 ? "Lease" : "Leases"
+            return AwakeProblem(title: "Display not held", detail: "\(leaseCount) \(noun) · idle sleep blocked")
+        case .off:
+            return nil
+        }
     }
 
-    private static func holdingRow(_ lease: AwakeLeaseInput) -> HoldingRow {
-        let line1: String
-        let line2: String
+    private static func withFailure(_ base: AwakeProblem?, _ failure: String?) -> AwakeProblem? {
+        guard let failure, failure.isEmpty == false else { return base }
+        guard let base else { return AwakeProblem(title: failure, detail: nil) }
+        return AwakeProblem(title: base.title, detail: failure)
+    }
+
+    /// Held by you, then Commands, then projects by name, so a group does not move when a session's state changes.
+    private static func groups(_ leases: [AwakeLeaseInput], systemHeld: Bool) -> [HoldingGroup] {
+        let manual = [AwakeLeaseInput.Kind.duration, .untilOff, .display].flatMap { kind in
+            leases.filter { $0.kind == kind }.map { manualRow($0, systemHeld: systemHeld) }
+        }
+        let commands = leases.filter { $0.kind == .command }
+            .sorted { ($0.pid ?? 0) < ($1.pid ?? 0) }
+            .map(commandRow)
+        var projects: [String: [AwakeLeaseInput]] = [:]
+        for lease in leases where lease.kind == .session {
+            projects[place(lease).project, default: []].append(lease)
+        }
+        let sessions = projects.keys
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+            .map { project in
+                HoldingGroup(
+                    title: project,
+                    rows: projects[project, default: []].sorted(by: sessionOrder).map(sessionRow)
+                )
+            }
+        var groups: [HoldingGroup] = []
+        if manual.isEmpty == false { groups.append(HoldingGroup(title: "Held by you", rows: manual)) }
+        if commands.isEmpty == false { groups.append(HoldingGroup(title: "Commands", rows: commands)) }
+        return groups + sessions
+    }
+
+    /// Working before stopped, then by name, then by pid.
+    private static func sessionOrder(_ left: AwakeLeaseInput, _ right: AwakeLeaseInput) -> Bool {
+        if left.stopped != right.stopped { return right.stopped }
+        let names = place(left).name.localizedCaseInsensitiveCompare(place(right).name)
+        if names != .orderedSame { return names == .orderedAscending }
+        return (left.pid ?? 0) < (right.pid ?? 0)
+    }
+
+    /// `project/branch`. The branch keeps any further slashes.
+    private static func place(_ lease: AwakeLeaseInput) -> (project: String, name: String) {
+        guard let label = text(lease.label) else {
+            return ("Other", text(lease.harness) ?? "Session")
+        }
+        guard let slash = label.firstIndex(of: "/") else { return (label, label) }
+        let project = String(label[..<slash])
+        let name = String(label[label.index(after: slash)...])
+        guard project.isEmpty == false, name.isEmpty == false else { return (label, label) }
+        return (project, name)
+    }
+
+    private static func sessionRow(_ lease: AwakeLeaseInput) -> HoldingRow {
+        let word = lease.stopped ? "stopped" : "working"
+        let source = [text(lease.harness), text(lease.label)].compactMap { $0 }
+        let pid = lease.pid.map { "pid \($0)" }
+        return HoldingRow(
+            mark: harnessMark(lease.harness),
+            name: place(lease).name,
+            word: word,
+            showsDot: lease.stopped == false,
+            isQuiet: lease.stopped,
+            help: (source + [pid].compactMap { $0 }).joined(separator: " · "),
+            accessibilitySentence: (source + [word, pid].compactMap { $0 }).joined(separator: ", ")
+        )
+    }
+
+    private static func commandRow(_ lease: AwakeLeaseInput) -> HoldingRow {
+        let name = text(lease.label) ?? "command"
+        let pid = lease.pid.map { "pid \($0)" }
+        return HoldingRow(
+            mark: .terminal,
+            name: name,
+            word: "running",
+            showsDot: false,
+            isQuiet: false,
+            help: pid,
+            accessibilitySentence: ([name, "running", pid].compactMap { $0 }).joined(separator: ", ")
+        )
+    }
+
+    private static func manualRow(_ lease: AwakeLeaseInput, systemHeld: Bool) -> HoldingRow {
+        let name: String
+        let mark: HoldingMark
+        var word = ""
         switch lease.kind {
         case .duration:
-            line1 = text(lease.label) ?? "Manual"
-            line2 = lease.until.map { "until \($0)" } ?? ""
-        case .untilOff:
-            line1 = text(lease.label) ?? "Until off"
-            line2 = ""
+            name = text(lease.label) ?? "Manual"
+            mark = .clock
+            word = lease.until.map { "until \($0)" } ?? ""
         case .display:
-            line1 = text(lease.label) ?? "Display"
-            line2 = ""
-        case .command:
-            line1 = text(lease.label) ?? "command"
-            line2 = pidLine("running", lease.pid)
-        case .session:
-            line1 = sessionLine(lease)
-            let lead = lease.stopped ? "stopped · background work" : "working"
-            line2 = pidLine(lead, lease.pid)
+            name = text(lease.label) ?? "Display"
+            mark = .display
+        default:
+            name = text(lease.label) ?? "Until off"
+            mark = .infinity
         }
-        let spoken = line2.isEmpty ? line1 : "\(line1), \(line2)"
-        return HoldingRow(line1: line1, line2: line2, accessibilitySentence: spoken)
+        return HoldingRow(
+            mark: mark,
+            name: name,
+            word: word,
+            showsDot: false,
+            isQuiet: systemHeld == false,
+            help: nil,
+            accessibilitySentence: word.isEmpty ? name : "\(name), \(word)"
+        )
     }
 
-    private static func sessionLine(_ lease: AwakeLeaseInput) -> String {
-        switch (text(lease.harness), text(lease.label)) {
-        case let (harness?, place?):
-            return "\(harness) · \(place)"
-        case let (harness?, nil):
-            return harness
-        case let (nil, place?):
-            return place
-        case (nil, nil):
-            return "Session"
+    private static func harnessMark(_ harness: String?) -> HoldingMark {
+        switch harness {
+        case "Claude Code": .claude
+        case "Codex": .codex
+        case "Grok": .grok
+        default: .terminal
         }
-    }
-
-    private static func pidLine(_ lead: String, _ pid: Int32?) -> String {
-        guard let pid else { return lead }
-        return "\(lead) · pid \(pid)"
     }
 
     private static func text(_ value: String?) -> String? {

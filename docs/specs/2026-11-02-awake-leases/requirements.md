@@ -175,12 +175,22 @@ It changes three things in MENU's spec: MENU-1.2 gains the Awake row before the 
 - **AWAKE-11.2** WHILE no Lease exists THE SYSTEM SHALL show `Off` on the Awake row.
 - **AWAKE-11.3** WHILE a Lease exists with the System assertion held THE SYSTEM SHALL show `On` and the names of the sources holding on the Awake row.
 - **AWAKE-11.4** WHILE a Lease exists with no System assertion THE SYSTEM SHALL NOT show `On` on the Awake row.
-- **AWAKE-11.5** WHEN the Awake row opens THE SYSTEM SHALL show `Keep awake for 1 hour`, `Keep awake until I turn it off`, the status block, `Display on`, `Release all` and a Holding row for each current Lease.
+- **AWAKE-11.5** WHEN the Awake row opens THE SYSTEM SHALL show `Keep awake for 1 hour`, `Keep awake until I turn it off`, `Display on` and `Release all`, in that order, above a Holding row for each current Lease. *(Amended 2026-11-04 by the locked Awake menu, `ui-brief.md`: the status block left this list; see AWAKE-11.11 and AWAKE-11.12.)*
 - **AWAKE-11.6** THE SYSTEM SHALL NOT show `Pause 15m`, `Let my Mac sleep now`, an Agent sessions row, an Integrations row or a per-Lease release button in the Awake Submenu.
 - **AWAKE-11.7** THE SYSTEM SHALL write menu text about Navori's own Leases only.
 - **AWAKE-11.8** THE SYSTEM SHALL NOT say in the menu that the Mac will sleep.
 - **AWAKE-11.9** THE SYSTEM SHALL NOT say in the menu that another app is holding the Mac awake.
 - **AWAKE-11.10** WHEN the app opens the Awake Submenu THE SYSTEM SHALL NOT read the process table or the system's assertions.
+- **AWAKE-11.11** WHILE no problem exists THE SYSTEM SHALL show no status text in the Awake Submenu.
+- **AWAKE-11.12** IF the System assertion or the Display assertion is refused, a menu action fails, or Awake records a problem THEN THE SYSTEM SHALL state that problem between the commands and the Holding rows.
+- **AWAKE-11.13** THE SYSTEM SHALL group Holding rows in this order: `Held by you`, `Commands`, then one group per session project in case-insensitive name order, where the project is the Lease label before its first `/`.
+- **AWAKE-11.14** THE SYSTEM SHALL lead a session's Holding row with the monochrome mark of its Harness, for Claude Code, Codex and Grok, and with a terminal symbol for any other Harness.
+- **AWAKE-11.15** THE SYSTEM SHALL show a working session with a green dot and the word `working`, and a stopped session dimmed with the word `stopped`.
+- **AWAKE-11.16** WHILE the Lease a command made exists THE SYSTEM SHALL show a check on `Keep awake for 1 hour`, `Keep awake until I turn it off` or `Display on`, with `until <time>` on the first of these.
+- **AWAKE-11.17** WHEN one source holds more than one Lease THE SYSTEM SHALL name it once on the Awake row with its count, as `Claude Code ×8`.
+- **AWAKE-11.18** IF a menu action fails or Awake records a problem other than a refused System assertion or a stopped Module THEN THE SYSTEM SHALL show an orange dot and `Needs attention` on the Awake row.
+- **AWAKE-11.19** (guard) WHEN the Awake Submenu is open THE SYSTEM SHALL CONTINUE TO move ↑ and ↓ through the four commands and to give Holding rows no keyboard stop.
+- **AWAKE-11.20** (guard) WHEN `Display on` is pressed while a display Lease exists THE SYSTEM SHALL CONTINUE TO end that Lease.
 
 ## 12. Keep what exists working
 

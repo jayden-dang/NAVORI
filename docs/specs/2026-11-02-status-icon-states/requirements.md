@@ -236,7 +236,7 @@ Recorded so that nobody reads these as requirements.
 - How `tray()` sits beside the state closure at `crates/kernel/src/runtime.rs:175`.
 - A Loop or Beat must not restart when the Shell reassigns the image, which happens on every snapshot today (`StatusBarController.render`, re-run by its observation).
 - A panic inside `tray()` must not take down the status path. How is for design.
-- The status block's text in AWAKE's design as the sentence for ICON-4.3.
+- The refused-assertion text in AWAKE's design (once its status block, now its problem line) as the sentence for ICON-4.3.
 - If the config sentence is shortened later, cut only the fix-it advice, and re-check KCONTRACT-2.4 and KCONTRACT-2.5.
 - A plain-output line for `summary`, later, if it is read by eye often.
 

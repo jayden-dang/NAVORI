@@ -93,9 +93,11 @@ public struct AwakeRowState: Equatable, Sendable {
     public let dot: StatusDot?
     public let hasSubmenu: Bool
 
+    private static let needsAttention = "Needs attention"
+
     public init(status: AwakeStatus, actionFailure: String? = nil) {
         if let actionFailure, actionFailure.isEmpty == false {
-            label = actionFailure
+            label = Self.needsAttention
             dot = .orange
             hasSubmenu = true
             return
@@ -106,7 +108,7 @@ public struct AwakeRowState: Equatable, Sendable {
             dot = nil
             hasSubmenu = true
         case .on(let sources):
-            let names = sources.filter { $0.isEmpty == false }
+            let names = Self.counted(sources)
             label = names.isEmpty ? "On" : "On · \(names.joined(separator: ", "))"
             dot = .green
             hasSubmenu = true
@@ -118,10 +120,24 @@ public struct AwakeRowState: Equatable, Sendable {
             label = "Unavailable"
             dot = nil
             hasSubmenu = false
-        case .problem(let text):
-            label = text
+        case .problem:
+            label = Self.needsAttention
             dot = .orange
             hasSubmenu = true
+        }
+    }
+
+    /// Each source once, in first-seen order, with a count when it holds more than one Lease.
+    private static func counted(_ sources: [String]) -> [String] {
+        var order: [String] = []
+        var counts: [String: Int] = [:]
+        for source in sources where source.isEmpty == false {
+            if counts[source] == nil { order.append(source) }
+            counts[source, default: 0] += 1
+        }
+        return order.map { name in
+            let count = counts[name, default: 1]
+            return count > 1 ? "\(name) ×\(count)" : name
         }
     }
 }

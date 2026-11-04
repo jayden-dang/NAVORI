@@ -586,3 +586,29 @@ Run: `swift test --package-path apps/macos --filter AwakeSubmenuStateTests` — 
 - [x] **Step 5: Commit** `git commit -m "feat(menu): keep the Mac awake from the Awake Submenu"`
 
 _Requirements: AWAKE-1.8, AWAKE-10.5, AWAKE-11.5, AWAKE-11.6, AWAKE-11.7, AWAKE-11.8, AWAKE-11.9, AWAKE-11.10, AWAKE-13.10_
+
+### Task 20: Show the locked Awake menu
+
+Amendment after delivery, from `ui-brief.md`.
+
+**Files:**
+- Create: `apps/macos/Navori/Features/Panel/HarnessMarkImage.swift`, `docs/specs/2026-11-02-awake-leases/ui-brief.md`, `docs/specs/2026-11-02-awake-leases/ui-brief.png`
+- Modify: `apps/macos/NavoriPanel/AwakeRowState.swift`, `apps/macos/NavoriPanel/AwakeSubmenuState.swift`, `apps/macos/Navori/Features/Panel/AwakeSubmenuView.swift`, `apps/macos/Navori/Features/Panel/MenuRowView.swift`, `apps/macos/Navori/Core/CoreStore.swift`, `docs/design/2026-11-01-menubar-ui-brief.md`, `docs/features/awake.md`
+- Test: `apps/macos/Tests/NavoriPanelTests/AwakeRowStateTests.swift`, `apps/macos/Tests/NavoriPanelTests/AwakeSubmenuStateTests.swift`, `apps/macos/Tests/NavoriPanelTests/AwakeLeaseMapTests.swift`, `apps/macos/Tests/NavoriBannerTests/CoreStartupBannerTests.swift`
+
+**Reuse:** rung 2 — `MenuRowView`, `AwakeRowState`, `AwakeSubmenuState`; new (rung 7): `HoldingList`, `HoldingLine`, `HoldingMarkView`, `AwakeProblemView`, `HarnessMarkImage`.
+
+**Interfaces:**
+- Consumes: `CoreStore.awakeStatus`, `awakeLeases`, `displayHeld`, `awakeActionMessage`
+- Produces: `MenuRow.isChecked: Bool = false`; `AwakeSubmenuState(status:leases:displayHeld:actionFailure:)` with `problem: AwakeProblem?`, `releaseAllEnabled`, `hourChecked`, `hourUntil`, `untilOffChecked`, `displayChecked`, `holdingGroups: [HoldingGroup]`; `HoldingRow { mark, name, word, showsDot, isQuiet, help, accessibilitySentence }`. Removes `AwakeBlockStatus`, `StatusBlockView` and `CoreStore.awakeBlockStatus`.
+
+**Depends-on:** Task 18, Task 19
+
+- [x] **Step 1: Write failing tests** for the counted level-0 sources and `Needs attention`, then for the problem line, checks, group order, row order, marks and row text. Run: `swift test --package-path apps/macos --filter AwakeRowStateTests` — expect: the new expectations fail.
+- [x] **Step 2: Implement** both states and the view from `design.md` `## UI design`.
+- [x] **Step 3: Update** the menubar brief, `docs/features/awake.md` and this spec to what shipped.
+- [x] **Step 4: Verify** `cargo xtask ci` — expect: pass. `grep -nE "will sleep|Pause|sleep now|another app|other app"` over the three Awake UI files — expect: no match.
+- [ ] **Step 5: Verify by hand** on `cargo xtask run`: ↑ and ↓ reach all four commands, pressing `Display on` twice ends its Lease, VoiceOver reads each row as one sentence, and each state in `design.md` shows.
+- [x] **Step 6: Commit** `git commit -m "feat(menu): group Awake's Holding list by project with Harness marks"`
+
+_Requirements: AWAKE-11.5, AWAKE-11.11, AWAKE-11.12, AWAKE-11.13, AWAKE-11.14, AWAKE-11.15, AWAKE-11.16, AWAKE-11.17, AWAKE-11.18, AWAKE-11.19, AWAKE-11.20_

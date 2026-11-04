@@ -164,22 +164,6 @@ final class CoreStore {
         )
     }
 
-    var awakeBlockStatus: AwakeBlockStatus {
-        switch awakeStatus {
-        case .off: .off
-        case .notHeld: .notHeld
-        case .unavailable: .unavailable
-        case .on:
-            .on(since: snapshot?.awake?.sinceMs.map { AwakeLeaseMap.clockText($0) } ?? "")
-        case .problem:
-            if snapshot?.awake?.systemHeld == true {
-                .on(since: snapshot?.awake?.sinceMs.map { AwakeLeaseMap.clockText($0) } ?? "")
-            } else {
-                .off
-            }
-        }
-    }
-
     var awakeLeases: [AwakeLeaseInput] {
         snapshot?.awake?.leases.compactMap { lease in
             AwakeLeaseMap.lease(

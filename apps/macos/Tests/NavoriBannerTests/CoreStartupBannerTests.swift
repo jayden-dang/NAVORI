@@ -23,11 +23,9 @@ import Testing
         status: .off,
         leases: [],
         displayHeld: false,
-        displayWanted: false,
         actionFailure: shown
     )
-    #expect(row.label == sentence)
-    #expect(menu.statusDetail == sentence)
-    #expect(row.label != String(reflecting: error))
-    #expect(menu.statusDetail.contains("CoreError") == false)
+    #expect(row.label == "Needs attention")
+    #expect(menu.problem?.title == sentence)
+        #expect(menu.problem?.title.contains("CoreError") == false)
 }

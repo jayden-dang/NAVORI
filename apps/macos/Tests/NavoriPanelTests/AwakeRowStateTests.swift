@@ -10,7 +10,7 @@ struct AwakeRowStateTests {
             (.notHeld, "Not held", .orange, true),
             (.unavailable, "Unavailable", nil, false),
             (.problem("Awake could not save a lease. Navori retries in 60 seconds."),
-             "Awake could not save a lease. Navori retries in 60 seconds.", .orange, true),
+             "Needs attention", .orange, true),
         ]
         for (status, label, dot, hasSubmenu) in cases {
             let row = AwakeRowState(status: status)
@@ -18,6 +18,13 @@ struct AwakeRowStateTests {
             #expect(row.dot == dot)
             #expect(row.hasSubmenu == hasSubmenu)
         }
+    }
+
+    @Test func a_source_holding_several_leases_is_named_once_with_its_count() {
+        let row = AwakeRowState(status: .on(sources: [
+            "Claude Code", "Codex", "Claude Code", "1 hour", "Claude Code", "Codex",
+        ]))
+        #expect(row.label == "On · Claude Code ×3, Codex ×2, 1 hour")
     }
 
     @Test func a_stopped_module_stays_unavailable() {
@@ -60,8 +67,8 @@ struct AwakeRowStateTests {
         )
         #expect(status == .problem(problem))
         let row = AwakeRowState(status: status)
-        #expect(row.label == problem)
-        #expect(row.label.contains("On") == false)
+        #expect(row.label == "Needs attention")
+        #expect(row.dot == .orange)
     }
 
     @Test func a_held_lease_with_no_problem_names_its_sources() {
@@ -100,7 +107,8 @@ struct AwakeRowStateTests {
         let shown = failure.visible(against: marks)
         #expect(shown == "The Navori core is not running.")
         let row = AwakeRowState(status: .off, actionFailure: shown)
-        #expect(row.label == "The Navori core is not running.")
+        #expect(row.label == "Needs attention")
+        #expect(row.dot == .orange)
 
         let achieved = AwakeHeldMarks(
             durationEndsAtMs: nil,

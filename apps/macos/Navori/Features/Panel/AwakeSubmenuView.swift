@@ -8,10 +8,9 @@ struct AwakeSubmenuView: View {
 
     private var state: AwakeSubmenuState {
         AwakeSubmenuState(
-            status: store.awakeBlockStatus,
+            status: store.awakeStatus,
             leases: store.awakeLeases,
             displayHeld: store.displayHeld,
-            displayWanted: store.displayWanted,
             actionFailure: store.awakeActionMessage
         )
     }
@@ -19,24 +18,45 @@ struct AwakeSubmenuView: View {
     var body: some View {
         let state = state
         VStack(alignment: .leading, spacing: 0) {
-            MenuRowView(row: command("awake.hold_hour", "Keep awake for 1 hour"), cascade: cascade)
-            MenuRowView(row: command("awake.hold_until_off", "Keep awake until I turn it off"), cascade: cascade)
-            StatusBlockView(title: state.statusTitle, detail: state.statusDetail)
-            MenuRowView(row: command("awake.display", state.displayLabel), cascade: cascade)
             MenuRowView(
-                row: command("awake.release_all", "Release all", dimmed: state.releaseAllEnabled == false),
+                row: command(
+                    "awake.hold_hour",
+                    "clock",
+                    "Keep awake for 1 hour",
+                    value: state.hourUntil,
+                    checked: state.hourChecked
+                ),
                 cascade: cascade
             )
-            if state.holdingRows.isEmpty == false {
-                VStack(alignment: .leading, spacing: 6) {
-                    SectionTitle("Holding")
-                    ForEach(Array(state.holdingRows.enumerated()), id: \.offset) { _, row in
-                        HoldingLine(row: row)
-                    }
-                }
-                .padding(.horizontal, 8)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
+            MenuRowView(
+                row: command(
+                    "awake.hold_until_off",
+                    "infinity",
+                    "Keep awake until I turn it off",
+                    checked: state.untilOffChecked
+                ),
+                cascade: cascade
+            )
+            MenuRowView(
+                row: command("awake.display", "display", "Display on", checked: state.displayChecked),
+                cascade: cascade
+            )
+            MenuRowView(
+                row: command(
+                    "awake.release_all",
+                    "xmark.circle",
+                    "Release all",
+                    dimmed: state.releaseAllEnabled == false
+                ),
+                cascade: cascade
+            )
+            if let problem = state.problem {
+                MenuSeparator()
+                AwakeProblemView(problem: problem)
+            }
+            if state.holdingGroups.isEmpty == false {
+                MenuSeparator()
+                HoldingList(groups: state.holdingGroups)
             }
         }
         .padding(5)
@@ -44,74 +64,171 @@ struct AwakeSubmenuView: View {
         .fixedSize(horizontal: true, vertical: true)
     }
 
-    private func command(_ id: String, _ title: String, dimmed: Bool = false) -> MenuRow {
+    private func command(
+        _ id: String,
+        _ icon: String,
+        _ title: String,
+        value: String? = nil,
+        checked: Bool = false,
+        dimmed: Bool = false
+    ) -> MenuRow {
         MenuRow(
             id: id,
-            icon: nil,
+            icon: icon,
             title: title,
-            value: nil,
+            value: value,
             dot: nil,
             opensSubmenu: false,
             shortcut: nil,
-            isDimmed: dimmed
+            isDimmed: dimmed,
+            isChecked: checked
         )
     }
 }
 
-struct StatusBlockView: View {
-    let title: String
-    let detail: String
+private struct MenuSeparator: View {
+    var body: some View {
+        Divider()
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+    }
+}
+
+private struct AwakeProblemView: View {
+    let problem: AwakeProblem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.system(size: 14))
-                .foregroundStyle(Color(nsColor: .labelColor))
-            if detail.isEmpty == false {
-                Text(detail)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Circle()
+                .fill(statusDotColor(.orange))
+                .frame(width: 7, height: 7)
+                .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(problem.title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color(nsColor: .labelColor))
+                if let detail = problem.detail {
+                    Text(detail)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                }
             }
+            .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title)
-        .accessibilityValue(detail)
+        .accessibilityLabel(problem.title)
+        .accessibilityValue(problem.detail ?? "")
+    }
+}
+
+/// Fixed heights make the list's size known without measuring. It scrolls only when it overflows.
+private struct HoldingList: View {
+    private static let titleHeight: CGFloat = 26
+    private static let rowHeight: CGFloat = 26
+    private static let maxHeight: CGFloat = 344
+
+    let groups: [HoldingGroup]
+
+    private var height: CGFloat {
+        let rows = groups.reduce(0) { $0 + $1.rows.count }
+        return CGFloat(groups.count) * Self.titleHeight + CGFloat(rows) * Self.rowHeight
+    }
+
+    var body: some View {
+        if height > Self.maxHeight {
+            ScrollView { content }
+                .frame(height: Self.maxHeight)
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
+                Text(group.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 3)
+                    .frame(maxWidth: .infinity, minHeight: Self.titleHeight, maxHeight: Self.titleHeight, alignment: .bottomLeading)
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(Array(group.rows.enumerated()), id: \.offset) { _, row in
+                    HoldingLine(row: row, height: Self.rowHeight)
+                }
+            }
+        }
     }
 }
 
 private struct HoldingLine: View {
     let row: HoldingRow
+    let height: CGFloat
 
-    private var until: String? {
-        row.line2.hasPrefix("until ") ? row.line2 : nil
+    private var ink: Color {
+        Color(nsColor: row.isQuiet ? .secondaryLabelColor : .labelColor)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            HStack(spacing: 8) {
-                Text(row.line1)
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color(nsColor: .labelColor))
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                if let until {
-                    Text(until)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-                        .lineLimit(1)
-                }
+        HStack(spacing: 6) {
+            HoldingMarkView(mark: row.mark)
+                .foregroundStyle(ink)
+                .frame(width: 20, height: 20)
+            Text(row.name)
+                .font(.system(size: 14))
+                .foregroundStyle(ink)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 8)
+            if row.showsDot {
+                Circle()
+                    .fill(statusDotColor(.green))
+                    .frame(width: 6, height: 6)
             }
-            if until == nil, row.line2.isEmpty == false {
-                Text(row.line2)
-                    .font(.system(size: 11.5, design: .monospaced))
-                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+            if row.word.isEmpty == false {
+                Text(row.word)
+                    .font(.system(size: 12))
+                    .foregroundStyle(ink)
                     .lineLimit(1)
             }
         }
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .leading)
+        .help(row.help ?? "")
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(row.accessibilitySentence)
+    }
+}
+
+private struct HoldingMarkView: View {
+    let mark: HoldingMark
+
+    var body: some View {
+        switch mark {
+        case .claude: harness(HarnessMarkImage.claude)
+        case .codex: harness(HarnessMarkImage.codex)
+        case .grok: harness(HarnessMarkImage.grok)
+        case .terminal: symbol("terminal")
+        case .clock: symbol("clock")
+        case .infinity: symbol("infinity")
+        case .display: symbol("display")
+        }
+    }
+
+    private func harness(_ image: NSImage) -> some View {
+        Image(nsImage: image)
+            .renderingMode(.template)
+            .resizable()
+            .frame(width: 16, height: 16)
+    }
+
+    private func symbol(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 13))
+            .symbolRenderingMode(.monochrome)
     }
 }

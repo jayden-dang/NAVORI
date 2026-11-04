@@ -36,7 +36,7 @@ The user's words (verbatim, in order; the Vietnamese quotes are kept as-is, with
 
 - **Layout:** 360pt wide, 5pt padding. Shipped order:
   1. Any banners (the core did not start, an unexpected quit, a config problem).
-  2. **Awake** — one line: icon `cup.and.saucer` · name · one value · chevron. `Off` with no dot; green dot `On · <sources>` while a Lease holds the system assertion; orange dot `Not held` when a Lease exists and that assertion does not; `Unavailable` with no submenu when the record is missing or the module has stopped.
+  2. **Awake** — one line: icon `cup.and.saucer` · name · one value · chevron. `Off` with no dot; green dot `On · <sources>` while a Lease holds the system assertion, each source once with its count (`On · Claude Code ×8`); orange dot `Not held` when a Lease exists and that assertion does not; orange dot `Needs attention` for a failed action or another problem; `Unavailable` with no submenu when the record is missing or the module has stopped.
   3. **Core** — one line, with the dev chip on the dev profile. Its submenu is unchanged.
   4. Separator → `Settings… ⌘,` · `About Navori` · `Quit Navori ⌘Q`.
   - Ask, Needs you, Ports and Pull Requests are not on level 0. They stay in the dev-only preview until those features ship.
@@ -75,14 +75,12 @@ The inbox is **the shared decision place between the user and Navori AI** — it
 
 ## Surface 3 — Awake submenu
 
-- **Layout:** `Keep awake for 1 hour`, `Keep awake until I turn it off`, then the status block, then `Display on` (it reads `Display off` once that Lease exists), then `Release all`, then a **Holding** header and one row per Lease.
-  - Status block: `Awake off` / `No Leases` when nothing is held; `Awake · since 11:38` / `2 Leases · idle sleep blocked`, plus `· display kept on` while a display Lease is held; `Can't hold this Mac awake` / `macOS refused the request. Navori keeps trying.` when the system assertion is refused; `Display not held` when the display assertion is refused.
-  - `Release all` stays visible. With no Lease it is dimmed and does nothing.
-  - Holding: `1 hour` with `until 11:38` right-aligned when the manual hold has an end; `Until off`; `Display`; a command as `<exe name>` / `running · pid 23719`; a session as `Claude Code · NAVORI/main` / `working · pid 23719`, or `stopped · background work · pid 23719` when stopped. No per-Lease release.
-  - No Agent sessions row and no Integrations row.
-- **Components:** commands are `MenuRowView` rows (`isDimmed` when `Release all` has nothing to end). The status block is `StatusBlockView`. Holding uses `SectionTitle` and a plain two-line row. Those rows are not cascade nodes.
-- **States:** off (`Awake off`, `Release all` dimmed) · on · system assertion refused · display assertion refused (`Display not held`, button reads `Display off`).
-- **Type & color / A11y:** as Surface 1. ↑ and ↓ reach the four commands. VoiceOver reads each command, the status block, and each Holding row as one sentence. The status block and Holding rows take no keyboard stop.
+Locked 2026-11-04 as variant C1. The brief of record is [`docs/specs/2026-11-02-awake-leases/ui-brief.md`](../specs/2026-11-02-awake-leases/ui-brief.md).
+
+- **Layout:** `Keep awake for 1 hour`, `Keep awake until I turn it off`, `Display on`, `Release all`; a problem line only when something is wrong; then Holding, grouped by `Held by you`, `Commands` and project. No per-Lease release. No Agent sessions row and no Integrations row.
+- **Components:** commands are `MenuRowView` rows with an icon and a check. Holding rows are not cascade nodes.
+- **States:** off (the commands alone, `Release all` dimmed) · on (no status text) · system assertion refused · display assertion refused · action failed.
+- **Type & color / A11y:** as Surface 1, with monochrome Harness marks. ↑ and ↓ reach the four commands. VoiceOver reads each command, the problem line and each Holding row as one sentence. The problem line and Holding rows take no keyboard stop.
 
 ## Surface 4 — Ports submenu (+ Project)
 
