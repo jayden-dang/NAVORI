@@ -38,14 +38,14 @@ The inventory of code units in the repository — every Rust crate and Swift tar
 
 | Module | Path | Responsibility |
 |---|---|---|
-| `navori-llm` | `ai/llm/` | Provider-neutral LLM client. Surface: `LlmProvider`, `OpenAiCompat`, `ChatRequest`, `ChatReply`, `Message`, `Role`, `LlmError`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_PROVIDER`. Depends on `navori-secrets` for `Secret` only. |
+| `navori-llm` | `ai/llm/` | Provider-neutral LLM client. Surface: `LlmProvider`, `OpenAiCompat`, `ChatRequest`, `ChatReply`, `Message`, `Role`, `LlmError`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_PROVIDER`. Depends on `navori-secrets` for `Secret` only, and on `reqwest` for HTTP. |
 | `navori-context` | `ai/context/` | Context Gateway: key read, Shield pass over the prompt, audit row, send; fails closed. Surface: `Gateway`, `Sender`, `AuditSink`, `AuditRow`, `Outcome`, `AskError`, `SendError`, `AuditError`. Depends on `navori-redact` and `navori-secrets`, not on `navori-llm`; `navori-ffi` wires them. |
 
 **Planned**
 
 | Module | Path | Responsibility |
 |---|---|---|
-| `navori-secrets` | `crates/secrets/` | Keychain store for tokens and API keys (landed; library only, no consumer yet, ROAD-11 and ROAD-19 consume it). |
+| `navori-secrets` | `crates/secrets/` | Keychain store for tokens and API keys (landed; consumed by `navori-llm`, `navori-context` and `navori-ffi`; ROAD-11 and ROAD-19 still to come). |
 | `navori-mod-inbox` | `modules/inbox/` | Feature Module: Needs you — Decisions, To-dos, Updates (R2). |
 | `navori-mod-ports` | `modules/ports/` | Feature Module: listening ports by project/worktree/harness (R3). |
 | `navori-mod-github` | `modules/github/` | Feature Module: pull requests, checks, approve/merge (R4). |

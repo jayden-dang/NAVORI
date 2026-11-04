@@ -60,7 +60,7 @@ Status: **Built** = in the tree at R0 · **Built (Rn)** = in the tree since that
 | Scheduler | Built | Periodic work for all modules: fast while the menu is open, slow in the background, a timer parks on uptime, and an overdue timer may fire during dark wake (ARCH-16). | `crates/kernel` |
 | Platform FFI | Built (R1) | Safe traits `ProcessSource`, `ExitSource` and `PowerAssertions` (`MacProcesses`, `KqueueExits`, `MacPower`). The only hand-written `unsafe` (ARCH-9). | `crates/macos` |
 | Process model | Built (R1) | Snapshot, project/worktree location, Harness table, child activity and process-exit watcher. No `unsafe`. Uses `ProcessSource` and `ExitSource`. | `crates/procs` |
-| Secrets | Built (R2) — library only, no consumer yet; ROAD-11 and ROAD-19 consume it | Keychain storage for tokens and API keys (ARCH-8). | `crates/secrets` |
+| Secrets | Built (R2) — consumed by `navori-llm`, `navori-context` and `navori-ffi`; ROAD-11 and ROAD-19 still to come | Keychain storage for tokens and API keys (ARCH-8). | `crates/secrets` |
 | Awake module | Built (R1) | Leases → at most one power assertion per kind; harness-session tracking. | `modules/awake` |
 | Ports module | Planned (R3) | Listening ports by project/worktree/harness; stop with approval. | `modules/ports` |
 | GitHub module | Planned (R4) | PR inbox, checks, approve/merge; OAuth device flow (ADR 0002). | `modules/github` |

@@ -71,7 +71,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | FFI | `uniffi` 0.32, `libc`, `objc2-io-kit`, `objc2-core-foundation` | — |
 | CLI | `clap` | — |
 | Secrets | `keyring-core`, `apple-native-keyring-store` (feature `keychain`) | — |
-| HTTP, SSE | `reqwest` 0.13.5 (feature `json`; used by `navori-llm`) | `eventsource-stream` (R2) |
+| HTTP, SSE | `reqwest` 0.13.5 (default features and `json`; rustls TLS by default; used by `navori-llm`) | `eventsource-stream` (R2) |
 | GitHub | — | `graphql_client` (R4) |
 | MCP | — | `rmcp` (R6) |
 | Runtime files | `tempfile` (atomic writes in the integrations Module) | — |
