@@ -7,7 +7,7 @@
 > for tracking.
 
 Feature code: SECRETS
-Status: Approved
+Status: In-progress
 Date: 2026-11-03
 Approved by the operator ("approve", 2026-11-03 21:01, on the review page at e3b886c, no card selected).
 Execution-mode: continuous
@@ -39,7 +39,7 @@ Compact delta every task inherits:
 - **Source classes** — every value in `requirements.md` and `design.md` is a Lock, `agent-decided` or Unverified. A task never promotes one to the operator's choice, and a code comment never states an `agent-decided` value as the operator's decision.
 - **Charter hard stops** — no test or step reads or writes a real Keychain item, or a config or data file outside this worktree and a temp directory. Only Task 6 contains such a test; it is `#[ignore]`d and never run here.
 - **ARCH-8, ARCH-9** — secrets only in the Keychain; no `unsafe` (the workspace lint forbids it; `[lints] workspace = true` is mandatory, xtask/src/main.rs:699-707).
-- **ARCH-4, ARCH-14, ARCH-17** — the crate defines no Action, route or command; release and dev never share an item; callers keep Keychain calls off the actor thread (their rule, not this crate's).
+- **ARCH-4, ARCH-10, ARCH-14** — the crate defines no Action, route or command; release and dev never share an item; callers keep Keychain calls off the actor thread (ARCH-10; their rule, not this crate's).
 - **Secrets in output** — `Debug`, `Display` and error text of this crate never contain a value; the backend error is never formatted, logged or `unwrap`ped (design decision 5). Secret-shaped fixtures are fake and split with `concat!` (testing.md).
 - **Testing** — test-first. Tests live in `crates/secrets/tests/` and use the public API (testing.md:14); test names are sentences in domain language. Fakes only at the system boundary (the Keychain).
 - **Lints** — no `unwrap`/`expect` outside tests. Clippy's `allow-expect-in-tests` covers only `#[test]` functions, so every test file with helpers that call `expect` starts with `#![allow(clippy::unwrap_used, clippy::expect_used)]`; `tests/common/mod.rs` also allows `dead_code` because each test crate uses a different subset. `missing_debug_implementations` is on and CI denies warnings.
@@ -448,7 +448,7 @@ _Requirements: SECRETS-6.1, SECRETS-6.2, SECRETS-5.1, SECRETS-5.2_
 
 **Interfaces:**
 - Consumes: `SecretKey`, `Secret`, `KeychainService` (Tasks 2, 3).
-- Produces: `trait SecretStore: Send + Sync` with `set(&self, &SecretKey, &Secret) -> Result<(), SecretError>`, `get(&self, &SecretKey) -> Result<Option<Secret>, SecretError>`, `exists(&self, &SecretKey) -> Result<bool, SecretError>`, `delete(&self, &SecretKey) -> Result<Deleted, SecretError>`; `Deleted::{Removed, WasAbsent}`; `Operation::{Set, Get, Exists, Delete}` with `Display`; `SecretError` with `operation()`; crate-private `SecretKey::{account, kind, name}` and `SecretError::new(Operation, KeychainService, &SecretKey)`; `FakeKeychain::{new, fail_next(Operation)}`; `MemoryStore::new(KeychainService, &FakeKeychain)`; test helpers `contract_set_get`, `contract_exists_delete`, `contract_errors`, `call`.
+- Produces: `trait SecretStore: Send + Sync` with `set(&self, &SecretKey, &Secret) -> Result<(), SecretError>`, `get(&self, &SecretKey) -> Result<Option<Secret>, SecretError>`, `exists(&self, &SecretKey) -> Result<bool, SecretError>`, `delete(&self, &SecretKey) -> Result<Deleted, SecretError>`; `Deleted::{Removed, WasAbsent}`; `Operation::{Set, Get, Exists, Delete}` with `Display`; `SecretError` with `operation()`; crate-private `SecretKey::{account, kind, name}` and `SecretError::new(Operation, KeychainService, &SecretKey)`; `FakeKeychain::{new, fail_next(Operation), item_count() -> usize}` (`item_count` is a feature-`fake` test accessor: a count, never a value); `MemoryStore::new(KeychainService, &FakeKeychain)`; test helpers `contract_set_get`, `contract_exists_delete`, `contract_errors`, `call`.
 
 **Depends-on:** Task 2, Task 3
 
