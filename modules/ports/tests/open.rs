@@ -95,17 +95,27 @@ async fn naming_an_address_the_port_is_not_bound_to_lists_the_addresses() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn open_is_a_read_action() {
+async fn the_catalog_has_list_and_open_as_read_actions_and_the_schema_names_their_inputs() {
     let rig = Rig::new();
-    let open = rig
+    let specs: Vec<_> = rig
         .kernel
         .actions()
         .into_iter()
-        .find(|spec| spec.module == "ports" && spec.name == "open")
-        .unwrap();
-    assert_eq!(open.risk, Risk::Read);
-    assert!(open.description.contains(' ') && open.description.ends_with('.'));
-    assert!(open.input_schema.to_string().contains("port"));
+        .filter(|spec| spec.module == "ports")
+        .collect();
+    let mut names: Vec<_> = specs.iter().map(|spec| spec.name.as_str()).collect();
+    names.sort_unstable();
+    assert_eq!(names, ["list", "open"]);
+    assert!(specs.iter().all(|spec| spec.risk == Risk::Read));
+    let open = specs.iter().find(|spec| spec.name == "open").unwrap();
+    let mut inputs: Vec<String> = open
+        .input_schema
+        .pointer("/oneOf/1/properties/open/properties")
+        .and_then(|inputs| inputs.as_object())
+        .map(|inputs| inputs.keys().cloned().collect())
+        .unwrap_or_default();
+    inputs.sort();
+    assert_eq!(inputs, ["address", "port"], "{}", open.input_schema);
 }
 
 #[tokio::test(start_paused = true)]

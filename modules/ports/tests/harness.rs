@@ -2,11 +2,10 @@
 
 mod common;
 
-use std::io::Write;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::Arc;
 use std::time::Duration;
 
-use common::{Gate, Rig};
+use common::{Gate, LogCapture, Rig};
 use navori_macos::ProcessSource;
 use navori_macos::fake::{FakeProcess, FakeProcesses};
 use navori_mod_ports::{HarnessMemo, HarnessName, Scanner};
@@ -19,22 +18,6 @@ const TOKEN_TEXT: &str = concat!("tok_", "abcdefghijklmnop");
 fn listener(pid: i32, exe: &str) -> FakeProcess {
     FakeProcess::new(pid, 1, 501, 10_000 + u64::try_from(pid).unwrap(), exe)
         .listen("127.0.0.1", 3000)
-}
-
-struct Captured(Arc<Mutex<Vec<u8>>>);
-
-impl Write for Captured {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
 }
 
 fn gated() -> (Arc<FakeProcesses>, Arc<Gate>, Scanner) {
@@ -53,13 +36,7 @@ fn harness(scan: &navori_mod_ports::Scan) -> Vec<Option<HarnessName>> {
 
 #[tokio::test(start_paused = true)]
 async fn a_listener_started_by_claude_code_shows_it_and_leaks_nothing_else() {
-    let writer = Arc::new(Mutex::new(Vec::<u8>::new()));
-    let captured = Arc::clone(&writer);
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::TRACE)
-        .with_ansi(false)
-        .with_writer(move || Captured(Arc::clone(&captured)))
-        .init();
+    let logs = LogCapture::start();
 
     let rig = Rig::new();
     rig.processes.add(
@@ -78,8 +55,7 @@ async fn a_listener_started_by_claude_code_shows_it_and_leaks_nothing_else() {
         json!("claude_code")
     );
     let state = rig.state().to_string();
-    let log = String::from_utf8_lossy(&writer.lock().unwrap_or_else(PoisonError::into_inner))
-        .into_owned();
+    let log = logs.text();
     for text in [listed.to_string(), state, log] {
         assert!(!text.contains(TOKEN_TEXT));
         assert!(!text.contains(TOKEN_NAME));
@@ -87,26 +63,15 @@ async fn a_listener_started_by_claude_code_shows_it_and_leaks_nothing_else() {
 }
 
 #[test]
-fn a_scan_error_and_its_text_name_no_environment_entry() {
-    let (fake, gate, scanner) = gated();
-    fake.add(listener(100, "/Users/u/bin/server").env(&[TOKEN_ENTRY, "GROK_AGENT=1"]));
-    gate.deny(true);
-
-    let (scan, memo) = scanner.scan(HarnessMemo::new());
-    let text = format!("{scan:?} {memo:?}");
-
-    assert!(scan.is_err());
-    assert!(!text.contains(TOKEN_TEXT));
-    assert!(!text.contains(TOKEN_NAME));
-}
-
-#[test]
 fn a_denied_environment_read_leaves_no_harness_and_the_next_scan_reads_again() {
     let (fake, gate, scanner) = gated();
-    fake.add(listener(100, "/Users/u/bin/server").env(&["CODEX_THREAD_ID=abc"]));
+    fake.add(listener(100, "/Users/u/bin/server").env(&["CODEX_THREAD_ID=abc", TOKEN_ENTRY]));
     gate.deny_env_once();
 
     let (first, memo) = scanner.scan(HarnessMemo::new());
+    let text = format!("{first:?} {memo:?}");
+    assert!(!text.contains(TOKEN_TEXT));
+    assert!(!text.contains(TOKEN_NAME));
     let first = first.unwrap();
     assert_eq!(harness(&first), vec![None]);
     assert_eq!(first.skipped, 0);

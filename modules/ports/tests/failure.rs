@@ -33,13 +33,7 @@ async fn a_failed_scan_keeps_the_last_good_list_and_says_why() {
 
     rig.gate.deny(true);
     rig.advance(Duration::from_secs(30)).await;
-    for _ in 0..200 {
-        rig.idle().await;
-        if rig.state()["problem"].is_string() {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(5));
-    }
+    rig.settle_problem().await;
     let failed = rig.dispatch(json!("list")).await.unwrap();
 
     assert_eq!(failed["scanned_at_ms"], ORIGIN_MS + 5_000);
@@ -105,12 +99,7 @@ async fn port_counts_never_turn_on_attention() {
 
     assert_eq!(tray.attention, None);
     assert_eq!(tray.glyph, None);
-}
-
-#[tokio::test(start_paused = true)]
-async fn a_scan_that_has_not_finished_asks_for_nothing() {
-    let tray = Ports::tray(&PortsState::default());
-
-    assert_eq!(tray.glyph, None);
-    assert_eq!(tray.attention, None);
+    let unscanned = Ports::tray(&PortsState::default());
+    assert_eq!(unscanned.attention, None);
+    assert_eq!(unscanned.glyph, None);
 }

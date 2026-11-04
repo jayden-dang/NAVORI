@@ -248,6 +248,18 @@ impl Rig {
         panic!("no scan finished: {}", self.state());
     }
 
+    /// Waits until a failed scan has published its problem.
+    pub async fn settle_problem(&self) {
+        for _ in 0..200 {
+            self.idle().await;
+            if self.state()["problem"].is_string() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        panic!("no scan failed: {}", self.state());
+    }
+
     /// Waits until the published scan carries this time.
     pub async fn settle_at(&self, scanned_at_ms: u64) {
         for _ in 0..200 {
@@ -270,6 +282,11 @@ impl Rig {
             std::thread::sleep(Duration::from_millis(5));
         }
         panic!("the module did not restart: {}", self.state());
+    }
+
+    /// How many process-list reads happened after the count was `mark`.
+    pub fn list_calls_since(&self, mark: usize) -> usize {
+        self.processes.list_calls() - mark
     }
 
     pub fn state(&self) -> Value {

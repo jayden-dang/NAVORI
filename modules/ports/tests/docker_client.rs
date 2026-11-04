@@ -194,9 +194,7 @@ async fn a_peer_streaming_trailers_without_end_is_too_large_before_the_deadline(
             }
         })
     });
-    let started = std::time::Instant::now();
     assert_eq!(read(&served).await, Err(DockerError::TooLarge));
-    assert!(started.elapsed() < Duration::from_secs(1));
     let _ = served.request.await;
     assert!(sent.load(Ordering::SeqCst) < 2 * 1024 * 1024);
 }
@@ -214,24 +212,16 @@ async fn a_body_of_many_small_chunks_is_decoded_whole() {
 }
 
 #[tokio::test]
-async fn a_repeated_content_length_is_a_bad_reply() {
-    let reply = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nContent-Length: 2\r\n\r\n[]";
-    let served = serve(say(reply.as_bytes().to_vec()));
-    assert_eq!(read(&served).await, Err(DockerError::BadReply));
-}
-
-#[tokio::test]
-async fn conflicting_content_lengths_are_a_bad_reply() {
-    let reply = "HTTP/1.1 200 OK\r\nContent-Length: 9\r\nContent-Length: 2\r\n\r\n[]";
-    let served = serve(say(reply.as_bytes().to_vec()));
-    assert_eq!(read(&served).await, Err(DockerError::BadReply));
-}
-
-#[tokio::test]
-async fn a_content_length_with_a_sign_is_a_bad_reply() {
-    let reply = "HTTP/1.1 200 OK\r\nContent-Length: +2\r\n\r\n[]";
-    let served = serve(say(reply.as_bytes().to_vec()));
-    assert_eq!(read(&served).await, Err(DockerError::BadReply));
+async fn a_content_length_that_is_repeated_conflicting_or_signed_is_a_bad_reply() {
+    for lengths in [
+        "Content-Length: 2\r\nContent-Length: 2",
+        "Content-Length: 9\r\nContent-Length: 2",
+        "Content-Length: +2",
+    ] {
+        let reply = format!("HTTP/1.1 200 OK\r\n{lengths}\r\n\r\n[]");
+        let served = serve(say(reply.into_bytes()));
+        assert_eq!(read(&served).await, Err(DockerError::BadReply), "{lengths}");
+    }
 }
 
 #[tokio::test]

@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::await_holding_lock)]
+#![allow(clippy::unwrap_used)]
 
 mod common;
 
@@ -50,16 +50,19 @@ async fn opening_the_panel_brings_the_next_scan_within_three_seconds_but_not_at_
     with_one_listener(&rig);
     rig.advance(Duration::from_secs(5)).await;
     rig.settle_at(ORIGIN_MS + 5_000).await;
+    let mark = rig.processes.list_calls();
+    let one_scan = mark;
     rig.advance(Duration::from_secs(10)).await;
-    assert_eq!(rig.processes.list_calls(), 3);
+    assert_eq!(rig.list_calls_since(mark), 0);
     rig.kernel.scheduler().set_panel_visible(true);
     rig.idle().await;
-    assert_eq!(rig.processes.list_calls(), 3);
+    assert_eq!(rig.list_calls_since(mark), 0);
     rig.advance(Duration::from_secs(3)).await;
     rig.settle_at(ORIGIN_MS + 18_000).await;
-    assert_eq!(rig.processes.list_calls(), 6);
+    assert_eq!(rig.list_calls_since(mark), one_scan);
 }
 
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(start_paused = true)]
 async fn a_scan_that_comes_due_during_a_slow_scan_is_skipped() {
     let rig = Rig::new();
@@ -70,14 +73,17 @@ async fn a_scan_that_comes_due_during_a_slow_scan_is_skipped() {
     drop(hold);
     rig.settle_at(ORIGIN_MS + 5_000).await;
     rig.idle().await;
-    assert_eq!(rig.processes.list_calls(), 3);
+    let mark = rig.processes.list_calls();
+    let first = mark;
     rig.advance(Duration::from_secs(29)).await;
     assert_eq!(rig.state()["scanned_at_ms"], ORIGIN_MS + 5_000);
-    assert_eq!(rig.processes.list_calls(), 3);
+    assert_eq!(rig.list_calls_since(mark), 0);
     rig.advance(Duration::from_secs(1)).await;
     rig.settle_at(ORIGIN_MS + 95_000).await;
+    assert_eq!(rig.processes.list_calls(), 2 * first);
 }
 
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(start_paused = true)]
 async fn list_answers_while_a_scan_is_running() {
     let rig = Rig::new();

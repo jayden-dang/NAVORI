@@ -8,7 +8,7 @@ use navori_mod_ports::{HarnessMemo, PortKind, Scanner, kind};
 
 #[test]
 fn each_port_gets_the_first_kind_that_applies() {
-    let rows: [(Option<&str>, bool, PortKind); 12] = [
+    let rows = [
         (
             Some("/Applications/Docker.app/Contents/MacOS/com.docker.backend"),
             false,
@@ -41,6 +41,23 @@ fn each_port_gets_the_first_kind_that_applies() {
             PortKind::Other,
         ),
         (None, true, PortKind::DevServer),
+        (Some("/opt/homebrew/bin/mysqld"), false, PortKind::Database),
+        (
+            Some("/opt/homebrew/bin/mariadbd"),
+            false,
+            PortKind::Database,
+        ),
+        (
+            Some("/opt/homebrew/bin/redis-server"),
+            false,
+            PortKind::Database,
+        ),
+        (
+            Some("/opt/homebrew/bin/valkey-server"),
+            false,
+            PortKind::Database,
+        ),
+        (Some("/opt/homebrew/bin/mongod"), false, PortKind::Database),
     ];
     for (exe, placed, expected) in rows {
         assert_eq!(
@@ -50,24 +67,6 @@ fn each_port_gets_the_first_kind_that_applies() {
         );
     }
     assert_eq!(kind(None, false), PortKind::Other);
-}
-
-#[test]
-fn each_database_name_is_a_database() {
-    for name in [
-        "mysqld",
-        "mariadbd",
-        "redis-server",
-        "valkey-server",
-        "mongod",
-    ] {
-        let exe = format!("/opt/homebrew/bin/{name}");
-        assert_eq!(
-            kind(Some(Path::new(&exe)), false),
-            PortKind::Database,
-            "{name}"
-        );
-    }
 }
 
 #[test]

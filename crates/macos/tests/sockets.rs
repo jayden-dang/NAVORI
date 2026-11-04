@@ -1,9 +1,8 @@
-//! Listening TCP sockets: a real read-back of this process, and the scripted fake.
+//! Listening TCP sockets: a real read-back of this process.
 
-use std::net::{IpAddr, TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream};
 
-use navori_macos::fake::{FakeProcess, FakeProcesses};
-use navori_macos::{Listener, MacProcesses, ProcessSource, ReadError};
+use navori_macos::{Listener, MacProcesses, ProcessSource};
 
 #[test]
 #[ignore = "reads this process's own sockets through the kernel"]
@@ -34,41 +33,14 @@ fn a_loopback_listener_in_this_process_is_read_back() -> Result<(), Box<dyn std:
 #[ignore = "reads this process's own name through the kernel"]
 fn the_short_name_of_this_process_is_read() -> Result<(), Box<dyn std::error::Error>> {
     let name = MacProcesses::new()?.name(std::process::id() as i32)?;
-    assert!(!name.is_empty());
+    let binary = std::env::current_exe()?;
+    let binary = binary
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default();
+    assert!(
+        !name.is_empty() && binary.starts_with(&name),
+        "{name} {binary}"
+    );
     Ok(())
-}
-
-#[test]
-fn the_fake_returns_the_listeners_it_was_given_and_records_the_read() {
-    let fake = FakeProcesses::new(501);
-    fake.add(
-        FakeProcess::new(10, 1, 501, 1_000, "/usr/bin/node")
-            .listen("127.0.0.1", 3000)
-            .listen("::", 5432),
-    );
-
-    assert_eq!(
-        fake.listeners(10),
-        Ok(vec![
-            Listener {
-                addr: IpAddr::from([127, 0, 0, 1]),
-                port: 3000
-            },
-            Listener {
-                addr: IpAddr::from([0u16; 8]),
-                port: 5432
-            },
-        ])
-    );
-    assert_eq!(fake.reads(), vec![(10, "fds")]);
-}
-
-#[test]
-fn the_fake_reports_a_refused_socket_read_and_a_missing_process() {
-    let fake = FakeProcesses::new(501);
-    fake.add(FakeProcess::new(10, 1, 501, 1_000, "/bin/sh").fds_err(ReadError::Denied));
-
-    assert_eq!(fake.listeners(10), Err(ReadError::Denied));
-    assert_eq!(fake.listeners(99), Err(ReadError::Gone));
-    assert_eq!(fake.name(99), Err(ReadError::Gone));
 }

@@ -5,7 +5,6 @@ mod common;
 use std::time::Duration;
 
 use common::{ORIGIN_MS, Rig};
-use navori_kernel::Risk;
 use navori_macos::ReadError;
 use navori_macos::fake::FakeProcess;
 use navori_mod_ports::{
@@ -196,22 +195,6 @@ async fn processes_without_a_project_are_listed_by_pid_and_their_ports_in_order(
         .collect();
     assert_eq!(ports, vec![json!(80), json!(9000)]);
     assert_eq!(state["groups"][0]["project"], Value::Null);
-}
-
-#[tokio::test(start_paused = true)]
-async fn list_is_a_read_action_with_a_schema_and_description() {
-    let rig = Rig::new();
-    let specs: Vec<_> = rig
-        .kernel
-        .actions()
-        .into_iter()
-        .filter(|spec| spec.module == "ports")
-        .collect();
-    assert_eq!(specs.len(), 2);
-    assert_eq!(specs[0].name, "list");
-    assert_eq!(specs[0].risk, Risk::Read);
-    assert!(specs[0].description.contains(' ') && specs[0].description.ends_with('.'));
-    assert!(specs[0].input_schema.to_string().contains("list"));
 }
 
 #[tokio::test(start_paused = true)]

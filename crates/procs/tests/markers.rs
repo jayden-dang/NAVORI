@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use navori_macos::fake::{FakeProcess, FakeProcesses};
-use navori_procs::{Harness, MARKERS, ProcId, Snapshot, Unavailable, started_by};
+use navori_procs::{Harness, ProcId, Snapshot, Unavailable, started_by};
 
 fn id_of(snapshot: &Snapshot, pid: i32) -> Result<ProcId, String> {
     snapshot
@@ -54,15 +54,6 @@ fn with_no_ancestor_each_marker_gives_its_harness() -> Result<(), String> {
         assert_eq!(started(&fake, 101)?, Ok(Some(harness)), "{entry}");
     }
     Ok(())
-}
-
-#[test]
-fn the_markers_are_the_three_names_in_a_fixed_order() {
-    let names = MARKERS.map(|(name, _)| name);
-    assert_eq!(
-        names,
-        ["CLAUDE_CODE_CHILD_SESSION", "CODEX_THREAD_ID", "GROK_AGENT"]
-    );
 }
 
 #[test]
