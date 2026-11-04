@@ -9,6 +9,7 @@ members = [
     "crates/ipc",
     "crates/macos",
     "crates/procs",
+    "crates/secrets",
     "crates/ffi",
     "apps/cli",
     "xtask",
@@ -31,13 +32,16 @@ navori-kernel = { path = "crates/kernel" }
 navori-ipc = { path = "crates/ipc" }
 navori-macos = { path = "crates/macos" }
 navori-procs = { path = "crates/procs" }
+navori-secrets = { path = "crates/secrets" }
 navori-mod-awake = { path = "modules/awake" }
 
 # Versions = latest stable on crates.io as of 2026-11-01 (`cargo xtask outdated` re-checks).
 anyhow = "1.0.104"
+apple-native-keyring-store = { version = "1.0.2", features = ["keychain"] }
 assert_cmd = "2.2.2"
 clap = { version = "4.6.7", features = ["derive", "env"] }
 futures = "0.3.34"
+keyring-core = "1.0.1"
 libc = "0.2.191"
 objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFString"] }
 objc2-io-kit = { version = "0.3.2", default-features = false, features = ["std", "pwr_mgt", "libc"] }
