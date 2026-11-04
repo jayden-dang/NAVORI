@@ -1,0 +1,105 @@
+//! `navori ask`: one prompt to the provider through the running app.
+
+use std::pin::pin;
+use std::time::Duration;
+
+use navori_ipc::{Client, IpcError, MAX_LINE_BYTES};
+use navori_protocol::rpc::Request;
+use navori_protocol::rpc::method;
+use navori_protocol::{AskReply, AskRequest};
+use serde_json::Value;
+use tokio::time::timeout;
+
+use crate::{Failure, decode};
+
+const NOTICE_AFTER: Duration = Duration::from_secs(3);
+const ASK_WAIT: Duration = Duration::from_secs(150);
+
+fn wait_limit() -> Duration {
+    std::env::var("NAVORI_ASK_WAIT_MS")
+        .ok()
+        .and_then(|ms| ms.parse().ok())
+        .map_or(ASK_WAIT, Duration::from_millis)
+}
+
+fn params(model: &str, prompt: &str) -> Result<Value, Failure> {
+    serde_json::to_value(AskRequest {
+        model: model.to_owned(),
+        text: prompt.to_owned(),
+    })
+    .map_err(|e| Failure::Failed(e.to_string()))
+}
+
+/// A fresh `Client` numbers its first call 1, so this is the exact line the server will read.
+pub fn check_size(model: &str, prompt: &str) -> Result<(), Failure> {
+    let line = serde_json::to_string(&Request::new(1, method::ASK, params(model, prompt)?))
+        .map_err(|e| Failure::Failed(e.to_string()))?;
+    if line.len() > MAX_LINE_BYTES {
+        return Err(Failure::Failed(format!(
+            "the question is too large: the request would be {} bytes and the limit is {MAX_LINE_BYTES}",
+            line.len()
+        )));
+    }
+    Ok(())
+}
+
+pub async fn run(client: &mut Client, model: &str, prompt: &str) -> Result<String, Failure> {
+    let params = params(model, prompt)?;
+    let wait = wait_limit();
+    let mut call = pin!(client.call(method::ASK, params));
+    let first = match timeout(wait.min(NOTICE_AFTER), &mut call).await {
+        Ok(answer) => Some(answer),
+        Err(_) if wait > NOTICE_AFTER => {
+            eprintln!("waiting for the answer…");
+            timeout(wait - NOTICE_AFTER, &mut call).await.ok()
+        }
+        Err(_) => None,
+    };
+    let Some(answer) = first else {
+        return Err(Failure::Failed(format!(
+            "the app did not answer within {} s (the request may still finish in the app)",
+            wait.as_secs_f64()
+        )));
+    };
+    let v = answer.map_err(|e| match e {
+        IpcError::Rpc(refusal) => Failure::Failed(refusal.message),
+        other => other.into(),
+    })?;
+    Ok(decode::<AskReply>(v)?.reply)
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+
+    fn line_length(model: &str, prompt: &str) -> usize {
+        let params = serde_json::json!({ "model": model, "text": prompt });
+        let request = Request::new(1, method::ASK, params);
+        serde_json::to_string(&request).unwrap().len()
+    }
+
+    fn refusal(model: &str, prompt: &str) -> Option<String> {
+        match check_size(model, prompt) {
+            Ok(()) => None,
+            Err(Failure::Failed(message)) => Some(message),
+            Err(_) => panic!("expected a plain failure"),
+        }
+    }
+
+    #[test]
+    fn a_request_line_of_exactly_the_limit_is_accepted() {
+        let prompt = "a".repeat(1_048_576 - line_length("m", ""));
+        assert_eq!(line_length("m", &prompt), 1_048_576);
+        assert_eq!(refusal("m", &prompt), None);
+    }
+
+    #[test]
+    fn a_request_line_one_byte_over_the_limit_is_refused_naming_the_limit() {
+        let prompt = "a".repeat(1_048_577 - line_length("m", ""));
+        assert_eq!(line_length("m", &prompt), 1_048_577);
+        let message = refusal("m", &prompt).unwrap();
+        assert!(message.contains("1048576"), "{message}");
+    }
+}

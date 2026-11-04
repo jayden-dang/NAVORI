@@ -6,7 +6,11 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use assert_cmd::Command;
-use navori_ffi::{CoreConfig, CoreSnapshot, NavoriCore, SnapshotListener};
+use futures::future::BoxFuture;
+use navori_context::{SendError, Sender};
+use navori_ffi::{AiDeps, CoreConfig, CoreSnapshot, NavoriCore, SnapshotListener};
+use navori_secrets::fake::{FakeKeychain, MemoryStore};
+use navori_secrets::{Secret, SecretStore};
 use predicates::prelude::*;
 use serde_json::Value;
 
@@ -48,23 +52,67 @@ fn start_core(config_toml: Option<&str>) -> Running {
         std::fs::create_dir_all(&data).unwrap();
         std::fs::write(data.join("config.toml"), body).unwrap();
     }
-    let core = NavoriCore::start(
-        CoreConfig {
-            profile: "dev".into(),
-            home_dir: home.path().to_string_lossy().into_owned(),
-            uid: std::fs::metadata(home.path()).unwrap().uid(),
-            app_version: "9.9.9-test".into(),
-            log_to_file: false,
-            helper_path: home
-                .path()
-                .join("Navori Dev.app/Contents/Helpers/navori")
-                .to_string_lossy()
-                .into_owned(),
-        },
-        Arc::new(Ignore),
-    )
-    .unwrap();
+    let core = NavoriCore::start(core_config(&home), Arc::new(Ignore)).unwrap();
     Running { home, core }
+}
+
+fn core_config(home: &tempfile::TempDir) -> CoreConfig {
+    CoreConfig {
+        profile: "dev".into(),
+        home_dir: home.path().to_string_lossy().into_owned(),
+        uid: std::fs::metadata(home.path()).unwrap().uid(),
+        app_version: "9.9.9-test".into(),
+        log_to_file: false,
+        helper_path: home
+            .path()
+            .join("Navori Dev.app/Contents/Helpers/navori")
+            .to_string_lossy()
+            .into_owned(),
+    }
+}
+
+fn start_core_with(deps: AiDeps) -> Running {
+    let home = short_home();
+    let core = NavoriCore::start_with(core_config(&home), Arc::new(Ignore), deps).unwrap();
+    Running { home, core }
+}
+
+struct StubSender {
+    delay: Duration,
+    reply: &'static str,
+}
+
+impl Sender for StubSender {
+    fn send<'a>(
+        &'a self,
+        _: &'a Secret,
+        _: &'a str,
+        _: &'a str,
+    ) -> BoxFuture<'a, Result<String, SendError>> {
+        Box::pin(async move {
+            tokio::time::sleep(self.delay).await;
+            Ok(self.reply.to_owned())
+        })
+    }
+}
+
+fn ai_deps(vault: &FakeKeychain, sender: StubSender) -> AiDeps {
+    let vault = vault.clone();
+    let sender = Arc::new(sender);
+    AiDeps {
+        open_secrets: Arc::new(move |service| {
+            let store: Arc<dyn SecretStore> = Arc::new(MemoryStore::new(service, &vault));
+            Ok(store)
+        }),
+        make_sender: Arc::new(move || sender.clone()),
+    }
+}
+
+fn running_ai_core(reply: &'static str, delay: Duration) -> (Running, FakeKeychain) {
+    let vault = FakeKeychain::new();
+    let running = start_core_with(ai_deps(&vault, StubSender { delay, reply }));
+    futures::executor::block_on(running.core.save_provider_key("k1".into())).unwrap();
+    (running, vault)
 }
 
 fn navori(home: &tempfile::TempDir) -> Command {
@@ -1202,4 +1250,116 @@ fn a_hook_dispatch_is_a_single_awake_call_per_event() {
         dispatched_action(&requests[0])["hold_session"]["session_id"],
         "s-1"
     );
+}
+
+#[test]
+fn ask_prints_the_reply_and_exits_zero() {
+    let (r, _vault) = running_ai_core("hello back", Duration::ZERO);
+    navori(&r.home)
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(0)
+        .stdout("hello back\n");
+}
+
+#[test]
+fn ask_without_model_is_a_usage_error() {
+    let r = running_core();
+    navori(&r.home).args(["ask", "hi"]).assert().code(2);
+}
+
+#[test]
+fn ask_help_describes_the_model_id() {
+    let r = running_core();
+    navori(&r.home)
+        .args(["ask", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("provider's own model name"))
+        .stdout(predicate::str::contains("deepseek-flash"));
+}
+
+#[test]
+fn ask_with_no_key_prints_the_sentence_and_exits_one() {
+    let vault = FakeKeychain::new();
+    let r = start_core_with(ai_deps(
+        &vault,
+        StubSender {
+            delay: Duration::ZERO,
+            reply: "unused",
+        },
+    ));
+    navori(&r.home)
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr("navori: No key set. Add one in Settings → AI.\n");
+}
+
+#[test]
+fn ask_reports_a_keychain_failure_without_the_no_key_sentence() {
+    let (r, vault) = running_ai_core("unused", Duration::ZERO);
+    vault.fail_next(navori_secrets::Operation::Get);
+    navori(&r.home)
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::starts_with("navori: get failed"))
+        .stderr(predicate::str::contains("No key set").not())
+        .stderr(predicate::str::contains("rpc error").not());
+}
+
+#[test]
+fn ask_reports_an_audit_refusal_as_a_message_with_exit_one() {
+    let (r, _vault) = running_ai_core("never sent", Duration::ZERO);
+    let data = r.home.path().join("Library/Application Support/Navori Dev");
+    let store = navori_store::Store::open(&data.join("navori.db"), &data.join("backups")).unwrap();
+    store.with_conn(|conn| {
+        conn.execute_batch("CREATE TABLE context_audit (blocking INTEGER)")
+            .unwrap();
+    });
+    navori(&r.home)
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr("navori: The audit log could not be recorded, so nothing was sent.\n");
+}
+
+#[test]
+fn ask_when_the_app_is_not_running_exits_three() {
+    let home = short_home();
+    navori(&home)
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("not running"));
+}
+
+#[test]
+fn ask_prints_a_waiting_notice_on_stderr_when_slow() {
+    let (r, _vault) = running_ai_core("late reply", Duration::from_millis(3500));
+    navori(&r.home)
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(0)
+        .stdout("late reply\n")
+        .stderr("waiting for the answer…\n");
+}
+
+#[test]
+fn ask_gives_up_when_the_app_does_not_answer() {
+    let server = recording_server_replying(Reply::Never);
+    let started = Instant::now();
+    navori(&server.home)
+        .env("NAVORI_ASK_WAIT_MS", "200")
+        .args(["ask", "--model", "m", "hi"])
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::contains("did not answer within 0.2 s"))
+        .stderr(predicate::str::contains("may still finish"));
+    assert!(started.elapsed() < Duration::from_secs(10));
 }
