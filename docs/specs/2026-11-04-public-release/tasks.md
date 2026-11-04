@@ -215,11 +215,11 @@ _Requirements: RELEASE-2.1, RELEASE-2.2, RELEASE-2.3, RELEASE-2.4, RELEASE-2.5, 
 
 **Depends-on:** Task 5
 
-- [ ] **Step 1: Write the failing tests:** `an_action_pinned_to_a_tag_is_reported` (`      - uses: actions/checkout@v4`); `an_action_pinned_to_a_full_sha_passes` (`uses: actions/checkout@` + 40 hex); `a_local_action_passes` (`uses: ./.github/actions/x`); `a_short_sha_is_reported` (7 hex); `quoted_uses_values_are_read` (`uses: "actions/checkout@v4"` reported); `a_sha_pin_followed_by_a_version_comment_passes` (`uses: actions/checkout@` + 40 hex + ` # v4.2.2`).
-- [ ] **Step 2: Run** `cargo test -p xtask release::` — expect: fails (function missing).
-- [ ] **Step 3: Implement** both functions and the one call in `ci()`; no existing check in `ci()` changes.
-- [ ] **Step 4: Run** `cargo test -p xtask && cargo xtask ci` — expect: pass (no workflow yet).
-- [ ] **Step 5: Commit** `git commit -m "feat(xtask): reject workflow actions not pinned to a commit SHA"`
+- [x] **Step 1: Write the failing tests:** `an_action_pinned_to_a_tag_is_reported` (`      - uses: actions/checkout@v4`); `an_action_pinned_to_a_full_sha_passes` (`uses: actions/checkout@` + 40 hex); `a_local_action_passes` (`uses: ./.github/actions/x`); `a_short_sha_is_reported` (7 hex); `quoted_uses_values_are_read` (`uses: "actions/checkout@v4"` reported); `a_sha_pin_followed_by_a_version_comment_passes` (`uses: actions/checkout@` + 40 hex + ` # v4.2.2`).
+- [x] **Step 2: Run** `cargo test -p xtask release::` — expect: fails (function missing).
+- [x] **Step 3: Implement** both functions and the one call in `ci()`; no existing check in `ci()` changes.
+- [x] **Step 4: Run** `cargo test -p xtask && cargo xtask ci` — expect: pass (no workflow yet).
+- [x] **Step 5: Commit** `git commit -m "feat(xtask): reject workflow actions not pinned to a commit SHA"`
 
 _Requirements: RELEASE-7.4, RELEASE-2.8_
 
