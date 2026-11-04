@@ -164,7 +164,7 @@ _Requirements: SECRETS-10.1, SECRETS-10.2, SECRETS-8.1_
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `crates/secrets/tests/names.rs`:
 
@@ -215,7 +215,7 @@ fn each_rejection_says_which_part_and_what_is_wrong() {
 
 Run: `cargo nextest run -p navori-secrets --test names` — expect: compile error, `SecretKey` not found.
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 `crates/secrets/src/key.rs`:
 
@@ -308,11 +308,11 @@ pub use key::*;
 
 The crate-private accessors (`account`, `kind`, `name`) arrive in Task 4 with their first caller, so this task's clippy gate has no unused code (the derived `PartialEq` reads both fields).
 
-- [ ] **Step 3: Run and gate**
+- [x] **Step 3: Run and gate**
 
 Run: `cargo fmt --all`, then `cargo nextest run -p navori-secrets --test names` — expect: 4 passed. Run: `cargo clippy -p navori-secrets --all-targets -- -D warnings` — expect: clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 `git add crates/secrets && git commit -m "feat(secrets): validate secret keys by kind and name"`
 
