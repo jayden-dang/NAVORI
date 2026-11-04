@@ -84,17 +84,17 @@ Compact delta every task inherits:
 
 **Depends-on:** none
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `install.rs`: `installing_writes_a_command_that_runs_the_helper_only_when_it_exists` expects exactly `[ -f '/Applications/Navori.app/Contents/Helpers/navori' ] && [ -x '/Applications/Navori.app/Contents/Helpers/navori' ] && exec '/Applications/Navori.app/Contents/Helpers/navori' hook || true`; the quote-in-path and dev cases at today's `:369`, `:384`, `:399` move to the guarded form.
   - `status.rs`: `hooks_written_in_the_earlier_form_need_repair` (loads `claude_installed.json`); the three tests that read the earlier form as installed move to guarded input — `a_complete_correct_set_is_installed` (`:77`, loads `claude_guarded.json` and `grok_guarded.json`), `a_symlinked_hook_file_is_read_through_the_link` (`:186`, links to `claude_guarded.json`), `a_quote_inside_the_helper_path_is_read_back_as_ours` (`:342`, the string at `:344` in the guarded form); `guarded_lookalikes_are_not_navoris` — paths that differ between the three places, a missing `exec`, `|| false`, the other profile's arguments, a path not ending `Contents/Helpers/navori`.
   - `repair.rs`: `repair_rewrites_earlier_form_hooks_as_guarded_and_keeps_other_hooks`.
   - `remove.rs`: `remove_deletes_the_running_profiles_hooks_in_both_forms_and_nothing_else`.
   - `guard_shell.rs` (runs `/bin/sh -c <command>` built by the module's install path into a temp Hook file, then read back): `a_missing_helper_exits_zero_with_no_output`; `a_directory_in_place_of_the_helper_exits_zero_with_no_output`; `a_helper_without_the_execute_bit_exits_zero_with_no_output`; `a_present_helper_gets_the_same_arguments_and_stdin` (a fake helper script writes `"$@"` and its stdin to files; expect `hook` and the exact payload bytes); `the_helper_runs_as_the_shell_process_itself` (the fake writes `$$`; expect it to equal the `sh` child's pid); `the_command_finishes_well_inside_the_hook_timeout` (under 2 s with the fake present). `guard_shell.rs` defines its own install helper over `Rig::new(dev, helper)` (the one in `install.rs` is local). The Session Lease through a real Harness (RELEASE-5.7) is exercised in Task 9 Step 4.
-- [ ] **Step 2: Run** `cargo test -p navori-mod-integrations` — expect: the new and moved tests fail on the earlier command text.
-- [ ] **Step 3: Implement** the guarded `command_for` and the two-form recognizer; switch `tests/common/mod.rs` `command()` to the guarded form and add `legacy_command()`; add `claude_guarded.json` and `grok_guarded.json`. `crates/ffi/tests/integrations.rs` needs no edit: its installed cases install through the Core and pick up the guarded form, and `:150` stays a needs-repair case.
-- [ ] **Step 4: Update the docs:** `docs/features/integrations.md:60`; amend HOOKS-4.4 (`requirements.md:96`) and HOOKS-5.2 (`:117`) in place to say the guarded command and its two-form recognition, each ending `*(Amended 2026-11-04 by RELEASE-5.1 — guarded hook command.)*` / `*(Amended 2026-11-04 by RELEASE-5.11.)*` — amended, not struck, because HOOKS `tasks.md:239,265` cite them and HOOKS is still In-progress; update HOOKS `design.md` decision 5 (`:27`) and the lines that say only the single-quoted form is recognized.
-- [ ] **Step 5: Run** `cargo test -p navori-mod-integrations && cargo xtask ci` — expect: pass.
-- [ ] **Step 6: Commit** `git commit -m "feat(integrations): write hooks that do nothing once the Navori helper is gone"`
+- [x] **Step 2: Run** `cargo test -p navori-mod-integrations` — expect: the new and moved tests fail on the earlier command text.
+- [x] **Step 3: Implement** the guarded `command_for` and the two-form recognizer; switch `tests/common/mod.rs` `command()` to the guarded form and add `legacy_command()`; add `claude_guarded.json` and `grok_guarded.json`. `crates/ffi/tests/integrations.rs` needs no edit: its installed cases install through the Core and pick up the guarded form, and `:150` stays a needs-repair case.
+- [x] **Step 4: Update the docs:** `docs/features/integrations.md:60`; amend HOOKS-4.4 (`requirements.md:96`) and HOOKS-5.2 (`:117`) in place to say the guarded command and its two-form recognition, each ending `*(Amended 2026-11-04 by RELEASE-5.1 — guarded hook command.)*` / `*(Amended 2026-11-04 by RELEASE-5.11.)*` — amended, not struck, because HOOKS `tasks.md:239,265` cite them and HOOKS is still In-progress; update HOOKS `design.md` decision 5 (`:27`) and the lines that say only the single-quoted form is recognized.
+- [x] **Step 5: Run** `cargo test -p navori-mod-integrations && cargo xtask ci` — expect: pass.
+- [x] **Step 6: Commit** `git commit -m "feat(integrations): write hooks that do nothing once the Navori helper is gone"`
 
 _Requirements: RELEASE-5.1, RELEASE-5.2, RELEASE-5.3, RELEASE-5.4, RELEASE-5.6, RELEASE-5.7, RELEASE-5.8, RELEASE-5.9, RELEASE-5.10, RELEASE-5.11, RELEASE-7.2_
 
@@ -115,11 +115,11 @@ _Requirements: RELEASE-5.1, RELEASE-5.2, RELEASE-5.3, RELEASE-5.4, RELEASE-5.6, 
 
 **Depends-on:** none
 
-- [ ] **Step 1: Write the failing tests:** `a_tag_naming_the_workspace_version_passes` (`v0.1.0`, `0.1.0` → `0.1.0`); `a_tag_naming_another_version_fails_naming_both` (`v0.2.0`, `0.1.0` → error text contains `0.2.0` and `0.1.0`); `a_tag_without_the_v_prefix_fails`; `a_version_with_a_pre_release_part_is_a_pre_release` (`0.2.0-rc.1` true, `1.0.0-rc.1+b.7` true); `build_metadata_alone_is_not_a_pre_release` (`1.0.0+build-1` false, `0.1.0` false).
-- [ ] **Step 2: Run** `cargo test -p xtask release::` — expect: does not compile (`release` module missing).
-- [ ] **Step 3: Implement** `release.rs` with the two functions and `run` handling `--check` only (the build path arrives in Task 4: until then `run` without `--check` bails with "release build not implemented"); add `mod release;` and the `Cmd::Release` arm in `main.rs`, the workspace version taken from `env!("CARGO_PKG_VERSION")`.
-- [ ] **Step 4: Run** `cargo test -p xtask && cargo xtask release --tag v0.1.0 --check` — expect: pass, then `version=0.1.0` and `prerelease=false`.
-- [ ] **Step 5: Commit** `git commit -m "feat(xtask): check that a release tag names the workspace version"`
+- [x] **Step 1: Write the failing tests:** `a_tag_naming_the_workspace_version_passes` (`v0.1.0`, `0.1.0` → `0.1.0`); `a_tag_naming_another_version_fails_naming_both` (`v0.2.0`, `0.1.0` → error text contains `0.2.0` and `0.1.0`); `a_tag_without_the_v_prefix_fails`; `a_version_with_a_pre_release_part_is_a_pre_release` (`0.2.0-rc.1` true, `1.0.0-rc.1+b.7` true); `build_metadata_alone_is_not_a_pre_release` (`1.0.0+build-1` false, `0.1.0` false).
+- [x] **Step 2: Run** `cargo test -p xtask release::` — expect: does not compile (`release` module missing).
+- [x] **Step 3: Implement** `release.rs` with the two functions and `run` handling `--check` only (the build path arrives in Task 4: until then `run` without `--check` bails with "release build not implemented"); add `mod release;` and the `Cmd::Release` arm in `main.rs`, the workspace version taken from `env!("CARGO_PKG_VERSION")`.
+- [x] **Step 4: Run** `cargo test -p xtask && cargo xtask release --tag v0.1.0 --check` — expect: pass, then `version=0.1.0` and `prerelease=false`.
+- [x] **Step 5: Commit** `git commit -m "feat(xtask): check that a release tag names the workspace version"`
 
 _Requirements: RELEASE-1.3, RELEASE-1.10_
 
