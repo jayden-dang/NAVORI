@@ -1,6 +1,9 @@
 //! Stopping what holds a port.
 
+mod process;
 mod resolve;
+
+pub use process::{member_outcome, reach_for, stop_process};
 
 pub use resolve::{
     ContainerPlan, FreshRead, Guard, Plan, ProcessPlan, Reach, Resolved, StopClass, resolve,

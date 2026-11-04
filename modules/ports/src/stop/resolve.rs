@@ -82,8 +82,8 @@ pub fn stop_class(entry: &PortEntry, own_pid: i32, helper: Option<&Path>) -> Sto
 /// What a stop must never signal: Navori itself, what started it, and the helper.
 pub struct Guard {
     own_pid: i32,
-    ancestors: BTreeSet<i32>,
-    complete: bool,
+    pub(super) ancestors: BTreeSet<i32>,
+    pub(super) complete: bool,
     source: Arc<dyn ProcessSource>,
     helper: Option<PathBuf>,
 }
@@ -231,7 +231,7 @@ fn resolve_process(
     }))
 }
 
-fn never(entry: &PortEntry, guard: &Guard) -> bool {
+pub(super) fn never(entry: &PortEntry, guard: &Guard) -> bool {
     entry.container.is_some()
         || stop_class(entry, guard.own_pid, guard.helper.as_deref()) == StopClass::Never
 }

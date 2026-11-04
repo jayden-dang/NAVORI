@@ -26,8 +26,8 @@ pub use place::{place, place_listener};
 pub use scan::{BackendPort, HarnessMemo, Scan, Scanner};
 pub use state::*;
 pub use stop::{
-    ContainerPlan, FreshRead, Guard, Plan, ProcessPlan, Reach, Resolved, StopClass, reason,
-    resolve, stop_class,
+    ContainerPlan, FreshRead, Guard, Plan, ProcessPlan, Reach, Resolved, StopClass, member_outcome,
+    reach_for, reason, resolve, stop_class, stop_process,
 };
 
 /// Opens the process source, once, when the first scan needs it.
