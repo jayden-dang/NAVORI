@@ -3,8 +3,8 @@ use std::net::IpAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use navori_macos::ProcessSource;
-use navori_procs::{Harness, ProcId, ProcsError, Snapshot, started_by};
+use navori_macos::{Listener, ProcessSource};
+use navori_procs::{Harness, ProcId, Process, ProcsError, Snapshot, Unavailable, started_by};
 
 use crate::kind::{is_docker_backend, kind};
 use crate::place::place_listener;
@@ -65,71 +65,94 @@ impl Scanner {
 
     fn scan_with(&self, memo: &HarnessMemo, kept: &mut HarnessMemo) -> Result<Scan, ProcsError> {
         let snapshot = Snapshot::take(Arc::clone(&self.source))?;
-        let mut found = Vec::new();
-        let mut unread = Vec::new();
-        for process in snapshot.processes() {
-            match snapshot.listeners(process.id) {
-                Ok(listeners) if listeners.is_empty() => {}
-                Ok(listeners) => found.push((process, listeners)),
-                Err(navori_procs::Unavailable::Exited) => {}
-                Err(_) => unread.push(process.id),
+        let (found, unread) = read_listeners(&snapshot);
+        let same = snapshot.still_same()?;
+        let skipped = unread.iter().filter(|id| same.contains(id)).count();
+        let mut scan = Scan {
+            skipped: u32::try_from(skipped).unwrap_or(u32::MAX),
+            ..Scan::default()
+        };
+        for (process, listeners) in found {
+            if same.contains(&process.id) {
+                self.add_process(
+                    &snapshot,
+                    process,
+                    by_port(&listeners),
+                    memo,
+                    kept,
+                    &mut scan,
+                );
             }
         }
-        let same = snapshot.still_same()?;
-        let skipped = count(unread.iter().filter(|id| same.contains(id)));
-        let mut entries = Vec::new();
-        let mut backend = Vec::new();
-        for (process, listeners) in found {
-            if !same.contains(&process.id) {
-                continue;
-            }
-            let exe = process.exe.clone().ok();
-            let mut ports: BTreeMap<u16, BTreeSet<IpAddr>> = BTreeMap::new();
-            for listener in listeners {
-                ports
-                    .entry(listener.port)
-                    .or_default()
-                    .insert(listener.addr);
-            }
-            if is_docker_backend(exe.as_deref()) {
-                backend.extend(ports.into_iter().map(|(port, addresses)| BackendPort {
+        Ok(scan)
+    }
+
+    fn add_process(
+        &self,
+        snapshot: &Snapshot,
+        process: &Process,
+        ports: BTreeMap<u16, BTreeSet<IpAddr>>,
+        memo: &HarnessMemo,
+        kept: &mut HarnessMemo,
+        scan: &mut Scan,
+    ) {
+        let exe = process.exe.clone().ok();
+        if is_docker_backend(exe.as_deref()) {
+            scan.backend
+                .extend(ports.into_iter().map(|(port, addresses)| BackendPort {
                     pid: process.id.pid,
                     start_us: process.id.start.0,
                     port,
                     addresses: addresses.into_iter().collect(),
                     exe: exe.clone(),
                 }));
-                continue;
-            }
-            let name = name_of(&snapshot, process.id, exe.as_deref());
-            let harness = harness_for(&snapshot, process.id, memo, kept);
-            let place = place_listener(snapshot.cwd(process.id), process.exe.clone(), &self.home);
-            let kind = kind(exe.as_deref(), place.project.is_some());
-            for (port, addresses) in ports {
-                entries.push(PortEntry {
-                    port,
-                    addresses: addresses.into_iter().collect(),
-                    pid: process.id.pid,
-                    start_us: process.id.start.0,
-                    name: name.clone(),
-                    exe: exe.clone(),
-                    place: place.clone(),
-                    harness,
-                    kind,
-                    container: None,
-                });
-            }
+            return;
         }
-        Ok(Scan {
-            entries,
-            skipped,
-            backend,
-        })
+        let name = name_of(snapshot, process.id, exe.as_deref());
+        let harness = harness_for(snapshot, process.id, memo, kept);
+        let place = place_listener(snapshot.cwd(process.id), process.exe.clone(), &self.home);
+        let kind = kind(exe.as_deref(), place.project.is_some());
+        scan.entries
+            .extend(ports.into_iter().map(|(port, addresses)| PortEntry {
+                port,
+                addresses: addresses.into_iter().collect(),
+                pid: process.id.pid,
+                start_us: process.id.start.0,
+                name: name.clone(),
+                exe: exe.clone(),
+                place: place.clone(),
+                harness,
+                kind,
+                container: None,
+            }));
     }
 }
 
-fn count<'a>(ids: impl Iterator<Item = &'a ProcId>) -> u32 {
-    u32::try_from(ids.count()).unwrap_or(u32::MAX)
+type Found<'a> = Vec<(&'a Process, Vec<Listener>)>;
+
+fn read_listeners(snapshot: &Snapshot) -> (Found<'_>, Vec<ProcId>) {
+    let mut found = Vec::new();
+    let mut unread = Vec::new();
+    for process in snapshot.processes() {
+        match snapshot.listeners(process.id) {
+            Ok(listeners) if listeners.is_empty() => {}
+            Ok(listeners) => found.push((process, listeners)),
+            Err(Unavailable::Exited) => {}
+            Err(_) => unread.push(process.id),
+        }
+    }
+    (found, unread)
+}
+
+fn by_port(listeners: &[Listener]) -> BTreeMap<u16, BTreeSet<IpAddr>> {
+    let mut ports: BTreeMap<u16, BTreeSet<IpAddr>> = BTreeMap::new();
+    for listener in listeners {
+        ports
+            .entry(listener.port)
+            .or_default()
+            .insert(listener.addr);
+    }
+    ports
 }
 
 fn name_of(snapshot: &Snapshot, id: ProcId, exe: Option<&std::path::Path>) -> String {
