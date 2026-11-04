@@ -379,7 +379,7 @@ _Requirements: PSTOP-1.17, PSTOP-1.11, PSTOP-1.12, PSTOP-1.13, PSTOP-1.14, PSTOP
 
 **Depends-on:** Task 2, Task 4
 
-- [ ] **Step 1: Write the failing tests** in `crates/ffi/tests/running.rs` (pure `build` with fixture states):
+- [x] **Step 1: Write the failing tests** in `crates/ffi/tests/running.rs` (pure `build` with fixture states):
   - join: `a_label_joins_the_project_before_its_first_slash` (reads the shared fixture), `a_session_lease_with_a_working_flag_makes_its_project_working`
   - `an_unknown_state_carries_its_reason_sentence_per_case_and_none_while_known` (four cases, the sentences verbatim, the Awake problem text passed through unchanged)
   - unknown, one test each: `awake_not_registered`, `awake_state_that_did_not_deserialize` (view `None`), `awake_with_a_problem_set`, `awake_module_down`, `tracking_agents_off`, `any_live_session_lease_without_a_label`; each leaves `row_stop_request` and `child_stop_request` empty for every project
@@ -396,10 +396,10 @@ _Requirements: PSTOP-1.17, PSTOP-1.11, PSTOP-1.12, PSTOP-1.13, PSTOP-1.14, PSTOP
   - `openable_is_true_for_a_listed_port_that_is_not_a_database_or_system_port` (`agent-decided`: `ports.open` accepts any listed port, so the Shell offers `Open` only where a page is plausible)
   - the tray and status icon not reading the view is checked by `rg -n "running::" crates/kernel` returning nothing (guard, a grep step)
   - a snapshot test in `crates/ffi/tests/core.rs` helpers style: `the_snapshot_carries_a_running_view_once_ports_has_scanned`, with no `kill` dispatch
-- [ ] **Step 2: Run** `cargo test -p navori-ffi --test running` — expect: compile errors.
-- [ ] **Step 3: Implement** `running.rs` per design section H; request strings are the exact `kill` JSON of Task 3 (a `Project` selector for a group and for a container, a `Pid` selector for a process port).
-- [ ] **Step 4: Wire** `snapshot()` and rebase onto `main` first (shared ffi files). Run `cargo test -p navori-ffi && cargo xtask ci` — expect: pass (it also builds the Swift shell, which must still compile with the new field unused).
-- [ ] **Step 5: Commit** `git commit -m "feat(ffi): join ports and awake into one running view"`
+- [x] **Step 2: Run** `cargo test -p navori-ffi --test running` — expect: compile errors.
+- [x] **Step 3: Implement** `running.rs` per design section H; request strings are the exact `kill` JSON of Task 3 (a `Project` selector for a group and for a container, a `Pid` selector for a process port).
+- [x] **Step 4: Wire** `snapshot()` and rebase onto `main` first (shared ffi files). Run `cargo test -p navori-ffi && cargo xtask ci` — expect: pass (it also builds the Swift shell, which must still compile with the new field unused).
+- [x] **Step 5: Commit** `git commit -m "feat(ffi): join ports and awake into one running view"`
 
 _Requirements: PSTOP-4.1, PSTOP-4.2, PSTOP-4.3, PSTOP-4.4, PSTOP-4.5, PSTOP-4.6, PSTOP-4.7, PSTOP-4.12, PSTOP-4.20, PSTOP-4.21, PSTOP-6.9, PSTOP-7.3_
 
