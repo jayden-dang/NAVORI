@@ -1,6 +1,6 @@
 # Navori — Architecture overview
 
-Navori is an AI-first personal cockpit for macOS (Apple Silicon): one menubar app whose logic lives in a Rust **Core** (kernel, modules, AI runtime) and whose UI is a Swift **Shell** (AppKit + SwiftUI), connected through UniFFI. It is built for a single user, runs locally, works with any cloud model the user chooses, and keeps a hardcore performance budget. First capabilities: Awake, Ports and GitHub pull requests — which are also the AI's first tools.
+Navori is an AI-first personal cockpit for macOS (Apple Silicon): one menubar app whose logic lives in a Rust **Core** (kernel, modules, AI runtime) and whose UI is a Swift **Shell** (AppKit + SwiftUI), connected through UniFFI. It is built for its author, installable by other developers through Homebrew, runs locally, works with any cloud model the user chooses, and keeps a hardcore performance budget. First capabilities: Awake, Ports and GitHub pull requests — which are also the AI's first tools.
 
 This file is the **entry point**: it maps where each part of the architecture is documented, keeps the principles' rationale and the index of locked decisions, and holds the **design seeds** for features not yet specified. When this file disagrees with a document listed below, that document wins.
 

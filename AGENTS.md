@@ -2,7 +2,7 @@
 
 Agent instructions for the Navori repo. Project overview and everyday commands: [README.md](README.md); architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Navori is an AI-first personal cockpit for macOS (Apple Silicon): a menubar app with a Rust core and a Swift (AppKit + SwiftUI) shell — single user (the author), local-first, with a hardcore performance budget.
+Navori is an AI-first personal cockpit for macOS (Apple Silicon): a menubar app with a Rust core and a Swift (AppKit + SwiftUI) shell — built for its author, installable by other developers through Homebrew, local-first, with a hardcore performance budget.
 
 ## Read first
 
