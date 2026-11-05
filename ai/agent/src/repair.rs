@@ -2,7 +2,9 @@
 
 use crate::record::{ConversationLog, Entry, LoggedTurn, RecordedMessage};
 
-const OUTCOME_UNKNOWN: &str = "The tool call was interrupted after it was recorded, but no result was durably recorded. Its outcome is unknown. Decide whether to retry from the tool semantics: retry only if the operation is read-only or idempotent; if it may have side effects, first verify external state or ask the user. Do not retry blindly.";
+pub(crate) const OUTCOME_UNKNOWN: &str = "The tool call was interrupted after it was recorded, but no result was durably recorded. Its outcome is unknown. Decide whether to retry from the tool semantics: retry only if the operation is read-only or idempotent; if it may have side effects, first verify external state or ask the user. Do not retry blindly.";
+
+pub(crate) const NOT_STARTED: &str = "The tool call was recorded but not started: the Turn ended before it could run. Nothing was changed by it.";
 
 pub fn repair(log: &ConversationLog) -> Vec<Entry> {
     log.turns

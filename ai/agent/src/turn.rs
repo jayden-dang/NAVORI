@@ -15,6 +15,7 @@ use crate::record::{
     ConversationId, ConversationLog, ConversationStore, Entry, Origin, RecordError,
     RecordedMessage, TurnId, derive_messages,
 };
+use crate::repair::{NOT_STARTED, OUTCOME_UNKNOWN};
 use crate::{Dispatcher, RepeatGuard, Toolset, repair};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,6 +91,12 @@ pub struct Agent {
     active: Arc<Mutex<HashSet<ConversationId>>>,
 }
 
+impl From<TurnErrorKind> for TurnEnd {
+    fn from(kind: TurnErrorKind) -> TurnEnd {
+        TurnEnd::Error(kind)
+    }
+}
+
 impl std::fmt::Debug for Agent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Agent")
@@ -118,7 +125,7 @@ impl Agent {
         &self,
         kernel: &Kernel,
         request: TurnRequest,
-        _cancel: CancellationToken,
+        cancel: CancellationToken,
     ) -> Result<TurnOutcome, TurnStartError> {
         let turn = TurnId::new();
         let mut started = Vec::new();
@@ -173,20 +180,37 @@ impl Agent {
             turn,
             seq: 0,
             steps: 0,
+            tokens: 0,
             open_step: None,
+            open_calls: Vec::new(),
+            in_flight: None,
             messages: history,
             unsent: 0,
             guard: RepeatGuard::new(),
         };
         let (end, answer) = match self
-            .drive(kernel, &mut run, &request.model, request.input)
+            .drive(kernel, &mut run, &request.model, request.input, &cancel)
             .await
         {
             Ok(answer) => (TurnEnd::Completed, answer),
-            Err(kind) => (TurnEnd::Error(kind), None),
+            Err(end) => (end, None),
         };
         let mut closing = Vec::new();
         if let Some(step) = run.open_step {
+            for call_id in std::mem::take(&mut run.open_calls) {
+                let text = if run.in_flight.as_ref() == Some(&call_id) {
+                    OUTCOME_UNKNOWN
+                } else {
+                    NOT_STARTED
+                };
+                let body = RecordedMessage::ToolResult {
+                    call_id,
+                    text: text.to_owned(),
+                    is_error: true,
+                    synthetic: true,
+                };
+                closing.push(run.message_entry(Some(step), body, 0));
+            }
             closing.push(Entry::StepEnded {
                 turn,
                 seq: step,
@@ -227,7 +251,8 @@ impl Agent {
         run: &mut Run,
         model: &str,
         input: String,
-    ) -> Result<Option<String>, TurnErrorKind> {
+        cancel: &CancellationToken,
+    ) -> Result<Option<String>, TurnEnd> {
         let toolset = Toolset::from_specs(&kernel.actions());
         let dispatcher = Dispatcher::new(self.limits.action_timeout);
         let turn = run.turn;
@@ -244,6 +269,12 @@ impl Agent {
         self.record(vec![entry]).await?;
 
         loop {
+            if cancel.is_cancelled() {
+                return Err(TurnEnd::Cancelled);
+            }
+            if run.steps >= self.limits.max_steps {
+                return Err(TurnEnd::StepLimit);
+            }
             let step = run.steps;
             self.record(vec![Entry::StepStarted {
                 turn,
@@ -252,18 +283,19 @@ impl Agent {
             }])
             .await?;
             run.open_step = Some(step);
-            let reply = self
-                .gateway
-                .send_chat(Outbound {
-                    request: ChatRequest {
-                        model: model.to_owned(),
-                        messages: run.messages.clone(),
-                        tools: toolset.defs(),
-                    },
-                    prior_redactions: std::mem::take(&mut run.unsent),
-                })
-                .await
-                .map_err(error_kind)?;
+            let sending = self.gateway.send_chat(Outbound {
+                request: ChatRequest {
+                    model: model.to_owned(),
+                    messages: run.messages.clone(),
+                    tools: toolset.defs(),
+                },
+                prior_redactions: std::mem::take(&mut run.unsent),
+            });
+            let reply = tokio::select! {
+                biased;
+                () = cancel.cancelled() => return Err(TurnEnd::Cancelled),
+                reply = sending => reply.map_err(error_kind)?,
+            };
             run.steps += 1;
             let ChatReply {
                 text,
@@ -308,13 +340,26 @@ impl Agent {
                 },
                 redactions,
             );
+            run.tokens += usage.as_ref().map_or(0, |u| u.input + u.output);
             self.record(vec![entry, Entry::Usage { turn, step, usage }])
                 .await?;
+            run.open_calls = tool_calls.iter().map(|c| c.id.clone()).collect();
             if tool_calls.is_empty() {
                 return Ok(text);
             }
+            if run.tokens >= self.limits.max_tokens {
+                return Err(TurnEnd::TokenLimit);
+            }
             for call in &tool_calls {
-                let mut outcome = dispatcher.call(kernel, &toolset, call).await;
+                if cancel.is_cancelled() {
+                    return Err(TurnEnd::Cancelled);
+                }
+                run.in_flight = Some(call.id.clone());
+                let mut outcome = tokio::select! {
+                    biased;
+                    () = cancel.cancelled() => return Err(TurnEnd::Cancelled),
+                    outcome = dispatcher.call(kernel, &toolset, call) => outcome,
+                };
                 if let Some(reminder) = run.guard.observe(&call.name, &call.arguments) {
                     outcome.text = format!("{}\n\n{reminder}", outcome.text);
                 }
@@ -330,6 +375,8 @@ impl Agent {
                     result.count,
                 );
                 self.record(vec![entry]).await?;
+                run.open_calls.retain(|id| *id != call.id);
+                run.in_flight = None;
             }
             self.record(vec![Entry::StepEnded {
                 turn,
@@ -437,7 +484,10 @@ struct Run {
     turn: TurnId,
     seq: u32,
     steps: u32,
+    tokens: u64,
     open_step: Option<u32>,
+    open_calls: Vec<String>,
+    in_flight: Option<String>,
     messages: Vec<Message>,
     unsent: u32,
     guard: RepeatGuard,
