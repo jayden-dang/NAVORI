@@ -20,7 +20,7 @@ Navori is an AI-first personal cockpit for macOS (Apple Silicon): a menubar app 
 ## Commands
 
 ```sh
-cargo xtask ci          # gate before every commit: fmt, clippy -D warnings, tests, check-deps, Swift build
+cargo xtask ci          # gate before every push (not required per commit): fmt, clippy -D warnings, tests, check-deps, Swift build
 cargo xtask perf        # GOAL-11 budget; --record writes perf-baseline.json when the run passes
 cargo xtask run         # build + launch "Navori Dev.app" (dev profile; separate data/logs/socket)
 cargo xtask install     # release build → /Applications/Navori.app
