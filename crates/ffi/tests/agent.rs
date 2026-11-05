@@ -430,17 +430,61 @@ fn a_repaired_turn_shows_a_real_end_time() {
 
 #[test]
 fn starting_the_core_builds_no_agent_and_runs_no_ai_session_migration() {
-    let home = home();
-    let fake = Arc::new(FakeLlm::new(vec![]));
-    let core = NavoriCore::start_with(
-        config(&home),
-        Arc::new(Quiet),
-        deps(&FakeKeychain::new(), &fake),
-    )
-    .unwrap();
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
+    let home = home();
+    let fake = Arc::new(FakeLlm::new(vec![Ok(text_reply("Hello."))]));
+    let secrets = Arc::new(AtomicUsize::new(0));
+    let providers = Arc::new(AtomicUsize::new(0));
+    let conversations = Arc::new(AtomicUsize::new(0));
+    let senders = Arc::new(AtomicUsize::new(0));
+    let base = deps(&FakeKeychain::new(), &fake);
+    let counted = AiDeps {
+        open_secrets: {
+            let (open, count) = (base.open_secrets.clone(), secrets.clone());
+            Arc::new(move |service| {
+                count.fetch_add(1, Ordering::SeqCst);
+                open(service)
+            })
+        },
+        make_sender: {
+            let (make, count) = (base.make_sender.clone(), senders.clone());
+            Arc::new(move || {
+                count.fetch_add(1, Ordering::SeqCst);
+                make()
+            })
+        },
+        make_provider: {
+            let (make, count) = (base.make_provider.clone(), providers.clone());
+            Arc::new(move || {
+                count.fetch_add(1, Ordering::SeqCst);
+                make()
+            })
+        },
+        make_conversations: {
+            let (make, count) = (base.make_conversations.clone(), conversations.clone());
+            Arc::new(move |store| {
+                count.fetch_add(1, Ordering::SeqCst);
+                make(store)
+            })
+        },
+    };
+    let core = NavoriCore::start_with(config(&home), Arc::new(Quiet), counted).unwrap();
+
+    let invoked = || {
+        [&secrets, &providers, &conversations, &senders].map(|count| count.load(Ordering::SeqCst))
+    };
     assert_eq!(open_store(&home).schema_version("ai_session").unwrap(), 0);
     assert!(fake.requests().is_empty());
+    assert_eq!(invoked(), [0, 0, 0, 0]);
+
+    futures::executor::block_on(core.save_provider_key("k1".into())).unwrap();
+    ask_navori_ai(&core, "Hi.");
+
+    let [secrets, providers, conversations, senders] = invoked();
+    assert!(secrets >= 1);
+    assert_eq!((providers, conversations, senders), (1, 1, 1));
+    assert_eq!(open_store(&home).schema_version("ai_session").unwrap(), 1);
     core.shutdown();
 }
 
