@@ -94,7 +94,13 @@ enum Cmd {
 }
 
 #[derive(Debug, Subcommand)]
-enum SoakCmd {}
+enum SoakCmd {
+    /// Print footprint, threads and fds of the installed Navori, once or every interval.
+    Observe {
+        #[arg(long, value_parser = parse_duration)]
+        every: Option<Duration>,
+    },
+}
 
 fn parse_duration(s: &str) -> Result<Duration, String> {
     let refuse =
@@ -207,7 +213,7 @@ fn main() -> Result<()> {
             for_,
             command,
         } => match command {
-            Some(sub) => match sub {},
+            Some(SoakCmd::Observe { every }) => soak::observe::observe(&root, every),
             None => {
                 let tier = if long {
                     soak::plan::Tier::Long {
