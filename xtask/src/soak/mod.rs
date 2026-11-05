@@ -23,7 +23,7 @@ use home::SoakHome;
 use host::{Children, Outcome, classify, parse_loadavg, screen_locked};
 use judge::{Hang, Reading, RunFacts, Side, clock, judge};
 use plan::{LoadStep, Tier, plan};
-use probe::{SoakProbe, TOOL_TIMEOUT, command_output};
+use probe::{SoakProbe, tool_stdout_bytes};
 
 pub(crate) use listen::listen;
 
@@ -37,6 +37,7 @@ const STOP_GRACE: Duration = Duration::from_secs(5);
 const SLICE: Duration = Duration::from_millis(250);
 const SUBSCRIBE_SETTLE: Duration = Duration::from_millis(200);
 pub(super) const OUT_DIR: &str = "build/soak";
+pub(crate) const PERF_APP: &str = "build/perf/Navori Dev.app";
 
 pub(crate) fn run(root: &Path, tier: Tier) -> Result<bool> {
     let started = Instant::now();
@@ -55,9 +56,7 @@ pub(crate) fn gate(root: &Path, app: &Path) -> Result<bool> {
 }
 
 fn progress(at: Duration, label: &str) {
-    let mut out = std::io::stdout().lock();
-    let _ = writeln!(out, "soak +{} {label}", clock(at));
-    let _ = out.flush();
+    say(&format!("soak +{} {label}", clock(at)));
 }
 
 fn say(line: &str) {
@@ -85,20 +84,22 @@ fn path_str(path: &Path) -> Result<&str> {
 }
 
 fn load_average() -> Result<f64> {
-    let mut command = Command::new("/usr/sbin/sysctl");
-    command.args(["-n", "vm.loadavg"]);
-    let out = command_output(&mut command, "sysctl -n vm.loadavg", TOOL_TIMEOUT)?;
-    ensure!(out.status.success(), "sysctl -n vm.loadavg failed");
-    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    let stdout = tool_stdout_bytes(
+        "/usr/sbin/sysctl",
+        &["-n", "vm.loadavg"],
+        "sysctl -n vm.loadavg",
+    )?;
+    let text = String::from_utf8_lossy(&stdout).to_string();
     parse_loadavg(&text).with_context(|| format!("sysctl -n vm.loadavg returned {text:?}"))
 }
 
 fn session_locked() -> Result<bool> {
-    let mut command = Command::new("/usr/sbin/ioreg");
-    command.args(["-n", "Root", "-d1"]);
-    let out = command_output(&mut command, "ioreg -n Root -d1", TOOL_TIMEOUT)?;
-    ensure!(out.status.success(), "ioreg -n Root -d1 failed");
-    Ok(screen_locked(&String::from_utf8_lossy(&out.stdout)))
+    let stdout = tool_stdout_bytes(
+        "/usr/sbin/ioreg",
+        &["-n", "Root", "-d1"],
+        "ioreg -n Root -d1",
+    )?;
+    Ok(screen_locked(&String::from_utf8_lossy(&stdout)))
 }
 
 fn spawn_perf(exe: &Path, perf_home: &Path) -> Result<Launched> {
@@ -151,7 +152,7 @@ fn drive(root: &Path, app: &Path, tier: &Tier, started: Instant) -> Result<bool>
     );
     let exe = app.join("Contents/MacOS/Navori");
     let own_exe = out.join("Navori Dev.app/Contents/MacOS/Navori");
-    let perf_exe = root.join("build/perf/Navori Dev.app/Contents/MacOS/Navori");
+    let perf_exe = root.join(PERF_APP).join("Contents/MacOS/Navori");
     let home = SoakHome::prepare(&[&own_exe, &perf_exe])?;
     let mut log = LogStream::start()?;
     warm_up(&home, &exe, &mut log)?;
@@ -194,8 +195,8 @@ fn drive(root: &Path, app: &Path, tier: &Tier, started: Instant) -> Result<bool>
     driver.stop()?;
     let facts = RunFacts {
         settle: plan.settle,
-        readings: driver.readings.clone(),
-        hangs: driver.hangs.clone(),
+        readings: std::mem::take(&mut driver.readings),
+        hangs: std::mem::take(&mut driver.hangs),
         exited_at: driver.exited_at,
         elapsed: started.elapsed(),
         load_errors: driver.errors,
@@ -338,6 +339,15 @@ impl Driver<'_> {
         }
     }
 
+    fn record_hang(&mut self, side: Side, at: Duration, started: Instant) {
+        self.hangs.push(Hang {
+            side,
+            at,
+            waited: started.elapsed(),
+            load_avg: load_average().ok(),
+        });
+    }
+
     fn probe_core(&mut self) -> Result<()> {
         let at = self.t0.elapsed();
         let started = Instant::now();
@@ -347,12 +357,7 @@ impl Driver<'_> {
             self.errors += 1;
         }
         if answer == Answer::TimedOut {
-            self.hangs.push(Hang {
-                side: Side::Core,
-                at,
-                waited: started.elapsed(),
-                load_avg: load_average().ok(),
-            });
+            self.record_hang(Side::Core, at, started);
         }
         Ok(())
     }
@@ -390,12 +395,7 @@ impl Driver<'_> {
             MENU_TIMEOUT,
         )?;
         if mark.is_none() {
-            self.hangs.push(Hang {
-                side: Side::Menu,
-                at,
-                waited: started.elapsed(),
-                load_avg: load_average().ok(),
-            });
+            self.record_hang(Side::Menu, at, started);
         }
         Ok(())
     }

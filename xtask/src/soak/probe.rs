@@ -75,6 +75,28 @@ impl SoakProbe {
     }
 }
 
+fn drain(mut stream: impl Read + Send + 'static) -> thread::JoinHandle<std::io::Result<Vec<u8>>> {
+    thread::spawn(move || {
+        let mut buf = Vec::new();
+        stream.read_to_end(&mut buf).map(|_| buf)
+    })
+}
+
+fn join_drain(reader: thread::JoinHandle<std::io::Result<Vec<u8>>>, name: &str) -> Result<Vec<u8>> {
+    reader
+        .join()
+        .map_err(|_| anyhow::anyhow!("{name} reader panicked"))?
+        .with_context(|| format!("read {name}"))
+}
+
+pub(super) fn tool_stdout_bytes(program: &str, args: &[&str], rendered: &str) -> Result<Vec<u8>> {
+    let mut command = Command::new(program);
+    command.args(args);
+    let out = command_output(&mut command, rendered, TOOL_TIMEOUT)?;
+    ensure!(out.status.success(), "{rendered} failed");
+    Ok(out.stdout)
+}
+
 pub(super) fn command_output(
     command: &mut Command,
     rendered: &str,
@@ -86,16 +108,10 @@ pub(super) fn command_output(
         .stderr(Stdio::piped())
         .spawn()
         .with_context(|| format!("cannot run {rendered}"))?;
-    let mut stdout = child.stdout.take().context("no stdout")?;
-    let mut stderr = child.stderr.take().context("no stderr")?;
-    let out_reader = thread::spawn(move || {
-        let mut buf = Vec::new();
-        stdout.read_to_end(&mut buf).map(|_| buf)
-    });
-    let err_reader = thread::spawn(move || {
-        let mut buf = Vec::new();
-        stderr.read_to_end(&mut buf).map(|_| buf)
-    });
+    let stdout = child.stdout.take().context("no stdout")?;
+    let stderr = child.stderr.take().context("no stderr")?;
+    let out_reader = drain(stdout);
+    let err_reader = drain(stderr);
     let started = Instant::now();
     let status = loop {
         if let Some(status) = child
@@ -111,14 +127,8 @@ pub(super) fn command_output(
         }
         thread::sleep(Duration::from_millis(20));
     };
-    let stdout = out_reader
-        .join()
-        .map_err(|_| anyhow::anyhow!("stdout reader panicked"))?
-        .context("read stdout")?;
-    let stderr = err_reader
-        .join()
-        .map_err(|_| anyhow::anyhow!("stderr reader panicked"))?
-        .context("read stderr")?;
+    let stdout = join_drain(out_reader, "stdout")?;
+    let stderr = join_drain(err_reader, "stderr")?;
     Ok(Output {
         status,
         stdout,

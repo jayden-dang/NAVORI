@@ -1,13 +1,12 @@
 use std::io::Write;
 use std::path::Path;
-use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result};
 
 use super::judge::{MIB, Reading};
-use super::probe::{SoakProbe, TOOL_TIMEOUT, command_output};
+use super::probe::{SoakProbe, tool_stdout_bytes};
 
 const INSTALLED_EXECUTABLE: &str = "/Applications/Navori.app/Contents/MacOS/Navori";
 
@@ -50,14 +49,12 @@ fn format_line(clock: &str, pid: u32, reading: &Reading) -> String {
 
 fn tool_stdout(program: &str, args: &[&str]) -> Result<String> {
     let rendered = format!("{program} {}", args.join(" "));
-    let mut command = Command::new(program);
-    command.args(args);
-    let out = command_output(&mut command, &rendered, TOOL_TIMEOUT)?;
-    ensure!(out.status.success(), "{rendered} failed");
-    Ok(String::from_utf8(out.stdout)
-        .with_context(|| format!("{rendered} output is not utf-8"))?
-        .trim_end()
-        .to_string())
+    Ok(
+        String::from_utf8(tool_stdout_bytes(program, args, &rendered)?)
+            .with_context(|| format!("{rendered} output is not utf-8"))?
+            .trim_end()
+            .to_string(),
+    )
 }
 
 fn installed_pid() -> Result<u32> {

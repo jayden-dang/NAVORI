@@ -151,7 +151,6 @@ pub(crate) fn judge(run: &RunFacts) -> Report {
                 Signal {
                     name: "footprint",
                     floor: FOOTPRINT_FLOOR_MIB,
-
                     one_decimal: true,
                 },
                 settled
@@ -163,7 +162,6 @@ pub(crate) fn judge(run: &RunFacts) -> Report {
                 Signal {
                     name: "threads",
                     floor: THREADS_FLOOR,
-
                     one_decimal: false,
                 },
                 settled.iter().map(|r| f64::from(r.threads)).collect(),
@@ -172,7 +170,6 @@ pub(crate) fn judge(run: &RunFacts) -> Report {
                 Signal {
                     name: "fds",
                     floor: FDS_FLOOR,
-
                     one_decimal: false,
                 },
                 settled.iter().map(|r| f64::from(r.fds)).collect(),

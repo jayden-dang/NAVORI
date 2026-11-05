@@ -53,10 +53,9 @@ impl Cli {
     }
 
     fn command(&self) -> Command {
-        let mut command = Command::new("/usr/bin/env");
+        let mut command = Command::new(&self.helper);
         command
-            .arg(format!("HOME={}", self.home.display()))
-            .arg(&self.helper)
+            .env("HOME", &self.home)
             .args(["--profile", "dev"])
             .stdin(Stdio::null())
             .stdout(Stdio::null())

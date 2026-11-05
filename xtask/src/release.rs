@@ -179,7 +179,7 @@ pub(crate) fn check(root: &Path) -> Result<()> {
     super::ci(root)?;
     ensure!(super::perf::run(root, false)?, "perf gate failed");
     ensure!(
-        super::soak::gate(root, &root.join("build/perf/Navori Dev.app"))?,
+        super::soak::gate(root, &root.join(super::soak::PERF_APP))?,
         "soak gate failed"
     );
     println!("{tag}");
