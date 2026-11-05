@@ -22,7 +22,7 @@ carry a one-clause copy of the derivation because a repo configured before the f
 has no Compat obligation text in this file for them to read — change the meanings here, and
 the derivation in `frame-change`, `clarify-decisions`, and `interpret-session` with it.
 
-Compat obligation values (the line is absent below, so it is **derived**): **None:** nothing
+Compat obligation values (the line below states it; when it is absent the value is **derived**): **None:** nothing
 outside this repo depends on any current schema, endpoint, or file format. **Internal:** other
 services or teams in the same org read them. **External:** users, customers, or third-party
 clients depend on them. Lifecycle Idea / Early development / Active development → **None**;
@@ -32,6 +32,7 @@ to override that default (e.g. once the installed app's data in
 
 - **Delivery intent:** `Production` — the quality bar the output must meet. A bar, not a release state: **Production** says how well the code must be built, never that the project has shipped.
 - **Lifecycle stage:** `Active development` — where the project is in its life.
+- **Compat obligation:** External — from v0.1.0 people install Navori with Homebrew and keep their data across upgrades: `navori.db` (forward-only migrations), `config.toml` keys (a rename is a migration), hook entries, Keychain service names and the signing identity stay stable.
 - **Default PR base:** `main` — `land-branch` reads it as the third rung of its base-resolution ladder.
 - **Default landing action:** `merge`
 
