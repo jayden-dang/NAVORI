@@ -8,6 +8,8 @@ permissions:
   contents: write
 
 # One constant group: two tags pushed seconds apart must not race on the tap push.
+# All releases share one group on purpose. Push tags one at a time: with a run in
+# progress and one queued, a third queued tag cancels the middle one.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -70,6 +72,23 @@ jobs:
             exit 1
           fi
           cat "$RUNNER_TEMP/check.txt" >> "$GITHUB_OUTPUT"
+
+      - name: Require a tap for a published final release
+        if: vars.PUBLISH_RELEASE == 'true' && steps.tag.outputs.prerelease != 'true' && vars.TAP_REPOSITORY == ''
+        run: |
+          echo "::error::PUBLISH_RELEASE is true for a final release but TAP_REPOSITORY is empty; refusing to publish it without a cask."
+          exit 1
+
+      - name: Require the tap token
+        if: vars.TAP_REPOSITORY != ''
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          TAP_REPOSITORY: ${{ vars.TAP_REPOSITORY }}
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "TAP_REPOSITORY is set to $TAP_REPOSITORY but the TAP_TOKEN secret is empty." >&2
+            exit 1
+          fi
 
       - name: Run the CI gate
         run: cargo xtask ci
@@ -136,12 +155,6 @@ jobs:
       - name: Build the release artifacts
         run: cargo xtask release --tag "$GITHUB_REF_NAME" --out dist
 
-      - name: Require a tap for a published final release
-        if: vars.PUBLISH_RELEASE == 'true' && steps.tag.outputs.prerelease != 'true' && vars.TAP_REPOSITORY == ''
-        run: |
-          echo "::error::PUBLISH_RELEASE is true for a final release but TAP_REPOSITORY is empty; refusing to publish it without a cask."
-          exit 1
-
       - name: Create the draft Release
         if: steps.existing.outputs.exists != 'true'
         env:
@@ -162,17 +175,6 @@ jobs:
           VERSION: ${{ steps.tag.outputs.version }}
         run: gh release upload "$GITHUB_REF_NAME" --clobber "dist/Navori-$VERSION.zip" "dist/Navori-$VERSION.zip.sha256"
 
-      - name: Require the tap token
-        if: vars.TAP_REPOSITORY != ''
-        env:
-          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
-          TAP_REPOSITORY: ${{ vars.TAP_REPOSITORY }}
-        run: |
-          if [ -z "$TAP_TOKEN" ]; then
-            echo "TAP_REPOSITORY is set to $TAP_REPOSITORY but the TAP_TOKEN secret is empty." >&2
-            exit 1
-          fi
-
       - name: Check out the tap
         if: vars.TAP_REPOSITORY != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -186,8 +188,6 @@ jobs:
         if: vars.TAP_REPOSITORY != ''
         env:
           TAP_REPOSITORY: ${{ vars.TAP_REPOSITORY }}
-          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
-          PUBLISH: ${{ vars.PUBLISH_RELEASE }}
           VERSION: ${{ steps.tag.outputs.version }}
           PRERELEASE: ${{ steps.tag.outputs.prerelease }}
         run: |
@@ -214,16 +214,22 @@ jobs:
           brew trust --cask "$tap_name/$cask"
           brew style --cask "$tap_name/$cask"
           brew audit --cask "$tap_name/$cask"
-          if [ "$PUBLISH" = "true" ]; then
-            # Prove write access now, before the Release is published.
-            branch=$(git -C tap rev-parse --abbrev-ref HEAD)
-            auth=$(printf 'x-access-token:%s' "$TAP_TOKEN" | base64 | tr -d '\n')
-            echo "::add-mask::$auth"
-            export GIT_CONFIG_COUNT=1
-            export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
-            export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth"
-            git -C tap push --dry-run origin "HEAD:$branch"
-          fi
+
+      - name: Prove write access to the tap
+        if: vars.TAP_REPOSITORY != '' && vars.PUBLISH_RELEASE == 'true'
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+        working-directory: tap
+        run: |
+          set -euo pipefail
+          # Prove write access now, before the Release is published.
+          branch=$(git rev-parse --abbrev-ref HEAD)
+          auth=$(printf 'x-access-token:%s' "$TAP_TOKEN" | base64 | tr -d '\n')
+          echo "::add-mask::$auth"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth"
+          git push --dry-run origin "HEAD:$branch"
 
       - name: Publish the Release
         if: vars.PUBLISH_RELEASE == 'true'
@@ -241,12 +247,14 @@ jobs:
           zip="Navori-$VERSION.zip"
           check_dir=$(mktemp -d)
           curl -L --fail --silent --show-error \
+            --retry 5 --retry-all-errors --retry-delay 5 \
             -o "$check_dir/$zip" \
             "https://github.com/$REPOSITORY/releases/download/$GITHUB_REF_NAME/$zip"
           cp "dist/$zip.sha256" "$check_dir/$zip.sha256"
           (cd "$check_dir" && shasum -a 256 -c "$zip.sha256")
 
       - name: Push the cask to the tap
+        id: push
         if: vars.PUBLISH_RELEASE == 'true' && vars.TAP_REPOSITORY != ''
         env:
           TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
@@ -257,6 +265,7 @@ jobs:
           ahead=$(git rev-list --count "origin/$branch..HEAD")
           if [ "$ahead" -eq 0 ]; then
             echo "The tap has nothing ahead of origin; nothing to push."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           auth=$(printf 'x-access-token:%s' "$TAP_TOKEN" | base64 | tr -d '\n')
@@ -265,6 +274,7 @@ jobs:
           export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
           export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth"
           git push origin "HEAD:$branch"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
 
       - name: Summarize the run
         if: success()
@@ -272,13 +282,16 @@ jobs:
           PUBLISH: ${{ vars.PUBLISH_RELEASE }}
           TAP_REPOSITORY: ${{ vars.TAP_REPOSITORY }}
           PRERELEASE: ${{ steps.tag.outputs.prerelease }}
+          PUSHED: ${{ steps.push.outputs.pushed }}
         run: |
           set -euo pipefail
           if [ "$PRERELEASE" = "true" ]; then cask=navori-rc; else cask=navori; fi
           if [ "$PUBLISH" != "true" ]; then
             echo "Draft only: $GITHUB_REF_NAME is a draft Release; nothing was published." >> "$GITHUB_STEP_SUMMARY"
-          elif [ -n "$TAP_REPOSITORY" ]; then
+          elif [ -n "$TAP_REPOSITORY" ] && [ "$PUSHED" = "true" ]; then
             echo "Published $GITHUB_REF_NAME and pushed cask $cask to $TAP_REPOSITORY." >> "$GITHUB_STEP_SUMMARY"
+          elif [ -n "$TAP_REPOSITORY" ]; then
+            echo "Published $GITHUB_REF_NAME; cask already up to date in $TAP_REPOSITORY." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "Published $GITHUB_REF_NAME; no tap is configured." >> "$GITHUB_STEP_SUMMARY"
           fi
