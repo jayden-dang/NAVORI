@@ -28,6 +28,8 @@ public enum CascadeEvent: Sendable {
 
 public enum CascadeEffect: Equatable, Sendable {
     case open(row: String)
+    /// The pointer entered `row` and its Submenu will open after the intent delay: build its view now, off screen.
+    case prepare(row: String)
     case close(depth: Int)
     /// Start (or restart) the hover timer; `hoverTimerFired` follows after `after` seconds unless cancelled.
     case armHoverTimer(after: TimeInterval)
@@ -106,7 +108,7 @@ public struct CascadeState: Sendable {
         // Counted from the first entry into the row: movement inside it must not postpone the open.
         if pendingRow == row { return effects }
         pendingRow = row
-        return effects + [.armHoverTimer(after: Self.intentDelay)]
+        return effects + [.prepare(row: row), .armHoverTimer(after: Self.intentDelay)]
     }
 
     private func hasOpenSibling(of row: String) -> Bool {

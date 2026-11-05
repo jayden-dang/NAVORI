@@ -9,7 +9,7 @@ struct CascadeStateTests {
         let armed = state.handle(
             .pointerOn(row: "core", at: CGPoint(x: 100, y: 200), submenu: nil)
         )
-        #expect(armed == [.armHoverTimer(after: CascadeState.intentDelay)])
+        #expect(armed == [.prepare(row: "core"), .armHoverTimer(after: CascadeState.intentDelay)])
         #expect(state.openPath == [])
         #expect(state.selection == "core")
         let opened = state.handle(.hoverTimerFired)
@@ -95,7 +95,7 @@ struct CascadeStateTests {
         let first = state.handle(
             .pointerOn(row: "core", at: CGPoint(x: 100, y: 200), submenu: nil)
         )
-        #expect(first == [.armHoverTimer(after: CascadeState.intentDelay)])
+        #expect(first == [.prepare(row: "core"), .armHoverTimer(after: CascadeState.intentDelay)])
         #expect(state.selection == "core")
         #expect(state.openPath == [])
         _ = state.handle(.click(row: "core"))
@@ -127,7 +127,7 @@ struct CascadeStateTests {
         var state = CascadeState(root: Self.tree)
         let point = CGPoint(x: 100, y: 200)
         let first = state.handle(.pointerOn(row: "core", at: point, submenu: nil))
-        #expect(first == [.armHoverTimer(after: CascadeState.intentDelay)])
+        #expect(first == [.prepare(row: "core"), .armHoverTimer(after: CascadeState.intentDelay)])
         #expect(state.selection == "core")
         #expect(state.openPath == [])
         let second = state.handle(.pointerOn(row: "core", at: point, submenu: nil))
@@ -171,7 +171,7 @@ struct CascadeStateTests {
         let armed = state.handle(
             .pointerOn(row: "core", at: CGPoint(x: 100, y: 200), submenu: nil)
         )
-        #expect(armed == [.armHoverTimer(after: CascadeState.intentDelay)])
+        #expect(armed == [.prepare(row: "core"), .armHoverTimer(after: CascadeState.intentDelay)])
         #expect(state.selection == "core")
         #expect(state.openPath == [])
         let left = state.handle(.pointerLeft(row: "settings"))

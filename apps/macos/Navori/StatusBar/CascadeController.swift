@@ -14,6 +14,9 @@ final class CascadeController {
     @ObservationIgnored private var hoverTimer: DispatchWorkItem?
     @ObservationIgnored private var rowFrames = CascadeRowFrames()
     @ObservationIgnored private var panels: [Int: CascadePanel] = [:]
+    /// The row whose root view each depth's panel holds. Lets an open skip the rebuild for a row that was
+    /// prepared at pointer entry or shown before. Emptied whenever the menu closes or the tree changes.
+    @ObservationIgnored private var builtRows: [Int: String] = [:]
     @ObservationIgnored private var lastClickRow: String?
     @ObservationIgnored private var lastClickAt: CFTimeInterval = 0
     @ObservationIgnored private var pendingFirstFrame: (@MainActor () -> Void)?
@@ -68,6 +71,7 @@ final class CascadeController {
     }
 
     func replaceTree() {
+        dropBuiltViews(sparingVisible: true)
         apply(state.handle(.replaceTree(tree())))
     }
 
@@ -94,6 +98,7 @@ final class CascadeController {
         for child in panels.values {
             child.hide()
         }
+        dropBuiltViews(sparingVisible: false)
         state = CascadeState(root: tree())
         selection = state.selection
     }
@@ -134,6 +139,8 @@ final class CascadeController {
             case let .open(row):
                 log.info("open: \(row, privacy: .public)")
                 presentSubmenu(row)
+            case let .prepare(row):
+                prepareSubmenu(row)
             case let .close(depth):
                 hideFrom(depth: depth)
             case let .armHoverTimer(delay):
@@ -160,7 +167,10 @@ final class CascadeController {
         child.onKey = { [weak self] key in
             self?.key(key)
         }
-        child.setRootView(AnyView(submenu(row).environment(self)))
+        if builtRows[depth] != row {
+            child.setRootView(AnyView(submenu(row).environment(self)))
+            builtRows[depth] = row
+        }
         child.onFittingSizeChange = { [weak self] in
             self?.schedulePlace(row)
         }
@@ -171,6 +181,29 @@ final class CascadeController {
         (child.contentView as? GlassSurfaceView)?.tint = surfaceTint
         placing = false
         schedulePlace(row)
+    }
+
+    /// The invisible half of an open, done while the intent delay runs: build the row's root view in its
+    /// depth's panel and measure it. The panel is not ordered front, so nothing appears and nothing takes focus.
+    private func prepareSubmenu(_ row: String) {
+        guard panel?.isOpen == true, let depth = treeDepth(of: row).map({ $0 + 1 }) else { return }
+        if let existing = panels[depth], existing.isVisible { return }
+        guard builtRows[depth] != row else { return }
+        let child = panels[depth] ?? CascadePanel()
+        panels[depth] = child
+        child.setRootView(AnyView(submenu(row).environment(self)))
+        _ = child.idealSize
+        builtRows[depth] = row
+    }
+
+    /// Forget every prepared or kept root view, so the next open rebuilds. A panel that is on screen keeps its
+    /// content until it is hidden when `sparingVisible`.
+    private func dropBuiltViews(sparingVisible: Bool) {
+        for depth in Array(builtRows.keys) {
+            builtRows[depth] = nil
+            guard let child = panels[depth], !(sparingVisible && child.isVisible) else { continue }
+            child.setRootView(AnyView(EmptyView()))
+        }
     }
 
     private func schedulePlace(_ row: String) {
