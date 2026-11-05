@@ -134,7 +134,7 @@ impl Agent {
             Some(id) => {
                 claim = Some(self.claim(id)?);
                 let mut log = self.load(id).await?;
-                let closers = repair(&log);
+                let closers = stamped(repair(&log));
                 if !closers.is_empty() {
                     self.append(closers).await.map_err(TurnStartError::Record)?;
                     for turn in log.turns.iter().filter(|t| t.end.is_none()) {
@@ -536,6 +536,19 @@ fn error_kind(error: AskError) -> TurnErrorKind {
         AskError::Audit => TurnErrorKind::Audit,
         AskError::Send(_) => TurnErrorKind::Provider,
     }
+}
+
+fn stamped(mut entries: Vec<Entry>) -> Vec<Entry> {
+    let now = now_ms();
+    for entry in &mut entries {
+        match entry {
+            Entry::Message { ts_ms, .. }
+            | Entry::StepEnded { ts_ms, .. }
+            | Entry::TurnEnded { ts_ms, .. } => *ts_ms = now,
+            _ => {}
+        }
+    }
+    entries
 }
 
 fn now_ms() -> i64 {

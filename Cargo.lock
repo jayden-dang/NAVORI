@@ -1205,6 +1205,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "futures",
+ "navori-agent",
  "navori-config",
  "navori-context",
  "navori-ipc",
@@ -1218,6 +1219,7 @@ dependencies = [
  "navori-redact",
  "navori-secrets",
  "navori-store",
+ "rusqlite",
  "serde",
  "serde_json",
  "tempfile",

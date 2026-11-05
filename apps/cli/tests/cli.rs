@@ -105,6 +105,7 @@ fn ai_deps(vault: &FakeKeychain, sender: StubSender) -> AiDeps {
             Ok(store)
         }),
         make_sender: Arc::new(move || sender.clone()),
+        ..AiDeps::production()
     }
 }
 

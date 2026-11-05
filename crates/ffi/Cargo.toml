@@ -22,6 +22,7 @@ bindgen = ["uniffi/cli"]
 [dependencies]
 anyhow.workspace = true
 futures.workspace = true
+navori-agent.workspace = true
 navori-config.workspace = true
 navori-context.workspace = true
 navori-ipc.workspace = true
@@ -34,6 +35,7 @@ navori-protocol.workspace = true
 navori-redact.workspace = true
 navori-secrets.workspace = true
 navori-store.workspace = true
+rusqlite.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
@@ -45,6 +47,7 @@ tracing-subscriber.workspace = true
 uniffi.workspace = true
 
 [dev-dependencies]
+navori-llm = { workspace = true, features = ["fake"] }
 navori-macos = { workspace = true, features = ["fake"] }
 navori-secrets = { workspace = true, features = ["fake"] }
 tempfile.workspace = true
