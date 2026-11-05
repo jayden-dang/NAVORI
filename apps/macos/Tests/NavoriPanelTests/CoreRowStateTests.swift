@@ -18,6 +18,24 @@ struct CoreRowStateTests {
         }
     }
 
+    @Test func the_production_menu_shows_the_core_row_only_when_it_needs_attention_or_is_down() {
+        let cases: [(CoreStatus, Bool)] = [
+            (.starting, false),
+            (.running, false),
+            (.needsAttention, true),
+            (.notRunning, true),
+        ]
+        for (status, visible) in cases {
+            #expect(CoreRowState.isVisible(status: status, inDevProfile: false) == visible)
+        }
+    }
+
+    @Test func the_dev_menu_always_shows_the_core_row() {
+        for status in [CoreStatus.starting, .running, .needsAttention, .notRunning] {
+            #expect(CoreRowState.isVisible(status: status, inDevProfile: true))
+        }
+    }
+
     @Test func module_dots_follow_the_module_state() {
         let cases: [(String, StatusDot)] = [
             ("running", .green),

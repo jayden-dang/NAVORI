@@ -39,6 +39,15 @@ public struct CoreRowState: Equatable, Sendable {
     public let dot: StatusDot?
     public let hasSubmenu: Bool
 
+    /// The dev profile always shows the Core row; production shows it only when the Core needs attention or is down.
+    public static func isVisible(status: CoreStatus, inDevProfile: Bool) -> Bool {
+        if inDevProfile { return true }
+        switch status {
+        case .needsAttention, .notRunning: return true
+        case .starting, .running: return false
+        }
+    }
+
     public init(status: CoreStatus) {
         switch status {
         case .starting:

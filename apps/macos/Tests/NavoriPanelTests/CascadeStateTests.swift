@@ -306,6 +306,69 @@ struct CascadeStateTests {
         #expect(state.openPath == [])
     }
 
+    private static func levelZero(core: Bool) -> [CascadeNode] {
+        var rows = [CascadeNode(id: "running", isActionable: true)]
+        if core {
+            rows.append(CascadeNode(id: "core", isActionable: true, children: [CascadeNode(id: "core.module", isActionable: true)]))
+        }
+        rows += [
+            CascadeNode(id: "settings", isActionable: true),
+            CascadeNode(id: "quit", isActionable: true),
+        ]
+        return rows
+    }
+
+    @Test func a_core_row_that_disappears_while_its_submenu_is_open_closes_it_and_clears_focus() {
+        var state = CascadeState(root: Self.levelZero(core: true))
+        _ = state.handle(.click(row: "core"))
+        _ = state.handle(.key(.right))
+        #expect(state.openPath == ["core"])
+        #expect(state.selection == "core.module")
+        let effects = state.handle(.replaceTree(Self.levelZero(core: false)))
+        #expect(effects == [.close(depth: 1)])
+        #expect(state.openPath == [])
+        #expect(state.selection == nil)
+    }
+
+    @Test func a_core_row_that_disappears_under_the_keyboard_selection_leaves_navigation_valid() {
+        var state = CascadeState(root: Self.levelZero(core: true))
+        _ = state.handle(.key(.down))
+        _ = state.handle(.key(.down))
+        #expect(state.selection == "core")
+        let effects = state.handle(.replaceTree(Self.levelZero(core: false)))
+        #expect(effects.isEmpty)
+        #expect(state.selection == nil)
+        _ = state.handle(.key(.down))
+        #expect(state.selection == "running")
+        _ = state.handle(.key(.down))
+        #expect(state.selection == "settings")
+    }
+
+    @Test func a_core_row_that_disappears_beside_the_selected_row_keeps_that_selection() {
+        var state = CascadeState(root: Self.levelZero(core: true))
+        _ = state.handle(.click(row: "running"))
+        _ = state.handle(.key(.down))
+        _ = state.handle(.key(.down))
+        _ = state.handle(.key(.down))
+        #expect(state.selection == "quit")
+        let effects = state.handle(.replaceTree(Self.levelZero(core: false)))
+        #expect(effects.isEmpty)
+        #expect(state.selection == "quit")
+    }
+
+    @Test func a_core_row_that_appears_keeps_the_selection_and_is_reachable() {
+        var state = CascadeState(root: Self.levelZero(core: false))
+        _ = state.handle(.key(.down))
+        #expect(state.selection == "running")
+        let effects = state.handle(.replaceTree(Self.levelZero(core: true)))
+        #expect(effects.isEmpty)
+        #expect(state.selection == "running")
+        _ = state.handle(.key(.down))
+        #expect(state.selection == "core")
+        let opened = state.handle(.click(row: "core"))
+        #expect(opened == [.open(row: "core")])
+    }
+
     @Test func a_tree_with_project_children_opens_three_levels_deep() {
         let tree = [
             CascadeNode(id: "running", isActionable: true, children: [
