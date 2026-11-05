@@ -219,15 +219,28 @@ async fn every_recorded_call_has_one_result_after_an_error_end() {
     assert!(results.iter().all(|r| r.3));
 }
 
+fn two_quick_calls() -> ChatReply {
+    let call = |id: &str, name: &str| ToolCall {
+        id: id.to_owned(),
+        name: name.to_owned(),
+        arguments: "{}".to_owned(),
+    };
+    ChatReply {
+        text: None,
+        reasoning: None,
+        tool_calls: vec![call("c1", "probe_look"), call("c2", "probe_look")],
+        usage: Some(common::usage(200, 100)),
+        finish: Finish::ToolCalls,
+    }
+}
+
 #[tokio::test]
-async fn every_recorded_call_has_one_result_after_a_limit_end() {
-    let mut reply = two_calls();
-    reply.usage = Some(common::usage(200, 100));
+async fn the_calls_of_the_step_that_reaches_the_token_limit_still_run() {
     let limits = Limits {
         max_tokens: 300,
         ..Limits::default()
     };
-    let rig = common::agent_with(vec![reply], limits);
+    let rig = common::agent_with(vec![two_quick_calls(), common::text_reply("never")], limits);
 
     let outcome = rig
         .agent
@@ -236,14 +249,38 @@ async fn every_recorded_call_has_one_result_after_a_limit_end() {
         .unwrap();
 
     assert_eq!(outcome.end, TurnEnd::TokenLimit);
+    assert_eq!(rig.probe.load(Ordering::SeqCst), 2);
     let results = tool_results(&rig);
     assert_eq!(results.len(), 2);
-    assert!(
-        results
-            .iter()
-            .all(|r| r.1.contains("but not started") && r.3)
-    );
-    assert_eq!(rig.probe.load(Ordering::SeqCst), 0);
+    assert!(results.iter().all(|r| !r.3 && !r.2), "{results:?}");
+    assert_eq!(rig.chat.requests().len(), 1);
+    let step_ends = rig
+        .store
+        .entries()
+        .iter()
+        .filter(|e| matches!(e, Entry::StepEnded { .. }))
+        .count();
+    assert_eq!(step_ends, 1);
+}
+
+#[tokio::test]
+async fn a_final_answer_over_the_token_limit_still_completes() {
+    let mut reply = common::text_reply("the answer");
+    reply.usage = Some(common::usage(500, 100));
+    let limits = Limits {
+        max_tokens: 300,
+        ..Limits::default()
+    };
+    let rig = common::agent_with(vec![reply], limits);
+
+    let outcome = rig
+        .agent
+        .run_turn(&rig.kernel, request("hi"), CancellationToken::new())
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.end, TurnEnd::Completed);
+    assert_eq!(outcome.answer.as_deref(), Some("the answer"));
 }
 
 #[tokio::test]

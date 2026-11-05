@@ -347,9 +347,6 @@ impl Agent {
             if tool_calls.is_empty() {
                 return Ok(text);
             }
-            if run.tokens >= self.limits.max_tokens {
-                return Err(TurnEnd::TokenLimit);
-            }
             for call in &tool_calls {
                 if cancel.is_cancelled() {
                     return Err(TurnEnd::Cancelled);
@@ -385,6 +382,9 @@ impl Agent {
             }])
             .await?;
             run.open_step = None;
+            if run.tokens >= self.limits.max_tokens {
+                return Err(TurnEnd::TokenLimit);
+            }
         }
     }
 
