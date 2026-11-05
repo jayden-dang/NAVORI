@@ -12,7 +12,7 @@ pub(crate) struct SoakHome {
 }
 
 impl SoakHome {
-    #[cfg_attr(test, allow(dead_code))]
+    #[cfg_attr(test, expect(dead_code))]
     pub(crate) fn prepare(exes: &[&Path]) -> Result<Self> {
         let uid = current_uid()?;
         Self::prepare_in(
@@ -23,15 +23,14 @@ impl SoakHome {
     }
 
     pub(crate) fn prepare_in(base: &Path, uid: u32, exes: &[&Path]) -> Result<Self> {
+        let root = base.join(format!("navori-perf-{uid}"));
+        check_socket_len(&root.join("run-1"))?;
         ensure_private_base(base, uid)?;
-        let previous = PerfHome {
-            root: base.join(format!("navori-perf-{uid}")),
-        };
+        let previous = PerfHome { root };
         for exe in exes {
             previous.sweep_stale(exe)?;
         }
         let perf = PerfHome::prepare(base, uid)?;
-        check_socket_len(&perf.root.join("run-1"))?;
         Ok(Self { perf })
     }
 
@@ -273,7 +272,10 @@ mod tests {
 
         let err = SoakHome::prepare_in(&base, uid, &[]).unwrap_err();
 
-        assert!(format!("{err:#}").contains("103"), "{err:#}");
+        let message = format!("{err:#}");
+        assert!(message.contains("103"), "{message}");
+        assert!(message.contains("navori.sock"), "{message}");
+        assert!(!base.exists(), "base created before the length check");
     }
 
     fn exited_within(child: &mut Child, limit: Duration) -> bool {
