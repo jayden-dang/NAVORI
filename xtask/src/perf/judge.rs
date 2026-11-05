@@ -375,7 +375,9 @@ mod tests {
         assert!(!verdict.passed, "{:?}", verdict.lines);
         assert!(
             verdict.lines.iter().any(|line| {
-                line.contains("submenu_intent_open_ms") && line.contains("158") && line.contains("80")
+                line.contains("submenu_intent_open_ms")
+                    && line.contains("158")
+                    && line.contains("80")
             }),
             "{:?}",
             verdict.lines
