@@ -532,6 +532,73 @@ struct ProjectChildStateTests {
 }
 
 @Suite
+struct ProjectChildReachTests {
+    @Test func a_project_with_sessions_and_no_ports_opens_a_child_of_session_rows() {
+        let state = RunningSubmenuState(running: running([
+            project("NAVORI", state: .working, sessions: [live, ended]),
+        ]))
+        let row = state.rows[0]
+        #expect(row.hasChild)
+        let node = row.node
+        #expect(node.id == row.id)
+        #expect(node.children.count == 2)
+        #expect(node.children.allSatisfy { $0.isActionable == false })
+        #expect(row.childRowIds.isEmpty)
+    }
+
+    @Test func the_sessions_only_child_shows_only_the_sessions_section() {
+        let state = ProjectChildState(
+            project: project("NAVORI", state: .working, sessions: [live]), nowMs: 0, home: "/Users/x"
+        )
+        #expect(state.sections == [.sessions])
+        #expect(state.stop == nil)
+        #expect(state.header.path == nil)
+        #expect(state.header.up == nil)
+    }
+
+    @Test func a_project_with_ports_nests_sessions_then_ports_then_stop() {
+        let state = RunningSubmenuState(running: running([
+            project("klynt", state: .working, sessions: [live], ports: [port(3000, stop: "a")], stoppable: 1, childStop: "c"),
+        ]))
+        let node = state.rows[0].node
+        #expect(node.children.map(\.id) == [
+            "running.project.klynt.session.0", "running.project.klynt.port.3000", "running.project.klynt.stop",
+        ])
+        #expect(node.children.map(\.isActionable) == [false, true, true])
+    }
+
+    @Test func other_with_sessions_only_opens_too() {
+        let state = RunningSubmenuState(running: running([
+            project("Other", state: .working, sessions: [live], isOther: true),
+        ]))
+        #expect(state.rows[0].hasChild)
+        #expect(state.rows[0].node.id == "running.other")
+        #expect(state.rows[0].node.children.count == 1)
+    }
+
+    @Test func a_project_with_neither_sessions_nor_ports_has_no_child_and_so_no_chevron() {
+        let state = RunningSubmenuState(running: running([
+            project("klynt", state: .working, sessions: [live]),
+            project("empty", state: .unknown),
+        ]))
+        let empty = state.rows[1]
+        #expect(empty.hasChild == false)
+        #expect(empty.node.children.isEmpty)
+    }
+
+    @Test func the_chevron_follows_the_node_rule_exactly() {
+        let state = RunningSubmenuState(running: running([
+            project("a", state: .working, sessions: [live]),
+            project("b", state: .idle, ports: [port(1)]),
+            project("c", state: .unknown),
+        ]))
+        for row in state.rows {
+            #expect(row.hasChild == (row.node.children.isEmpty == false))
+        }
+    }
+}
+
+@Suite
 struct PortRowIdTests {
     @Test func two_listeners_on_one_port_keep_distinct_ids_and_offers() {
         let first = RunningPortInput(port: 3000, name: "node", stopRequest: "a", target: .process(pid: 10, startUs: 1))

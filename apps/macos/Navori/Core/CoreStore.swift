@@ -240,13 +240,7 @@ final class CoreStore {
     /// What the menu tree nests under `Running`: each project with its child rows, then `Stop all ports`.
     var runningTree: [CascadeNode] {
         guard let state = runningSubmenu else { return [] }
-        let projects = state.rows.map { row in
-            CascadeNode(
-                id: row.id,
-                isActionable: true,
-                children: row.childRowIds.map { CascadeNode(id: $0, isActionable: true) }
-            )
-        }
+        let projects = state.rows.map(\.node)
         return projects + (state.stopAll == nil ? [] : [CascadeNode(id: Self.stopAllId, isActionable: true)])
     }
 

@@ -185,6 +185,8 @@ public struct ProjectRowState: Equatable, Sendable {
     public let targets: [StopTarget]
     public let childRowIds: [String]
     public let childOffers: [String: StopOffer]
+    /// One id per session row of the child menu. They are shown, never acted on.
+    public let sessionRowIds: [String]
 
     init(_ project: RunningProjectInput) {
         targets = project.ports.compactMap(\.target)
@@ -206,6 +208,7 @@ public struct ProjectRowState: Equatable, Sendable {
         }
         childRowIds = ids
         childOffers = offers
+        sessionRowIds = project.sessions.indices.map { ProjectChildState.sessionId(project: id, index: $0) }
         switch project.state {
         case .working:
             dot = .filled
@@ -224,6 +227,18 @@ public struct ProjectRowState: Equatable, Sendable {
 }
 
 extension ProjectRowState {
+    /// The row opens a child menu exactly when the child has something to show: a session or a port.
+    /// The chevron and the cascade node both follow this one rule.
+    public var hasChild: Bool { sessionRowIds.isEmpty == false || childRowIds.isEmpty == false }
+
+    public var node: CascadeNode {
+        CascadeNode(
+            id: id,
+            isActionable: true,
+            children: sessionRowIds.map { CascadeNode(id: $0) } + childRowIds.map { CascadeNode(id: $0, isActionable: true) }
+        )
+    }
+
     public static func id(of project: RunningProjectInput) -> String {
         project.isOther ? "running.other" : "running.project.\(project.name)"
     }
@@ -511,6 +526,8 @@ public struct ProjectChildState: Equatable, Sendable {
     }
 
     public static func stopId(project: String) -> String { "\(project).stop" }
+
+    public static func sessionId(project: String, index: Int) -> String { "\(project).session.\(index)" }
 
     private static func abbreviated(_ path: String, home: String) -> String {
         guard home.isEmpty == false, home != "/" else { return path }
