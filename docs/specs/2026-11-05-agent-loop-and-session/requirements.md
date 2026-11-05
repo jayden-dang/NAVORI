@@ -22,7 +22,7 @@ Words: Conversation, Turn and Step are defined in CONTEXT.md. "THE SYSTEM" is th
 - **LOOP-1.4** THE SYSTEM SHALL take the model id for a Turn from the starter, with no default model and no config key (ROAD-11 owns both; ASK requirements.md:139).
 - **LOOP-1.5** THE SYSTEM SHALL make every model call of a Turn a single non-streaming request through the `openai_compat` adapter and the provider key that ROAD-36 shipped (streaming is ROAD-15's, docs/roadmap/INDEX.md:90).
 - **LOOP-1.6** THE SYSTEM SHALL accept a model reply that carries tool calls with empty or null text. Today the adapter rejects any reply whose `content` is not a string, as `Malformed` (ai/llm/src/openai_compat.rs:143-145).
-- **LOOP-1.7** WHEN a request follows earlier assistant messages of the Conversation THE SYSTEM SHALL resend each of them with every part the Provider requires back, including its reasoning text. With tools in the request, DeepSeek answers 400 when an earlier `reasoning_content` is missing (Weigh W5; auto/research-deepseek-tools.md).
+- **LOOP-1.7** WHEN a request follows earlier assistant messages of the Conversation THE SYSTEM SHALL resend each of them with every part the Provider requires back, including its reasoning text. With tools in the request, DeepSeek answers 400 when an earlier `reasoning_content` is missing (Weigh W5; auto/research-deepseek-tools.md). The reasoning text resent is the recorded one, after the Shield (LOOP-3.6, LOOP-5.3) (`agent-decided`: thinking is left at the Provider's default, which is on, and its reasoning is replayed, rather than sending `thinking` disabled; research-deepseek-tools.md:7,53). Whether DeepSeek accepts reasoning the Shield changed is in Open Questions.
 - **LOOP-1.8** IF a tool call's arguments are not valid JSON, or do not fit the Action's parameter schema, THEN THE SYSTEM SHALL dispatch nothing for that call and return to the model an error result that names the problem.
 - **LOOP-1.9** IF a dispatched Action returns an error, or does not answer within the Agent loop's time limit for one Action, THEN THE SYSTEM SHALL return that failure to the model as an error result, a timeout result when the limit passed, and continue the Turn (dsh `timeout-policy`; `agent-decided`: the limit, no longer than the Kernel's 30 s dispatch timeout, crates/kernel/src/runtime.rs:308).
 
@@ -49,7 +49,7 @@ Words: Conversation, Turn and Step are defined in CONTEXT.md. "THE SYSTEM" is th
 - **LOOP-3.6** THE SYSTEM SHALL pass every text it records through the Shield before recording it: the input, the assistant text, the reasoning text, each tool call's arguments and each tool result (ARCH-6).
 - **LOOP-3.7** WHEN a Turn ends THE SYSTEM SHALL record why: completed, cancelled, a step or token limit, or an error (`agent-decided`: the set of reasons, after dsh's `TurnEndReason`).
 - **LOOP-3.8** THE SYSTEM SHALL keep the Conversation in the app's SQLite store, created on the first Turn and never at startup (L18, ARCH-12, ARCH-17; its stored shape is design, Open Questions S-stop).
-- **LOOP-3.9** IF a record write fails THEN THE SYSTEM SHALL end the Turn with an error and send no further model request in it (`agent-decided`, after dsh's "model-visible means logged").
+- **LOOP-3.9** IF a record write fails THEN THE SYSTEM SHALL end the Turn with an error and send no further model request in it (`agent-decided`, after dsh's "model-visible means logged"). An end that cannot itself be recorded is repaired by LOOP-4.1 on the next open.
 - **LOOP-3.10** WHEN a Turn continues an existing Conversation THE SYSTEM SHALL send the model that Conversation's earlier messages, as recorded after the Shield (LOOP-3.6), before the new input (`agent-decided`, after dsh's session history and CONTEXT.md's "a sequence of Turns").
 
 ## 4. Repair a Turn cut short by a crash
@@ -94,7 +94,7 @@ Words: Conversation, Turn and Step are defined in CONTEXT.md. "THE SYSTEM" is th
 
 **Story:** As the operator, I want to run one gated Turn against DeepSeek by hand, through a real Kernel with its real Read Actions, so that I can see the loop answer from a real model before ROAD-15 gives it a screen. The demo is the operator running that test (Weigh W3); this run does not claim it.
 
-- **LOOP-9.1** WHERE `NAVORI_LIVE_LLM=1` is set and the test is run with `--ignored` THE SYSTEM SHALL run one Turn against DeepSeek through a real Kernel with its real Read Actions, using the key from the operator's `pass` entry, and SHALL report the answer and the Actions the Turn called (gate pattern of ai/llm/tests/live_deepseek.rs:15-24). No agent runs `pass show`.
+- **LOOP-9.1** WHERE `NAVORI_LIVE_LLM=1`, `NAVORI_LIVE_PASS_ENTRY=<entry>` and `NAVORI_LIVE_MODEL=<model>` are set and the test is run with `--ignored` THE SYSTEM SHALL run one Turn against DeepSeek with that model (LOOP-1.4) through a real Kernel with its real Read Actions, using the key from that `pass` entry, and SHALL report the answer and the Actions the Turn called (gate pattern of ai/llm/tests/live_deepseek.rs:15-24). No agent runs `pass show`.
 
 ## 10. Existing behavior stays intact
 
@@ -129,9 +129,9 @@ Files this change touches, and what each guards:
 **Story:** As a stakeholder, I want measurable quality targets for this feature, so that how-well is not left implicit.
 
 - **Performance:**
-  - **LOOP-11.1** WHEN `cargo xtask perf` runs after this change THE SYSTEM SHALL show no regression against the base commit measured in the same session for idle CPU, wakeups, footprint, cold start and menu open (GOAL-11, docs/standards/performance.md) — verified by `cargo xtask perf` on an idle machine.
+  - **LOOP-11.1** WHEN `cargo xtask perf` runs after this change THE SYSTEM SHALL keep every gated metric within its budget (GOAL-11, docs/standards/performance.md:35) and, measured at the base commit and at the head on the same idle machine, keep each metric's head median within the base median + max(10% of it, the metric's floor) (performance.md:35-36; `agent-decided`: applying that rule base-to-head, since no `perf-baseline.json` exists) — verified by `cargo xtask perf` run at both commits.
   - **LOOP-11.2** WHEN the Core starts THE SYSTEM SHALL build no part of the Agent loop and run no Conversation migration (ARCH-17) — verified by a test that starts the Core and finds neither built.
-  - **LOOP-11.3** THE SYSTEM SHALL run a Turn's blocking store and Keychain calls off the async worker threads — verified by a test in which another connection's `core.status` answers while a Turn waits on its fake provider.
+  - **LOOP-11.3** THE SYSTEM SHALL run a Turn's blocking store and Keychain calls off the async worker threads — verified by a test in which another connection's `core.status` answers while a Turn's Conversation record write or audit write is held blocked by a fake (for example, waiting on a barrier).
 - **Security:** (consulted docs/security/threat-model.md, Approved)
   - **LOOP-11.4** THE SYSTEM SHALL send nothing to the provider that has not passed the Shield, including a secret that a Read Action's result carries (THR-1, THR-10) — verified by a fake provider that asserts the received body holds the `[REDACTED:<rule>]` marker and not the planted secret.
   - **LOOP-11.5** WHILE debug logging is off THE SYSTEM SHALL let no input text, reply text, reasoning text, tool argument or tool result reach a log line (THR-3; docs/architecture/data.md "no prompt content or secrets unless debug is on") — verified by a test, run with debug logging off, that searches the log output for planted strings after a Turn. What a Turn writes to the Journal is Open Questions S-journal.
@@ -162,4 +162,5 @@ Files this change touches, and what each guards:
 - S-parallel: serial or parallel tool calls within a Step — owner: design-solution — date: design — forbid-guess: no test depends on the order in which Actions run, only on the order of their results (LOOP-1.2).
 - S-tools: tool names for Actions (for example `module.action`; DeepSeek allows a-z, A-Z, 0-9, `_` and `-`, up to 128 characters) and cutting each Action's parameter schema from its Module's shared enum schema (crates/protocol/src/lib.rs:27) — owner: design-solution — date: design — forbid-guess: no test pins a tool name.
 - Whether DeepSeek sends `content` as null or as an empty string with tool calls (research: unconfirmed) — owner: author of the live test — date: when LOOP-9.1 first runs — forbid-guess: fixtures cover both (LOOP-1.6).
+- Does DeepSeek accept a replayed `reasoning_content` that the Shield changed (research-deepseek-tools.md:38-40, unconfirmed)? — owner: author of the live test — date: when LOOP-9.1 first runs — forbid-guess: a fixture covers a redacted replay; no test asserts the Provider accepts it.
 - The `pass` entry that holds the DeepSeek key — owner: operator — date: before LOOP-9.1 first runs — forbid-guess: no agent runs `pass show` or invents a name.
