@@ -411,10 +411,10 @@ impl Agent {
         steps: u32,
     ) {
         tracing::info!(%conversation, %turn, end, steps, "turn ended");
-        let severity = if matches!(end, "completed" | "cancelled") {
-            Severity::Info
-        } else {
+        let severity = if end == "interrupted" || end.starts_with("error:") {
             Severity::Warn
+        } else {
+            Severity::Info
         };
         self.bus.emit(
             "ai",

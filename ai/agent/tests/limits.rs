@@ -304,3 +304,29 @@ async fn a_repeated_call_carries_the_reminder_in_its_result() {
         .unwrap();
     assert!(third.starts_with("You are repeating the exact same tool call"));
 }
+
+#[tokio::test]
+async fn a_limit_end_is_journaled_as_info_and_an_error_end_as_warn() {
+    use navori_protocol::Severity;
+
+    let limits = Limits {
+        max_steps: 1,
+        ..Limits::default()
+    };
+    let mut stopped =
+        common::agent_with(vec![common::call_reply("c1", "probe_look", "{}")], limits);
+    stopped
+        .agent
+        .run_turn(&stopped.kernel, request("loop"), CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(stopped.events.try_recv().unwrap().severity, Severity::Info);
+
+    let mut failed = common::agent_with(vec![], Limits::default());
+    failed
+        .agent
+        .run_turn(&failed.kernel, request("hi"), CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(failed.events.try_recv().unwrap().severity, Severity::Warn);
+}
