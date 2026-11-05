@@ -149,6 +149,10 @@ fn measure_phase_a(
     for slot in &mut submenu_opens {
         *slot = open_submenu(&launched, log)?;
     }
+    let mut submenu_intent_opens = [0.0; 5];
+    for slot in &mut submenu_intent_opens {
+        *slot = open_submenu_by_hover(&launched, log)?;
+    }
     let peak = sample_pid(probe, pid)?;
     finish_measured(&mut launched)?;
     Ok(PhaseAProcess {
@@ -159,6 +163,8 @@ fn measure_phase_a(
         menu_reopen_ms,
         menu_open_cpu_ms,
         submenu_open_ms: median(&submenu_opens).context("submenu_open_ms has no samples")?,
+        submenu_intent_open_ms: median(&submenu_intent_opens)
+            .context("submenu_intent_open_ms has no samples")?,
         peak_bytes: peak.peak,
     })
 }
@@ -233,11 +239,13 @@ fn measurements(
         .collect();
     let mut reopen = Vec::with_capacity(phase_a.len());
     let mut submenu = Vec::with_capacity(phase_a.len());
+    let mut submenu_intent = Vec::with_capacity(phase_a.len());
     let mut cpu = Vec::new();
     for run in phase_a {
         reopen
             .push(median(run.menu_reopen_ms.as_slice()).context("menu_reopen_ms has no samples")?);
         submenu.push(run.submenu_open_ms);
+        submenu_intent.push(run.submenu_intent_open_ms);
         cpu.extend(run.menu_open_cpu_ms.iter().copied());
     }
     let mut ranked: Vec<&PhaseAProcess> = phase_a.iter().collect();
@@ -286,6 +294,7 @@ fn measurements(
     insert_median(&mut out, "menu_open_after_launch_ms", &menu_open)?;
     insert_median(&mut out, "menu_reopen_ms", &reopen)?;
     insert_median(&mut out, "submenu_open_ms", &submenu)?;
+    insert_median(&mut out, "submenu_intent_open_ms", &submenu_intent)?;
     insert_median(&mut out, "footprint_menu_open_mb", &footprint)?;
     insert_median(&mut out, "menu_open_cpu_ms", &cpu)?;
     insert_median(&mut out, "idle_cpu_pct", &idle_cpu)?;
@@ -313,6 +322,7 @@ struct PhaseAProcess {
     menu_reopen_ms: [f64; 5],
     menu_open_cpu_ms: Vec<f64>,
     submenu_open_ms: f64,
+    submenu_intent_open_ms: f64,
     peak_bytes: u64,
 }
 
@@ -354,6 +364,17 @@ fn open_submenu(launched: &Launched, log: &mut LogStream) -> Result<f64> {
     let mark = await_mark(log, pid, is_submenu_open, "submenuOpened")?;
     let Mark::SubmenuOpened { ms } = mark else {
         bail!("pid {pid} submenuOpened returned a different mark");
+    };
+    Ok(ms)
+}
+
+/// SIGINFO: the app enters the Core row, the real intent timer fires, the Submenu opens.
+fn open_submenu_by_hover(launched: &Launched, log: &mut LogStream) -> Result<f64> {
+    let pid = launched.pid;
+    launched.signal("INFO")?;
+    let mark = await_mark(log, pid, is_submenu_intent_open, "submenuIntentOpened")?;
+    let Mark::SubmenuIntentOpened { ms } = mark else {
+        bail!("pid {pid} submenuIntentOpened returned a different mark");
     };
     Ok(ms)
 }
@@ -468,6 +489,10 @@ fn is_reopen(mark: &Mark) -> bool {
 
 fn is_submenu_open(mark: &Mark) -> bool {
     matches!(mark, Mark::SubmenuOpened { .. })
+}
+
+fn is_submenu_intent_open(mark: &Mark) -> bool {
+    matches!(mark, Mark::SubmenuIntentOpened { .. })
 }
 
 fn session_marker(perf_home: &Path) -> PathBuf {
@@ -726,6 +751,7 @@ mod tests {
             menu_open_cpu_ms: vec![1.0, 3.0],
             peak_bytes: 3 * 1_048_576,
             submenu_open_ms,
+            submenu_intent_open_ms: submenu_open_ms * 10.0,
         }
     }
 
@@ -771,6 +797,7 @@ mod tests {
         ];
         let measured = measurements(&phase_a, &phase_b(), 12.5).unwrap();
         assert_eq!(measured["submenu_open_ms"], 8.0);
+        assert_eq!(measured["submenu_intent_open_ms"], 80.0);
     }
 
     #[test]

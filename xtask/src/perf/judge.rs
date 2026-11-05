@@ -96,6 +96,12 @@ pub const METRICS: &[MetricSpec] = &[
         floor: 5.0,
     },
     MetricSpec {
+        name: "submenu_intent_open_ms",
+        unit: "ms",
+        kind: Kind::Gated { budget: 80.0 },
+        floor: 10.0,
+    },
+    MetricSpec {
         name: "snapshot_ms",
         unit: "ms",
         kind: Kind::Gated { budget: 10.0 },
@@ -269,6 +275,7 @@ mod tests {
             ("menu_open_cpu_ms".to_owned(), 5.0),
             ("thread_count".to_owned(), 2.0),
             ("submenu_open_ms".to_owned(), 16.0),
+            ("submenu_intent_open_ms".to_owned(), 80.0),
             ("snapshot_ms".to_owned(), 10.0),
             ("port_scan_ms".to_owned(), 50.0),
         ])
@@ -303,6 +310,7 @@ mod tests {
             "menu_open_cpu_ms",
             "thread_count",
             "submenu_open_ms",
+            "submenu_intent_open_ms",
             "snapshot_ms",
             "port_scan_ms",
         ];
@@ -356,6 +364,24 @@ mod tests {
             verdict.lines
         );
         assert!(verdict.passed, "{:?}", verdict.lines);
+    }
+
+    #[test]
+    fn an_intent_open_at_the_old_150_ms_timer_fails_the_run() {
+        // The re-armed 150 ms timer plus about 8 ms of open cost.
+        let mut measurements = within_budget();
+        measurements.insert("submenu_intent_open_ms".to_owned(), 158.0);
+        let verdict = judge(&measurements, None, &machine());
+        assert!(!verdict.passed, "{:?}", verdict.lines);
+        assert!(
+            verdict.lines.iter().any(|line| {
+                line.contains("submenu_intent_open_ms") && line.contains("158") && line.contains("80")
+            }),
+            "{:?}",
+            verdict.lines
+        );
+        measurements.insert("submenu_intent_open_ms".to_owned(), 58.0);
+        assert!(judge(&measurements, None, &machine()).passed);
     }
 
     #[test]
@@ -544,6 +570,12 @@ mod tests {
             ),
             ("thread_count", 2.0, None, "2 threads `thread_count`"),
             ("submenu_open_ms", 5.0, Some(16.0), "≤ 16 ms"),
+            (
+                "submenu_intent_open_ms",
+                10.0,
+                Some(80.0),
+                "Submenu open from pointer entry | ≤ 80 ms",
+            ),
             ("snapshot_ms", 2.0, Some(10.0), "≤ 10 ms"),
             ("port_scan_ms", 5.0, Some(50.0), "≤ 50 ms"),
         ];
