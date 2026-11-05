@@ -71,7 +71,6 @@ public struct RunningProjectInput: Equatable, Sendable {
     public let sessions: [RunningSessionInput]
     public let ports: [RunningPortInput]
     public let stoppablePorts: Int
-    public let rowStopRequest: String?
     public let childStopRequest: String?
     public let path: String?
     public let upSinceMs: Int64?
@@ -83,7 +82,6 @@ public struct RunningProjectInput: Equatable, Sendable {
         sessions: [RunningSessionInput],
         ports: [RunningPortInput],
         stoppablePorts: Int,
-        rowStopRequest: String?,
         childStopRequest: String?,
         path: String? = nil,
         upSinceMs: Int64? = nil
@@ -96,7 +94,6 @@ public struct RunningProjectInput: Equatable, Sendable {
         self.sessions = sessions
         self.ports = ports
         self.stoppablePorts = stoppablePorts
-        self.rowStopRequest = rowStopRequest
         self.childStopRequest = childStopRequest
     }
 }
@@ -178,22 +175,17 @@ public struct ProjectRowState: Equatable, Sendable {
     public let name: String
     public let dot: ProjectDot
     public let spoken: String
-    /// `Stop N` on the row. Present only when the Core sent a row request.
-    public let stop: StopOffer?
     /// `Stop N ports` in the child menu. Present only when the Core sent a child request.
     public let childStop: StopOffer?
-    public let targets: [StopTarget]
     public let childRowIds: [String]
     public let childOffers: [String: StopOffer]
     /// One id per session row of the child menu. They are shown, never acted on.
     public let sessionRowIds: [String]
 
     init(_ project: RunningProjectInput) {
-        targets = project.ports.compactMap(\.target)
         let id = Self.id(of: project)
         self.id = id
         name = project.name
-        stop = StopOffer(count: project.stoppablePorts, request: project.rowStopRequest)
         childStop = StopOffer(count: project.stoppablePorts, request: project.childStopRequest)
         var ids = project.ports.map { ProjectChildState.portId(project: id, port: $0) }
         var offers: [String: StopOffer] = [:]

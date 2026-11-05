@@ -12,7 +12,6 @@ private func project(
     sessions: [RunningSessionInput] = [],
     ports: [RunningPortInput] = [],
     stoppable: Int = 0,
-    rowStop: String? = nil,
     childStop: String? = nil,
     isOther: Bool = false
 ) -> RunningProjectInput {
@@ -23,7 +22,6 @@ private func project(
         sessions: sessions,
         ports: ports,
         stoppablePorts: stoppable,
-        rowStopRequest: rowStop,
         childStopRequest: childStop
     )
 }
@@ -122,11 +120,9 @@ struct RunningSubmenuStateTests {
 
     @Test func the_stop_control_is_spoken_with_its_port_count() {
         let state = RunningSubmenuState(running: running([
-            project("a", state: .idle, ports: [port(1), port(2)], stoppable: 2, rowStop: "ra", childStop: "ra"),
-            project("b", state: .idle, ports: [port(3)], stoppable: 1, rowStop: "rb", childStop: "rb"),
+            project("a", state: .idle, ports: [port(1), port(2)], stoppable: 2, childStop: "ra"),
+            project("b", state: .idle, ports: [port(3)], stoppable: 1, childStop: "rb"),
         ]))
-        #expect(state.rows[0].stop?.spoken == "Stop 2 ports")
-        #expect(state.rows[1].stop?.spoken == "Stop 1 port")
         #expect(state.rows[0].childStop?.spoken == "Stop 2 ports")
     }
 
@@ -181,25 +177,10 @@ struct RunningSubmenuStateTests {
         #expect(known.note == nil)
     }
 
-    @Test func a_row_offers_stop_only_when_the_input_carries_a_request() {
-        let state = RunningSubmenuState(running: running([
-            project("idle-one", state: .idle, ports: [port(1, stop: "a"), port(2, stop: "b")],
-                    stoppable: 2, rowStop: "req-idle", childStop: "req-idle"),
-            project("busy", state: .working, sessions: [live], ports: [port(3, stop: "c")],
-                    stoppable: 1, rowStop: nil, childStop: "req-busy"),
-            project("mystery", state: .unknown, ports: [port(4)], stoppable: 0),
-            project("empty-request", state: .idle, ports: [port(5)], stoppable: 1, rowStop: ""),
-        ]))
-        #expect(state.rows[0].stop == StopOffer(count: 2, request: "req-idle"))
-        #expect(state.rows[1].stop == nil)
-        #expect(state.rows[2].stop == nil)
-        #expect(state.rows[3].stop == nil)
-    }
-
     @Test func the_child_stop_is_built_from_the_child_request() {
         let state = RunningSubmenuState(running: running([
             project("busy", state: .working, sessions: [live], ports: [port(3, stop: "c")],
-                    stoppable: 1, rowStop: nil, childStop: "req-busy"),
+                    stoppable: 1, childStop: "req-busy"),
             project("bare", state: .working, sessions: [live]),
         ]))
         #expect(state.rows[0].childStop == StopOffer(count: 1, request: "req-busy"))
@@ -213,7 +194,7 @@ struct RunningSubmenuStateTests {
 
     @Test func the_submenu_runs_from_keep_awake_to_stop_all() {
         let idle = project(
-            "api", state: .idle, ports: [port(1, stop: "a")], stoppable: 1, rowStop: "r", childStop: "r"
+            "api", state: .idle, ports: [port(1, stop: "a")], stoppable: 1, childStop: "r"
         )
         let state = RunningSubmenuState(
             running: running(
@@ -267,15 +248,15 @@ struct RunningSubmenuStateTests {
     @Test func stop_all_is_absent_when_no_named_project_is_idle() {
         let state = RunningSubmenuState(running: running([
             project("busy", state: .working, sessions: [live], ports: [port(1)]),
-            project("Other", state: .idle, ports: [port(2, stop: "o")], stoppable: 1, rowStop: "o", isOther: true),
+            project("Other", state: .idle, ports: [port(2, stop: "o")], stoppable: 1, isOther: true),
         ], stopAll: [], otherLeft: 1))
         #expect(state.stopAll == nil)
     }
 
     @Test func stop_all_carries_the_core_counts() {
         let state = RunningSubmenuState(running: running([
-            project("a", state: .idle, ports: [port(1)], stoppable: 1, rowStop: "ra"),
-            project("b", state: .idle, ports: [port(2), port(3)], stoppable: 2, rowStop: "rb"),
+            project("a", state: .idle, ports: [port(1)], stoppable: 1),
+            project("b", state: .idle, ports: [port(2), port(3)], stoppable: 2),
         ], stopAll: ["ra", "rb"], stopAllPorts: 3, inUse: 5, otherLeft: 1, hidden: 2))
         #expect(state.stopAll == StopAllOffer(
             requests: ["ra", "rb"], ports: 3, projects: 2, inUse: 5, otherLeft: 1, systemHidden: 2
@@ -323,7 +304,6 @@ private func child(
             sessions: sessions,
             ports: ports,
             stoppablePorts: stoppable,
-            rowStopRequest: nil,
             childStopRequest: childStop,
             path: path,
             upSinceMs: upSinceMs
@@ -514,7 +494,7 @@ struct ProjectChildStateTests {
             project(
                 "klynt", state: .idle,
                 ports: [port(3000, stop: "a"), port(5432, stop: "")],
-                stoppable: 1, rowStop: "r", childStop: "c"
+                stoppable: 1, childStop: "c"
             ),
         ]))
         let row = state.rows[0]
@@ -607,7 +587,7 @@ struct PortRowIdTests {
         let state = RunningSubmenuState(running: running([
             RunningProjectInput(
                 name: "p", isOther: false, state: .idle, sessions: [], ports: [first, second, box],
-                stoppablePorts: 3, rowStopRequest: "r", childStopRequest: "c"
+                stoppablePorts: 3, childStopRequest: "c"
             ),
         ]))
         let ids = state.rows[0].childRowIds
@@ -629,7 +609,7 @@ struct RunningCommandRowsTests {
         #expect(commands.map(\.name) == ["make test"])
         let state = RunningSubmenuState(
             running: running(
-                [project("api", state: .idle, ports: [port(1, stop: "a")], stoppable: 1, rowStop: "r", childStop: "r")],
+                [project("api", state: .idle, ports: [port(1, stop: "a")], stoppable: 1, childStop: "r")],
                 stopAll: ["r"], stopAllPorts: 1
             ),
             commands: commands
@@ -663,7 +643,6 @@ struct PortActionsTests {
                 sessions: [],
                 ports: ports,
                 stoppablePorts: 0,
-                rowStopRequest: nil,
                 childStopRequest: nil
             ),
             nowMs: 0,
@@ -696,7 +675,6 @@ struct PortActionsTests {
                 sessions: [],
                 ports: [],
                 stoppablePorts: 0,
-                rowStopRequest: nil,
                 childStopRequest: nil,
                 path: "/Users/me/dev/api"
             ),

@@ -70,7 +70,7 @@ struct RunningSubmenuView: View {
                 .frame(maxWidth: .infinity, minHeight: Self.rowHeight, alignment: .leading)
                 .accessibilityAddTraits(.isStaticText)
         case let .project(project):
-            ProjectRowView(state: project, targets: project.targets, store: store, cascade: cascade)
+            ProjectRowView(state: project, cascade: cascade)
         case let .stopAll(offer):
             StopLineView(
                 id: CoreStore.stopAllId,

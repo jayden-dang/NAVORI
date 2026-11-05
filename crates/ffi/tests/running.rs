@@ -145,7 +145,6 @@ fn assert_stop_is_off(view: &RunningView) {
     for project in &view.projects {
         assert_eq!(project.state, ProjectState::Unknown, "{}", project.name);
         assert_eq!(project.stoppable_ports, 0, "{}", project.name);
-        assert_eq!(project.row_stop_request, None, "{}", project.name);
         assert_eq!(project.child_stop_request, None, "{}", project.name);
         for listed in &project.ports {
             assert_eq!(listed.stop_request, "", "{}", project.name);
@@ -319,7 +318,6 @@ fn the_ports_module_down_gives_no_stop_requests() {
     for project in &view.projects {
         assert!(project.ports.is_empty());
         assert_eq!(project.stoppable_ports, 0);
-        assert_eq!(project.row_stop_request, None);
         assert_eq!(project.child_stop_request, None);
     }
     assert!(view.stop_all.is_empty());
@@ -354,7 +352,6 @@ fn a_database_and_a_system_port_are_left_out_of_the_group_requests_but_have_thei
     let view = view_of(Some(&awake(vec![])), Some(&ports));
     let klynt = project(&view, "klynt");
     let group = kill(json!({"project": "klynt"}), json!([process(10)]));
-    assert_eq!(json_of(&klynt.row_stop_request), group);
     assert_eq!(json_of(&klynt.child_stop_request), group);
     assert_eq!(klynt.stoppable_ports, 1);
     assert_eq!(view.hidden_system_ports, 2);
@@ -460,7 +457,7 @@ fn stop_all_holds_each_idle_named_project_with_a_stoppable_port_and_never_other(
         kill(json!({"project": "alpha"}), json!([process(10)]))
     );
     assert_eq!(
-        json_of(&other(&view).row_stop_request),
+        json_of(&other(&view).child_stop_request),
         kill(json!({"project": null}), json!([process(13)]))
     );
 }
@@ -570,7 +567,7 @@ fn a_repo_literally_named_other_stays_a_named_project_not_the_no_project_group()
     let named = project(&view, "Other");
     assert!(!named.is_other);
     assert_eq!(
-        json_of(&named.row_stop_request),
+        json_of(&named.child_stop_request),
         kill(json!({"project": "Other"}), json!([process(10)]))
     );
     assert_eq!(view.projects.iter().filter(|p| p.is_other).count(), 1);
@@ -579,8 +576,7 @@ fn a_repo_literally_named_other_stays_a_named_project_not_the_no_project_group()
 }
 
 #[test]
-fn a_row_stop_request_exists_only_for_an_idle_project_and_a_child_stop_request_for_every_known_project()
- {
+fn a_child_stop_request_exists_for_every_known_project_and_no_unknown_one() {
     let ports = state(vec![
         in_project(port(3000, 10), "busy"),
         in_project(port(3001, 11), "calm"),
@@ -590,15 +586,12 @@ fn a_row_stop_request_exists_only_for_an_idle_project_and_a_child_stop_request_f
         Some(&ports),
     );
     let busy = project(&known, "busy");
-    assert_eq!(busy.row_stop_request, None);
     assert!(busy.child_stop_request.is_some());
     let calm = project(&known, "calm");
-    assert!(calm.row_stop_request.is_some());
     assert!(calm.child_stop_request.is_some());
 
     let unknown = view_of(None, Some(&ports));
     for project in &unknown.projects {
-        assert_eq!(project.row_stop_request, None);
         assert_eq!(project.child_stop_request, None);
     }
 }

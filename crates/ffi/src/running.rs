@@ -53,7 +53,6 @@ pub struct RunningProject {
     pub sessions: Vec<RunningSession>,
     pub ports: Vec<RunningPort>,
     pub stoppable_ports: u32,
-    pub row_stop_request: Option<String>,
     pub child_stop_request: Option<String>,
 }
 
@@ -155,7 +154,7 @@ pub fn build(
         match project.state {
             ProjectState::Idle if project.is_other => other_ports_left = project.stoppable_ports,
             ProjectState::Idle => {
-                if let Some(request) = &project.row_stop_request {
+                if let Some(request) = &project.child_stop_request {
                     stop_all.push(request.clone());
                     stop_all_ports += project.stoppable_ports;
                 }
@@ -242,9 +241,6 @@ fn project_of(key: Key, mut draft: Draft<'_>, known: bool) -> RunningProject {
         sessions,
         ports,
         stoppable_ports,
-        row_stop_request: group_request
-            .clone()
-            .filter(|_| state == ProjectState::Idle),
         child_stop_request: group_request,
         state,
     }

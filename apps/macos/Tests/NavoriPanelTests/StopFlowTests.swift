@@ -148,7 +148,6 @@ struct StopFlowTests {
             sessions: [],
             ports: (0..<ports).map { RunningPortInput(port: 3000 + $0, name: "node", stopRequest: "p\($0)") },
             stoppablePorts: ports,
-            rowStopRequest: request,
             childStopRequest: request
         )
     }
@@ -197,15 +196,13 @@ struct StopFlowTests {
         progress.record([stale, gone])
         #expect(progress.entry(for: .process(pid: 412, startUs: 1)) == .failed("The port closed."))
         #expect(progress.entry(for: .process(pid: 413, startUs: 2)) == .stopping)
-        #expect(progress.failures(among: [.process(pid: 412, startUs: 1), .process(pid: 413, startUs: 2)]) == ["The port closed."])
-        #expect(progress.isStopping(among: [.process(pid: 413, startUs: 2)]))
 
         progress.prune(listed: [.process(pid: 412, startUs: 1)])
         #expect(progress.entry(for: .process(pid: 412, startUs: 1)) == .failed("The port closed."))
         #expect(progress.entry(for: .process(pid: 413, startUs: 2)) == nil)
 
         progress.prune(listed: [])
-        #expect(progress.failures(among: [.process(pid: 412, startUs: 1)]).isEmpty)
+        #expect(progress.entry(for: .process(pid: 412, startUs: 1)) == nil)
     }
 
     @Test func fewer_stops_than_confirmed_read_as_results_not_as_an_error() {
@@ -269,30 +266,5 @@ struct StopFlowTests {
         #expect(all.spoken == "Stop 5 ports")
         let one = StopAllOffer(requests: ["a"], ports: 1, projects: 1, inUse: 0, otherLeft: 0, systemHidden: 0)
         #expect(one.spoken == "Stop 1 port")
-    }
-}
-
-@Suite
-struct StopProgressAttributionTests {
-    @Test func a_reason_with_no_listed_target_stays_unattributed() {
-        var progress = StopProgress()
-        let listed = StopTarget.process(pid: 1, startUs: 1)
-        progress.record([StopResult(target: listed, result: .protected, reason: "This process is protected.")])
-        #expect(progress.unattributed(["This process is protected.", "Navori got no answer to the stop."], among: [listed])
-            == ["Navori got no answer to the stop."])
-        #expect(progress.unattributed(["The stop failed.", "The stop failed."], among: [listed])
-            == ["The stop failed.", "The stop failed."])
-    }
-
-    @Test func each_attributed_failure_removes_one_matching_reason_only() {
-        var progress = StopProgress()
-        let first = StopTarget.process(pid: 1, startUs: 1)
-        let second = StopTarget.process(pid: 2, startUs: 2)
-        progress.record([
-            StopResult(target: first, result: .failed, reason: "The stop failed."),
-            StopResult(target: second, result: .failed, reason: "The stop failed."),
-        ])
-        #expect(progress.unattributed(["The stop failed.", "The stop failed.", "The stop failed."], among: [first, second])
-            == ["The stop failed."])
     }
 }

@@ -367,7 +367,6 @@ final class CoreStore {
     private static func offerCounts(_ state: RunningSubmenuState) -> [String: Int] {
         var counts: [String: Int] = [:]
         for row in state.rows {
-            if let stop = row.stop { counts[row.id] = stop.count }
             for (id, offer) in row.childOffers { counts[id] = offer.count }
         }
         if let all = state.stopAll { counts[stopAllId] = all.ports }
@@ -412,7 +411,6 @@ final class CoreStore {
                 )
             },
             stoppablePorts: Int(project.stoppablePorts),
-            rowStopRequest: project.rowStopRequest,
             childStopRequest: project.childStopRequest,
             path: project.path,
             upSinceMs: project.upSinceMs
