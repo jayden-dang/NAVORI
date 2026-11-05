@@ -30,7 +30,7 @@ Terms used below:
 **Story:** As the user, I want to click the status item and see the new glass menu holding only what Navori really knows, so that the menu is pleasant to read and never shows anything invented.
 
 - **MENU-1.1** WHEN level 0 opens THE SYSTEM SHALL show it 360 pt wide on an `NSGlassEffectView` with style `.clear` and a tint.
-- **MENU-1.2** THE SYSTEM SHALL lay out level 0 in this order: any banners, the Awake row, the Core row, a separator, `Settings…`, `About Navori`, `Quit Navori`. (amended by AWAKE-11.1)
+- **MENU-1.2** THE SYSTEM SHALL lay out level 0 in this order: any banners, the Awake row, the Core row, a separator, `Settings…`, `About Navori`, `Quit Navori`. (amended by AWAKE-11.1) *(Amended 2026-11-05, operator decision: the Core row is present only as MENU-3.11 says; where it is absent the order is otherwise unchanged and the separator stays before `Settings…`.)*
 - **MENU-1.3** THE SYSTEM SHALL NOT show a header row, the app name caption or the version on level 0.
 - **MENU-1.4** WHERE the code is Release code THE SYSTEM SHALL NOT show the Ask field, Needs you, the Ports or Pull Requests rows, or `You're all caught up`. (amended by AWAKE-11.1)
 - **MENU-1.5** THE SYSTEM SHALL draw rows with SF Pro 14 pt titles and 13 pt right-aligned values, in `labelColor` and `secondaryLabelColor`, with no `tertiaryLabelColor` on glass.
@@ -54,16 +54,19 @@ Terms used below:
 
 **Story:** As the user, I want to open the Core row and read each module's state and the recent activity, so that I can tell what Navori is doing without opening a terminal.
 
-- **MENU-3.1** THE SYSTEM SHALL draw the Core row on one line: icon, `Core`, the state in words, and a chevron when it has a Submenu.
+- **MENU-3.1** THE SYSTEM SHALL draw the Core row on one line: icon, `Core`, the state in words, and a chevron when it has a Submenu. *(Amended 2026-11-05, operator decision: this is how the row is drawn when it is shown; whether it is shown is MENU-3.11.)*
 - **MENU-3.2** THE SYSTEM SHALL name the state as `Starting`, `Running`, `Needs attention` or `Not running`, following the order the Core row's initializer in `NavoriPanel` applies (`CoreStore.health` was deleted by ICON, `docs/specs/2026-11-02-status-icon-states/design.md` decision 5), with a green dot for `Running`, an orange dot for `Needs attention`, a red dot for `Not running` and no dot for `Starting`.
 - **MENU-3.3** WHEN the Core row's Submenu opens THE SYSTEM SHALL list every module in the snapshot with its state, its restart count when above 0, and its detail when it has one.
 - **MENU-3.4** WHEN the Core row's Submenu opens THE SYSTEM SHALL list at most 8 recent Events in the snapshot's order, each with its summary, a severity icon and its relative age in today's narrow numeric form.
 - **MENU-3.5** IF the snapshot holds no Events THEN THE SYSTEM SHALL show `Nothing yet.` in place of the Event list.
 - **MENU-3.6** WHILE the Submenu is open WHEN a new snapshot arrives THE SYSTEM SHALL update its rows without closing it.
-- **MENU-3.7** IF the Core has no snapshot THEN THE SYSTEM SHALL show the Core row with no chevron and no Submenu.
-- **MENU-3.8** WHERE the app runs the dev profile THE SYSTEM SHALL show a `DEV` chip on the Core row.
+- **MENU-3.7** IF the Core has no snapshot THEN THE SYSTEM SHALL show the Core row with no chevron and no Submenu. *(Amended 2026-11-05, operator decision: where the row is shown. In production a Core with no snapshot that has not failed is `Starting` and the row is hidden by MENU-3.11.)*
+- **MENU-3.8** WHERE the app runs the dev profile THE SYSTEM SHALL show a `DEV` chip on the Core row. *(Amended 2026-11-05, operator decision: the dev profile shows the Core row in every state, see MENU-3.12; the chip is unchanged.)*
 - **MENU-3.9** WHERE the app runs the release profile THE SYSTEM SHALL NOT show the `DEV` chip.
 - **MENU-3.10** (guard) WHEN a module row is drawn THE SYSTEM SHALL CONTINUE TO color its dot green for `running`, yellow for `starting` or `restarting`, red for `failed` and gray otherwise.
+- **MENU-3.11** WHERE the app runs the release profile THE SYSTEM SHALL show the Core row, and with it the Core Submenu, only while the Core is `Needs attention` or `Not running`, and SHALL NOT show it while the Core is `Running` or `Starting`. WHEN the Core's state changes while the Cascade is open THE SYSTEM SHALL add or remove the row without closing the Cascade, keeping the selection on a surviving row and moving it off a removed one. *(Added 2026-11-05, operator decision: the row was a placeholder until features had data (brief item 12); the Running row now exists, and a healthy Core row is noise in normal use. Cost, recorded on purpose: the Core Submenu's Events list is the only in-app place that shows the counts-only `ports.stopped` Events, so in production those Events are now visible in the app only while the Core needs attention; `navori events` and Settings → Doctor still show them. `cargo xtask perf` runs the dev profile, where the row stays, so `submenu_open_ms` (MENU-8.1) still measures a surface that production hides while the Core is healthy.)*
+- **MENU-3.12** (guard) WHERE the app runs the dev profile THE SYSTEM SHALL CONTINUE TO show the Core row in every state, with the `DEV` chip. *(Added 2026-11-05, operator decision.)*
+- **MENU-3.13** (guard) WHEN the Core row is shown THE SYSTEM SHALL CONTINUE TO list the same module states and the same 8 most recent Events in its Submenu (MENU-3.3, MENU-3.4), keep its chevron rules (MENU-3.7) and dot colors (MENU-3.2, MENU-3.10), and WHEN the Core row is hidden THE SYSTEM SHALL CONTINUE TO draw the banners and the status icon from the same Core state as before. *(Added 2026-11-05, operator decision.)*
 
 ## 4. Move through submenus with the pointer
 
@@ -214,7 +217,7 @@ Guards named above:
 
 These conditions reopen a decision. They are not requirements.
 
-- The Awake row ships: the Core row stays.
+- ~~The Awake row ships: the Core row stays.~~ Superseded 2026-11-05 by the operator's decision (MENU-3.11): in production the Core row shows only while the Core needs attention or is down; the dev profile keeps it.
 - The Cascade and its gate turn out larger than the visual work in design: split the Cascade into its own ROAD.
 - The real Cascade exceeds 16 ms after optimizing: change the budget through `define-project`, or reconsider.
 - The Safe diagonal dominates the Cascade's complexity for a narrow menu: drop it.
