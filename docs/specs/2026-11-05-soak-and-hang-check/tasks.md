@@ -12,6 +12,7 @@ Approval: the operator's /shape --go, before reading the spec (operator command:
 Date: 2026-11-05
 Execution-mode: continuous
 Max-concurrency: auto
+Delivered-by: PR #29
 Requirements: ./requirements.md
 Design: ./design.md
 
@@ -71,6 +72,13 @@ Every task inherits these:
 | `docs/standards/INDEX.md` | changed | Gates: release-check is ci + perf + soak gate |
 | `docs/agents/project.md` | changed | release step 1 names the soak gate and its cost |
 | `docs/specs/2026-11-04-public-release/requirements.md` | changed | amendment note on RELEASE-2.1 and RELEASE-2.2 |
+| `xtask/src/soak/host.rs` | new (build amendment) | host helpers the driver uses: the `Children` guard, loadavg and screen-lock parsing, outcome classification. Built as `drive.rs` in Task 7 and renamed after the whole-branch review |
+| `docs/specs/2026-11-04-public-release/design.md` | changed (review amendment) | the places that said release-check runs ci then perf now name the soak gate |
+| `docs/specs/2026-11-04-public-release/tasks.md` | changed (review amendment) | same wording fix |
+| `docs/roadmap/INDEX.md` | changed (review amendment) | ROAD-27's local gate wording names the soak gate; no status or milestone change |
+| `README.md`, `AGENTS.md` | changed (review amendment) | command lists gain `cargo xtask soak` and `soak observe` |
+
+Build amendment, 2026-11-05: after the whole-branch review two names changed from this plan. `Event` became `LoadStep`, and `Envelope` became `AwakeCommand`, because both words already mean something else in `CONTEXT.md`. `Plan` no longer carries a `load` field, and `listen::bind` was folded into `listen`. The behavior in the tasks below is unchanged.
 
 Retrieval (load-subgraph, schema 1.1): blast_radius on these paths is advisory, not a gate.
 - `perf/mod.rs` → MENU, PERF, PORTS.
