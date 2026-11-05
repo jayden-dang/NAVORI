@@ -28,8 +28,10 @@ struct InlineConfirmRow<Lead: View>: View {
             Spacer(minLength: 0)
             ConfirmTextButton(title: "Cancel", weight: .regular, ink: cancelInk, action: onCancel)
                 .focused($focus, equals: .cancel)
+                .layoutPriority(2)
             ConfirmTextButton(title: "Stop", weight: .semibold, ink: stopInk, action: onConfirm)
                 .accessibilityLabel(stopLabel)
+                .layoutPriority(2)
         }
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
@@ -66,6 +68,8 @@ private struct ConfirmTextButton: View {
             Text(title)
                 .font(.system(size: 13, weight: weight))
                 .foregroundStyle(ink)
+                .lineLimit(1)
+                .fixedSize()
                 .padding(.horizontal, 5)
                 .frame(height: 20)
                 .background(

@@ -150,6 +150,8 @@ private struct CommandRowView: View {
             Text(row.word)
                 .font(.system(size: 12))
                 .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .lineLimit(1)
+                .fixedSize()
         }
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)

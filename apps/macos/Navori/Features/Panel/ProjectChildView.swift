@@ -80,6 +80,8 @@ struct ProjectChildView: View {
                         .font(.system(size: 12))
                         .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                         .lineLimit(1)
+                        .fixedSize()
+                        .layoutPriority(1)
                 }
             }
             .accessibilityElement(children: .ignore)
@@ -175,17 +177,32 @@ private struct SessionRowView: View {
                 .foregroundStyle(Color(nsColor: .labelColor))
                 .lineLimit(1)
                 .truncationMode(.tail)
+                .layoutPriority(1)
             Spacer(minLength: 8)
             if state.showsDot {
                 Circle()
                     .fill(statusDotColor(.green))
                     .frame(width: 6, height: 6)
+                    .layoutPriority(2)
             }
-            Text(state.detail)
+            // Only the branch may shrink (in the middle); the title, dot and state word keep their room.
+            if let branch = state.branch {
+                Text(branch)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text("\u{00B7}")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .layoutPriority(2)
+            }
+            Text(state.state)
                 .font(.system(size: 13))
                 .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(2)
         }
         .opacity(state.dimmed ? 0.45 : 1)
         .padding(.horizontal, 8)
@@ -303,12 +320,16 @@ private struct PortRowView: View {
                     .foregroundStyle(selected ? Color.white.opacity(0.8) : Color(nsColor: .secondaryLabelColor))
                     .lineLimit(1)
                     .fixedSize()
+                    .layoutPriority(1)
                     .opacity(secondary)
             }
             Spacer(minLength: 8)
             Text(state.portText)
                 .font(.system(size: 11.5, design: .monospaced))
                 .foregroundStyle(selected ? Color.white.opacity(0.85) : Color(nsColor: .secondaryLabelColor))
+                .lineLimit(1)
+                .fixedSize()
+                .layoutPriority(2)
                 .opacity(secondary)
         }
         .padding(.horizontal, 8)
@@ -334,6 +355,8 @@ private struct PortRowView: View {
         if stopping {
             Text("Stopping\u{2026}")
                 .font(.system(size: 13))
+                .lineLimit(1)
+                .fixedSize()
                 .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
                 .padding(.trailing, 8)
                 .accessibilityHidden(true)
@@ -457,6 +480,8 @@ struct StopLineView: View {
                 Text(text)
                     .font(.system(size: 14))
                     .foregroundStyle(selected ? Color.white : Color(nsColor: .labelColor))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
             .padding(.horizontal, 8)
             .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)

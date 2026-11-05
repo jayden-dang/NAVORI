@@ -346,7 +346,10 @@ public enum PortMark: Equatable, Sendable {
 public struct SessionRowState: Equatable, Sendable {
     public let mark: HoldingMark
     public let title: String
-    public let detail: String
+    /// The branch, when the session has one: the only part of the row that may shrink.
+    public let branch: String?
+    /// `working` or `stopped`: always shown.
+    public let state: String
     public let dimmed: Bool
     public let showsDot: Bool
     public let spoken: String
@@ -357,7 +360,8 @@ public struct SessionRowState: Equatable, Sendable {
         let branch = Self.text(session.branch)
         self.title = title
         mark = AwakeSubmenuState.harnessMark(session.harness)
-        detail = branch.map { "\($0) \u{00B7} \(word)" } ?? word
+        self.branch = branch
+        state = word
         dimmed = session.stopped
         showsDot = session.stopped == false
         var parts = [title]

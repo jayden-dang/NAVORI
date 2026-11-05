@@ -25,6 +25,7 @@ struct ProjectRowView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
+                        .layoutPriority(2)
                 }
             }
             .padding(.horizontal, 8)

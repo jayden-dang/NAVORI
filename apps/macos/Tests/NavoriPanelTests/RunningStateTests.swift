@@ -434,12 +434,30 @@ struct ProjectChildStateTests {
         #expect(state.sessions[0].spoken == "Parallel roads, Claude Code, branch dev, working")
         #expect(state.sessions[1].spoken == "old, Codex, stopped")
         #expect(state.sessions[2].spoken == "Session, working")
-        #expect(state.sessions[0].detail == "dev \u{00B7} working")
-        #expect(state.sessions[1].detail == "stopped")
+        #expect(state.sessions.map(\.branch) == ["dev", nil, nil])
+        #expect(state.sessions.map(\.state) == ["working", "stopped", "working"])
         #expect(state.sessions.map(\.dimmed) == [false, true, false])
         #expect(state.sessions.map(\.showsDot) == [true, false, true])
         #expect(state.ports[0].spoken == "kimi-webbridge, port 10086, listening")
         #expect(state.ports[0].portText == ":10086")
+    }
+
+    @Test func a_long_branch_stays_whole_in_its_own_field_and_in_the_spoken_text() {
+        let long = "feature/zr-169-add-a-custom-upstream-error-handling-for-the-gateway-layer"
+        let state = child(
+            state: .working,
+            sessions: [session("Fix retries", branch: long), session("Done", branch: long, stopped: true), session("x", branch: "")],
+            ports: [listener(1, "n")]
+        )
+        #expect(state.sessions[0].branch == long)
+        #expect(state.sessions[0].state == "working")
+        #expect(state.sessions[0].spoken == "Fix retries, Claude Code, branch \(long), working")
+        #expect(state.sessions[1].branch == long)
+        #expect(state.sessions[1].state == "stopped")
+        #expect(state.sessions[1].dimmed)
+        #expect(state.sessions[1].spoken.hasSuffix("branch \(long), stopped"))
+        #expect(state.sessions[2].branch == nil)
+        #expect(state.sessions[2].state == "working")
     }
 
     @Test func a_port_row_names_its_kind_and_a_container_says_docker() {
