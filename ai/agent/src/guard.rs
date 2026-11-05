@@ -1,5 +1,6 @@
 // Ported from dsh (MIT, Copyright (c) 2026 DeepSeek): packages/guard/repeat-tool-reminder. See ai/agent/LICENSE-dsh.
 
+use crate::dispatch::before_open_marker;
 use serde_json::{Map, Value};
 
 const PREVIEW_CHARS: usize = 500;
@@ -77,11 +78,7 @@ fn preview(canonical: &str) -> String {
         .char_indices()
         .nth(PREVIEW_CHARS)
         .map_or(canonical.len(), |(i, _)| i);
-    if let Some(open) = canonical[..end].rfind("[REDACTED:")
-        && !canonical[open..end].contains(']')
-    {
-        end = open;
-    }
+    end = before_open_marker(canonical, end);
     let shown = canonical[..end].chars().count();
     format!("{}… (+{} more chars)", &canonical[..end], total - shown)
 }

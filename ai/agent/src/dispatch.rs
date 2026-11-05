@@ -112,6 +112,14 @@ fn failure(message: String) -> ToolOutcome {
     }
 }
 
+/// Backs `cut` up to the start of a `[REDACTED:` marker that the cut would leave unclosed.
+pub(crate) fn before_open_marker(text: &str, cut: usize) -> usize {
+    match text[..cut].rfind("[REDACTED:") {
+        Some(open) if !text[open..cut].contains(']') => open,
+        _ => cut,
+    }
+}
+
 pub(crate) fn cap_result(mut text: String) -> String {
     if text.len() <= MAX_RESULT_BYTES {
         return text;
@@ -121,11 +129,7 @@ pub(crate) fn cap_result(mut text: String) -> String {
     while !text.is_char_boundary(keep) {
         keep -= 1;
     }
-    if let Some(open) = text[..keep].rfind("[REDACTED:")
-        && !text[open..keep].contains(']')
-    {
-        keep = open;
-    }
+    keep = before_open_marker(&text, keep);
     text.truncate(keep);
     text.push_str(&format!("\n[truncated: {} bytes cut]", total - keep));
     text
