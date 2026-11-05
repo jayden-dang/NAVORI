@@ -31,17 +31,13 @@ impl Toolset {
                     tracing::warn!(tool = %name, "two actions share one tool name; neither is offered");
                     return None;
                 }
-                let Some(cut) = cut(spec) else {
+                let Some((parameters, unit)) = cut(spec) else {
                     tracing::warn!(
                         module = %spec.module,
                         action = %spec.name,
                         "action has no variant in its module schema; not offered as a tool"
                     );
                     return None;
-                };
-                let (parameters, unit) = match cut {
-                    Cut::Fields(parameters) => (parameters, false),
-                    Cut::Unit => (empty_object(), true),
                 };
                 let tool = Tool {
                     module: spec.module.clone(),
@@ -76,11 +72,6 @@ impl Toolset {
     }
 }
 
-enum Cut {
-    Unit,
-    Fields(Value),
-}
-
 fn tool_name(spec: &ActionSpec) -> String {
     format!("{}_{}", spec.module, spec.name)
 }
@@ -89,7 +80,8 @@ fn empty_object() -> Value {
     json!({"type":"object","properties":{},"additionalProperties":false})
 }
 
-fn cut(spec: &ActionSpec) -> Option<Cut> {
+/// The tool parameters cut from the action's schema, and whether the action is a unit variant.
+fn cut(spec: &ActionSpec) -> Option<(Value, bool)> {
     let schema = &spec.input_schema;
     let single = std::slice::from_ref(schema);
     let entries = schema
@@ -98,21 +90,21 @@ fn cut(spec: &ActionSpec) -> Option<Cut> {
         .map_or(single, Vec::as_slice);
     for entry in entries {
         if entry.get("const").and_then(Value::as_str) == Some(spec.name.as_str()) {
-            return Some(Cut::Unit);
+            return Some((empty_object(), true));
         }
         let in_enum = entry
             .get("enum")
             .and_then(Value::as_array)
             .is_some_and(|names| names.iter().any(|n| n.as_str() == Some(spec.name.as_str())));
         if in_enum {
-            return Some(Cut::Unit);
+            return Some((empty_object(), true));
         }
         if let Some(fields) = entry.get("properties").and_then(|p| p.get(&spec.name)) {
             let mut parameters = fields.clone();
             if let (Some(object), Some(defs)) = (parameters.as_object_mut(), schema.get("$defs")) {
                 object.insert("$defs".to_owned(), defs.clone());
             }
-            return Some(Cut::Fields(parameters));
+            return Some((parameters, false));
         }
     }
     None
