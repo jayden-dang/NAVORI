@@ -99,10 +99,10 @@ cluster(SOAK) = [SOAK], owns_coverage 12/17. Those features' behavior is guarded
 
 **Depends-on:** none
 
-- [ ] **Step 1: Record perf's current output shape.** Run `cargo test -p xtask perf::` and save the list of test names it prints: `cargo test -p xtask perf:: -- --list > /tmp/soak-perf-tests-before.txt`. Expect: pass.
-- [ ] **Step 2: Change the three declarations** to `pub(crate) mod`. Leave `baseline`, `docker`, `judge` and `probe` private.
-- [ ] **Step 3: Run** `cargo test -p xtask perf:: -- --list | diff /tmp/soak-perf-tests-before.txt -`. Expect: no diff. Then run `cargo test -p xtask` and `cargo clippy -p xtask --all-targets -- -D warnings`. Expect: pass, with no new warning.
-- [ ] **Step 4: Commit** `git commit -m "refactor(xtask): let the crate reach perf's home, launch and log-stream modules"`
+- [x] **Step 1: Record perf's current output shape.** Run `cargo test -p xtask perf::` and save the list of test names it prints: `cargo test -p xtask perf:: -- --list > /tmp/soak-perf-tests-before.txt`. Expect: pass.
+- [x] **Step 2: Change the three declarations** to `pub(crate) mod`. Leave `baseline`, `docker`, `judge` and `probe` private.
+- [x] **Step 3: Run** `cargo test -p xtask perf:: -- --list | diff /tmp/soak-perf-tests-before.txt -`. Expect: no diff. Then run `cargo test -p xtask` and `cargo clippy -p xtask --all-targets -- -D warnings`. Expect: pass, with no new warning.
+- [x] **Step 4: Commit** `git commit -m "refactor(xtask): let the crate reach perf's home, launch and log-stream modules"`
 
 _Requirements: SOAK-8.1, SOAK-8.2_
 
