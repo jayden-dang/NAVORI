@@ -11,7 +11,7 @@ use navori_context::{
     AskError, AuditError, AuditRow, AuditSink, Gateway, Outcome, SendError, Sender,
 };
 use navori_llm::{
-    ChatRequest, DEEPSEEK_BASE_URL, DEEPSEEK_PROVIDER, LlmProvider, Message, OpenAiCompat, Role,
+    ChatRequest, DEEPSEEK_BASE_URL, DEEPSEEK_PROVIDER, LlmError, LlmProvider, Message, OpenAiCompat,
 };
 use navori_protocol::rpc;
 use navori_redact::redact_text;
@@ -75,15 +75,20 @@ impl Sender for LlmSender {
         Box::pin(async move {
             let request = ChatRequest {
                 model: model.to_owned(),
-                messages: vec![Message {
-                    role: Role::User,
+                messages: vec![Message::User {
                     text: text.to_owned(),
                 }],
+                tools: vec![],
             };
             self.provider
                 .complete(request, key)
                 .await
-                .map(|reply| reply.text)
+                .and_then(|reply| {
+                    reply
+                        .text
+                        .filter(|text| !text.is_empty())
+                        .ok_or(LlmError::Malformed)
+                })
                 .map_err(|error| {
                     tracing::warn!(
                         provider = DEEPSEEK_PROVIDER,

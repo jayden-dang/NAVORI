@@ -10,26 +10,66 @@ pub use openai_compat::OpenAiCompat;
 pub const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com";
 pub const DEEPSEEK_PROVIDER: &str = "deepseek";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Role {
-    User,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Message {
+    User {
+        text: String,
+    },
+    Assistant {
+        text: Option<String>,
+        reasoning: Option<String>,
+        tool_calls: Vec<ToolCall>,
+    },
+    Tool {
+        call_id: String,
+        text: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Message {
-    pub role: Role,
-    pub text: String,
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+    pub arguments: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolDef {
+    pub name: String,
+    pub description: String,
+    pub parameters: serde_json::Value,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<Message>,
+    pub tools: Vec<ToolDef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Usage {
+    pub input: u64,
+    pub output: u64,
+    pub cache_hit: Option<u64>,
+    pub cache_miss: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Finish {
+    Stop,
+    ToolCalls,
+    Length,
+    Other(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChatReply {
-    pub text: String,
+    pub text: Option<String>,
+    pub reasoning: Option<String>,
+    pub tool_calls: Vec<ToolCall>,
+    pub usage: Option<Usage>,
+    pub finish: Finish,
 }
 
 #[derive(Debug, thiserror::Error)]
