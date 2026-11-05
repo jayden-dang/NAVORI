@@ -399,7 +399,7 @@ _Requirements: PSTOP-1.17, PSTOP-1.11, PSTOP-1.12, PSTOP-1.13, PSTOP-1.14, PSTOP
   - `a_port_row_carries_its_worktree_and_harness_and_a_docker_port_carries_no_harness`
   - `two_ports_of_one_process_are_one_target_and_count_as_two_ports`
   - `a_repo_literally_named_other_stays_a_named_project_not_the_no_project_group`
-  - `a_row_stop_request_exists_only_for_an_idle_project_and_a_child_stop_request_for_every_known_project`
+  - `a_row_stop_request_exists_only_for_an_idle_project_and_a_child_stop_request_for_every_known_project` *(Amended 2026-11-05: renamed `a_child_stop_request_exists_for_every_known_project_and_no_unknown_one`; no row request.)*
   - `openable_is_true_for_a_listed_port_that_is_not_a_database_or_system_port` (`agent-decided`: `ports.open` accepts any listed port, so the Shell offers `Open` only where a page is plausible)
   - the tray and status icon not reading the view is checked by `rg -n "running::" crates/kernel` returning nothing (guard, a grep step)
   - a snapshot test in `crates/ffi/tests/core.rs` helpers style: `the_snapshot_carries_a_running_view_once_ports_has_scanned`, with no `kill` dispatch
@@ -425,7 +425,7 @@ _Requirements: PSTOP-4.1, PSTOP-4.2, PSTOP-4.3, PSTOP-4.4, PSTOP-4.5, PSTOP-4.6,
 - Produces:
   - `RunningInput`, `RunningProjectInput` (plain structs mirroring the record)
   - `RunningRowState(running: RunningInput?)`: `label`, `dot: StatusDot?`, `hasSubmenu`, `spoken`
-  - `enum ProjectDot { filled, ring, none }`, `ProjectRowState { name, dot, spoken, stop: StopOffer? }`, `StopOffer { count: Int, request: String }` (built from `row_stop_request` only; the child's `Stop N ports` is built from `child_stop_request`)
+  - `enum ProjectDot { filled, ring, none }`, `ProjectRowState { name, dot, spoken, stop: StopOffer? }`, `StopOffer { count: Int, request: String }` (built from `row_stop_request` only; the child's `Stop N ports` is built from `child_stop_request`) *(Amended 2026-11-05, operator decision: `ProjectRowState.stop` and `row_stop_request` are removed; the row has `hasChild` and a `node` instead.)*
   - `RunningSubmenuState(running:)`: `rows`, `stopAll: StopAllOffer?` (`StopAllOffer { requests: [String], ports: Int, projects: Int, inUse: Int, otherLeft: Int, systemHidden: Int }`), `nothingRunning: Bool`
   - `enum StopFlow { idle, asking(count: Int), running, failed([String]) }` with `press()`, `confirm()`, `dismiss()`, `finish([StopResult])`; a second `confirm()` while `running` is ignored
   - `struct StopResult: Decodable { target, result, reason }` and `KillReply: Decodable`
@@ -469,7 +469,7 @@ _Requirements: PSTOP-4.8, PSTOP-4.9, PSTOP-4.10, PSTOP-4.11, PSTOP-4.13, PSTOP-4
 - [x] **Step 4: Verify** by hand in the dev app (`cargo xtask run`, then the cold-start drive of `docs/agents/verify.md`): the level-0 `Running` row, the project list, the ring and dot, `Nothing running`, the problem line; and the unchanged `Keep awake` and `Tracking agents` still work. Run `cargo xtask ci && cargo xtask perf` — expect: pass (guard: the existing metrics; no `--record`). Note: the probe drives the Core submenu (`openCoreSubmenuFresh`, PerfProbe.swift:96, StatusBarController.swift:188-194), not Running. Read both; if the probe can open another row by id, point a second probe at `running`; if timing Running needs a new xtask metric, do not add it here: record "PSTOP-10.1 for the Running submenu is not measured by `cargo xtask perf`" in the run report, never reporting it as met, and time the first frame by hand with the dev app.
 - [x] **Step 5: Commit** `git commit -m "feat(shell): show running projects in one menu"`
 
-_Requirements: PSTOP-4.15, PSTOP-4.16, PSTOP-4.18, PSTOP-10.1, PSTOP-10.5_
+_Requirements: PSTOP-4.15, PSTOP-4.16, PSTOP-4.18, PSTOP-4.22, PSTOP-10.1, PSTOP-10.5_
 
 ---
 
@@ -486,13 +486,13 @@ _Requirements: PSTOP-4.15, PSTOP-4.16, PSTOP-4.18, PSTOP-10.1, PSTOP-10.5_
 - Produces:
   - `CoreStore.stop(_ requests: [String]) async -> [StopResult]` (dispatches `ports` once per request, decodes the reply, keeps `stopProgress` per project and per port until a later snapshot no longer lists the target)
   - `InlineConfirmation` view: text names the ports (never processes), `Stop` and `Cancel`; focus lands on `Cancel`; `Esc`, `Cancel`, the pointer leaving or the menu closing send nothing
-  - a ringed project row shows `Stop N` while selected; `Stop all ports…` row with its own confirmation naming port count, project count, the "in use" count and the ports left in `Other`
+  - a ringed project row shows `Stop N` while selected; `Stop all ports…` row with its own confirmation naming port count, project count, the "in use" count and the ports left in `Other` *(Amended 2026-11-05: superseded; the row has no `Stop N`, the child's `Stop N ports` carries that behaviour.)*
 
 **Depends-on:** Task 9, Task 10
 
 - [x] **Step 1: Write the failing tests** in `StopFlowTests.swift`: `stop_all_sends_one_request_per_idle_project_after_one_confirmation`, `a_failed_target_keeps_its_row_with_the_reason`, `fewer_stops_than_confirmed_read_as_results_not_as_an_error`, `a_confirmation_text_names_ports_and_the_in_use_and_other_counts`.
 - [x] **Step 2: Run** the Swift test command — expect: failures.
-- [x] **Step 3: Implement** `CoreStore.stop`, `InlineConfirmation`, the `Stop N` button as a sibling of the row's own button (Tab reaches it, VoiceOver reads `Stop 3 ports`, pressing it does not open the child), and `Stop all ports…`.
+- [x] **Step 3: Implement** `CoreStore.stop`, `InlineConfirmation`, the `Stop N` button as a sibling of the row's own button (Tab reaches it, VoiceOver reads `Stop 3 ports`, pressing it does not open the child), and `Stop all ports…`. *(Amended 2026-11-05: the row button was removed by operator decision; the child's `Stop N ports` keeps the confirmation.)*
 - [x] **Step 4: Verify** in the dev app on a throwaway listener this step spawns (`python3 -m http.server 0`, started in a fresh `git init` repo at `target/pstop-e2e-<n>` inside this worktree: `target/` is gitignored, lies under `$HOME` with a non-hidden first component, so `place()` counts it as project `pstop-e2e-<n>`; then a hand-made session Lease labelled `pstop-e2e-<n>/main` with `navori --profile dev dispatch awake` so the project joins and the row is working, and a second run with no Lease so it is idle): hover, press `Stop N`, confirm, and read the row leave on the next state; dismiss sends nothing (check with `navori --profile dev events`). Never press `Stop` on a listener the step did not start.
 - [x] **Step 5: Run** `cargo xtask ci` — expect: pass. Commit `git commit -m "feat(shell): stop a project's ports or all idle ports"`
 

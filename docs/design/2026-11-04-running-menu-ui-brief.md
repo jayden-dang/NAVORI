@@ -22,7 +22,7 @@ The user's words, in order (Vietnamese verbatim, with an English translation):
 
 - **Question:** Is anything running on this Mac that nobody is working in?
 - **Finding:** on the lock date, `openklynt-main` and `Other` read as a ring: 4 ports with no session. `openklynt-main` had been up 2 days 20 hours. The ring is the finding; this menu states it by shape, not in words.
-- **Primary job:** free those ports. Hover the ringed row, press `Stop 3`, confirm.
+- **Primary job:** free those ports. Hover the ringed row, press `Stop 3`, confirm. *(Amended 2026-11-05, operator decision: the row has no `Stop 3`; hover opens the child menu, press its `Stop 3 ports`, confirm. Still two actions.)*
 
 ## Signature
 
@@ -43,11 +43,11 @@ The user's words, in order (Vietnamese verbatim, with an English translation):
 - **States:**
   - Filled green dot: at least one session is working.
   - Orange ring: nobody is working here. `Other` follows the same rule.
-  - Hover on a ringed row with ports: `Stop N` appears, then an inline confirmation. A row with a working session has no `Stop`; it is in the child menu.
+  - Hover on a ringed row with ports: `Stop N` appears, then an inline confirmation. A row with a working session has no `Stop`; it is in the child menu. *(Amended 2026-11-05, operator decision: the `Stop N` hover is gone from every row, ringed or working; Stop lives in the child menu as `Stop N ports`. Project rows gain a chevron at the trailing edge, the same chevron as `Keep awake`, white when selected, on every row whose child can open: a project with sessions or ports. A project with sessions and no ports opens a child with a `Sessions` section only. The row still shows no counts, ages, port numbers or status words.)*
   - Nothing running: `Nothing running`, and no `Stop all ports…`.
   - `Stop all ports…` always confirms.
 - **Type & color:** name 14pt regular. Color is only the dot. The row carries no secondary text.
-- **A11y:** VoiceOver reads the state the dot shows, for example `klynt, working` and `openklynt-main, 3 idle ports`. ↑ and ↓ move through rows, → opens the child, and Tab reaches `Stop N`.
+- **A11y:** VoiceOver reads the state the dot shows, for example `klynt, working` and `openklynt-main, 3 idle ports`. ↑ and ↓ move through rows, → opens the child, and Tab reaches `Stop N`. *(Amended 2026-11-05: Tab reaches `Stop N ports` in the child; the row has no Stop.)*
 
 ## Surface 3: Project child menu
 
