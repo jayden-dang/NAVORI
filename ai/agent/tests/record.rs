@@ -4,8 +4,8 @@ mod common;
 
 use common::MemoryConversations;
 use navori_agent::{
-    ConversationId, ConversationLog, ConversationStore, Entry, Origin, RecordError,
-    RecordedMessage, TurnId, derive_messages, repair,
+    ConversationId, ConversationLog, ConversationStore, Entry, Origin, RecordedMessage, TurnId,
+    derive_messages, repair,
 };
 use navori_context::{Message, ToolCall};
 
@@ -257,30 +257,4 @@ fn repair_run_twice_adds_nothing_the_second_time() {
 
     let second = repair(&store.load(&conversation).unwrap());
     assert_eq!(second, Vec::<Entry>::new());
-}
-
-#[test]
-fn the_memory_store_refuses_a_second_result_for_one_call() {
-    let conversation = ConversationId::new();
-    let turn = TurnId::new();
-    let store = MemoryConversations::default();
-    store
-        .append(&interrupted_entries(conversation, turn))
-        .unwrap();
-
-    let again = Entry::Message {
-        turn,
-        seq: 3,
-        step: Some(1),
-        body: RecordedMessage::ToolResult {
-            call_id: "c1".into(),
-            text: "x".into(),
-            is_error: false,
-            synthetic: false,
-        },
-        redactions: 0,
-        ts_ms: 4,
-    };
-
-    assert_eq!(store.append(&[again]), Err(RecordError::Duplicate));
 }

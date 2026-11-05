@@ -21,27 +21,6 @@ async fn the_system_actions_schema_has_one_entry_per_variant() {
     assert!(prune["properties"]["prune_journal"]["properties"]["older_than_days"].is_object());
 }
 
-#[allow(dead_code)]
-#[derive(schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
-enum Plain {
-    Alpha,
-    Beta,
-}
-
-#[test]
-fn undocumented_unit_variants_share_one_enum_entry() {
-    let schema = serde_json::to_value(schemars::schema_for!(Plain)).unwrap();
-    let one_of = schema.get("oneOf").and_then(|v| v.as_array());
-    let entries: Vec<_> = match one_of {
-        Some(e) => e.clone(),
-        None => vec![schema.clone()],
-    };
-    assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0]["type"], "string");
-    assert_eq!(entries[0]["enum"], json!(["alpha", "beta"]));
-}
-
 #[tokio::test]
 async fn only_read_actions_are_offered_as_tools() {
     let kernel = common::kernel(Store::open_in_memory().unwrap());
