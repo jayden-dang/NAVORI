@@ -138,7 +138,7 @@ _Requirements: LOOP-8.1_
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1: Failing tests** in `ai/context/tests/chat.rs`, using a fake `SecretStore`, a recording `ChatSender` and an in-memory `AuditSink`, as in `ai/context/tests/gateway.rs`:
+- [x] **Step 1: Failing tests** in `ai/context/tests/chat.rs`, using a fake `SecretStore`, a recording `ChatSender` and an in-memory `AuditSink`, as in `ai/context/tests/gateway.rs`:
   - `shielding_a_shielded_text_again_finds_nothing_new`: through `Gateway::shield`, the token and the `password=` assignment get `count` 1 and 1 on the first pass. A second pass over each output gives the same text with `count` 0. This asserts `count`, not the raw findings: `secret_assignment` re-finds its own marker.
   - `a_planted_secret_in_a_tool_result_arrives_redacted_and_counted_once`: the request carries `[REDACTED:github_token]`, the audit row says `kinds "text"`, `outcome authorized`, `redacted_count 1`.
   - `prior_redactions_add_to_the_row`: `prior_redactions: 2` on a clean request gives `redacted_count 2`.
@@ -151,8 +151,8 @@ _Requirements: LOOP-8.1_
   - `send_chat_without_a_chat_sender_is_a_send_error`.
 
   Run `cargo test -p navori-context` — expect: unresolved names.
-- [ ] **Step 2: Implement.** `shield` calls the existing private `inspect` (gateway.rs:173-176) and counts only findings whose original span does not start with `[REDACTED:`. In `ai/context/tests/gateway.rs`, `the_context_crate_calls_the_sender_in_one_place` (:725-737) is changed to assert every `.send(` site is in `gateway.rs` (two now: `ask` and `send_chat`). `send_chat` reads the key, then Shields every message text, reasoning, tool-call argument, tool text, `ToolDef` name and description, and every string inside `parameters`, keys and values (design.md:140). If the Shield would change a key, the call is `blocked` and nothing is sent: a redacted key would no longer be the schema. Then it writes the row (`prior_redactions` + its fresh count) and sends. `ai/context/Cargo.toml` gains `navori-llm.workspace = true`. Update dependencies.md:29 so `navori-context` gains `navori-llm`, types only. Run `cargo test -p navori-context` — expect: pass, with every other `ai/context/tests/gateway.rs` assertion unchanged.
-- [ ] **Step 3: Gate and commit:** `git commit -m "feat(context): shield and audit a structured chat request in the Gateway"`.
+- [x] **Step 2: Implement.** `shield` calls the existing private `inspect` (gateway.rs:173-176) and counts only findings whose original span does not start with `[REDACTED:`. In `ai/context/tests/gateway.rs`, `the_context_crate_calls_the_sender_in_one_place` (:725-737) is changed to assert every `.send(` site is in `gateway.rs` (two now: `ask` and `send_chat`). `send_chat` reads the key, then Shields every message text, reasoning, tool-call argument, tool text, `ToolDef` name and description, and every string inside `parameters`, keys and values (design.md:140). If the Shield would change a key, the call is `blocked` and nothing is sent: a redacted key would no longer be the schema. Then it writes the row (`prior_redactions` + its fresh count) and sends. `ai/context/Cargo.toml` gains `navori-llm.workspace = true`. Update dependencies.md:29 so `navori-context` gains `navori-llm`, types only. Run `cargo test -p navori-context` — expect: pass, with every other `ai/context/tests/gateway.rs` assertion unchanged.
+- [x] **Step 3: Gate and commit:** `git commit -m "feat(context): shield and audit a structured chat request in the Gateway"`.
 
 _Requirements: LOOP-5.1, LOOP-5.2, LOOP-5.3, LOOP-5.4, LOOP-5.5, LOOP-5.6, LOOP-10.2, LOOP-11.4_
 
