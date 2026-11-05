@@ -10,7 +10,7 @@ Feature code: SOAK
 Status: Approved
 Approval: the operator's /shape --go, before reading the spec (operator command: `/shape #27 --auto --go --video --work=opus --interpret=opus --build=sonnet`, relayed by the conductor on 2026-11-05)
 Date: 2026-11-05
-Execution-mode: unset
+Execution-mode: continuous
 Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
