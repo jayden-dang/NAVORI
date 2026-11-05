@@ -10,3 +10,4 @@ apps/macos/Generated
 /draft-ui
 .skills/
 .worktrees/
+.claude/
