@@ -75,7 +75,11 @@ impl SoakProbe {
     }
 }
 
-fn command_output(command: &mut Command, rendered: &str, timeout: Duration) -> Result<Output> {
+pub(super) fn command_output(
+    command: &mut Command,
+    rendered: &str,
+    timeout: Duration,
+) -> Result<Output> {
     let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

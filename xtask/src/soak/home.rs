@@ -12,7 +12,6 @@ pub(crate) struct SoakHome {
 }
 
 impl SoakHome {
-    #[cfg_attr(test, expect(dead_code))]
     pub(crate) fn prepare(exes: &[&Path]) -> Result<Self> {
         let uid = current_uid()?;
         Self::prepare_in(

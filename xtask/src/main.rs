@@ -7,6 +7,7 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
+use std::time::Duration;
 
 use anyhow::{Context, Result, bail, ensure};
 use clap::{Parser, Subcommand, ValueEnum};
@@ -74,6 +75,45 @@ enum Cmd {
     },
     /// Gate a release locally (tag free, tree clean, ci, perf), then print the tag to push.
     ReleaseCheck,
+    /// Soak an isolated Navori under load and judge footprint, threads, fds and hangs.
+    Soak {
+        /// Run the two-hour tier, which reports and always exits 0.
+        #[arg(long)]
+        long: bool,
+        /// With --long, drive the load for this long instead (90s, 20m, 2h).
+        #[arg(long = "for", requires = "long", value_parser = parse_duration)]
+        for_: Option<Duration>,
+        #[command(subcommand)]
+        command: Option<SoakCmd>,
+    },
+    #[command(hide = true)]
+    SoakListen {
+        #[arg(long)]
+        secs: u64,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum SoakCmd {}
+
+fn parse_duration(s: &str) -> Result<Duration, String> {
+    let refuse =
+        || format!("{s:?} is not a duration; write a number and a unit, like 90s, 20m or 2h");
+    let split = s.len().checked_sub(1).ok_or_else(refuse)?;
+    if !s.is_char_boundary(split) {
+        return Err(refuse());
+    }
+    let (digits, unit) = s.split_at(split);
+    let n: u64 = digits.parse().map_err(|_| refuse())?;
+    let per = match unit {
+        "s" => 1,
+        "m" => 60,
+        "h" => 3600,
+        _ => return Err(refuse()),
+    };
+    n.checked_mul(per)
+        .map(Duration::from_secs)
+        .ok_or_else(refuse)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -162,6 +202,27 @@ fn main() -> Result<()> {
         }
         Cmd::Release { tag, out, check } => release::run(&root, &tag, out.as_deref(), check),
         Cmd::ReleaseCheck => release::check(&root),
+        Cmd::Soak {
+            long,
+            for_,
+            command,
+        } => match command {
+            Some(sub) => match sub {},
+            None => {
+                let tier = if long {
+                    soak::plan::Tier::Long {
+                        load: for_.unwrap_or(Duration::from_secs(7200)),
+                    }
+                } else {
+                    soak::plan::Tier::Short
+                };
+                if !soak::run(&root, tier)? {
+                    bail!("soak gate failed");
+                }
+                Ok(())
+            }
+        },
+        Cmd::SoakListen { secs } => soak::listen(secs),
     }
 }
 
@@ -1212,7 +1273,22 @@ mod tests {
     use std::io::Read;
     use std::process::Command;
 
-    use super::tool_stdout;
+    use std::time::Duration;
+
+    use super::{parse_duration, tool_stdout};
+
+    #[test]
+    fn durations_read_seconds_minutes_and_hours() {
+        assert_eq!(parse_duration("90s").unwrap(), Duration::from_secs(90));
+        assert_eq!(parse_duration("20m").unwrap(), Duration::from_secs(1200));
+        assert_eq!(parse_duration("2h").unwrap(), Duration::from_secs(7200));
+    }
+
+    #[test]
+    fn a_duration_without_a_unit_is_refused() {
+        let err = parse_duration("90").unwrap_err();
+        assert!(err.contains("90"), "{err}");
+    }
 
     /// Child tool progress must be on a pipe, not inherited stdout, so
     /// `cargo xtask perf` can emit `build <seconds>s` as the first report line.
