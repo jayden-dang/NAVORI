@@ -888,3 +888,47 @@ async fn a_huge_result_is_cut_at_a_character_boundary_with_a_visible_marker() {
         )]
     );
 }
+
+#[tokio::test]
+async fn a_follow_up_turn_replays_each_rewritten_call_id_with_exactly_one_result() {
+    let rig = common::agent_with(
+        vec![
+            common::call_reply("call_0", "probe_look", "{}"),
+            common::call_reply("call_0", "probe_look_at", r#"{"n":2}"#),
+            common::text_reply("done"),
+            common::text_reply("again"),
+        ],
+        Limits::default(),
+    );
+    let first = rig
+        .agent
+        .run_turn(&rig.kernel, request("look twice"), Default::default())
+        .await
+        .unwrap();
+
+    let mut follow_up = request("and now");
+    follow_up.conversation = Some(first.conversation);
+    rig.agent
+        .run_turn(&rig.kernel, follow_up, Default::default())
+        .await
+        .unwrap();
+
+    let replayed = rig.chat.requests().pop().unwrap().messages;
+    let announced: Vec<String> = replayed
+        .iter()
+        .filter_map(|m| match m {
+            Message::Assistant { tool_calls, .. } => Some(tool_calls),
+            _ => None,
+        })
+        .flatten()
+        .map(|c| c.id.clone())
+        .collect();
+    assert_eq!(announced.len(), 2, "{announced:?}");
+    for id in &announced {
+        let answers = replayed
+            .iter()
+            .filter(|m| matches!(m, Message::Tool { call_id, .. } if call_id == id))
+            .count();
+        assert_eq!(answers, 1, "{id} in {replayed:?}");
+    }
+}
