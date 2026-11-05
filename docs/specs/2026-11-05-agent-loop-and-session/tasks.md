@@ -435,15 +435,15 @@ _Requirements: LOOP-9.1_
 
 **Depends-on:** Task 10, Task 11, Task 12
 
-- [ ] **Step 1: Docs:**
+- [x] **Step 1: Docs:**
   - data.md:27 reads "one row per model call", and data.md:21 notes the `ai` module's `ai.turn_ended` Event.
   - The `ai_session_*` row moves from Planned to built, with the five tables, the two indexes and body encoding v1.
   - system.md:69/72 states what is built.
   - modules.md:41-42 and map.md:29 gain `navori-agent` and the `navori-context` → `navori-llm` types edge.
   - Estimated cost stays named as ROAD-11's (approved by the operator 2026-11-05).
-- [ ] **Step 2: Unchanged behavior:** `git diff --stat $(git merge-base main HEAD) -- crates/kernel crates/store modules` shows no change. `cargo test -p navori-kernel -p navori-store -p navori-mod-awake -p navori-mod-ports -p navori-mod-integrations` passes.
-- [ ] **Step 3: Whole gate:** `cargo xtask ci` — expect: pass.
-- [ ] **Step 4: Perf, on an idle machine:** run `cargo xtask perf` at the merge base and at the head, without `--record`. Compare each metric's head median with the base median + max(10%, the metric's floor) (performance.md:35-36), and write both tables into the task report. A failing metric blocks the merge, not this plan.
-- [ ] **Step 5: Commit:** `git commit -m "docs(loop): record the built Agent loop, Conversation tables and dependency edges"`.
+- [x] **Step 2: Unchanged behavior:** `git diff --stat $(git merge-base main HEAD) -- crates/kernel crates/store modules` shows no change. `cargo test -p navori-kernel -p navori-store -p navori-mod-awake -p navori-mod-ports -p navori-mod-integrations` passes.
+- [x] **Step 3: Whole gate:** `cargo xtask ci` — expect: pass.
+- [x] **Step 4: Perf, on an idle machine:** run `cargo xtask perf` at the merge base and at the head, without `--record`. Compare each metric's head median with the base median + max(10%, the metric's floor) (performance.md:35-36), and write both tables into the task report. A failing metric blocks the merge, not this plan.
+- [x] **Step 5: Commit:** `git commit -m "docs(loop): record the built Agent loop, Conversation tables and dependency edges"`.
 
 _Requirements: LOOP-10.5, LOOP-10.6, LOOP-11.1_
