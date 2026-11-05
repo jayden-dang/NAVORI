@@ -94,7 +94,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Closed:** None
 **Deferred:**
 - ROAD-39 shield-screen-layers → unscheduled (2026-11-05, app denylist, path blocks, OCR and screenshots wait until Navori AI sees the screen; split from ROAD-12)
-- ROAD-40 computer-use → unscheduled (2026-11-05, Navori AI controlling other apps comes after the Agent loop; dsh has no usable base for it, ADR 0008)
+- ROAD-40 computer-use → unscheduled (2026-11-05, built in `navori-macos` by porting cua-driver, cheapest Control path first, ADR 0009; waits for ROAD-14, ROAD-37, ROAD-25 and ROAD-39) — Notes: [ROAD-40](roads/ROAD-40.notes.md)
 **Blockers:** None
 
 ## MILE-4 — Ports (R3)
