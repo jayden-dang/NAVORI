@@ -395,8 +395,8 @@ _Requirements: LOOP-3.8, LOOP-10.3, LOOP-10.4, LOOP-11.2, LOOP-11.3, LOOP-1.1, L
 
 **Depends-on:** Task 10
 
-- [ ] **Step 1: Write** `every_action_s_catalog_risk_matches_its_own_risk`. For each `ActionView` of a started core, a `sample(module, name) -> serde_json::Value` match (panicking on an unknown pair) builds a JSON value, which is deserialized into the module's enum. The test then asserts `serde_json::to_value(action.risk())? == serde_json::Value::String(view.risk)` (`Risk` serializes snake_case; `risk_name` is private). The core is started with `start_with` and a minimal `AiDeps` built as ask.rs's `Fixture::deps()` is. Also assert the count of `ActionView`s equals the number of sample arms, so a new Action without a sample fails. Run `cargo test -p navori-ffi --test actions_risk` — expect: pass (it documents present agreement; a drift would fail).
-- [ ] **Step 2: Gate and commit:** `git commit -m "test(ffi): check every Action's catalog Risk against its own Risk"`.
+- [x] **Step 1: Write** `every_action_s_catalog_risk_matches_its_own_risk`. For each `ActionView` of a started core, a `sample(module, name) -> serde_json::Value` match (panicking on an unknown pair) builds a JSON value, which is deserialized into the module's enum. The test then asserts `serde_json::to_value(action.risk())? == serde_json::Value::String(view.risk)` (`Risk` serializes snake_case; `risk_name` is private). The core is started with `start_with` and a minimal `AiDeps` built as ask.rs's `Fixture::deps()` is. Also assert the count of `ActionView`s equals the number of sample arms, so a new Action without a sample fails. Run `cargo test -p navori-ffi --test actions_risk` — expect: pass (it documents present agreement; a drift would fail).
+- [x] **Step 2: Gate and commit:** `git commit -m "test(ffi): check every Action's catalog Risk against its own Risk"`.
 
 _Requirements: LOOP-2.6_
 
