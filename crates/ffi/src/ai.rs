@@ -305,7 +305,10 @@ impl StoreConversations {
         if !*migrated {
             self.store
                 .migrate(SESSION_OWNER, SESSION_MIGRATIONS)
-                .map_err(|_| RecordError::Migration)?;
+                .map_err(|error| {
+                    tracing::error!(owner = SESSION_OWNER, %error, "conversation tables could not be migrated");
+                    RecordError::Migration
+                })?;
             *migrated = true;
         }
         Ok(())
@@ -324,7 +327,17 @@ fn write_error(error: rusqlite::Error) -> RecordError {
         {
             RecordError::Duplicate
         }
-        _ => RecordError::Write,
+        _ => {
+            tracing::warn!(code = sqlite_code(&error), "conversation write failed");
+            RecordError::Write
+        }
+    }
+}
+
+fn sqlite_code(error: &rusqlite::Error) -> i32 {
+    match error {
+        rusqlite::Error::SqliteFailure(failure, _) => failure.extended_code,
+        _ => -1,
     }
 }
 
@@ -431,7 +444,10 @@ fn read_entries(
     conn: &Connection,
     conversation: &ConversationId,
 ) -> Result<Vec<Entry>, RecordError> {
-    let read = |_: rusqlite::Error| RecordError::Read;
+    let read = |error: rusqlite::Error| {
+        tracing::warn!(code = sqlite_code(&error), "conversation read failed");
+        RecordError::Read
+    };
     let id = conversation.to_string();
     let created: Option<i64> = conn
         .query_row(

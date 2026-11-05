@@ -651,3 +651,76 @@ fn the_store_refuses_a_second_result_for_a_call_and_keeps_nothing_of_the_failed_
         RecordError::UnknownConversation
     );
 }
+
+#[derive(Clone, Default)]
+struct Capture(Arc<std::sync::Mutex<Vec<u8>>>);
+
+impl std::io::Write for Capture {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(buf);
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Capture {
+    type Writer = Capture;
+    fn make_writer(&'a self) -> Capture {
+        self.clone()
+    }
+}
+
+impl Capture {
+    fn text(&self) -> String {
+        String::from_utf8(self.0.lock().unwrap().clone()).unwrap()
+    }
+}
+
+fn capturing_logs() -> (Capture, tracing::subscriber::DefaultGuard) {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        let _ = tracing::subscriber::set_global_default(
+            tracing_subscriber::fmt()
+                .with_max_level(tracing::Level::TRACE)
+                .with_writer(std::io::sink)
+                .finish(),
+        );
+    });
+    let capture = Capture::default();
+    let guard = tracing::subscriber::set_default(
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .with_writer(capture.clone())
+            .with_ansi(false)
+            .finish(),
+    );
+    (capture, guard)
+}
+
+#[test]
+fn a_failed_conversation_write_logs_the_sqlite_code_and_none_of_the_text() {
+    use navori_agent::{Entry, RecordError, RecordedMessage, TurnId};
+    use navori_ffi::ConversationStore;
+    let (logs, _guard) = capturing_logs();
+    let conversations =
+        navori_ffi::StoreConversations::new(navori_store::Store::open_in_memory().unwrap());
+
+    let outcome = conversations.append(&[Entry::Message {
+        turn: TurnId::new(),
+        seq: 0,
+        step: None,
+        body: RecordedMessage::Input {
+            text: "a private question".into(),
+        },
+        redactions: 0,
+        ts_ms: 1,
+    }]);
+
+    assert_eq!(outcome, Err(RecordError::Write));
+    let logs = logs.text();
+    assert!(logs.contains("conversation write failed"), "{logs}");
+    assert!(logs.contains("code"), "{logs}");
+    assert!(!logs.contains("a private question"), "{logs}");
+}

@@ -460,42 +460,10 @@ async fn a_second_turn_started_at_once_on_one_conversation_is_refused() {
     assert_eq!(rig.chat.requests().len(), 2);
 }
 
-#[derive(Clone, Default)]
-struct Capture(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
-
-impl std::io::Write for Capture {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().unwrap().extend_from_slice(buf);
-        Ok(buf.len())
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Capture {
-    type Writer = Capture;
-    fn make_writer(&'a self) -> Capture {
-        self.clone()
-    }
-}
-
-fn keep_callsites_interested() {
-    static ONCE: std::sync::Once = std::sync::Once::new();
-    ONCE.call_once(|| {
-        let _ = tracing::subscriber::set_global_default(
-            tracing_subscriber::fmt()
-                .with_max_level(tracing::Level::TRACE)
-                .with_writer(std::io::sink)
-                .finish(),
-        );
-    });
-}
-
 #[tokio::test]
 async fn no_message_text_reaches_the_logs() {
-    keep_callsites_interested();
-    let capture = Capture::default();
+    common::keep_callsites_interested();
+    let capture = common::Capture::default();
     let _guard = tracing::subscriber::set_default(
         tracing_subscriber::fmt()
             .with_max_level(tracing::Level::INFO)
@@ -765,4 +733,43 @@ async fn two_calls_with_one_id_in_one_reply_each_get_their_own_result() {
     assert_eq!(tool_texts.len(), 2);
     assert_ne!(tool_texts[0].0, tool_texts[1].0);
     assert_eq!(tool_texts[1].1, r#"{"seen":5}"#);
+}
+
+#[tokio::test]
+async fn a_failed_record_write_leaves_a_log_line_without_message_text() {
+    common::keep_callsites_interested();
+    let capture = common::Capture::default();
+    let _guard = tracing::subscriber::set_default(
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .with_writer(capture.clone())
+            .with_ansi(false)
+            .finish(),
+    );
+    let rig = common::agent_with(
+        vec![common::text_reply("a private answer")],
+        Limits::default(),
+    );
+    let release = rig.chat.hold_next();
+
+    let (outcome, ()) = tokio::join!(
+        rig.agent.run_turn(
+            &rig.kernel,
+            request("a private question"),
+            Default::default()
+        ),
+        async {
+            until_requests(&rig, 1).await;
+            rig.store.fail_next_append();
+            release.send(()).unwrap();
+        }
+    );
+
+    assert_eq!(outcome.unwrap().end, TurnEnd::Error(TurnErrorKind::Record));
+    let logs = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
+    assert!(logs.contains("conversation record failed"), "{logs}");
+    assert!(logs.contains("WARN"), "{logs}");
+    for text in ["a private question", "a private answer"] {
+        assert!(!logs.contains(text), "{text} in {logs}");
+    }
 }

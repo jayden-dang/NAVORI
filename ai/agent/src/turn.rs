@@ -445,18 +445,45 @@ impl Agent {
         let store = Arc::clone(&self.store);
         tokio::task::spawn_blocking(move || store.load(&id))
             .await
-            .unwrap_or(Err(RecordError::Read))
-            .map_err(|e| match e {
-                RecordError::UnknownConversation => TurnStartError::UnknownConversation,
-                other => TurnStartError::Record(other),
+            .unwrap_or_else(|join| {
+                tracing::error!(conversation = %id, panicked = join.is_panic(), "conversation load task did not finish");
+                Err(RecordError::Read)
+            })
+            .map_err(|e| {
+                if e != RecordError::UnknownConversation {
+                    tracing::warn!(conversation = %id, kind = ?e, "conversation load failed");
+                }
+                match e {
+                    RecordError::UnknownConversation => TurnStartError::UnknownConversation,
+                    other => TurnStartError::Record(other),
+                }
             })
     }
 
     async fn append(&self, entries: Vec<Entry>) -> Result<(), RecordError> {
         let store = Arc::clone(&self.store);
+        let turn = entries.iter().find_map(turn_of);
         tokio::task::spawn_blocking(move || store.append(&entries))
             .await
-            .unwrap_or(Err(RecordError::Write))
+            .unwrap_or_else(|join| {
+                tracing::error!(turn = ?turn, panicked = join.is_panic(), "conversation write task did not finish");
+                Err(RecordError::Write)
+            })
+            .inspect_err(|error| {
+                tracing::warn!(turn = ?turn, kind = ?error, "conversation record failed");
+            })
+    }
+}
+
+fn turn_of(entry: &Entry) -> Option<TurnId> {
+    match entry {
+        Entry::ConversationStarted { .. } => None,
+        Entry::TurnStarted { id, .. } => Some(*id),
+        Entry::StepStarted { turn, .. }
+        | Entry::Message { turn, .. }
+        | Entry::Usage { turn, .. }
+        | Entry::StepEnded { turn, .. }
+        | Entry::TurnEnded { turn, .. } => Some(*turn),
     }
 }
 

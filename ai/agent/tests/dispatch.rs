@@ -190,3 +190,38 @@ async fn a_small_result_is_returned_whole() {
 
     assert!(!outcome.text.contains("truncated"));
 }
+
+#[tokio::test]
+async fn a_refusal_is_logged_with_its_reason_and_without_the_arguments() {
+    common::keep_callsites_interested();
+    let capture = common::Capture::default();
+    let _guard = tracing::subscriber::set_default(
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .with_writer(capture.clone())
+            .with_ansi(false)
+            .finish(),
+    );
+    let (kernel, _) = common::kernel_with_probe();
+    let toolset = Toolset::from_specs(&kernel.actions());
+    let dispatcher = Dispatcher::new(Duration::from_secs(10));
+
+    dispatcher
+        .call(
+            &kernel,
+            &toolset,
+            &call("probe_change", r#"{"secret":"hush"}"#),
+        )
+        .await;
+    dispatcher
+        .call(&kernel, &toolset, &call("probe_look_at", "not json hush"))
+        .await;
+
+    let logs = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
+    assert!(logs.contains("tool call refused"), "{logs}");
+    assert!(logs.contains("probe_change"), "{logs}");
+    assert!(logs.contains("not_read_only"), "{logs}");
+    assert!(logs.contains("probe_look_at"), "{logs}");
+    assert!(logs.contains("not_json"), "{logs}");
+    assert!(!logs.contains("hush"), "{logs}");
+}

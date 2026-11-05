@@ -27,29 +27,44 @@ impl Dispatcher {
 
     pub async fn call(&self, kernel: &Kernel, toolset: &Toolset, call: &ToolCall) -> ToolOutcome {
         let Some(tool) = toolset.lookup(&call.name) else {
+            tracing::warn!(reason = "unknown_tool", "tool call refused");
             return failure(format!("no Action named {}.", call.name));
         };
         if tool.risk != Risk::Read {
-            return failure(format!(
-                "Navori AI cannot run {} yet: it changes things and needs your approval, which is not available.",
-                call.name
-            ));
+            return refused(
+                &call.name,
+                "not_read_only",
+                format!(
+                    "Navori AI cannot run {} yet: it changes things and needs your approval, which is not available.",
+                    call.name
+                ),
+            );
         }
         let arguments: Value = if tool.unit && call.arguments.trim().is_empty() {
             Value::Null
         } else {
             match serde_json::from_str(&call.arguments) {
                 Ok(arguments) => arguments,
-                Err(e) => return failure(format!("the arguments are not valid JSON: {e}.")),
+                Err(e) => {
+                    return refused(
+                        &call.name,
+                        "not_json",
+                        format!("the arguments are not valid JSON: {e}."),
+                    );
+                }
             }
         };
         let no_arguments =
             arguments.is_null() || arguments.as_object().is_some_and(|o| o.is_empty());
         if tool.unit && !no_arguments {
-            return failure(format!(
-                "the arguments do not fit {}: it takes no arguments.",
-                call.name
-            ));
+            return refused(
+                &call.name,
+                "takes_no_arguments",
+                format!(
+                    "the arguments do not fit {}: it takes no arguments.",
+                    call.name
+                ),
+            );
         }
         let action = if tool.unit {
             Value::String(tool.action.clone())
@@ -66,18 +81,28 @@ impl Dispatcher {
                 text: capped(value.to_string()),
                 is_error: false,
             },
-            Ok(Err(DispatchError::InvalidAction { message, .. })) => failure(format!(
-                "the arguments do not fit {}: {message}.",
-                call.name
-            )),
-            Ok(Err(e)) => failure(format!("{e}.")),
-            Err(_) => failure(format!(
-                "{} did not answer within {} s.",
-                call.name,
-                self.action_timeout.as_secs_f64()
-            )),
+            Ok(Err(DispatchError::InvalidAction { message, .. })) => refused(
+                &call.name,
+                "arguments_do_not_fit",
+                format!("the arguments do not fit {}: {message}.", call.name),
+            ),
+            Ok(Err(e)) => refused(&call.name, "dispatch_failed", format!("{e}.")),
+            Err(_) => refused(
+                &call.name,
+                "timed_out",
+                format!(
+                    "{} did not answer within {} s.",
+                    call.name,
+                    self.action_timeout.as_secs_f64()
+                ),
+            ),
         }
     }
+}
+
+fn refused(tool: &str, reason: &'static str, message: String) -> ToolOutcome {
+    tracing::warn!(tool, reason, "tool call refused");
+    failure(message)
 }
 
 fn failure(message: String) -> ToolOutcome {
