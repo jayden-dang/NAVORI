@@ -187,6 +187,7 @@ impl Agent {
             messages: history,
             unsent: 0,
             guard: RepeatGuard::new(),
+            call_ids: HashSet::new(),
         };
         let (end, answer) = match self
             .drive(kernel, &mut run, &request.model, request.input, &cancel)
@@ -315,6 +316,7 @@ impl Agent {
             };
             let text = shield_part(text)?;
             let reasoning = shield_part(reasoning)?;
+            let tool_calls = run.unique_ids(tool_calls);
             let mut shielded_calls = Vec::new();
             for call in &tool_calls {
                 let arguments = self.shield(&call.arguments)?;
@@ -492,9 +494,26 @@ struct Run {
     messages: Vec<Message>,
     unsent: u32,
     guard: RepeatGuard,
+    call_ids: HashSet<String>,
 }
 
 impl Run {
+    fn unique_ids(&mut self, calls: Vec<ToolCall>) -> Vec<ToolCall> {
+        calls
+            .into_iter()
+            .map(|mut call| {
+                let mut id = call.id.clone();
+                let mut n = 1;
+                while !self.call_ids.insert(id.clone()) {
+                    n += 1;
+                    id = format!("{}-{n}", call.id);
+                }
+                call.id = id;
+                call
+            })
+            .collect()
+    }
+
     fn message_entry(
         &mut self,
         step: Option<u32>,

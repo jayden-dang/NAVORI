@@ -668,3 +668,101 @@ async fn a_module_gets_the_arguments_as_written_while_the_record_and_the_model_g
         .unwrap();
     assert_eq!(sent, shielded);
 }
+
+#[tokio::test]
+async fn a_call_id_the_model_reuses_is_made_unique_within_the_turn() {
+    let rig = common::agent_with(
+        vec![
+            common::call_reply("call_0", "probe_look", "{}"),
+            common::call_reply("call_0", "probe_look_at", r#"{"n":2}"#),
+            common::text_reply("done"),
+        ],
+        Limits::default(),
+    );
+
+    let outcome = rig
+        .agent
+        .run_turn(&rig.kernel, request("look twice"), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.end, TurnEnd::Completed);
+    let results: Vec<String> = rig
+        .store
+        .entries()
+        .into_iter()
+        .filter_map(|e| match e {
+            Entry::Message {
+                body: RecordedMessage::ToolResult { call_id, text, .. },
+                ..
+            } => Some(format!("{call_id} {text}")),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(results.len(), 2, "{results:?}");
+    let ids: std::collections::HashSet<&str> =
+        results.iter().filter_map(|r| r.split(' ').next()).collect();
+    assert_eq!(ids.len(), 2, "{results:?}");
+    let last = rig.chat.requests().pop().unwrap();
+    let announced: Vec<String> = last
+        .messages
+        .iter()
+        .filter_map(|m| match m {
+            Message::Assistant { tool_calls, .. } => Some(tool_calls.clone()),
+            _ => None,
+        })
+        .flatten()
+        .map(|c| c.id)
+        .collect();
+    assert_eq!(announced.len(), 2);
+    assert_ne!(announced[0], announced[1]);
+    let answered: Vec<String> = last
+        .messages
+        .iter()
+        .filter_map(|m| match m {
+            Message::Tool { call_id, .. } => Some(call_id.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(answered, announced);
+}
+
+#[tokio::test]
+async fn two_calls_with_one_id_in_one_reply_each_get_their_own_result() {
+    let call = |name: &str, arguments: &str| ToolCall {
+        id: "dup".to_owned(),
+        name: name.to_owned(),
+        arguments: arguments.to_owned(),
+    };
+    let reply = ChatReply {
+        text: None,
+        reasoning: None,
+        tool_calls: vec![
+            call("probe_look", "{}"),
+            call("probe_look_at", r#"{"n":5}"#),
+        ],
+        usage: None,
+        finish: Finish::ToolCalls,
+    };
+    let rig = common::agent_with(vec![reply, common::text_reply("ok")], Limits::default());
+
+    let outcome = rig
+        .agent
+        .run_turn(&rig.kernel, request("both"), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.end, TurnEnd::Completed);
+    let last = rig.chat.requests().pop().unwrap();
+    let tool_texts: Vec<(String, String)> = last
+        .messages
+        .iter()
+        .filter_map(|m| match m {
+            Message::Tool { call_id, text } => Some((call_id.clone(), text.clone())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(tool_texts.len(), 2);
+    assert_ne!(tool_texts[0].0, tool_texts[1].0);
+    assert_eq!(tool_texts[1].1, r#"{"seen":5}"#);
+}
