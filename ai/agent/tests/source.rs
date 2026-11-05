@@ -35,3 +35,24 @@ fn every_ported_file_opens_with_the_port_header() {
     }
     assert!(offenders.is_empty(), "missing port header: {offenders:?}");
 }
+
+#[test]
+fn only_the_dispatcher_calls_kernel_dispatch() {
+    let mut offenders = Vec::new();
+    for entry in fs::read_dir(crate_dir().join("src")).unwrap() {
+        let path = entry.unwrap().path();
+        if path.file_name().is_some_and(|n| n == "dispatch.rs") {
+            continue;
+        }
+        if path.extension().is_none_or(|e| e != "rs") {
+            continue;
+        }
+        if fs::read_to_string(&path).unwrap().contains(".dispatch(") {
+            offenders.push(path.display().to_string());
+        }
+    }
+    assert!(
+        offenders.is_empty(),
+        "dispatch outside the dispatcher: {offenders:?}"
+    );
+}
