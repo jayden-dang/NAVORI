@@ -202,7 +202,7 @@ _Requirements: LOOP-1.1, LOOP-10.7, LOOP-10.8_
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Failing tests** in `ai/agent/tests/dispatch.rs`, each asserting the probe's request counter:
+- [x] **Step 1: Failing tests** in `ai/agent/tests/dispatch.rs`, each asserting the probe's request counter:
   - `a_read_action_is_dispatched_and_its_reply_returned` (counter 1, `is_error` false).
   - `a_write_action_is_refused_without_reaching_the_module`: text `Error: Navori AI cannot run probe_change yet: it changes things and needs your approval, which is not available.`, counter 0.
   - `an_unknown_name_is_refused`: text `Error: no Action named probe_gone.`, counter 0.
@@ -213,8 +213,8 @@ _Requirements: LOOP-1.1, LOOP-10.7, LOOP-10.8_
   - `an_action_slower_than_the_limit_times_out`: `Dispatcher::new(Duration::from_millis(200))`, text `Error: probe_slow did not answer within 0.2 s.`
 
   In `source.rs`, `only_the_dispatcher_calls_kernel_dispatch` greps `ai/agent/src` for `.dispatch(` outside `dispatch.rs`. Run `cargo test -p navori-agent` — expect: unresolved names.
-- [ ] **Step 2: Implement** `dispatch.rs` in the design's order: lookup, then Risk, then JSON parse, then Envelope, then `timeout(kernel.dispatch)`. Each refusal or failure becomes a `ToolOutcome` with `is_error: true`. The timeout text uses the configured limit in seconds. Run `cargo test -p navori-agent` — expect: pass.
-- [ ] **Step 3: Gate and commit:** `git commit -m "feat(agent): route every tool call through one Read-only dispatch point"`.
+- [x] **Step 2: Implement** `dispatch.rs` in the design's order: lookup, then Risk, then JSON parse, then Envelope, then `timeout(kernel.dispatch)`. Each refusal or failure becomes a `ToolOutcome` with `is_error: true`. The timeout text uses the configured limit in seconds. Run `cargo test -p navori-agent` — expect: pass.
+- [x] **Step 3: Gate and commit:** `git commit -m "feat(agent): route every tool call through one Read-only dispatch point"`.
 
 _Requirements: LOOP-1.2, LOOP-1.8, LOOP-1.9, LOOP-2.1, LOOP-2.2, LOOP-2.3, LOOP-2.4, LOOP-2.5, LOOP-11.6_
 
