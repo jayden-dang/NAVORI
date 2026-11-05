@@ -363,7 +363,7 @@ _Requirements: LOOP-6.1, LOOP-6.2, LOOP-7.1, LOOP-7.2_
 
 **Depends-on:** Task 2, Task 9
 
-- [ ] **Step 1: Failing tests** in `crates/ffi/tests/agent.rs`, using `start_with` with `AiDeps { make_provider: FakeLlm, .. }` and a key saved in `FakeKeychain`:
+- [x] **Step 1: Failing tests** in `crates/ffi/tests/agent.rs`, using `start_with` with `AiDeps { make_provider: FakeLlm, .. }` and a key saved in `FakeKeychain`:
   - `navori_ai_answers_which_ports_are_open_from_ports_list`: the script calls `ports_list`, then answers. The second request holds a `Message::Tool` for that call (its content depends on the machine). `ports_list` is among the offered tools, and no Write Action is.
   - `ports_kill_is_refused_and_the_ports_module_receives_nothing`: the Journal holds no `ports.stopped`, and the refusal text is in the record.
   - `a_three_step_turn_leaves_three_authorized_audit_rows`.
@@ -375,8 +375,8 @@ _Requirements: LOOP-6.1, LOOP-6.2, LOOP-7.1, LOOP-7.2_
   - `no_new_action_appears`: `core.actions()` lists exactly the current triples of module, action and Risk, read at the base commit and written into the test as literals.
 
   Run `cargo test -p navori-ffi --test agent` — expect: unresolved names.
-- [ ] **Step 2: Implement.** `AiDeps::production()` builds one `Arc<OpenAiCompat>` that both `LlmSender` and `LlmChatSender` share. `StoreConversations` runs `ensure_table()` in `append` and `load`. `AiRuntime::new` takes `bus: EventBus` (cloned before `kernel` moves into `Inner`, lib.rs:318-330). `AiRuntime::agent()` uses `get_or_try_init` and maps a Keychain failure to `TurnStartError::Keychain`. `run_agent_turn` uses `on_runtime`, with `ShutDown` mapped to `TurnStartError::ShutDown`. Update the full `AiDeps` literals at crates/ffi/tests/ask.rs:78 (`Fixture::deps()`), :272, :739, :764, :1140 and apps/cli/tests/cli.rs:102 by adding `..AiDeps::production()`. That fills the new fields; production providers build nothing until a Turn runs. Also update `LlmSender::new` at ask.rs:713 and :834. `crates/ffi/Cargo.toml` gains `navori-agent`, plus `navori-llm` with `fake` as a dev-dependency. Run `cargo test -p navori-ffi && cargo test -p navori-cli` — expect: pass, with `ask.rs` assertions unchanged.
-- [ ] **Step 3: Gate and commit:** `git commit -m "feat(ffi): run Navori AI Turns in the Core with the Conversation in SQLite"`.
+- [x] **Step 2: Implement.** `AiDeps::production()` builds one `Arc<OpenAiCompat>` that both `LlmSender` and `LlmChatSender` share. `StoreConversations` runs `ensure_table()` in `append` and `load`. `AiRuntime::new` takes `bus: EventBus` (cloned before `kernel` moves into `Inner`, lib.rs:318-330). `AiRuntime::agent()` uses `get_or_try_init` and maps a Keychain failure to `TurnStartError::Keychain`. `run_agent_turn` uses `on_runtime`, with `ShutDown` mapped to `TurnStartError::ShutDown`. Update the full `AiDeps` literals at crates/ffi/tests/ask.rs:78 (`Fixture::deps()`), :272, :739, :764, :1140 and apps/cli/tests/cli.rs:102 by adding `..AiDeps::production()`. That fills the new fields; production providers build nothing until a Turn runs. Also update `LlmSender::new` at ask.rs:713 and :834. `crates/ffi/Cargo.toml` gains `navori-agent`, plus `navori-llm` with `fake` as a dev-dependency. Run `cargo test -p navori-ffi && cargo test -p navori-cli` — expect: pass, with `ask.rs` assertions unchanged.
+- [x] **Step 3: Gate and commit:** `git commit -m "feat(ffi): run Navori AI Turns in the Core with the Conversation in SQLite"`.
 
 _Requirements: LOOP-3.8, LOOP-10.3, LOOP-10.4, LOOP-11.2, LOOP-11.3, LOOP-1.1, LOOP-2.2, LOOP-4.1, LOOP-5.2, LOOP-11.6_
 
