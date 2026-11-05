@@ -375,12 +375,12 @@ _Requirements: SOAK-1.10, SOAK-3.2_
 
 **Depends-on:** Task 1, Task 2, Task 3, Task 4, Task 5, Task 6
 
-- [ ] **Step 1: Write the failing tests** for `parse_duration`:
+- [x] **Step 1: Write the failing tests** for `parse_duration`:
   - `durations_read_seconds_minutes_and_hours`: `"90s"` → 90 s, `"20m"` → 1200 s, `"2h"` → 7200 s.
   - `a_duration_without_a_unit_is_refused`: `"90"` → Err naming `90`.
 
   Run: `cargo test -p xtask duration` — expect: compile error.
-- [ ] **Step 2: Implement the driver** in the order of design "Soak driver" steps 1 to 10:
+- [x] **Step 2: Implement the driver** in the order of design "Soak driver" steps 1 to 10:
   1. bundle into `build/soak/` (`run` only);
   2. compile the probe into `build/soak/`;
   3. spawn `caffeinate -d -i -w <std::process::id()>`;
@@ -399,7 +399,7 @@ _Requirements: SOAK-1.10, SOAK-3.2_
   10. teardown in a `Children` guard: SIGTERM, 5 s, then SIGKILL; on a fail verdict print `soak evidence <run dir> pid <pid>` and leave the run directory.
 
   Print `soak +mm:ss <event>` progress lines as they happen. Then print `judge(&facts).lines()` and return `report.exit_ok(&tier)`. A SOAK-1.10 condition returns `Err` without printing a verdict.
-- [ ] **Step 3: Wire the commands** in `main.rs`:
+- [x] **Step 3: Wire the commands** in `main.rs`:
   - `Cmd::Soak { long: false, .. }` calls `soak::run(&root, Tier::Short)`;
   - `long: true` calls `Tier::Long { load: for_.unwrap_or(2h) }`;
   - a false result bails with `soak gate failed`;
@@ -407,7 +407,7 @@ _Requirements: SOAK-1.10, SOAK-3.2_
   - the `command: Option<SoakCmd>` field is matched: `None` runs the soak (Task 8 adds `Some(SoakCmd::Observe { .. })`).
 
   Run: `cargo test -p xtask` and `cargo clippy -p xtask --all-targets -- -D warnings` — expect: pass.
-- [ ] **Step 4: Run it end to end on this Mac.**
+- [x] **Step 4: Run it end to end on this Mac.**
   1. Before the run, save `shasum -a 256` of each existing file among `~/.codex/hooks.json`, `~/.grok/hooks/navori.json` and the `navori` lines of `~/.claude/settings.json` (`grep -n navori`), into `/tmp/soak-hooks-before.txt`. Then `touch /tmp/soak-start`. The installed Navori and other Claude sessions may legitimately write to the real home during the run, so modification times alone cannot prove SOAK-7.6.
   2. Run `cargo xtask soak`.
   3. During the run:
@@ -426,7 +426,7 @@ _Requirements: SOAK-1.10, SOAK-3.2_
   - Ctrl-C a second run after 2 minutes, and expect no `Navori Dev` from `build/soak` left running;
   - run `cargo xtask soak` 3 times in a row on an idle machine: expect the same verdict, the same LEAK set and the same hang sides;
   - `git diff --stat main -- apps crates modules` is empty.
-- [ ] **Step 5: Commit** `git commit -m "feat(xtask): add cargo xtask soak, a 20-minute and a long soak of an isolated Navori"`
+- [x] **Step 5: Commit** `git commit -m "feat(xtask): add cargo xtask soak, a 20-minute and a long soak of an isolated Navori"`
 
 _Requirements: SOAK-1.1, SOAK-1.4, SOAK-1.8, SOAK-1.9, SOAK-1.10, SOAK-1.12, SOAK-1.14, SOAK-3.3, SOAK-3.4, SOAK-5.2, SOAK-7.5, SOAK-7.6, SOAK-8.3, SOAK-9.2, SOAK-9.4_
 
