@@ -79,6 +79,18 @@ The loop that runs Navori AI: send a turn to the model, run the Actions it calls
 results back, and repeat until it answers or a Decision is needed.
 _Avoid_: harness (a Harness is a CLI Navori observes), runtime, engine
 
+**Conversation**:
+Navori AI's stored exchange with the user: a sequence of Turns, kept after the Sensitive Data Shield.
+_Avoid_: session (that is an Agent session), chat (a Model role, and later a screen)
+
+**Turn**:
+One input to Navori AI, with what started it, through to its answer, a Decision, a limit or a cancel.
+_Avoid_: run, request
+
+**Step**:
+One model request inside a Turn, plus the Actions that request calls.
+_Avoid_: iteration, turn (for one request)
+
 **Provider**:
 A cloud LLM service the user configures (Anthropic, OpenAI, DeepSeek, Google, xAI,
 OpenRouter or a custom OpenAI-compatible endpoint), reached through an adapter.
@@ -187,3 +199,5 @@ _Avoid_: proxy, AI client
 ## Flagged ambiguities
 
 - "agent" alone was used for both an Agent session and any AI caller of Actions — resolved: never use it alone; say **Agent session**, **Harness** or **Navori AI**.
+- "turn" was readable as one model request — resolved: a **Turn** runs from one input to Navori AI's answer and holds zero or more **Steps** (dsh docs/architecture.md:83); a **Step** is one model request.
+- "session" was used for both a Harness's run and Navori AI's history — resolved: an **Agent session** is a Harness's; Navori AI's is a **Conversation**.
