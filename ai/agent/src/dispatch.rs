@@ -78,7 +78,7 @@ impl Dispatcher {
         let reply = tokio::time::timeout(self.action_timeout, kernel.dispatch(envelope)).await;
         match reply {
             Ok(Ok(value)) => ToolOutcome {
-                text: capped(value.to_string()),
+                text: value.to_string(),
                 is_error: false,
             },
             Ok(Err(DispatchError::InvalidAction { message, .. })) => refused(
@@ -112,7 +112,7 @@ fn failure(message: String) -> ToolOutcome {
     }
 }
 
-fn capped(mut text: String) -> String {
+pub(crate) fn cap_result(mut text: String) -> String {
     if text.len() <= MAX_RESULT_BYTES {
         return text;
     }
@@ -120,6 +120,11 @@ fn capped(mut text: String) -> String {
     let mut keep = MAX_RESULT_BYTES;
     while !text.is_char_boundary(keep) {
         keep -= 1;
+    }
+    if let Some(open) = text[..keep].rfind("[REDACTED:")
+        && !text[open..keep].contains(']')
+    {
+        keep = open;
     }
     text.truncate(keep);
     text.push_str(&format!("\n[truncated: {} bytes cut]", total - keep));

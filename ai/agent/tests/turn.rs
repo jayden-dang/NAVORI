@@ -816,3 +816,75 @@ async fn a_secret_straddling_the_repeat_reminder_cut_never_reaches_the_record_or
         }
     }
 }
+
+fn tool_results(rig: &common::Rig) -> Vec<String> {
+    rig.store
+        .entries()
+        .into_iter()
+        .filter_map(|e| match e {
+            Entry::Message {
+                body: RecordedMessage::ToolResult { text, .. },
+                ..
+            } => Some(text),
+            _ => None,
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_secret_straddling_the_result_cap_is_shielded_before_the_cut() {
+    let rig = common::agent_with(
+        vec![
+            common::call_reply("c1", "probe_edge", "{}"),
+            common::text_reply("done"),
+        ],
+        Limits::default(),
+    );
+
+    rig.agent
+        .run_turn(&rig.kernel, request("edge"), Default::default())
+        .await
+        .unwrap();
+
+    let shielded = format!("\"{} [REDACTED:github_token] end\"", "x".repeat(65_514));
+    let kept = 65_516;
+    let expected = format!(
+        "{}\n[truncated: {} bytes cut]",
+        &shielded[..kept],
+        shielded.len() - kept
+    );
+    assert_eq!(tool_results(&rig), vec![expected.clone()]);
+    let last = rig.chat.requests().pop().unwrap();
+    assert!(
+        last.messages
+            .iter()
+            .any(|m| matches!(m, Message::Tool { text, .. } if *text == expected))
+    );
+}
+
+#[tokio::test]
+async fn a_huge_result_is_cut_at_a_character_boundary_with_a_visible_marker() {
+    let rig = common::agent_with(
+        vec![
+            common::call_reply("c1", "probe_big", "{}"),
+            common::text_reply("done"),
+        ],
+        Limits::default(),
+    );
+
+    rig.agent
+        .run_turn(&rig.kernel, request("big"), Default::default())
+        .await
+        .unwrap();
+
+    let whole = serde_json::to_string(&"é".repeat(40_000)).unwrap();
+    let kept = 65_535;
+    assert_eq!(
+        tool_results(&rig),
+        vec![format!(
+            "{}\n[truncated: {} bytes cut]",
+            &whole[..kept],
+            whole.len() - kept
+        )]
+    );
+}

@@ -11,6 +11,7 @@ use navori_kernel::{EventBus, Kernel, Severity};
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
 
+use crate::dispatch::cap_result;
 use crate::record::{
     ConversationId, ConversationLog, ConversationStore, Entry, Origin, RecordError,
     RecordedMessage, TurnId, derive_messages,
@@ -367,6 +368,10 @@ impl Agent {
                     outcome.text = format!("{}\n\n{reminder}", outcome.text);
                 }
                 let result = self.shield(&outcome.text)?;
+                let result = Shielded {
+                    text: cap_result(result.text),
+                    ..result
+                };
                 run.unsent += result.count;
                 run.messages.push(Message::Tool {
                     call_id: call.id.clone(),
