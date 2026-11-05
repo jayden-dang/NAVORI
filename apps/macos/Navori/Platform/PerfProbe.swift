@@ -84,6 +84,7 @@ enum PerfProbe {
         _ = signal(SIGUSR1, SIG_IGN)
         _ = signal(SIGUSR2, SIG_IGN)
         _ = signal(SIGTERM, SIG_IGN)
+        _ = signal(SIGINFO, SIG_IGN)
 
         let openMenu = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
         openMenu.setEventHandler {
@@ -108,7 +109,16 @@ enum PerfProbe {
             }
         }
         terminate.resume()
-        sources = [openMenu, openSubmenu, terminate]
+        // Bench only: NAVORI_PERF_BENCH_N pointer entries per mode, results in /tmp/navori-submenu-bench.csv.
+        let bench = DispatchSource.makeSignalSource(signal: SIGINFO, queue: .main)
+        bench.setEventHandler {
+            MainActor.assumeIsolated {
+                let n = Int(ProcessInfo.processInfo.environment["NAVORI_PERF_BENCH_N"] ?? "") ?? 40
+                statusBar?.runSubmenuBench(iterations: n)
+            }
+        }
+        bench.resume()
+        sources = [openMenu, openSubmenu, terminate, bench]
     }
 
     private static func nowMicroseconds() -> UInt64? {
