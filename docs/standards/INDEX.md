@@ -13,7 +13,7 @@ The single source of engineering rules. Feature work, reviews and "done" claims 
 
 ## Code
 
-- **Rust:** edition 2024, stable toolchain (`rust-toolchain.toml`), target `aarch64-apple-darwin`. Every crate inherits `version`, `edition`, `rust-version` and `[lints]` from the workspace.
+- **Rust:** edition 2024, a toolchain pinned to an exact version in `rust-toolchain.toml`, bumped by a deliberate commit that passes `cargo xtask ci`, target `aarch64-apple-darwin`. Every crate inherits `version`, `edition`, `rust-version` and `[lints]` from the workspace.
 - **Lints:** `unsafe_code = "forbid"` everywhere except where ARCH-9 allows it; `clippy::all` warns; `unwrap_used` / `expect_used` / `dbg_macro` / `todo` warn. `unwrap`/`expect` are allowed in tests only (`clippy.toml`).
 - **Dependencies:** declared once in `[workspace.dependencies]`, pinned to the latest stable release; check drift with `cargo xtask outdated`. Prefer the standard library and existing workspace crates over new dependencies.
 - **Swift:** the app target builds in Swift 6 language mode; the UniFFI-generated `NavoriCore` target stays in Swift 5 mode until UniFFI's async code is fully `Sendable` (uniffi-rs #2448). Only `CoreStore` touches the bindings (ARCH-2).
@@ -24,7 +24,7 @@ The single source of engineering rules. Feature work, reviews and "done" claims 
 
 - **Before every commit:** `cargo xtask ci` — `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --workspace`, `cargo xtask check-deps`, Swift build.
 - **Before every release:** `cargo xtask perf` green (see [performance.md](performance.md)).
-- There is no hosted CI yet; the local gates are authoritative. Revisit when the project is open-sourced.
+- Hosted CI is the release workflow (`.github/workflows/release.yml`, ADR 0007): on a `v*` tag it runs `cargo xtask ci`. `cargo xtask release-check` (ci + perf) stays the local gate before tagging, and perf never runs on CI. Otherwise the local gates are authoritative.
 
 ## Commits
 

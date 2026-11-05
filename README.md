@@ -6,7 +6,7 @@ Swift (AppKit + SwiftUI) shell. Architecture: [docs/ARCHITECTURE.md](docs/ARCHIT
 ## Requirements
 
 - macOS 26+ on Apple Silicon, Xcode (Swift 6) command-line tools
-- Rust stable (`rust-toolchain.toml` pins the channel and components)
+- Rust 1.97.1 (`rust-toolchain.toml` pins the exact toolchain and components)
 
 ## Install
 
@@ -20,6 +20,12 @@ brew install --cask navori
 
 Navori is self-signed and not notarized; the cask clears the quarantine flag so macOS opens
 it without a Gatekeeper prompt. macOS 26 and Apple Silicon only.
+
+Navori's hooks assume the harness runs them through a POSIX-compatible shell (sh, bash, zsh,
+dash and ksh were tested; fish and nushell were not).
+
+Release candidates install as the separate cask `navori-rc`. To move to the stable release:
+`brew uninstall --cask navori-rc && brew install --cask navori`; your settings stay.
 
 ## Everyday commands
 
