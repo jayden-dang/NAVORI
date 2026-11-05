@@ -234,7 +234,7 @@ _Requirements: LOOP-1.2, LOOP-1.8, LOOP-1.9, LOOP-2.1, LOOP-2.2, LOOP-2.3, LOOP-
 
 **Depends-on:** Task 5
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `the_third_identical_call_gets_the_first_reminder` returns dsh's first-threshold sentence, starting `You are repeating the exact same tool call with identical arguments.`
   - `the_fifth_and_eighth_calls_get_the_detailed_reminder`, whose text contains `- tool: probe_look` and `- consecutive_calls: 5`.
   - `key_order_does_not_make_a_call_different`: `{"a":1,"b":2}` then `{"b":2,"a":1}` count as 2.
@@ -243,8 +243,8 @@ _Requirements: LOOP-1.2, LOOP-1.8, LOOP-1.9, LOOP-2.1, LOOP-2.2, LOOP-2.3, LOOP-
   - `long_arguments_are_cut_at_500_characters`, ending `… (+N more chars)`.
 
   Run `cargo test -p navori-agent --test guard` — expect: unresolved names.
-- [ ] **Step 2: Implement** `guard.rs` with dsh's texts and thresholds 3/5/8, and the port header. Run — expect: pass.
-- [ ] **Step 3: Gate and commit:** `git commit -m "feat(agent): port dsh's repeat-tool reminder"`.
+- [x] **Step 2: Implement** `guard.rs` with dsh's texts and thresholds 3/5/8, and the port header. Run — expect: pass.
+- [x] **Step 3: Gate and commit:** `git commit -m "feat(agent): port dsh's repeat-tool reminder"`.
 
 _Requirements: LOOP-6.3_
 
