@@ -156,3 +156,37 @@ async fn an_action_slower_than_the_limit_times_out() {
     );
     assert!(outcome.is_error);
 }
+
+#[tokio::test]
+async fn a_huge_result_is_cut_at_a_character_boundary_with_a_visible_marker() {
+    let (kernel, _) = common::kernel_with_probe();
+    let toolset = Toolset::from_specs(&kernel.actions());
+
+    let outcome = Dispatcher::new(Duration::from_secs(10))
+        .call(&kernel, &toolset, &call("probe_big", ""))
+        .await;
+
+    let whole = serde_json::to_string(&"é".repeat(40_000)).unwrap();
+    let kept = 65_535;
+    assert!(!outcome.is_error);
+    assert_eq!(
+        outcome.text,
+        format!(
+            "{}\n[truncated: {} bytes cut]",
+            &whole[..kept],
+            whole.len() - kept
+        )
+    );
+}
+
+#[tokio::test]
+async fn a_small_result_is_returned_whole() {
+    let (kernel, _) = common::kernel_with_probe();
+    let toolset = Toolset::from_specs(&kernel.actions());
+
+    let outcome = Dispatcher::new(Duration::from_secs(10))
+        .call(&kernel, &toolset, &call("probe_look", "{}"))
+        .await;
+
+    assert!(!outcome.text.contains("truncated"));
+}

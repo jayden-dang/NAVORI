@@ -41,6 +41,8 @@ pub enum TestAction {
     Slow,
     /// Show what was found.
     Leak,
+    /// Return a very long text.
+    Big,
     /// Keep a note.
     Note { text: String },
 }
@@ -65,6 +67,7 @@ impl ModuleAction for TestAction {
             doc("change", "Change something.", Risk::Write),
             doc("slow", "Answer after a long wait.", Risk::Read),
             doc("leak", "Show what was found.", Risk::Read),
+            doc("big", "Return a very long text.", Risk::Read),
             doc("note", "Keep a note.", Risk::Read),
         ]
     }
@@ -90,6 +93,7 @@ impl Module for TestModule {
                 TestAction::Look => req.respond(Ok(json!({"seen": "room"}))),
                 TestAction::LookAt { n } => req.respond(Ok(json!({"seen": n}))),
                 TestAction::Change => req.respond::<()>(Err(ActionError::Failed("changed".into()))),
+                TestAction::Big => req.respond(Ok(json!("é".repeat(40_000)))),
                 TestAction::Note { ref text } => {
                     self.notes.lock().unwrap().push(text.clone());
                     req.respond(Ok(json!({"noted": true})));
