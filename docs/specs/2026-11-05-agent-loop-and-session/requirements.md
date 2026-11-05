@@ -155,7 +155,7 @@ Files this change touches, and what each guards:
 ## Open Questions
 
 - S-cost: estimated cost per Turn (Locks L19/L20 partly deferred to ROAD-11) — owner: operator — date: at the review of this file — forbid-guess: no price or cost value is computed or stored by this road.
-- Answered in design.md (2026-11-05), no longer open: S-stop (charter Lock L22 and design "Persisted formats"), S-journal (Decision 12, LOOP-3.11), S-shield-refusal (Decision 10, LOOP-5.4), S-limits (Decision 8: 8 Steps, 200 000 tokens summed over input and output), S-origin (Decision 9: `user`), S-parallel (Decision 4: serial), S-tools (Decisions 5–6: `{module}_{action}`, schema cut from the enum's `oneOf`).
+- Answered in design.md (2026-11-05), no longer open: S-stop (charter Lock L22 and design "Persisted formats"), S-journal (Decision 13, LOOP-3.11), S-shield-refusal (Decision 10, LOOP-5.4), S-limits (Decision 8: 8 Steps, 200 000 tokens summed over input and output), S-origin (Decision 9: `user`), S-parallel (Decision 4: serial), S-tools (Decisions 5–6: `{module}_{action}`, schema cut from the enum's `oneOf`).
 - Whether DeepSeek sends `content` as null or as an empty string with tool calls (research: unconfirmed) — owner: author of the live test — date: when LOOP-9.1 first runs — forbid-guess: fixtures cover both (LOOP-1.6).
 - Does DeepSeek accept a replayed `reasoning_content` that the Shield changed (research-deepseek-tools.md:38-40, unconfirmed)? — owner: author of the live test — date: when LOOP-9.1 first runs — forbid-guess: a fixture covers a redacted replay; no test asserts the Provider accepts it.
 - The `pass` entry that holds the DeepSeek key — owner: operator — date: before LOOP-9.1 first runs — forbid-guess: no agent runs `pass show` or invents a name.
