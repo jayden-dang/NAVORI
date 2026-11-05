@@ -1,7 +1,7 @@
 # Requirements: Ports panel and stop
 
 Feature code: PSTOP
-Status: In-progress
+Status: Implemented
 Approved by the operator ("approve", 2026-11-04 21:17 +07, typed in the conductor session after reading RUN/sheet.html for 775cb62; relayed in .skills/_pending-ports-panel/auto/operator-reply.md).
 Date: 2026-11-04
 
