@@ -89,3 +89,78 @@ pub fn kernel_with_probe() -> (Kernel, Arc<AtomicUsize>) {
         .start();
     (kernel, received)
 }
+
+#[derive(Default)]
+pub struct MemoryConversations {
+    state: std::sync::Mutex<MemoryState>,
+    fail_next: std::sync::atomic::AtomicBool,
+}
+
+#[derive(Default, Clone)]
+struct MemoryState {
+    entries: Vec<(navori_agent::ConversationId, navori_agent::Entry)>,
+    turns: std::collections::HashMap<navori_agent::TurnId, navori_agent::ConversationId>,
+}
+
+impl MemoryConversations {
+    pub fn fail_next_append(&self) {
+        self.fail_next.store(true, Ordering::SeqCst);
+    }
+}
+
+impl navori_agent::ConversationStore for MemoryConversations {
+    fn append(&self, entries: &[navori_agent::Entry]) -> Result<(), navori_agent::RecordError> {
+        use navori_agent::{ConversationLog, Entry, RecordError};
+
+        if self.fail_next.swap(false, Ordering::SeqCst) {
+            return Err(RecordError::Write);
+        }
+        let mut guard = self.state.lock().unwrap();
+        let mut next = guard.clone();
+        for entry in entries {
+            let conversation = match entry {
+                Entry::ConversationStarted { id, .. } => *id,
+                Entry::TurnStarted {
+                    id, conversation, ..
+                } => {
+                    next.turns.insert(*id, *conversation);
+                    *conversation
+                }
+                Entry::StepStarted { turn, .. }
+                | Entry::Message { turn, .. }
+                | Entry::Usage { turn, .. }
+                | Entry::StepEnded { turn, .. }
+                | Entry::TurnEnded { turn, .. } => {
+                    *next.turns.get(turn).ok_or(RecordError::Write)?
+                }
+            };
+            next.entries.push((conversation, entry.clone()));
+            let scoped: Vec<Entry> = next
+                .entries
+                .iter()
+                .filter(|(c, _)| *c == conversation)
+                .map(|(_, e)| e.clone())
+                .collect();
+            ConversationLog::from_entries(scoped)?;
+        }
+        *guard = next;
+        Ok(())
+    }
+
+    fn load(
+        &self,
+        conversation: &navori_agent::ConversationId,
+    ) -> Result<navori_agent::ConversationLog, navori_agent::RecordError> {
+        let guard = self.state.lock().unwrap();
+        let scoped: Vec<navori_agent::Entry> = guard
+            .entries
+            .iter()
+            .filter(|(c, _)| c == conversation)
+            .map(|(_, e)| e.clone())
+            .collect();
+        if scoped.is_empty() {
+            return Err(navori_agent::RecordError::UnknownConversation);
+        }
+        navori_agent::ConversationLog::from_entries(scoped)
+    }
+}
