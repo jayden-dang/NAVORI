@@ -60,6 +60,10 @@ impl Origin {
             Origin::User => "user",
         }
     }
+
+    pub fn parse(value: &str) -> Option<Origin> {
+        (value == Origin::User.as_str()).then_some(Origin::User)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

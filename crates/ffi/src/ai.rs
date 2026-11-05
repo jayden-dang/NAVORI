@@ -482,14 +482,12 @@ fn read_entries(
         .map_err(read)?;
     for (turn_id, seq, origin, model, started, ended, end_reason) in turn_rows {
         let turn: TurnId = turn_id.parse()?;
-        if origin != Origin::User.as_str() {
-            return Err(RecordError::Read);
-        }
+        let origin = Origin::parse(&origin).ok_or(RecordError::Read)?;
         entries.push(Entry::TurnStarted {
             id: turn,
             conversation: *conversation,
             seq,
-            origin: Origin::User,
+            origin,
             model,
             ts_ms: started,
         });
