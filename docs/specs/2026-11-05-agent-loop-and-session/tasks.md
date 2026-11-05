@@ -10,7 +10,7 @@ Feature code: LOOP
 Status: Approved
 Date: 2026-11-05
 Approved by the operator ("approve", 2026-11-05 21:02 +07, on the review sheet at 4c30a7d).
-Execution-mode: unset
+Execution-mode: continuous
 Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
