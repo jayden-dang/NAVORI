@@ -7,8 +7,9 @@ on:
 permissions:
   contents: write
 
+# One constant group: two tags pushed seconds apart must not race on the tap push.
 concurrency:
-  group: release-${{ github.ref_name }}
+  group: release
   cancel-in-progress: false
 
 jobs:
