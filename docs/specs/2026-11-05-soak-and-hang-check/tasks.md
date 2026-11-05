@@ -242,7 +242,7 @@ _Requirements: SOAK-1.6, SOAK-1.7, SOAK-1.11, SOAK-1.13, SOAK-2.1, SOAK-2.2, SOA
   Write `probe.rs`, which compiles the helper with bare `swiftc -O`, the same way perf does (`xtask/src/perf/probe.rs:58-71`).
 
   Run: `cargo test -p xtask soak::probe` — expect: pass.
-- [ ] **Step 3: Prove it on the real app (design Decision 9).** Run `cargo xtask run`, then call the compiled helper on the `Navori Dev` pid (`pgrep -f "Navori Dev.app/Contents/MacOS/Navori"`). Expect: one JSON line with fds > 0. If it fails with EPERM, stop. That is a design blocker, and it goes back to the operator rather than being worked around.
+- [ ] **Step 3: Prove it on the real app (design Decision 9).** Call the compiled helper, read-only, on the running installed app's pid (`pgrep -x -f /Applications/Navori.app/Contents/MacOS/Navori`), a hardened-runtime app. Do not start `cargo xtask run`, which would write the real `Navori Dev` data that Task 7 checks the soak leaves alone. The plan review already did this once (17 fds, no EPERM; `.skills/_pending-soak/auto/plan-review.md`). Expect: one JSON line with fds > 0. If it fails with EPERM, stop. That is a design blocker, and it goes back to the operator rather than being worked around.
 - [ ] **Step 4: Commit** `git commit -m "feat(xtask): add a soak probe for footprint, threads and open files"`
 
 _Requirements: SOAK-1.5, SOAK-2.4_
@@ -393,9 +393,9 @@ _Requirements: SOAK-1.10, SOAK-3.2_
      - `HoldStore` → `StoreHold::open(<run>/Library/Application Support/Navori Dev/navori.db, 3 s)`, then the renew at +0.5 s, the probe at +1 s and the commit at +4 s;
      - `ProbeCore` → `Cli::status(2 s)`; `TimedOut` records a `Hang` with the load average from `/usr/sbin/sysctl -n vm.loadavg`;
      - `Sample` → `SoakProbe::read`;
-     - `ProbeMenu` → a fresh `LogStream::start()`, then `signal("USR1")`, then `wait_for(pid, |m| matches!(m, Mark::MenuOpened{..}), 2 s)`;
+     - `ProbeMenu` → if `ioreg -n Root -d1` shows `"CGSSessionScreenIsLocked"=Yes`, return the SOAK-1.10 error `the screen is locked; unlock it and rerun`; otherwise a fresh `LogStream::start()`, then `signal("USR1")`, then `wait_for(pid, |m| matches!(m, Mark::MenuOpened{..}), 2 s)`;
   9. on each step, poll pending dispatches into the error and timeout counts, reap children, and check `wait_exit(Duration::ZERO)`;
-  10. teardown in a `Children` guard: SIGTERM, 5 s, then SIGKILL.
+  10. teardown in a `Children` guard: SIGTERM, 5 s, then SIGKILL; on a fail verdict print `soak evidence <run dir> pid <pid>` and leave the run directory.
 
   Print `soak +mm:ss <event>` progress lines as they happen. Then print `judge(&facts).lines()` and return `report.exit_ok(&tier)`. A SOAK-1.10 condition returns `Err` without printing a verdict.
 - [ ] **Step 3: Wire the commands** in `main.rs`:
@@ -418,7 +418,8 @@ _Requirements: SOAK-1.10, SOAK-3.2_
 
   Then:
   - redo the hook-file hashes into `/tmp/soak-hooks-after.txt` and `diff` them: expect no difference;
-  - run a soak and `kill -9` its app after 3 minutes: expect `soak app exited at +…` and `soak verdict fail`;
+  - run a soak and `kill -9` its app after 3 minutes: expect `soak app exited at +…`, `soak verdict fail` and a `soak evidence <dir> pid <pid>` line whose directory still exists;
+  - run `cargo xtask soak --long --for 3m` and lock the screen (Ctrl-Cmd-Q) before it ends: expect `the screen is locked; unlock it and rerun`, no verdict and a non-zero exit, not a menu hang;
   - `cargo xtask soak --long --for 3m`: expect the same line kinds and exit 0 whatever the verdict;
   - `pgrep -f "build/soak/Navori Dev.app"` prints nothing;
   - Ctrl-C a second run after 2 minutes, and expect no `Navori Dev` from `build/soak` left running;
@@ -426,7 +427,7 @@ _Requirements: SOAK-1.10, SOAK-3.2_
   - `git diff --stat main -- apps crates modules` is empty.
 - [ ] **Step 5: Commit** `git commit -m "feat(xtask): add cargo xtask soak, a 20-minute and a long soak of an isolated Navori"`
 
-_Requirements: SOAK-1.1, SOAK-1.4, SOAK-1.8, SOAK-1.9, SOAK-1.12, SOAK-3.3, SOAK-3.4, SOAK-5.2, SOAK-7.5, SOAK-7.6, SOAK-8.3, SOAK-9.2, SOAK-9.4_
+_Requirements: SOAK-1.1, SOAK-1.4, SOAK-1.8, SOAK-1.9, SOAK-1.10, SOAK-1.12, SOAK-1.14, SOAK-3.3, SOAK-3.4, SOAK-5.2, SOAK-7.5, SOAK-7.6, SOAK-8.3, SOAK-9.2, SOAK-9.4_
 
 ---
 
@@ -488,7 +489,7 @@ _Requirements: SOAK-6.1, SOAK-6.2, SOAK-6.3, SOAK-6.4_
 
 **Depends-on:** Task 7, Task 8
 
-- [ ] **Step 1: Add the gate line and the doc comment.** `gate` checks that the app exists and fails with `build/perf/Navori Dev.app is missing; run cargo xtask perf first` if not. Remove the `allow(dead_code)` on `mod soak;`. Run `cargo test -p xtask` and `cargo clippy -p xtask --all-targets -- -D warnings` — expect: pass.
+- [ ] **Step 1: Add the gate line and the doc comment.** `gate` checks that the app exists and fails with `build/perf/Navori Dev.app is missing; run cargo xtask perf first` if not, which is SOAK-1.10's "cannot launch" with no verdict printed. A direct `cargo xtask soak` builds its own bundle, so it never meets this case. Remove the `allow(dead_code)` on `mod soak;`. Run `cargo test -p xtask` and `cargo clippy -p xtask --all-targets -- -D warnings` — expect: pass.
 - [ ] **Step 2: Update the four docs** listed under Files.
 - [ ] **Step 3: Run `cargo xtask release-check`** on a clean tree whose version tag is free. Expect: preflight, then ci, then perf, then the soak gate, in that order.
   - On a soak fail (expected while #21 is open): it ends `soak gate failed`, exits non-zero and prints no `git tag` line.
@@ -497,4 +498,4 @@ _Requirements: SOAK-6.1, SOAK-6.2, SOAK-6.3, SOAK-6.4_
   - `cargo xtask --help` lists `soak` but not `soak-listen`. No release-check path reaches `--long`; `rg -n 'Tier::Long' xtask/src/release.rs` prints nothing.
 - [ ] **Step 4: Commit** `git commit -m "feat(xtask): run the soak gate in release-check after perf"`
 
-_Requirements: SOAK-4.1, SOAK-4.2, SOAK-4.3, SOAK-4.4, SOAK-5.5, SOAK-9.1_
+_Requirements: SOAK-1.10, SOAK-4.1, SOAK-4.2, SOAK-4.3, SOAK-4.4, SOAK-5.5, SOAK-9.1_

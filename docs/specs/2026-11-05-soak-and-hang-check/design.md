@@ -53,7 +53,7 @@ listens on nothing new; the load's TCP listeners are soak-owned processes on loo
 
 1. External soak in xtask, with nothing added to the app, the Core or the `navori` CLI (Lock: card Must keep and Decided).
 2. Reuse of perf code (Weigh W1–W3, agent-decided, D4). The only edit under `xtask/src/perf/` is `mod` → `pub(crate) mod` for `home`, `launch` and `logstream` (`xtask/src/perf/mod.rs:1-7`; `probe` stays private, since soak has its own helper). Every private helper in `perf/mod.rs` stays private, `judge` included, so soak keeps its own warm-up, bounded command runner and median.
-3. Own tree `/tmp/navori-soak-<uid>/navori-perf-<uid>/`. `PerfHome::prepare(base, uid)` names the leaf (`xtask/src/perf/home.rs:36-37`), the soak creates and guards the outer directory itself, and the Docker link that `fresh_run` makes is removed before launch (D5, D18).
+3. Own tree `/tmp/navori-soak-<uid>/navori-perf-<uid>/` (Weigh W2, agent-decided; D5). `PerfHome::prepare(base, uid)` names the leaf (`xtask/src/perf/home.rs:36-37`), the soak creates and guards the outer directory itself, and the Docker link that `fresh_run` makes is removed before launch (D5, D18).
 4. The load runs as an ordered plan of timed steps computed up front, a pure function of the tier, and is executed by one driver loop. The schedule is unit-testable without a clock, and the run stays deterministic (SOAK-9.4).
 5. The load's helper processes are:
    - `/bin/sleep 3` for command Leases;
@@ -65,6 +65,7 @@ listens on nothing new; the load's TCP listeners are soak-owned processes on loo
 7. "Cannot drive the load" in SOAK-1.10 means one of these:
    - a helper process cannot be spawned;
    - the store holder does not print `held` within 3 s (Decision 12);
+   - the user session is locked when the menu probe is due (Decision 11);
    - the `navori` helper exits 2 (usage error);
    - the helper exits 3 (app not running) while the app process is still alive.
 
@@ -72,7 +73,7 @@ listens on nothing new; the load's TCP listeners are soak-owned processes on loo
 8. Interrupts: xtask cannot install a signal handler (decision 2's context). The app and every load child are spawned in xtask's process group (`xtask/src/perf/launch.rs:22-24`), so a terminal Ctrl-C reaches all of them. Every app pid is recorded in the soak home, and the next soak's `sweep_stale` stops any survivor (SOAK-1.8, SOAK-7.2).
 9. The open-fd count comes from `proc_pidinfo(PROC_PIDLISTFDS)`: a size call, then a call into a buffer with slack, then the count is bytes / `sizeof(proc_fdinfo)`. Same-uid fds are readable without root: `lsof -p <Finder pid>` returned 385 lines on 2026-11-05. That is weak evidence for libproc on a hardened-runtime app, so the first task proves `SoakProbe::read` against the real `Navori Dev.app` before anything builds on it.
 10. Store holds are phased against the load (design review F2; Weigh W4, soak-interpret review r3). A hold is requested 1 s after a Lease tick, and opens once confirmed (Decision 12), and its commit closes it 4 s after that. Half a second into the hold a `RenewLease` is sent, so a Core writer is queued behind the lock (every Event is journaled, `crates/kernel/src/bus.rs` `publish`) when the Core probe arrives 1 s into the hold. That is the #21 situation. `status` itself reads no table (`crates/ffi/src/app.rs:46-62`), so without that queued writer the probe would pass falsely. Envelopes are spawned and not waited on: each dispatch is a child process tracked with a 10 s deadline and reaped by the loop, so no dispatch delays a probe. The loop blocks only on a probe (at most 2 s), a sample or a spawn. Steps run in order. A step that comes due while an earlier one is still running starts as soon as that one returns, and its actual start time is what the report records.
-11. Menu frames need a drawable display (design review F3). `menuOpened` is logged from the panel's first presented frame (`apps/macos/Navori/StatusBar/StatusPanel.swift:128`), and `show` returns early without a button window (`StatusPanel.swift:97`). The soak therefore holds `/usr/bin/caffeinate -d -i -w <xtask pid>` for the whole run (SOAK-1.12), and starts a fresh `LogStream` just before the menu probe, so a two-hour-old stream cannot void the verdict (F7). A menu hang means "no mark in 2 s" (SOAK-3.4).
+11. Menu frames need a drawable display (design review F3). `menuOpened` is logged from the panel's first presented frame (`apps/macos/Navori/StatusBar/StatusPanel.swift:128`), and `show` returns early without a button window (`StatusPanel.swift:97`). The soak therefore holds `/usr/bin/caffeinate -d -i -w <xtask pid>` for the whole run (SOAK-1.12), and starts a fresh `LogStream` just before the menu probe, so a two-hour-old stream cannot void the verdict (F7). A menu hang means "no mark in 2 s" (SOAK-3.4). Before the menu probe, the driver reads `ioreg -n Root -d1` and treats `"CGSSessionScreenIsLocked"=Yes` in `IOConsoleUsers` as a locked session. That is a SOAK-1.10 "cannot drive" failure with `the screen is locked; unlock it and rerun`, not a hang, so a locked screen cannot fail a good release as a hang (conductor final review M2, agent-decided). While unlocked, the key is absent (checked 2026-11-05). Its presence while locked is unverified until Task 7's locked-screen check.
 12. The store hold must be confirmed, not assumed (Weigh W5, soak-interpret design review r1). The `sqlite3` shell has no busy timeout of its own, so a `BEGIN IMMEDIATE` that meets a Core write fails at once and the shell carries on (seen on this Mac). The holder is therefore fed `.bail on`, `.timeout 2000`, then `BEGIN IMMEDIATE;`, then `SELECT 'held';`. Without `.bail on`, a `BEGIN` that times out still lets `SELECT 'held'` print (plan review, reproduced 2026-11-05); with it, the shell exits 1 and prints no `held`. The hold opens when `held` is read on its stdout, within 3 s. The renew (+0.5 s), Core probe (+1 s) and commit (+4 s) are timed from that moment. A missing `held` is a SOAK-1.10 failure.
 13. No ADR. Every decision is reversible within xtask and follows the perf gate's precedent.
 
@@ -163,7 +164,7 @@ Locality: new `xtask/assets/soak-probe.swift` and `xtask/src/soak/probe.rs` (lea
 
 ### Soak driver
 
-Satisfies: SOAK-1.1, SOAK-1.4, SOAK-1.8, SOAK-1.9, SOAK-1.10, SOAK-1.12, SOAK-3.2, SOAK-3.3, SOAK-3.4, SOAK-7.5, SOAK-9.2
+Satisfies: SOAK-1.1, SOAK-1.4, SOAK-1.8, SOAK-1.9, SOAK-1.10, SOAK-1.12, SOAK-1.14, SOAK-3.2, SOAK-3.3, SOAK-3.4, SOAK-7.5, SOAK-9.2
 Reuse:
 - rung 2: `Launched::spawn` and `signal` (`xtask/src/perf/launch.rs:19-38`), `LogStream::start` and `wait_for` (`xtask/src/perf/logstream.rs:94,121`), and `super::bundle(root, Profile::Dev, Flavor::Release, out)` (`xtask/src/main.rs:313`).
 - rung 3: std `process::Command` for the bounded runner and the children.
@@ -199,8 +200,8 @@ The flow:
    - `HoldStore`: spawn `/usr/bin/sqlite3 <run>/Library/Application Support/Navori Dev/navori.db` and write `.bail on`, `.timeout 2000`, `BEGIN IMMEDIATE;` and `SELECT 'held';`. The path follows `crates/config/src/lib.rs:58-62,74`. Wait up to 3 s for `held` on its stdout (otherwise SOAK-1.10). Then, from that moment, dispatch the renew at +0.5 s (spawned), run the Core probe at +1 s, and at +4 s write `COMMIT;`, close stdin and reap. If the soak dies mid-hold, stdin EOF ends `sqlite3` and the transaction rolls back.
    - `ProbeCore`: `status(2 s)`; `TimedOut` records a `Hang { side: Core }` with the 1-minute load average from `sysctl -n vm.loadavg`.
    - `Sample`: `SoakProbe::read(pid)`.
-   - `ProbeMenu`: start a fresh `LogStream`, then `signal("USR1")` (`Launched::signal` adds the dash itself, `xtask/src/perf/launch.rs:70-71`; perf passes bare names), then `wait_for(pid, MenuOpened, 2 s)`; `None` records a `Hang { side: Menu }`.
-10. Teardown, always, including on error. Every child, pending dispatches included, sits in a `Children` guard whose `Drop` kills and reaps it, so none outlives the run, because std children have no kill-on-drop (design review F8). `Launched`'s own `Drop` sends SIGKILL. The orderly path sends SIGTERM, waits 5 s, sends SIGKILL (SOAK-1.8), drops the guard, then judges and prints.
+   - `ProbeMenu`: check the session lock (Decision 11), then start a fresh `LogStream`, then `signal("USR1")` (`Launched::signal` adds the dash itself, `xtask/src/perf/launch.rs:70-71`; perf passes bare names), then `wait_for(pid, MenuOpened, 2 s)`; `None` records a `Hang { side: Menu }`.
+10. Teardown, always, including on error. Every child, pending dispatches included, sits in a `Children` guard whose `Drop` kills and reaps it, so none outlives the run, because std children have no kill-on-drop (design review F8). `Launched`'s own `Drop` sends SIGKILL. The orderly path sends SIGTERM, waits 5 s, sends SIGKILL (SOAK-1.8), drops the guard, then judges and prints. On a fail verdict it prints `soak evidence <run dir> pid <pid>` and leaves the run directory, which lives under the soak's own `/tmp` tree and is replaced by the next soak (SOAK-1.14).
 
 Each CLI call runs as `/usr/bin/env HOME=<run> <app>/Contents/Helpers/navori --profile dev …`, the same shape as perf (`xtask/src/perf/mod.rs:204-224`) (SOAK-7.5). The bounded runner kills the child at its timeout and reaps it. Progress lines (`soak +mm:ss …`) are flushed as they happen, so a 20-minute run is never silent.
 
@@ -291,7 +292,7 @@ New seams: the soak module's own public functions. No existing seam changes.
 ## Coverage check
 
 Every requirement ID in requirements.md appears in exactly one `Satisfies:` line:
-- SOAK-1.1 to 1.13;
+- SOAK-1.1 to 1.14;
 - SOAK-2.1 to 2.5;
 - SOAK-3.1 to 3.7;
 - SOAK-4.1 to 4.4;
