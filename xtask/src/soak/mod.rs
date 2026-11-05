@@ -44,7 +44,6 @@ pub(crate) fn run(root: &Path, tier: Tier) -> Result<bool> {
     drive(root, &app, &tier, started)
 }
 
-#[cfg_attr(test, expect(dead_code))]
 pub(crate) fn gate(root: &Path, app: &Path) -> Result<bool> {
     ensure!(
         app.exists(),
@@ -378,5 +377,19 @@ impl Driver<'_> {
             self.app.wait_exit(STOP_GRACE)?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gate_without_a_perf_bundle_says_to_run_perf_first() {
+        let root = tempfile::tempdir().unwrap();
+        let app = root.path().join("build/perf/Navori Dev.app");
+        let err = gate(root.path(), &app).unwrap_err().to_string();
+        assert!(err.contains("Navori Dev.app is missing"), "{err}");
+        assert!(err.contains("run cargo xtask perf first"), "{err}");
     }
 }

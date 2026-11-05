@@ -64,6 +64,8 @@ Files this change touches, and what in them is guarded:
 
 - **RELEASE-2.1** WHEN `cargo xtask release-check` runs THE SYSTEM SHALL run `cargo xtask ci` and then `cargo xtask perf`, stopping at the first that fails.
 - **RELEASE-2.2** WHEN both pass THE SYSTEM SHALL print the release tag `v<workspace version>` and the `git tag` and `git push` commands that publish it.
+
+*(Amended 2026-11-05 by SOAK-4.1/4.2: after perf, release-check runs the soak gate; the tag prints only when it passes too.)*
 - **RELEASE-2.3** IF the workspace version is not a valid Semantic Versioning 2.0 version THEN THE SYSTEM SHALL fail before running the gate, naming the version.
 - **RELEASE-2.4** IF the tag `v<workspace version>` already exists locally or on `origin` THEN THE SYSTEM SHALL fail before running the gate, naming the tag.
 - **RELEASE-2.5** IF the working tree has uncommitted changes to tracked files THEN THE SYSTEM SHALL fail before running the gate, listing the changed files.

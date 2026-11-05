@@ -23,8 +23,8 @@ The single source of engineering rules. Feature work, reviews and "done" claims 
 ## Gates
 
 - **Before every commit:** `cargo xtask ci` — `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --workspace`, `cargo xtask check-deps`, Swift build.
-- **Before every release:** `cargo xtask perf` green (see [performance.md](performance.md)).
-- Hosted CI is the release workflow (`.github/workflows/release.yml`, ADR 0007): on a `v*` tag it runs `cargo xtask ci`. `cargo xtask release-check` (ci + perf) stays the local gate before tagging, and perf never runs on CI. Otherwise the local gates are authoritative.
+- **Before every release:** `cargo xtask perf` green, then the soak gate green (see [performance.md](performance.md)).
+- Hosted CI is the release workflow (`.github/workflows/release.yml`, ADR 0007): on a `v*` tag it runs `cargo xtask ci`. `cargo xtask release-check` (ci + perf + soak gate) stays the local gate before tagging, and perf never runs on CI. Otherwise the local gates are authoritative.
 
 ## Commits
 

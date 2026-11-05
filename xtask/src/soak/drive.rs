@@ -25,6 +25,7 @@ impl Children {
         Ok(())
     }
 
+    #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         self.list.len()
     }

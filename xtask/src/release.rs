@@ -178,6 +178,10 @@ pub(crate) fn check(root: &Path) -> Result<()> {
         .map_err(|problem| anyhow::anyhow!(problem))?;
     super::ci(root)?;
     ensure!(super::perf::run(root, false)?, "perf gate failed");
+    ensure!(
+        super::soak::gate(root, &root.join("build/perf/Navori Dev.app"))?,
+        "soak gate failed"
+    );
     println!("{tag}");
     println!("git tag {tag} && git push origin {tag}");
     Ok(())

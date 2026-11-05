@@ -14,7 +14,6 @@ use clap::{Parser, Subcommand, ValueEnum};
 
 mod perf;
 mod release;
-#[cfg_attr(not(test), allow(dead_code))]
 mod soak;
 
 const SIGNING_IDENTITY: &str = "Navori Local Signing";
@@ -73,7 +72,7 @@ enum Cmd {
         #[arg(long)]
         check: bool,
     },
-    /// Gate a release locally (tag free, tree clean, ci, perf), then print the tag to push.
+    /// Gate a release locally (tag free, tree clean, ci, perf, soak gate), then print the tag to push.
     ReleaseCheck,
     /// Soak an isolated Navori under load and judge footprint, threads, fds and hangs.
     Soak {

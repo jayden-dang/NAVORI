@@ -139,7 +139,8 @@ Run in order; `cut-release` executes exactly these and does not improvise. `<ver
 `[workspace.package] version` in `Cargo.toml`.
 
 1. `cargo xtask release-check` — the local gate: tag free, tree clean, `cargo xtask ci`,
-   `cargo xtask perf` (GOAL-11 budget; `--record` is not part of a release). On success it
+   `cargo xtask perf` (GOAL-11 budget; `--record` is not part of a release), then the
+   20-minute soak gate (`cargo xtask soak`, about 23 minutes). On success it
    prints the tag to push.
 2. `git tag v<version>`
 3. `git push origin v<version>` — pushing a `v*` tag runs `.github/workflows/release.yml`
