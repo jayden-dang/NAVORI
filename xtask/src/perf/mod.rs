@@ -1,9 +1,9 @@
 mod baseline;
 mod docker;
-mod home;
+pub(crate) mod home;
 mod judge;
-mod launch;
-mod logstream;
+pub(crate) mod launch;
+pub(crate) mod logstream;
 mod probe;
 
 use std::fs;
