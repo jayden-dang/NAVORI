@@ -490,13 +490,13 @@ _Requirements: SOAK-6.1, SOAK-6.2, SOAK-6.3, SOAK-6.4_
 
 **Depends-on:** Task 7, Task 8
 
-- [ ] **Step 1: Add the gate line and the doc comment.** `gate` checks that the app exists and fails with `build/perf/Navori Dev.app is missing; run cargo xtask perf first` if not, which is SOAK-1.10's "cannot launch" with no verdict printed. A direct `cargo xtask soak` builds its own bundle, so it never meets this case. Remove the `allow(dead_code)` on `mod soak;`. Run `cargo test -p xtask` and `cargo clippy -p xtask --all-targets -- -D warnings` — expect: pass.
-- [ ] **Step 2: Update the four docs** listed under Files.
-- [ ] **Step 3: Run `cargo xtask release-check`** on a clean tree whose version tag is free. Expect: preflight, then ci, then perf, then the soak gate, in that order.
+- [x] **Step 1: Add the gate line and the doc comment.** `gate` checks that the app exists and fails with `build/perf/Navori Dev.app is missing; run cargo xtask perf first` if not, which is SOAK-1.10's "cannot launch" with no verdict printed. A direct `cargo xtask soak` builds its own bundle, so it never meets this case. Remove the `allow(dead_code)` on `mod soak;`. Run `cargo test -p xtask` and `cargo clippy -p xtask --all-targets -- -D warnings` — expect: pass.
+- [x] **Step 2: Update the four docs** listed under Files.
+- [x] **Step 3: Run `cargo xtask release-check`** on a clean tree whose version tag is free. Expect: preflight, then ci, then perf, then the soak gate, in that order.
   - On a soak fail (expected while #21 is open): it ends `soak gate failed`, exits non-zero and prints no `git tag` line.
   - On a soak pass: it prints the tag and the `git tag … && git push origin …` line.
   - The soak adds ≤ 23 minutes: read the `soak elapsed` line, which is printed on fail as well as pass.
   - `cargo xtask --help` lists `soak` but not `soak-listen`. No release-check path reaches `--long`; `rg -n 'Tier::Long' xtask/src/release.rs` prints nothing.
-- [ ] **Step 4: Commit** `git commit -m "feat(xtask): run the soak gate in release-check after perf"`
+- [x] **Step 4: Commit** `git commit -m "feat(xtask): run the soak gate in release-check after perf"`
 
 _Requirements: SOAK-1.10, SOAK-4.1, SOAK-4.2, SOAK-4.3, SOAK-4.4, SOAK-5.5, SOAK-9.1_
