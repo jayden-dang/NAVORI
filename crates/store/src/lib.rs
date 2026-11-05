@@ -240,14 +240,14 @@ impl Store {
         Ok(())
     }
 
-    /// Newest first.
+    /// Newest first; events sharing a millisecond come back in the order they were written.
     pub fn journal_recent(&self, limit: usize) -> Result<Vec<Event>> {
         let limit = i64::try_from(limit).unwrap_or(i64::MAX);
         let rows: Vec<(String, i64, String, String, String, String, String)> =
             self.with_conn(|c| {
                 let mut stmt = c.prepare(
                     "SELECT id, ts_ms, module, kind, severity, summary, payload
-                 FROM events ORDER BY ts_ms DESC, id DESC LIMIT ?1",
+                 FROM events ORDER BY ts_ms DESC, rowid DESC LIMIT ?1",
                 )?;
                 let rows = stmt.query_map([limit], |r| {
                     Ok((

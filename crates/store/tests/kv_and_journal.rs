@@ -55,6 +55,38 @@ fn journal_returns_newest_events_first_up_to_the_limit() {
 }
 
 #[test]
+fn journal_breaks_same_millisecond_ties_by_write_order_not_id() {
+    let store = Store::open_in_memory().unwrap();
+    // The first written event has the larger id string, as random ULIDs may.
+    store.journal_append(&event("zzz", 100, "first")).unwrap();
+    store.journal_append(&event("aaa", 100, "second")).unwrap();
+    let recent = store.journal_recent(2).unwrap();
+    assert_eq!(
+        recent
+            .iter()
+            .map(|e| e.summary.as_str())
+            .collect::<Vec<_>>(),
+        vec!["second", "first"]
+    );
+}
+
+#[test]
+fn journal_orders_by_timestamp_before_write_order() {
+    let store = Store::open_in_memory().unwrap();
+    store.journal_append(&event("a", 300, "newest ts")).unwrap();
+    store.journal_append(&event("b", 100, "oldest ts")).unwrap();
+    store.journal_append(&event("c", 200, "middle ts")).unwrap();
+    let recent = store.journal_recent(3).unwrap();
+    assert_eq!(
+        recent
+            .iter()
+            .map(|e| e.summary.as_str())
+            .collect::<Vec<_>>(),
+        vec!["newest ts", "middle ts", "oldest ts"]
+    );
+}
+
+#[test]
 fn journal_never_persists_secrets() {
     let store = Store::open_in_memory().unwrap();
     let mut e = event(
