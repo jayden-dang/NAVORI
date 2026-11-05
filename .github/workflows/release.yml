@@ -14,6 +14,7 @@ concurrency:
 jobs:
   release:
     runs-on: macos-26
+    timeout-minutes: 60
     environment: release
     permissions:
       contents: write
@@ -194,10 +195,9 @@ jobs:
 
       - name: Remove the temporary keychain
         if: always()
+        timeout-minutes: 5
         run: |
-          if [ -f "$RUNNER_TEMP/signing.cer" ]; then
-            sudo security remove-trusted-cert -d "$RUNNER_TEMP/signing.cer" || true
-          fi
+          # Hosted runners are discarded VMs; remove-trusted-cert hung waiting for authorization, so the trust entry stays.
           rm -f "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/signing.cer"
           if [ -f "$RUNNER_TEMP/keychains.txt" ]; then
             # shellcheck disable=SC2046
