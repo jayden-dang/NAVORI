@@ -13,6 +13,7 @@ pub enum Mark {
     StatusItemDrawn { ms: f64 },
     MenuOpened { ms: f64, first: bool, modules: u32 },
     SubmenuOpened { ms: f64 },
+    SubmenuIntentOpened { ms: f64 },
 }
 
 #[derive(Debug)]
@@ -53,6 +54,13 @@ fn parse_message(message: &str) -> Option<Mark> {
                 return None;
             }
             Some(Mark::SubmenuOpened { ms })
+        }
+        "submenuIntentOpened" => {
+            let ms = finite_ms(parts.next()?)?;
+            if parts.next().is_some() {
+                return None;
+            }
+            Some(Mark::SubmenuIntentOpened { ms })
         }
         _ => None,
     }
@@ -278,6 +286,17 @@ mod tests {
     fn a_submenu_mark_parses_its_time() {
         let line = r#"{"eventMessage":"submenuOpened ms=7.3","processID":9}"#;
         assert_eq!(parse_line(line), Some((9, Mark::SubmenuOpened { ms: 7.3 })));
+    }
+
+    #[test]
+    fn a_submenu_intent_mark_parses_its_time_and_is_not_a_plain_submenu_mark() {
+        let line = r#"{"eventMessage":"submenuIntentOpened ms=58.4","processID":9}"#;
+        assert_eq!(
+            parse_line(line),
+            Some((9, Mark::SubmenuIntentOpened { ms: 58.4 }))
+        );
+        let extra = r#"{"processID":9,"eventMessage":"submenuIntentOpened ms=1.0 x=1"}"#;
+        assert_eq!(parse_line(extra), None);
     }
 
     #[test]

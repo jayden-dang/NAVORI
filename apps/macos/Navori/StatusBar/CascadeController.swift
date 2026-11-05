@@ -27,8 +27,6 @@ final class CascadeController {
     @ObservationIgnored weak var panel: StatusPanel?
     @ObservationIgnored private var surfaceTint: NSColor = GlassTint.standard
 
-    private static let hoverDelay: TimeInterval = 0.150
-
     init(
         tree: @escaping () -> [CascadeNode],
         submenu: @escaping (String) -> AnyView,
@@ -41,8 +39,20 @@ final class CascadeController {
         self.selection = state.selection
     }
 
-    func pointer(on row: String, at screenPoint: CGPoint) {
-        apply(state.handle(.pointerOn(row: row, at: screenPoint, submenu: openSubmenuRect)))
+    /// `onFirstFrame` is for the perf probe: it fires on the first frame of the Submenu this entry opens.
+    func pointer(on row: String, at screenPoint: CGPoint, onFirstFrame: (@MainActor () -> Void)? = nil) {
+        let effects = state.handle(.pointerOn(row: row, at: screenPoint, submenu: openSubmenuRect))
+        if let onFirstFrame {
+            // Keep the callback only when this entry opens a Submenu: now, or when the intent timer fires.
+            let opens = effects.contains { effect in
+                switch effect {
+                case .open, .armHoverTimer(after: CascadeState.intentDelay): true
+                default: false
+                }
+            }
+            pendingFirstFrame = opens ? onFirstFrame : nil
+        }
+        apply(effects)
     }
 
     func pointerLeft(_ row: String) {
@@ -138,8 +148,8 @@ final class CascadeController {
                 presentSubmenu(row)
             case let .close(depth):
                 hideFrom(depth: depth)
-            case .armHoverTimer:
-                armHoverTimer()
+            case let .armHoverTimer(delay):
+                armHoverTimer(after: delay)
             case .cancelHoverTimer:
                 hoverTimer?.cancel()
                 hoverTimer = nil
@@ -263,7 +273,7 @@ final class CascadeController {
         return search(tree(), depth: 0)
     }
 
-    private func armHoverTimer() {
+    private func armHoverTimer(after delay: TimeInterval) {
         hoverTimer?.cancel()
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
@@ -271,7 +281,7 @@ final class CascadeController {
             }
         }
         hoverTimer = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.hoverDelay, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     private func hoverTimerFired() {

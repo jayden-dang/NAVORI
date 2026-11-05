@@ -29,7 +29,8 @@ public enum CascadeEvent: Sendable {
 public enum CascadeEffect: Equatable, Sendable {
     case open(row: String)
     case close(depth: Int)
-    case armHoverTimer
+    /// Start (or restart) the hover timer; `hoverTimerFired` follows after `after` seconds unless cancelled.
+    case armHoverTimer(after: TimeInterval)
     case cancelHoverTimer
     case activate(row: String)
     case closeAll
@@ -44,6 +45,12 @@ public struct CascadeState: Sendable {
     private var pendingRow: String?
     private var lastPoint: CGPoint?
     private var anchor: CGPoint?
+
+    /// How long a pointer entering a row waits before its Submenu opens (the intent delay), counted from entry.
+    public static let intentDelay: TimeInterval = 0.050
+
+    /// How long the pointer rests before a Submenu opens while it travels the safe diagonal.
+    public static let restDelay: TimeInterval = 0.150
 
     private static let diagonalSegment: CGFloat = 16
     private static let diagonalSlack: CGFloat = 26
@@ -79,14 +86,35 @@ public struct CascadeState: Sendable {
             return []
         }
         lastPoint = point
-        pendingRow = row
-        var effects: [CascadeEffect] = []
-        if holdsForDiagonal(row: row, point: point, submenu: submenu) == false {
-            anchor = point
-            effects.append(contentsOf: apply(row, shouldOpen: false))
+        let hadPending = pendingRow != nil
+        if holdsForDiagonal(row: row, point: point, submenu: submenu) {
+            // The pointer may be crossing this row on its way to the open Submenu: wait for it to rest.
+            pendingRow = row
+            return [.armHoverTimer(after: Self.restDelay)]
         }
-        effects.append(.armHoverTimer)
-        return effects
+        anchor = point
+        // Another row of this panel owns an open Submenu: switch at once, as native menus do.
+        let switching = hasOpenSibling(of: row)
+        let effects = apply(row, shouldOpen: switching)
+        let opensAfterIntent = switching == false
+            && node(id: row).map { mayOpen($0) } == true
+            && openPath.contains(row) == false
+        guard opensAfterIntent else {
+            pendingRow = nil
+            return (hadPending ? [.cancelHoverTimer] : []) + effects
+        }
+        // Counted from the first entry into the row: movement inside it must not postpone the open.
+        // pendingRow == row means a timer is already armed for this row (intent, or the diagonal rest timer);
+        // re-arming would postpone the open. A stale rest timer firing for a row that can no longer open is a no-op:
+        // `handleHoverTimerFired` opens through `apply`, which checks `mayOpen`.
+        if pendingRow == row { return effects }
+        pendingRow = row
+        return effects + [.armHoverTimer(after: Self.intentDelay)]
+    }
+
+    private func hasOpenSibling(of row: String) -> Bool {
+        guard let ancestors = ancestors(of: row), openPath.count > ancestors.count else { return false }
+        return openPath[ancestors.count] != row
     }
 
     private mutating func handlePointerLeft(_ row: String) -> [CascadeEffect] {
@@ -116,8 +144,9 @@ public struct CascadeState: Sendable {
     }
 
     private mutating func handleHoverTimerFired() -> [CascadeEffect] {
-        guard let pendingRow else { return [] }
-        return apply(pendingRow, shouldOpen: true)
+        guard let row = pendingRow else { return [] }
+        pendingRow = nil
+        return apply(row, shouldOpen: true)
     }
 
     private mutating func handleKey(_ key: CascadeKey) -> [CascadeEffect] {
