@@ -450,21 +450,21 @@ _Requirements: SOAK-1.1, SOAK-1.4, SOAK-1.8, SOAK-1.9, SOAK-1.10, SOAK-1.12, SOA
 
 **Depends-on:** Task 4, Task 7
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `the_installed_app_is_found_by_its_exact_executable_path`: a ps text with `  812 /Applications/Navori.app/Contents/MacOS/Navori` → `Some(812)`.
   - `the_dev_app_is_never_taken_for_the_installed_app`: only `/…/Navori Dev.app/Contents/MacOS/Navori` → `None`.
   - `no_navori_process_is_none`.
 
   Run: `cargo test -p xtask soak::observe` — expect: compile error.
-- [ ] **Step 2: Implement** `observe`:
+- [x] **Step 2: Implement** `observe`:
   - compile the probe into `build/soak/`;
   - find the pid with `ps`; with no pid, bail with `Navori is not running`;
   - print `observe <HH:MM:SS> pid <n> footprint <MiB> threads <n> fds <n>` once, or every `every` until interrupted;
   - send no signal, dispatch nothing and write no file.
 
   Run: `cargo test -p xtask soak::observe` — expect: pass.
-- [ ] **Step 3: Run** `cargo xtask soak observe` and `cargo xtask soak observe --every 10s` (Ctrl-C after 3 lines) against `/Applications/Navori.app`. Expect: one line, then three lines. `git status --short` shows no new file outside `build/`. With Navori quit, the command prints `Navori is not running` and exits non-zero.
-- [ ] **Step 4: Commit** `git commit -m "feat(xtask): add cargo xtask soak observe for the installed app"`
+- [x] **Step 3: Run** `cargo xtask soak observe` and `cargo xtask soak observe --every 10s` (Ctrl-C after 3 lines) against `/Applications/Navori.app`. Expect: one line, then three lines. `git status --short` shows no new file outside `build/`. With Navori quit, the command prints `Navori is not running` and exits non-zero.
+- [x] **Step 4: Commit** `git commit -m "feat(xtask): add cargo xtask soak observe for the installed app"`
 
 _Requirements: SOAK-6.1, SOAK-6.2, SOAK-6.3, SOAK-6.4_
 
