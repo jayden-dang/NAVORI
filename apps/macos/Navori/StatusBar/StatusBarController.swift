@@ -212,15 +212,6 @@ final class StatusBarController: NSObject {
         }
     }
 
-    /// Perf harness only (SIGINFO): the open path after the intent timer fires, with and without preparation.
-    func runSubmenuBench(iterations: Int) {
-        guard panelBuilt, panel.isOpen else {
-            PerfProbe.fault("SIGINFO bench has no level 0")
-            return
-        }
-        SubmenuBench.run(cascade: panel.cascade, iterations: iterations)
-    }
-
     private func showMenu() {
         panel.close()
         #if DEBUG

@@ -26,10 +26,6 @@ final class CascadeController {
     @ObservationIgnored private let submenu: (String) -> AnyView
     @ObservationIgnored private let activateRow: (String) -> Void
     @ObservationIgnored private let log = Logger(subsystem: "dev.navori", category: "cascade")
-    /// Perf harness only: per-step timings of the open path. Nil outside the bench.
-    @ObservationIgnored var presentTrace: SubmenuPresentTrace?
-    /// Perf harness only: false measures the open without the intent-window preparation.
-    @ObservationIgnored var prepareEnabled = true
     @ObservationIgnored var interceptKey: ((CascadeKey) -> Bool)?
     @ObservationIgnored weak var panel: StatusPanel?
     @ObservationIgnored private var surfaceTint: NSColor = GlassTint.standard
@@ -46,8 +42,7 @@ final class CascadeController {
         self.selection = state.selection
     }
 
-    func pointer(on row: String, at screenPoint: CGPoint, onFirstFrame: (@MainActor () -> Void)? = nil) {
-        if let onFirstFrame { pendingFirstFrame = onFirstFrame }
+    func pointer(on row: String, at screenPoint: CGPoint) {
         apply(state.handle(.pointerOn(row: row, at: screenPoint, submenu: openSubmenuRect)))
     }
 
@@ -172,40 +167,33 @@ final class CascadeController {
         child.onKey = { [weak self] key in
             self?.key(key)
         }
-        let t0 = CACurrentMediaTime()
         if builtRows[depth] != row {
             child.setRootView(AnyView(submenu(row).environment(self)))
             builtRows[depth] = row
         }
-        let t1 = CACurrentMediaTime()
         child.onFittingSizeChange = { [weak self] in
             self?.schedulePlace(row)
         }
         let firstFrame = pendingFirstFrame
         pendingFirstFrame = nil
         placing = true
-        let frame = frameForSubmenu(row, child: child)
-        let t2 = CACurrentMediaTime()
-        child.show(frame: frame, onFirstFrame: firstFrame)
+        child.show(frame: frameForSubmenu(row, child: child), onFirstFrame: firstFrame)
         (child.contentView as? GlassSurfaceView)?.tint = surfaceTint
         placing = false
-        presentTrace?.recordPresent(setRoot: t1 - t0, frame: t2 - t1, show: CACurrentMediaTime() - t2)
         schedulePlace(row)
     }
 
     /// The invisible half of an open, done while the intent delay runs: build the row's root view in its
     /// depth's panel and measure it. The panel is not ordered front, so nothing appears and nothing takes focus.
     private func prepareSubmenu(_ row: String) {
-        guard prepareEnabled, panel?.isOpen == true, let depth = treeDepth(of: row).map({ $0 + 1 }) else { return }
+        guard panel?.isOpen == true, let depth = treeDepth(of: row).map({ $0 + 1 }) else { return }
         if let existing = panels[depth], existing.isVisible { return }
         guard builtRows[depth] != row else { return }
         let child = panels[depth] ?? CascadePanel()
         panels[depth] = child
-        let started = CACurrentMediaTime()
         child.setRootView(AnyView(submenu(row).environment(self)))
         _ = child.idealSize
         builtRows[depth] = row
-        presentTrace?.recordPrepare(CACurrentMediaTime() - started)
     }
 
     /// Forget every prepared or kept root view, so the next open rebuilds. A panel that is on screen keeps its
@@ -320,38 +308,6 @@ final class CascadeController {
     private func hoverTimerFired() {
         hoverTimer = nil
         guard let panel, panel.isOpen else { return }
-        presentTrace?.timerFiredAt = CACurrentMediaTime()
         apply(state.handle(.hoverTimerFired))
     }
-}
-
-
-/// Perf harness only. The synchronous cost of one submenu open, in seconds.
-@MainActor
-final class SubmenuPresentTrace {
-    var timerFiredAt = 0.0
-    private(set) var prepare = 0.0
-    private(set) var setRoot = 0.0
-    private(set) var frame = 0.0
-    private(set) var show = 0.0
-
-    func reset() {
-        timerFiredAt = 0
-        prepare = 0
-        setRoot = 0
-        frame = 0
-        show = 0
-    }
-
-    func recordPrepare(_ seconds: Double) {
-        prepare = seconds
-    }
-
-    func recordPresent(setRoot: Double, frame: Double, show: Double) {
-        self.setRoot = setRoot
-        self.frame = frame
-        self.show = show
-    }
-
-    var presentTotal: Double { setRoot + frame + show }
 }
