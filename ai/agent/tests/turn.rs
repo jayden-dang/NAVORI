@@ -620,3 +620,51 @@ async fn turns_in_a_conversation_are_numbered_from_one() {
         .collect();
     assert_eq!(seqs, vec![1, 2]);
 }
+
+#[tokio::test]
+async fn a_module_gets_the_arguments_as_written_while_the_record_and_the_model_get_the_shielded_copy()
+ {
+    let arguments = format!(r#"{{"text":"{}"}}"#, common::PLANTED);
+    let rig = common::agent_with(
+        vec![
+            common::call_reply("c1", "probe_note", &arguments),
+            common::text_reply("noted"),
+        ],
+        Limits::default(),
+    );
+
+    rig.agent
+        .run_turn(&rig.kernel, request("note it"), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(*rig.notes.lock().unwrap(), vec![common::PLANTED.to_owned()]);
+    let shielded = r#"{"text":"[REDACTED:github_token]"}"#;
+    let recorded: Vec<String> = rig
+        .store
+        .entries()
+        .into_iter()
+        .filter_map(|e| match e {
+            Entry::Message {
+                body: RecordedMessage::Assistant { tool_calls, .. },
+                ..
+            } => Some(tool_calls),
+            _ => None,
+        })
+        .flatten()
+        .map(|c| c.arguments)
+        .collect();
+    assert_eq!(recorded, vec![shielded.to_owned()]);
+    let requests = rig.chat.requests();
+    let sent = requests[1]
+        .messages
+        .iter()
+        .find_map(|m| match m {
+            Message::Assistant { tool_calls, .. } => {
+                tool_calls.first().map(|c| c.arguments.clone())
+            }
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(sent, shielded);
+}

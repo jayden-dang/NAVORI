@@ -41,6 +41,8 @@ pub enum TestAction {
     Slow,
     /// Show what was found.
     Leak,
+    /// Keep a note.
+    Note { text: String },
 }
 
 impl ModuleAction for TestAction {
@@ -63,12 +65,14 @@ impl ModuleAction for TestAction {
             doc("change", "Change something.", Risk::Write),
             doc("slow", "Answer after a long wait.", Risk::Read),
             doc("leak", "Show what was found.", Risk::Read),
+            doc("note", "Keep a note.", Risk::Read),
         ]
     }
 }
 
 pub struct TestModule {
     pub received: Arc<AtomicUsize>,
+    pub notes: Arc<std::sync::Mutex<Vec<String>>>,
 }
 
 impl Module for TestModule {
@@ -86,6 +90,10 @@ impl Module for TestModule {
                 TestAction::Look => req.respond(Ok(json!({"seen": "room"}))),
                 TestAction::LookAt { n } => req.respond(Ok(json!({"seen": n}))),
                 TestAction::Change => req.respond::<()>(Err(ActionError::Failed("changed".into()))),
+                TestAction::Note { ref text } => {
+                    self.notes.lock().unwrap().push(text.clone());
+                    req.respond(Ok(json!({"noted": true})));
+                }
                 TestAction::Leak => req.respond(Ok(json!({"found": PLANTED}))),
                 TestAction::Slow => {
                     tokio::time::sleep(Duration::from_secs(2)).await;
@@ -97,13 +105,22 @@ impl Module for TestModule {
     }
 }
 
-pub fn kernel_with_probe() -> (Kernel, Arc<AtomicUsize>) {
+pub type Notes = Arc<std::sync::Mutex<Vec<String>>>;
+
+pub fn kernel_with_notes() -> (Kernel, Arc<AtomicUsize>, Notes) {
     let received = Arc::new(AtomicUsize::new(0));
+    let notes = Notes::default();
     let kernel = Kernel::builder(Store::open_in_memory().unwrap())
         .register(TestModule {
             received: Arc::clone(&received),
+            notes: Arc::clone(&notes),
         })
         .start();
+    (kernel, received, notes)
+}
+
+pub fn kernel_with_probe() -> (Kernel, Arc<AtomicUsize>) {
+    let (kernel, received, _) = kernel_with_notes();
     (kernel, received)
 }
 
@@ -308,6 +325,7 @@ pub struct Rig {
     pub audit: Arc<MemoryAudit>,
     pub events: broadcast::Receiver<Event>,
     pub probe: Arc<AtomicUsize>,
+    pub notes: Notes,
 }
 
 pub fn agent_with(script: Vec<ChatReply>, limits: Limits) -> Rig {
@@ -337,7 +355,7 @@ pub fn build_rig(
         shield,
     )
     .with_chat_sender(chat.clone());
-    let (kernel, probe) = kernel_with_probe();
+    let (kernel, probe, notes) = kernel_with_notes();
     let events = kernel.bus().subscribe();
     let store = Arc::new(MemoryConversations::default());
     let agent = Agent::new(
@@ -354,5 +372,6 @@ pub fn build_rig(
         audit,
         events,
         probe,
+        notes,
     }
 }

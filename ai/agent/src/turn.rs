@@ -316,14 +316,15 @@ impl Agent {
             let text = shield_part(text)?;
             let reasoning = shield_part(reasoning)?;
             let mut shielded_calls = Vec::new();
-            for call in tool_calls {
+            for call in &tool_calls {
                 let arguments = self.shield(&call.arguments)?;
                 redactions += arguments.count;
                 shielded_calls.push(ToolCall {
                     arguments: arguments.text,
-                    ..call
+                    ..call.clone()
                 });
             }
+            let raw_calls = tool_calls;
             let tool_calls = shielded_calls;
             run.unsent += redactions;
             run.messages.push(Message::Assistant {
@@ -347,7 +348,7 @@ impl Agent {
             if tool_calls.is_empty() {
                 return Ok(text);
             }
-            for call in &tool_calls {
+            for call in &raw_calls {
                 if cancel.is_cancelled() {
                     return Err(TurnEnd::Cancelled);
                 }
