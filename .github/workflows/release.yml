@@ -22,6 +22,18 @@ jobs:
     env:
       KEYCHAIN_NAME: navori-release.keychain-db
     steps:
+      # This workflow imports a system trust root with `sudo security add-trusted-cert`
+      # and must never run on a self-hosted runner.
+      - name: Require a GitHub-hosted runner
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_ENVIRONMENT" != "github-hosted" ]; then
+            echo "::error::Refusing to run: the runner is $RUNNER_ENVIRONMENT, not github-hosted; this workflow trusts a certificate system-wide."
+            exit 1
+          fi
+
       - name: Check out the tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
