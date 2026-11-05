@@ -79,6 +79,33 @@ pub(crate) fn requirement_mismatch(expected: &str, actual: &[String]) -> Option<
     ))
 }
 
+/// Whether a `.sha256` file line names exactly the release zip as its file.
+pub(crate) fn sha_names_zip(sha_line: &str, zip_name: &str) -> bool {
+    let mut fields = sha_line.split_whitespace();
+    let (Some(_hash), Some(name), None) = (fields.next(), fields.next(), fields.next()) else {
+        return false;
+    };
+    name == zip_name
+}
+
+/// Text naming both versions when the app's bundle version is not the tag's.
+pub(crate) fn bundle_version_mismatch(actual: &str, expected: &str) -> Option<String> {
+    (actual.trim() != expected).then(|| {
+        format!(
+            "the app's CFBundleShortVersionString is \"{}\" but the tag names {expected}",
+            actual.trim()
+        )
+    })
+}
+
+/// Create the output directory only when nothing is wrong with the identity.
+pub(crate) fn create_out_unless(problem: Option<String>, out: &Path) -> Result<()> {
+    if let Some(problem) = problem {
+        bail!(problem);
+    }
+    std::fs::create_dir_all(out).with_context(|| format!("create {}", out.display()))
+}
+
 /// Why the release cannot be signed, given `NAVORI_SIGN_IDENTITY` and the
 /// stdout of `security find-identity -v -p codesigning`.
 pub(crate) fn identity_problem(env: Option<&str>, find_identity_stdout: &str) -> Option<String> {
@@ -164,17 +191,11 @@ pub(crate) fn run(root: &Path, tag: &str, out: Option<&Path>, check: bool) -> Re
         return Ok(());
     }
     let out = out.context("--out <dir> is required unless --check is given")?;
-    std::fs::create_dir_all(out).with_context(|| format!("create {}", out.display()))?;
     let zip_name = format!("Navori-{version}.zip");
     let sha_path = out.join(format!("{zip_name}.sha256"));
 
     if out.join(&zip_name).exists() && sha_path.exists() {
-        output(
-            Command::new("shasum")
-                .args(["-a", "256", "-c"])
-                .arg(sha_path.file_name().unwrap_or_default())
-                .current_dir(out),
-        )?;
+        verify_reused(out, &zip_name, &sha_path, version)?;
     } else {
         build_zip(root, out, &zip_name, &sha_path)?;
     }
@@ -195,6 +216,65 @@ pub(crate) fn run(root: &Path, tag: &str, out: Option<&Path>, check: bool) -> Re
     Ok(())
 }
 
+/// Check a zip and hash downloaded from an earlier run before it is reused.
+fn verify_reused(out: &Path, zip_name: &str, sha_path: &Path, version: &str) -> Result<()> {
+    let sha_text = std::fs::read_to_string(sha_path)
+        .with_context(|| format!("read {}", sha_path.display()))?;
+    ensure!(
+        sha_names_zip(sha_text.trim(), zip_name),
+        "{} must name exactly {zip_name}",
+        sha_path.display()
+    );
+    output(
+        Command::new("shasum")
+            .args(["-a", "256", "-c"])
+            .arg(sha_path.file_name().unwrap_or_default())
+            .current_dir(out),
+    )?;
+
+    let dir = std::env::temp_dir().join(format!("navori-reuse-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).with_context(|| format!("create {}", dir.display()))?;
+    let result = verify_unzipped(&out.join(zip_name), &dir, version);
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
+
+fn verify_unzipped(zip: &Path, dir: &Path, version: &str) -> Result<()> {
+    sh(Command::new("ditto").arg("-x").arg("-k").arg(zip).arg(dir))?;
+    let app = dir.join("Navori.app");
+    verify_signed_app(&app)?;
+    let plist = app.join("Contents/Info.plist");
+    let actual = output(
+        Command::new("/usr/libexec/PlistBuddy")
+            .args(["-c", "Print :CFBundleShortVersionString"])
+            .arg(&plist),
+    )?;
+    if let Some(problem) = bundle_version_mismatch(&actual, version) {
+        bail!(problem);
+    }
+    Ok(())
+}
+
+/// The app's signature must verify and carry the pinned designated requirements.
+fn verify_signed_app(app: &Path) -> Result<()> {
+    sh(Command::new("codesign")
+        .args(["--verify", "--strict", "--deep"])
+        .arg(app))?;
+    let mut actual = Vec::new();
+    for target in [app.to_path_buf(), app.join("Contents/Helpers/navori")] {
+        let stdout = output(Command::new("codesign").args(["-d", "-r-"]).arg(&target))?;
+        actual.extend(designated_lines(&stdout));
+    }
+    if let Some(problem) = requirement_mismatch(
+        include_str!("../assets/designated-requirement.txt"),
+        &actual,
+    ) {
+        bail!(problem);
+    }
+    Ok(())
+}
+
 fn build_zip(root: &Path, out: &Path, zip_name: &str, sha_path: &Path) -> Result<()> {
     let count = output(
         Command::new("git")
@@ -211,28 +291,16 @@ fn build_zip(root: &Path, out: &Path, zip_name: &str, sha_path: &Path) -> Result
 
     let identities =
         output(Command::new("security").args(["find-identity", "-v", "-p", "codesigning"]))?;
-    if let Some(problem) = identity_problem(
-        std::env::var("NAVORI_SIGN_IDENTITY").ok().as_deref(),
-        &identities,
-    ) {
-        bail!(problem);
-    }
+    create_out_unless(
+        identity_problem(
+            std::env::var("NAVORI_SIGN_IDENTITY").ok().as_deref(),
+            &identities,
+        ),
+        out,
+    )?;
 
     let app = bundle(root, Profile::Release, Flavor::Release, out)?;
-    sh(Command::new("codesign")
-        .args(["--verify", "--strict", "--deep"])
-        .arg(&app))?;
-    let mut actual = Vec::new();
-    for target in [app.clone(), app.join("Contents/Helpers/navori")] {
-        let stdout = output(Command::new("codesign").args(["-d", "-r-"]).arg(&target))?;
-        actual.extend(designated_lines(&stdout));
-    }
-    if let Some(problem) = requirement_mismatch(
-        include_str!("../assets/designated-requirement.txt"),
-        &actual,
-    ) {
-        bail!(problem);
-    }
+    verify_signed_app(&app)?;
 
     let zip = out.join(zip_name);
     let _ = std::fs::remove_file(&zip);
@@ -308,8 +376,9 @@ pub(crate) fn check_workflows(root: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        cask_file, cask_text, designated_lines, identity_problem, is_prerelease, preflight,
-        requirement_mismatch, tag_version, unpinned_actions,
+        bundle_version_mismatch, cask_file, cask_text, create_out_unless, designated_lines,
+        identity_problem, is_prerelease, preflight, requirement_mismatch, sha_names_zip,
+        tag_version, unpinned_actions,
     };
 
     const COMPAT: &str = "# Project\n- **Compat obligation:** External\n";
@@ -616,6 +685,57 @@ mod tests {
     fn build_metadata_alone_is_not_a_pre_release() {
         assert!(!is_prerelease("1.0.0+build-1"));
         assert!(!is_prerelease("0.1.0"));
+    }
+
+    #[test]
+    fn a_hash_line_naming_the_release_zip_is_accepted() {
+        let line = format!("{}  Navori-0.1.0.zip", "a".repeat(64));
+        assert!(sha_names_zip(&line, "Navori-0.1.0.zip"));
+    }
+
+    #[test]
+    fn a_hash_line_naming_another_file_is_rejected() {
+        let hash = "a".repeat(64);
+        assert!(!sha_names_zip(
+            &format!("{hash}  Navori-0.0.9.zip"),
+            "Navori-0.1.0.zip"
+        ));
+        assert!(!sha_names_zip(
+            &format!("{hash}  ../Navori-0.1.0.zip"),
+            "Navori-0.1.0.zip"
+        ));
+        assert!(!sha_names_zip(
+            &format!("{hash} *Navori-0.1.0.zip"),
+            "Navori-0.1.0.zip"
+        ));
+        assert!(!sha_names_zip(
+            &format!("{hash}  Navori-0.1.0.zip extra"),
+            "Navori-0.1.0.zip"
+        ));
+        assert!(!sha_names_zip(&hash, "Navori-0.1.0.zip"));
+        assert!(!sha_names_zip("", "Navori-0.1.0.zip"));
+    }
+
+    #[test]
+    fn an_app_with_another_bundle_version_fails_naming_both() {
+        let text = bundle_version_mismatch("0.1.0-rc.8\n", "0.1.0-rc.9").unwrap();
+        assert!(
+            text.contains("0.1.0-rc.8") && text.contains("0.1.0-rc.9"),
+            "{text}"
+        );
+        assert_eq!(bundle_version_mismatch("0.1.0-rc.9\n", "0.1.0-rc.9"), None);
+    }
+
+    #[test]
+    fn an_identity_failure_leaves_no_output_directory_behind() {
+        let out = std::env::temp_dir().join(format!("navori-out-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&out);
+        let err = create_out_unless(Some("no identity".to_owned()), &out).unwrap_err();
+        assert!(err.to_string().contains("no identity"));
+        assert!(!out.exists());
+        create_out_unless(None, &out).unwrap();
+        assert!(out.is_dir());
+        let _ = std::fs::remove_dir_all(&out);
     }
 
     const SHA: &str = "11bd71901bbe5b1630ceea73d27597364c9af683";
