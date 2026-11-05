@@ -178,30 +178,11 @@ impl Gateway {
             prior_redactions,
         } = outbound;
         let Some(fresh) = self.shield_request(&mut request) else {
-            tracing::warn!(
-                provider = self.provider,
-                reason = "shield_refused",
-                "chat refused"
-            );
-            if let Err(error) = self.write_row(Outcome::Blocked, 0).await {
-                tracing::warn!(
-                    provider = self.provider,
-                    reason = error.as_str(),
-                    "blocked audit row not recorded"
-                );
-            }
-            return Err(AskError::Shield);
+            return Err(self.refuse("chat refused").await);
         };
 
-        let count = prior_redactions.saturating_add(fresh);
-        if let Err(error) = self.write_row(Outcome::Authorized, count).await {
-            tracing::warn!(
-                provider = self.provider,
-                reason = error.as_str(),
-                "context audit write failed"
-            );
-            return Err(AskError::Audit);
-        }
+        self.authorize(prior_redactions.saturating_add(fresh))
+            .await?;
 
         chat_sender
             .send(&secret, request)
@@ -268,30 +249,11 @@ impl Gateway {
         let secret = self.read_key().await?;
 
         let Some(redacted) = self.inspect(text) else {
-            tracing::warn!(
-                provider = self.provider,
-                reason = "shield_refused",
-                "ask refused"
-            );
-            if let Err(error) = self.write_row(Outcome::Blocked, 0).await {
-                tracing::warn!(
-                    provider = self.provider,
-                    reason = error.as_str(),
-                    "blocked audit row not recorded"
-                );
-            }
-            return Err(AskError::Shield);
+            return Err(self.refuse("ask refused").await);
         };
 
-        let count = u32::try_from(redacted.findings.len()).unwrap_or(u32::MAX);
-        if let Err(error) = self.write_row(Outcome::Authorized, count).await {
-            tracing::warn!(
-                provider = self.provider,
-                reason = error.as_str(),
-                "context audit write failed"
-            );
-            return Err(AskError::Audit);
-        }
+        self.authorize(u32::try_from(redacted.findings.len()).unwrap_or(u32::MAX))
+            .await?;
 
         self.sender
             .send(&secret, model, &redacted.text)
@@ -318,6 +280,36 @@ impl Gateway {
     fn inspect(&self, text: &str) -> Option<Redacted> {
         let redacted = catch_unwind(AssertUnwindSafe(|| (self.shield)(text))).ok()?;
         well_formed(text, &redacted).then_some(redacted)
+    }
+
+    /// Logs a Shield refusal as `what`, records the Blocked row, and yields the error to return.
+    async fn refuse(&self, what: &'static str) -> AskError {
+        tracing::warn!(
+            provider = self.provider,
+            reason = "shield_refused",
+            "{what}"
+        );
+        if let Err(error) = self.write_row(Outcome::Blocked, 0).await {
+            tracing::warn!(
+                provider = self.provider,
+                reason = error.as_str(),
+                "blocked audit row not recorded"
+            );
+        }
+        AskError::Shield
+    }
+
+    /// Records the Authorized row; nothing leaves unless it is written.
+    async fn authorize(&self, redacted_count: u32) -> Result<(), AskError> {
+        if let Err(error) = self.write_row(Outcome::Authorized, redacted_count).await {
+            tracing::warn!(
+                provider = self.provider,
+                reason = error.as_str(),
+                "context audit write failed"
+            );
+            return Err(AskError::Audit);
+        }
+        Ok(())
     }
 
     async fn write_row(&self, outcome: Outcome, redacted_count: u32) -> Result<(), AuditError> {
