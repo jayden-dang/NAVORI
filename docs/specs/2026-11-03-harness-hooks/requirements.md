@@ -1,7 +1,7 @@
 # Requirements: Harness hooks
 
 Feature code: HOOKS
-Status: In-progress
+Status: Implemented
 Date: 2026-11-03
 Approved by the operator ("approve", 2026-11-03, on the review page at c2da2f5, no card selected).
 
@@ -202,3 +202,13 @@ Files this change touches: `apps/cli/src/main.rs`, `apps/cli/tests/cli.rs`, `cra
 - Whether a signed build writing into `~/.claude`, `~/.codex` and `~/.grok` triggers a macOS permission prompt — owner: operator dogfood, Task 15 — 2026-11-03 — forbid-guess: do not claim Install works on a signed build until it has run on one.
 - Claude Code's `Stop` does not run on a user interrupt (code.claude.com/docs/en/hooks), and no other event fires then, so a Session Lease can last until the next turn's `Stop`, `SessionEnd`, the Harness process exiting or the 8 h TTL. The milestone outcome ("goes back to normal sleep after they stop") is not fully met on that path. This gap is unrun, not measured. API errors are closed by HOOKS-4.16. Codex is unchecked: it has an `Interrupt` event, and whether `Stop` runs on an interrupt is not stated — owner: operator — 2026-11-03 — forbid-guess: do not treat an interrupt as covered until a real session has been watched.
 - Codex skips a new or changed hook until the user reviews and trusts it in `/hooks` (docs, raw), and every Repair changes the hook's hash. So a Codex hook that Navori reports as Installed may not run yet. Grok lists its own global hooks and the Claude Code settings file it reads as trusted "After folder trust" (`~/.grok/docs/user-guide/10-hooks.md:68-69`, verified locally), which is a folder trust and not a per-hook review; it states no hash-based hook review. The Claude Code page read for the research note states no trust step, and the audit reports that Claude Code normally picks up direct edits to its hooks through a file watcher (stated by the audit, not seen in the pages read here). Both are documentation reads, unrun. What Settings and `navori doctor` should say about this is undecided — owner: operator — 2026-11-03 — forbid-guess: do not word a Codex row as working until the hook is trusted.
+
+## Known gaps
+
+Nobody recorded these; none is claimed as working. Marked Implemented on 2026-11-05 by operator decision with these left open.
+
+- macOS permission prompt for writes into `~/.claude`, `~/.codex` and `~/.grok` from a signed build — operator — 2026-11-05 — not recorded. Install, Repair and Remove ran on the signed release build for all three Harnesses (Journal and `navori doctor`), so no prompt blocked them; whether one was shown is not written down.
+- Standard error of a hook that exits 0 (HOOKS-2.2) — operator — 2026-11-05 — not recorded whether Claude Code or Codex shows it.
+- Grok's daemon route and a live Harness ancestor — operator — 2026-11-05 — not recorded directly. Grok session Leases started and ended in real runs (3/3), so a Lease does start on that route.
+- Codex payload keys and `Stop` `reason` — operator — 2026-11-05 — no Codex payload was recorded; only Claude Code's are. Codex Leases started and ended in real runs (8/8).
+- Esc in a real Claude Code session and the Codex `/hooks` trust step — operator — 2026-11-05 — checked by the operator; the outcomes are not written down here.

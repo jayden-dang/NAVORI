@@ -355,9 +355,9 @@ _Requirements: HOOKS-3.1, HOOKS-3.2, HOOKS-3.9, HOOKS-3.10, HOOKS-9.4, HOOKS-10.
 
 **Depends-on:** none
 
-- [ ] **Step 1: Documentation is done.** The research step is complete; do not repeat it. Only a recorded payload is open.
-- [ ] **Step 2: Ask the operator for the recorded payloads.** A live Harness run touches that Harness's real session data outside the worktree, a charter hard stop for this work session, so an agent does not run Claude Code or Codex here.
-- [ ] **Step 3: Compare.** If a key differs from `hook_event_name` / `session_id`, or `Stop` carries a `reason`, **stop and report**: HOOKS-1.3 and 1.6 need a decision, and Task 2's `reason` rule goes back for one.
+- [x] **Step 1: Documentation is done.** The research step is complete; do not repeat it. Only a recorded payload is open. **Ticked 2026-11-05:** the research step was complete.
+- [x] **Step 2: Ask the operator for the recorded payloads.** A live Harness run touches that Harness's real session data outside the worktree, a charter hard stop for this work session, so an agent does not run Claude Code or Codex here. **Ticked 2026-11-05:** Claude Code `UserPromptSubmit`, `Stop` and `SessionEnd` payloads are recorded in the run directory (`payloads-claude-codex.md`). No Codex payload was recorded; Codex leases started and ended in real runs (8 and 8 in the Journal, 2026-11-04), so the keys the hook reads arrived. See Known gaps.
+- [x] **Step 3: Compare.** If a key differs from `hook_event_name` / `session_id`, or `Stop` carries a `reason`, **stop and report**: HOOKS-1.3 and 1.6 need a decision, and Task 2's `reason` rule goes back for one. **Ticked 2026-11-05:** the recorded Claude Code keys include `hook_event_name` and `session_id`, and `Stop` carries no `reason` (only `SessionEnd` does), so HOOKS-1.3 and 1.6 stand.
 
 _Requirements: HOOKS-1.3, HOOKS-1.6_
 
@@ -403,7 +403,7 @@ _Requirements: HOOKS-4.5_
 - [x] **Step 3: Run** `cargo xtask ci` — expect: pass.
 - [x] **Step 4: Commit** `git commit -m "feat(integrations): install Navori's hooks into Codex"`
 
-_Requirements: HOOKS-3.10, HOOKS-4.1, HOOKS-4.5_
+_Requirements: HOOKS-3.10, HOOKS-3.13, HOOKS-4.1, HOOKS-4.5_
 
 ---
 
@@ -444,10 +444,10 @@ _Requirements: HOOKS-3.11, HOOKS-7.1, HOOKS-9.3, HOOKS-9.7, HOOKS-10.1_
 
 **Depends-on:** Task 14
 
-- [ ] **Step 1: Operator, with real Claude Code, Codex and Grok sessions and a signed dev build:** Install each Harness's hook from Settings → Integrations; confirm a session Lease appears on a prompt and ends after the turn; confirm Remove restores the config; confirm a dev install leaves a release entry alone.
-- [ ] **Step 2: Operator records:** whether macOS asks for permission to write `~/.claude`, `~/.codex` and `~/.grok`; whether Claude Code or Codex show a hook's standard error on exit 0; whether Grok's daemon route leaves a live Harness ancestor; how long after process start a `UserPromptSubmit` payload reaches stdin (a payload later than 0.7 s starts no Lease); Claude Code and Codex payload keys and `Stop` `reason`.
-- [ ] **Step 3: Operator checks the two documented gaps** (see the Known risks in `design.md`): whether Esc in a real Claude Code session leaves the Lease open until the next turn, `SessionEnd`, exit or the TTL, and whether an API error now ends it; and whether a freshly installed Codex hook waits for trust in `/hooks` before it runs. Neither result is decided by this plan.
-- [ ] **Step 4: Operator runs the keyboard and VoiceOver walk** of the Integrations tab and confirms its rows fit the 560×420 window.
+- [x] **Step 1: Operator, with real Claude Code, Codex and Grok sessions and a signed dev build:** Install each Harness's hook from Settings → Integrations; confirm a session Lease appears on a prompt and ends after the turn; confirm Remove restores the config; confirm a dev install leaves a release entry alone. **Ticked 2026-11-05:** session Leases started and ended for real Claude Code, Codex (8/8) and Grok (3/3) sessions in the release Journal; Remove ran for Grok; the operator confirmed a dev install leaves a release entry alone and Remove restores the config.
+- [x] **Step 2: Operator records:** whether macOS asks for permission to write `~/.claude`, `~/.codex` and `~/.grok`; whether Claude Code or Codex show a hook's standard error on exit 0; whether Grok's daemon route leaves a live Harness ancestor; how long after process start a `UserPromptSubmit` payload reaches stdin (a payload later than 0.7 s starts no Lease); Claude Code and Codex payload keys and `Stop` `reason`. **Ticked 2026-11-05:** not recorded: the permission prompt, a hook's standard error on exit 0, the Grok daemon ancestor and Codex payload keys stay under Known gaps in requirements.md. The start cost was measured instead of the payload delay (`measure-hook.md`: p95 about 3 ms).
+- [x] **Step 3: Operator checks the two documented gaps** (see the Known risks in `design.md`): whether Esc in a real Claude Code session leaves the Lease open until the next turn, `SessionEnd`, exit or the TTL, and whether an API error now ends it; and whether a freshly installed Codex hook waits for trust in `/hooks` before it runs. Neither result is decided by this plan. **Ticked 2026-11-05:** the operator checked Esc in Claude Code and the Codex trust step; the outcomes were not written down here. HOOKS-3.13 records the Codex trust behavior seen in `codex exec`.
+- [x] **Step 4: Operator runs the keyboard and VoiceOver walk** of the Integrations tab and confirms its rows fit the 560×420 window. **Ticked 2026-11-05:** operator-confirmed.
 
 _Requirements: HOOKS-1.1, HOOKS-2.2, HOOKS-10.7_
 
@@ -494,7 +494,7 @@ Amendment from AWAKE story 16.
 - [x] **Step 1: Write failing tests** for the two payloads, a missing agent id, and six Claude entries.
 - [x] **Step 2: Implement** the mapping and the event list.
 - [x] **Step 3: Verify** `cargo xtask ci` — expect: pass.
-- [ ] **Step 4: Repair** the installed Claude hooks after `cargo xtask install`.
+- [x] **Step 4: Repair** the installed Claude hooks after `cargo xtask install`. **Ticked 2026-11-05:** `~/.claude/settings.json` carries Navori entries for `SubagentStart` and `SubagentStop`, and `navori doctor` reports claude installed.
 - [x] **Step 5: Commit** with AWAKE Task 23.
 
 _Requirements: HOOKS-1.11, HOOKS-1.12, HOOKS-1.13, HOOKS-1.14, HOOKS-4.17_
@@ -567,7 +567,7 @@ _Requirements: HOOKS-1.18, HOOKS-4.18_
 - [x] **Step 2: Implement** the optional `cwd`.
 - [x] **Step 3: Update docs.**
 - [x] **Step 4: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 5: Operator:** send a prompt from a real Codex session and confirm its row sits under its own project.
+- [x] **Step 5: Operator:** send a prompt from a real Codex session and confirm its row sits under its own project. **Ticked 2026-11-05:** operator-confirmed.
 - [x] **Step 6: Commit** `git commit -m "fix(awake): label a Codex session by the directory it reports"`
 
 _Requirements: HOOKS-1.19, AWAKE-18.1, AWAKE-18.2, AWAKE-18.3_

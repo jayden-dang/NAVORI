@@ -54,7 +54,7 @@ Both come from `research-hooks-claude-codex.md`. Neither is built around, and ne
 
 ### `navori hook` command
 
-Satisfies: HOOKS-1.11, HOOKS-1.12, HOOKS-1.13, HOOKS-1.14, HOOKS-1.15, HOOKS-1.16, HOOKS-1.17, HOOKS-1.1, HOOKS-1.2, HOOKS-1.3, HOOKS-1.4, HOOKS-1.5, HOOKS-1.6, HOOKS-1.7, HOOKS-1.8, HOOKS-1.9, HOOKS-1.10, HOOKS-2.1, HOOKS-2.2, HOOKS-2.3, HOOKS-2.4, HOOKS-2.5, HOOKS-2.6, HOOKS-8.4, HOOKS-9.1, HOOKS-10.2, HOOKS-10.3
+Satisfies: HOOKS-1.11, HOOKS-1.12, HOOKS-1.13, HOOKS-1.14, HOOKS-1.15, HOOKS-1.16, HOOKS-1.17, HOOKS-1.1, HOOKS-1.2, HOOKS-1.3, HOOKS-1.4, HOOKS-1.5, HOOKS-1.6, HOOKS-1.7, HOOKS-1.8, HOOKS-1.9, HOOKS-1.10, HOOKS-2.1, HOOKS-2.2, HOOKS-2.3, HOOKS-2.4, HOOKS-2.5, HOOKS-2.6, HOOKS-8.4, HOOKS-9.1, HOOKS-10.2, HOOKS-10.3, HOOKS-1.18, HOOKS-1.19
 Reuse: rung 2 — `Client::connect`/`call`, `socket_path`, `Failure`, the clap `Command` enum (`apps/cli/src/main.rs:32, 140, 248`); rung 2 — the fail-open `ask_for_command_lease` pattern (`main.rs:294-318`); rung 3 — `std::os::unix::process::parent_id`, `std::process::id`, `std::thread`, `std::sync::mpsc::recv_timeout`. New code (rung 7) only for the event map.
 Respects: ARCH-1 (no logic beyond a map), ARCH-3, ARCH-11 (the existing user-private socket), ARCH-14 (`--profile` global flag picks the socket)
 Security: THR-6
@@ -66,7 +66,7 @@ Flow, with `start = Instant::now()` taken first and **before `Cli::parse`**:
 
 0. `main()` looks at the raw arguments first. It skips an optional `--profile <value>` or `--profile=<value>`, and if the next token is `hook` it takes the hook path and never calls clap — any other command, including `awake run -- echo hook`, goes to clap exactly as today (HOOKS-9.1): the profile is `dev` only when the arguments carry `--profile dev`, and is `release` in every other case. The `NAVORI_PROFILE` variable is **ignored** on this path, so a release hook cannot reach the dev Core from a shell that exports `dev`, and a bad value cannot make clap print and exit 2 (which would block a prompt). The runtime build, the panic hook and `catch_unwind` also sit inside this path, so no failure there returns exit 1. [agent-decided; HOOKS-2.1, 8.4]
 1. A std thread reads stdin, capped at 16 MiB (`take`), and sends the bytes on a channel; the main thread waits with `recv_timeout(0.7 s)`, the shortest deadline, because the event is not known until the bytes are parsed. A Harness that never closes stdin therefore cannot hold the hook. Past the cap the JSON is cut and fails to parse, so nothing is dispatched. [agent-decided]
-2. `plan` parses only `hook_event_name`, `session_id`, `reason` (serde ignores everything else, so prompt text is never kept or sent — HOOKS-1.8). Event map: `UserPromptSubmit` → `{"hold_session":{"session_id","pid":<own>,"ppid":<parent>}}`, both pids converted with `i32::try_from` and nothing dispatched if either fails; `Stop` with no `reason` or `reason == "end_turn"`, `StopCancelled`, `StopFailure`, `Interrupt` → `{"stop_session":{"session_id"}}`; `SessionEnd` → `{"end_session":{"session_id"}}`; anything else → `None`. Deadline: 0.7 s for `SessionEnd`, 1.5 s otherwise. [Lock for the table; deadlines and the `reason` rule agent-decided]
+2. `plan` parses only `hook_event_name`, `session_id`, `reason` and `cwd` (serde ignores everything else, so prompt text is never kept or sent — HOOKS-1.8). Event map: `UserPromptSubmit` → `{"hold_session":{"session_id","pid":<own>,"ppid":<parent>}}`, plus `"cwd"` when the payload carries one and on no other event (HOOKS-1.19; realigned 2026-11-05 to `apps/cli/src/hook.rs`), both pids converted with `i32::try_from` and nothing dispatched if either fails; `Stop` with no `reason` or `reason == "end_turn"`, `StopCancelled`, `StopFailure`, `Interrupt` → `{"stop_session":{"session_id"}}`; `SessionEnd` → `{"end_session":{"session_id"}}`; anything else → `None`. Deadline: 0.7 s for `SessionEnd`, 1.5 s otherwise. [Lock for the table; deadlines and the `reason` rule agent-decided]
 3. A current-thread tokio runtime (as `main()` builds today) runs `timeout(start + deadline − now, connect + call("core.dispatch", {"module":"awake","action":…}))`. Any error, including `IpcError::NotRunning` and an Invalid reply for a non-Harness pid, is dropped.
 4. The whole body is inside `catch_unwind`; a panic hook that prints nothing is installed first. `std::process::exit(0)` ends the process, so the stdin thread cannot delay exit.
 
@@ -86,7 +86,7 @@ The Module is stateless between calls: `initial_state` is empty, so nothing is r
 
 ### Hook-file model (domain)
 
-Satisfies: HOOKS-4.17, HOOKS-3.3, HOOKS-3.4, HOOKS-3.5, HOOKS-3.6, HOOKS-3.7, HOOKS-3.8, HOOKS-4.1, HOOKS-4.2, HOOKS-4.3, HOOKS-4.4, HOOKS-4.5, HOOKS-4.8, HOOKS-4.10, HOOKS-4.16, HOOKS-5.1, HOOKS-5.2, HOOKS-5.3, HOOKS-5.5, HOOKS-6.1, HOOKS-6.2, HOOKS-6.3, HOOKS-6.5, HOOKS-8.1, HOOKS-8.2, HOOKS-8.3, HOOKS-9.6
+Satisfies: HOOKS-4.17, HOOKS-3.3, HOOKS-3.4, HOOKS-3.5, HOOKS-3.6, HOOKS-3.7, HOOKS-3.8, HOOKS-4.1, HOOKS-4.2, HOOKS-4.3, HOOKS-4.4, HOOKS-4.5, HOOKS-4.8, HOOKS-4.10, HOOKS-4.16, HOOKS-5.1, HOOKS-5.2, HOOKS-5.3, HOOKS-5.5, HOOKS-6.1, HOOKS-6.2, HOOKS-6.3, HOOKS-6.5, HOOKS-8.1, HOOKS-8.2, HOOKS-8.3, HOOKS-9.6, HOOKS-4.18
 Reuse: rung 5 — `serde_json::Value` with the `preserve_order` feature (decision 7); rung 3 — std only for the shell-string parse. New code (rung 7).
 Respects: ARCH-14
 Security: THR-9, TB-7
@@ -140,7 +140,7 @@ The row is ok when no present Harness is `needs_repair` or `unreadable`; its det
 
 ### Settings → Integrations tab (Shell)
 
-Satisfies: HOOKS-3.1, HOOKS-3.2, HOOKS-3.9, HOOKS-3.10, HOOKS-9.4, HOOKS-10.7
+Satisfies: HOOKS-3.1, HOOKS-3.2, HOOKS-3.9, HOOKS-3.10, HOOKS-9.4, HOOKS-10.7, HOOKS-3.13
 Reuse: rung 2 — `SettingsTab` and the `TabView` in `SettingsView.swift:5-29`, `Form{Section}.formStyle(.grouped)` as in `GeneralTab`, `CoreStore.dispatch(module:actionJSON:)`, the `performAwake` call-and-log pattern in `CoreStore.swift`. New code (rung 7): the view model and the tab.
 Respects: ARCH-1, ARCH-2 (no `NavoriCore` import outside `CoreStore`)
 Surface:
@@ -153,7 +153,7 @@ Interface: `IntegrationsModel` (`@MainActor @Observable`): `rows: [IntegrationRo
 Depth: If `IntegrationsModel` vanished, the tab would need to know the JSON shape of the Module's reply and how to build the four Action strings; it keeps that to `refresh`, `perform` and one decoded row type. The tab itself extends `SettingsView`.
 Locality: extend — `apps/macos/Navori/Features/Settings/SettingsView.swift`, new `IntegrationsTab.swift` in the same folder; `CoreStore.swift` gains only the `helper_path` argument.
 
-State wording is Swift's mapping of the Module's `state` string; the *reason* sentences come from the Module (HOOKS-3.9), so a Harness that is not found is explained in Rust, not Swift. A dispatch failure shows the error text in the tab and logs it, as `performAwake` does for Awake. There is no browser-rendered surface here, so the template's `## UI design` section is deleted: the Settings window is native SwiftUI.
+State wording is Swift's mapping of the Module's `state` string; the *reason* sentences come from the Module (HOOKS-3.9), including the Codex trust sentence on an Installed or Needs repair row (HOOKS-3.13, `modules/integrations/src/state.rs`; realigned 2026-11-05), so a Harness that is not found is explained in Rust, not Swift. A dispatch failure shows the error text in the tab and logs it, as `performAwake` does for Awake. There is no browser-rendered surface here, so the template's `## UI design` section is deleted: the Settings window is native SwiftUI.
 
 ### Workspace and docs
 
@@ -185,7 +185,7 @@ Locality: extend — `Cargo.toml`, `modules/integrations/Cargo.toml`, `docs/`.
 
 ## Coverage check
 
-Every ID of HOOKS-1.1 to 10.7 appears in exactly one `Satisfies:` line above, except the two deliberately unmapped:
+Every ID of HOOKS-1.1 to 10.7 (and the later 1.18, 1.19, 3.13, 4.18, added to their sections on 2026-11-05) appears in exactly one `Satisfies:` line above, except the two deliberately unmapped:
 - HOOKS-9.3 and HOOKS-9.7 guard the Awake Actions, Lease model and timing constants. `modules/awake/` is not edited, so no section satisfies them; they are discharged by the existing Awake test suite staying green and by a diff check that `modules/awake/` is untouched.
 
 HOOKS-7.4 is satisfied by *no code*, as noted in Core wiring.
