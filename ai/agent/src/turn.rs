@@ -379,7 +379,12 @@ impl Agent {
                 });
                 let entry = run.message_entry(
                     Some(step),
-                    result_body(call, result.text, outcome.is_error),
+                    RecordedMessage::ToolResult {
+                        call_id: call.id.clone(),
+                        text: result.text,
+                        is_error: outcome.is_error,
+                        synthetic: false,
+                    },
                     result.count,
                 );
                 self.record(vec![entry]).await?;
@@ -492,15 +497,6 @@ fn turn_of(entry: &Entry) -> Option<TurnId> {
         | Entry::Usage { turn, .. }
         | Entry::StepEnded { turn, .. }
         | Entry::TurnEnded { turn, .. } => Some(*turn),
-    }
-}
-
-fn result_body(call: &ToolCall, text: String, is_error: bool) -> RecordedMessage {
-    RecordedMessage::ToolResult {
-        call_id: call.id.clone(),
-        text,
-        is_error,
-        synthetic: false,
     }
 }
 
