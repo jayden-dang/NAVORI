@@ -24,14 +24,16 @@ IDs are immutable once Status is Approved. Retire a requirement by striking it t
   - every 5 s, renew the duration Lease through `awake` `{"hold_for":{"seconds":10}}`. It replaces the current duration Lease (`modules/awake/src/actor.rs:294`);
   - every 60 s, call `awake release_all`;
   - every 20 s, open a TCP listener on `127.0.0.1` in a soak-owned child process and close it 45 s later. 45 s is longer than the Ports Module's 30 s scan cadence with the menu closed (`modules/ports/src/actor.rs:28`), and `ports list` answers from the last scan without rescanning (`modules/ports/src/action.rs:9-10`);
-  - every 2 minutes, have a second process hold a write transaction on the run's `navori.db` for 4 s.
+  - every 2 minutes, starting 1 s after a Lease tick, have a second process hold a write transaction on the run's `navori.db` for 4 s. Half a second into each hold, one extra `{"hold_for":{"seconds":10}}` renew is sent, so that a Core writer is queued behind the lock before the Core probe 1 s into the hold (SOAK-3.1). Envelopes are sent without waiting for their answer, so no dispatch delays a probe (agent-decided; Weigh W4, soak-interpret review r3: every Event is journaled, `crates/kernel/src/bus.rs` `publish`, while `status` reads no table, `crates/ffi/src/app.rs:46-62`).
 - **SOAK-1.4** THE SYSTEM SHALL send the app no Envelope other than `status`, `awake hold_for`, `awake hold_command`, `awake release_all` and `ports list` (agent-decided, D9: the smallest set that drives the three load kinds in the card).
 - **SOAK-1.5** WHILE the load runs THE SYSTEM SHALL sample, from outside the app process, its footprint (`phys_footprint`, MiB), thread count and open file-descriptor count every 10 s (agent-decided, D10).
 - **SOAK-1.6** WHEN the load ends THE SYSTEM SHALL print one line per signal in the form `soak <footprint|threads|fds> start <v> end <v> trend <±v>/h <ok|LEAK>`, where start and end are the medians of the first and last third of the post-settle samples and trend is their least-squares slope per hour (agent-decided, D12, D14).
 - **SOAK-1.7** WHEN no signal is LEAK and no hang was recorded THE SYSTEM SHALL print `soak verdict pass` and the elapsed time, and exit 0 (output wording agent-decided, D14).
 - **SOAK-1.8** WHEN the run ends, fails or is interrupted THE SYSTEM SHALL stop the app (SIGTERM, then SIGKILL after 5 s) and every child process the soak started (5 s agent-decided: the same grace perf gives, `xtask/src/perf/mod.rs:443-458`).
 - **SOAK-1.9** IF the app process exits before the load ends THEN THE SYSTEM SHALL print `soak app exited at +<mm:ss>`, print `soak verdict fail` and exit non-zero (agent-decided: a crash is the strongest stall and must not pass as "no hang"; output wording D14).
-- **SOAK-1.10** IF the soak cannot build, launch, sample or drive the load THEN THE SYSTEM SHALL print what failed and exit non-zero without printing a verdict.
+- **SOAK-1.10** IF the soak cannot build, launch or sample the app, or cannot drive the load (a helper process cannot be spawned, or the `navori` helper exits 2 for a usage error, or exits 3 while the app process is still alive) THEN THE SYSTEM SHALL print what failed and exit non-zero without printing a verdict (the definition of "cannot drive" is agent-decided, design Decision 7).
+- **SOAK-1.11** WHEN the load ends THE SYSTEM SHALL print `soak load errors <n> timeouts <n>`, counting Envelopes answered with an Action error (exit 1) and Envelopes not answered within 10 s. Neither count changes the verdict (agent-decided, design Decisions 6 and 7: an Action error under store contention is load behaving, and a stall is judged by the Core probe).
+- **SOAK-1.12** WHILE the soak runs THE SYSTEM SHALL hold a display and idle-sleep assertion bound to its own process (`/usr/bin/caffeinate -d -i -w <pid>`), so that the menu can draw the frame its `menuOpened` mark waits for (agent-decided, design review: `menuOpened` is logged from the panel's first presented frame, `apps/macos/Navori/StatusBar/StatusPanel.swift:128`).
 
 ## 2. A creeping signal fails the soak and is named
 
@@ -50,7 +52,7 @@ IDs are immutable once Status is Approved. Retire a requirement by striking it t
 - **SOAK-3.1** WHILE the load runs THE SYSTEM SHALL probe the Core every 30 s, and once 1 s into each store write hold (SOAK-1.3), by running `navori --profile dev status` against the run's socket (agent-decided, D11).
 - **SOAK-3.2** IF a Core probe has not answered within 2 s THEN THE SYSTEM SHALL end that probe and record a hang on side `core` (agent-decided, D11: four times Apple's 500 ms "proper hang" (WWDC23 session 10248) as margin for a busy machine, and below the store's 5 s `busy_timeout` (`crates/store/src/lib.rs:100`) so that a status waiting behind a store lock counts).
 - **SOAK-3.3** WHEN the last trend sample has been taken THE SYSTEM SHALL probe the menu once, by sending the app SIGUSR1 and waiting for its `menuOpened` log line (agent-decided, D11).
-- **SOAK-3.4** IF the `menuOpened` line has not arrived within 2 s of the SIGUSR1 THEN THE SYSTEM SHALL record a hang on side `menu` (agent-decided, D11).
+- **SOAK-3.4** IF the `menuOpened` line has not arrived within 2 s of the SIGUSR1 THEN THE SYSTEM SHALL record a hang on side `menu` (agent-decided, D11). A menu hang means "no `menuOpened` mark within 2 s". The cause can be a stuck main thread, or a session that is locked during the probe.
 - **SOAK-3.5** THE SYSTEM SHALL send the app no SIGUSR1, SIGUSR2 or SIGINFO before the last trend sample, so that the menu stays closed through the trend window (agent-decided, D11).
 - **SOAK-3.6** WHEN a hang is recorded THE SYSTEM SHALL print `soak hang <core|menu> at +<mm:ss> waited <ms> load <1-minute load average>` (output wording agent-decided, D14).
 - **SOAK-3.7** WHEN any hang was recorded THE SYSTEM SHALL print `soak verdict fail` and exit non-zero.
@@ -81,14 +83,14 @@ IDs are immutable once Status is Approved. Retire a requirement by striking it t
 - **SOAK-6.1** WHEN the operator runs `cargo xtask soak observe` THE SYSTEM SHALL print one line with the local time, pid, footprint (MiB), thread count and open file-descriptor count of the running `/Applications/Navori.app/Contents/MacOS/Navori` process (agent-decided, D13).
 - **SOAK-6.2** WHERE `--every <duration>` is given THE SYSTEM SHALL print one such line per interval until interrupted (agent-decided, D13).
 - **SOAK-6.3** IF no process from `/Applications/Navori.app` is running THEN THE SYSTEM SHALL print `Navori is not running` and exit non-zero (output wording agent-decided, D14).
-- **SOAK-6.4** WHILE observing THE SYSTEM SHALL send the observed process no signal, send it no Envelope and write no file (D13, D15).
+- **SOAK-6.4** WHILE observing THE SYSTEM SHALL send the observed process no signal, send it no Envelope and write no file. The probe helper is compiled into `build/soak/` before observing starts (D13, D15).
 
 ## 7. A soak leaves my own Navori alone
 
 **Story:** As the operator, I want a soak run to leave my real config, database, socket, logs, Harness hooks and Docker untouched, so that I can soak on the Mac I work on.
 
-- **SOAK-7.1** WHEN a soak starts THE SYSTEM SHALL create `/tmp/navori-soak-<uid>/` (its run home is the nested `/tmp/navori-soak-<uid>/navori-perf-<uid>/`, because `PerfHome::prepare` names that leaf, `xtask/src/perf/home.rs:37`) with mode 0700 owned by the current user, and refuse to start if that path is a symlink or belongs to another user (D5, Weigh mechanism).
-- **SOAK-7.2** WHEN a soak starts THE SYSTEM SHALL stop the app processes recorded by a previous soak under its own home before replacing that home, and never touch perf's `/tmp/navori-perf-<uid>/` (D5, Weigh mechanism).
+- **SOAK-7.1** WHEN a soak starts THE SYSTEM SHALL create `/tmp/navori-soak-<uid>/` (its run home is the nested `/tmp/navori-soak-<uid>/navori-perf-<uid>/`, because `PerfHome::prepare` names that leaf, `xtask/src/perf/home.rs:37`) with mode 0700 owned by the current user, and refuse to start if that path is a symlink, belongs to another user or has a mode other than 0700. An existing directory that passes these checks is reused (D5, Weigh mechanism).
+- **SOAK-7.2** WHEN a soak starts THE SYSTEM SHALL stop the app processes recorded by a previous soak under its own home before replacing that home, whether that soak ran from `build/soak/` or from the gate's `build/perf/` bundle, and never touch perf's `/tmp/navori-perf-<uid>/` (D5, Weigh mechanism).
 - **SOAK-7.3** IF the run's socket path would exceed 103 bytes THEN THE SYSTEM SHALL refuse to start, so that the Core never falls back to the shared `/tmp/navori-<uid>/dev.sock` (`crates/config/src/lib.rs:64-68`).
 - **SOAK-7.4** WHEN the soak prepares a run directory THE SYSTEM SHALL remove the Docker socket link from it before launching the app and print `docker=not linked` (agent-decided, D18).
 - **SOAK-7.5** THE SYSTEM SHALL run every `navori` CLI call with `--profile dev` and `HOME` set to the run directory.
