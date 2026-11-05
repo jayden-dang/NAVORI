@@ -28,11 +28,12 @@ IDs are immutable once Status is Approved. Retire a requirement by striking it t
 - **SOAK-1.4** THE SYSTEM SHALL send the app no Envelope other than `status`, `awake hold_for`, `awake hold_command`, `awake release_all` and `ports list` (agent-decided, D9: the smallest set that drives the three load kinds in the card).
 - **SOAK-1.5** WHILE the load runs THE SYSTEM SHALL sample, from outside the app process, its footprint (`phys_footprint`, MiB), thread count and open file-descriptor count every 10 s (agent-decided, D10).
 - **SOAK-1.6** WHEN the load ends THE SYSTEM SHALL print one line per signal in the form `soak <footprint|threads|fds> start <v> end <v> trend <±v>/h <ok|LEAK>`, where start and end are the medians of the first and last third of the post-settle samples and trend is their least-squares slope per hour (agent-decided, D12, D14).
-- **SOAK-1.7** WHEN no signal is LEAK and no hang was recorded THE SYSTEM SHALL print `soak verdict pass` and the elapsed time, and exit 0 (output wording agent-decided, D14).
+- **SOAK-1.7** WHEN no signal is LEAK and no hang was recorded THE SYSTEM SHALL print `soak verdict pass` and exit 0 (output wording agent-decided, D14).
 - **SOAK-1.8** WHEN the run ends, fails or is interrupted THE SYSTEM SHALL stop the app (SIGTERM, then SIGKILL after 5 s) and every child process the soak started (5 s agent-decided: the same grace perf gives, `xtask/src/perf/mod.rs:443-458`).
 - **SOAK-1.9** IF the app process exits before the load ends THEN THE SYSTEM SHALL print `soak app exited at +<mm:ss>`, print `soak verdict fail` and exit non-zero (agent-decided: a crash is the strongest stall and must not pass as "no hang"; output wording D14).
 - **SOAK-1.10** IF the soak cannot build, launch or sample the app, or cannot drive the load (a helper process cannot be spawned; the `navori` helper exits 2 for a usage error, or exits 3 while the app process is still alive; or the store-holding process does not confirm its lock within 3 s) THEN THE SYSTEM SHALL print what failed and exit non-zero without printing a verdict (the definition of "cannot drive" is agent-decided, design Decision 7).
 - **SOAK-1.11** WHEN the load ends THE SYSTEM SHALL print `soak load errors <n> timeouts <n>`, counting Envelopes answered with an Action error (exit 1) and Envelopes not answered within 10 s. Neither count changes the verdict (agent-decided, design Decisions 6 and 7: an Action error under store contention is load behaving, and a stall is judged by the Core probe).
+- **SOAK-1.13** WHEN a soak run prints a verdict, pass or fail, THE SYSTEM SHALL print `soak elapsed <mm:ss>` on the line before it (agent-decided, D14; soak-interpret tasks review r1: the gate is expected to fail while #21 is open, and SOAK-9.1 is verified by this time).
 - **SOAK-1.12** WHILE the soak runs THE SYSTEM SHALL hold a display and idle-sleep assertion bound to its own process (`/usr/bin/caffeinate -d -i -w <pid>`), so that the menu can draw the frame its `menuOpened` mark waits for (agent-decided, design review: `menuOpened` is logged from the panel's first presented frame, `apps/macos/Navori/StatusBar/StatusPanel.swift:128`).
 
 ## 2. A creeping signal fails the soak and is named
@@ -94,7 +95,7 @@ IDs are immutable once Status is Approved. Retire a requirement by striking it t
 - **SOAK-7.3** IF the run's socket path would exceed 103 bytes THEN THE SYSTEM SHALL refuse to start, so that the Core never falls back to the shared `/tmp/navori-<uid>/dev.sock` (`crates/config/src/lib.rs:64-68`).
 - **SOAK-7.4** WHEN the soak prepares a run directory THE SYSTEM SHALL remove the Docker socket link from it before launching the app and print `docker=not linked` (agent-decided, D18).
 - **SOAK-7.5** THE SYSTEM SHALL run every `navori` CLI call with `--profile dev` and `HOME` set to the run directory.
-- **SOAK-7.6** WHEN a soak run ends THE SYSTEM SHALL have created, changed or removed nothing in the real home's `Library/Application Support/Navori`, `Library/Application Support/Navori Dev`, `Library/Logs/Navori` and `Library/Logs/Navori Dev`, in `/tmp/navori-<uid>/`, or among the hook files `~/.claude/settings.json`, `~/.codex/hooks.json` and `~/.grok/hooks/navori.json` and their `*.navori-bak-*` backups (`modules/integrations/src/infra/files.rs:29-47`). Verified by comparing the paths and modification times there before and after a run.
+- **SOAK-7.6** WHEN a soak run ends THE SYSTEM SHALL have created, changed or removed nothing in the real home's `Library/Application Support/Navori`, `Library/Application Support/Navori Dev`, `Library/Logs/Navori` and `Library/Logs/Navori Dev`, in `/tmp/navori-<uid>/`, or among the hook files `~/.claude/settings.json`, `~/.codex/hooks.json` and `~/.grok/hooks/navori.json` and their `*.navori-bak-*` backups (`modules/integrations/src/infra/files.rs:29-47`). Verified during a run by `lsof` on the soak's app showing no open path in those places, by `find … -newer <start marker>` on the dev paths, and by comparing hashes of the hook files (the `navori` lines of `~/.claude/settings.json`) before and after. Modification times alone cannot prove it, because the installed Navori and other sessions write there.
 
 ## 8. The perf gate and the other commands stay as they are
 
@@ -105,7 +106,7 @@ IDs are immutable once Status is Approved. Retire a requirement by striking it t
 - **SOAK-8.3** (guard) WHEN any existing `cargo xtask` subcommand is invoked THE SYSTEM SHALL CONTINUE TO accept the same arguments and do the same work (`xtask/src/main.rs:140-163`).
 
 Files this change touches:
-- `xtask/src/perf/mod.rs`: guarded by SOAK-8.1 and SOAK-8.2. The only edit is `mod` → `pub(crate) mod` for `home`, `launch`, `logstream` and `probe` (Weigh, D4).
+- `xtask/src/perf/mod.rs`: guarded by SOAK-8.1 and SOAK-8.2. The only edit is `mod` → `pub(crate) mod` for `home`, `launch` and `logstream` (Weigh, D4; narrowed from four modules to three by the plan review, because soak does not use `perf::probe`).
 - `xtask/src/release.rs`: guarded by SOAK-4.3 and SOAK-4.4.
 - `xtask/src/main.rs`: guarded by SOAK-8.3.
 - `xtask/src/soak/` (new): no behavior to guard.
@@ -118,7 +119,7 @@ Files this change touches:
 
 **Story:** As a stakeholder, I want measurable quality targets for this feature, so that how-well is not left implicit.
 
-- **Performance:** **SOAK-9.1** WHEN `cargo xtask release-check` runs the short soak THE SYSTEM SHALL add no more than 23 minutes to it (agent-decided, D7: 1 minute settle + 20 minutes load + teardown; the operator's Ask-me bound is about 30 minutes). Verified by the elapsed time SOAK-1.7 prints. **SOAK-9.2** THE SYSTEM SHALL add no timer, polling loop, signal handler, Envelope, IPC method, FFI function or CLI command to the app, the Core or the `navori` CLI for the soak (card Must keep; ARCH-16). Verified by the diff touching only `xtask/` and docs, and by `cargo xtask perf` staying within its budgets.
+- **Performance:** **SOAK-9.1** WHEN `cargo xtask release-check` runs the short soak THE SYSTEM SHALL add no more than 23 minutes to it (agent-decided, D7: 1 minute settle + 20 minutes load + teardown; the operator's Ask-me bound is about 30 minutes). Verified by the elapsed time SOAK-1.13 prints. **SOAK-9.2** THE SYSTEM SHALL add no timer, polling loop, signal handler, Envelope, IPC method, FFI function or CLI command to the app, the Core or the `navori` CLI for the soak (card Must keep; ARCH-16). Verified by the diff touching only `xtask/` and docs, and by `cargo xtask perf` staying within its budgets.
 - **Security:** **SOAK-9.3** WHEN the soak creates its temporary home THE SYSTEM SHALL keep the run socket inside a 0700 tree owned by the current user, so that no other local user can drive the soak's Core (THR-4 at TB-2, `docs/security/threat-model.md`, Approved). Verified by a test on the directory's mode and owner, and by SOAK-7.1 and SOAK-7.3.
 - **Reliability:** **SOAK-9.4** WHEN `cargo xtask soak` runs 3 times in a row on the same revision with no code change, on a machine with no other build running, THE SYSTEM SHALL give the same verdict and the same set of LEAK signals and hang sides in all 3 runs. Verified manually once built (same shape as PERF-6.4). No standing reliability doc applies (`docs/ops/reliability.md` absent).
 - **Accessibility:** None. This is a developer command-line tool with no UI.
@@ -139,4 +140,4 @@ Files this change touches:
 
 ## Open Questions
 
-- Whether "the perf gate unchanged" covers source as well as behavior. This spec reads it as behavior, so the 4-word visibility diff in `xtask/src/perf/mod.rs:1-7` is the one candidate Ask-me item (Weigh W1–W3). If the operator reads it as source, D4 switches to copying the code. Owner: the operator. Date: 2026-11-05. Forbid-guess.
+- Whether "the perf gate unchanged" covers source as well as behavior. This spec reads it as behavior, so the 3-word visibility diff in `xtask/src/perf/mod.rs:1-7` is the one candidate Ask-me item (Weigh W1–W3). If the operator reads it as source, D4 switches to copying the code. Owner: the operator. Date: 2026-11-05. Forbid-guess.

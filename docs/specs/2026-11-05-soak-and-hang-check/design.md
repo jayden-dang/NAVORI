@@ -52,7 +52,7 @@ listens on nothing new; the load's TCP listeners are soak-owned processes on loo
 ## Decisions
 
 1. External soak in xtask, with nothing added to the app, the Core or the `navori` CLI (Lock: card Must keep and Decided).
-2. Reuse of perf code (Weigh W1–W3, agent-decided, D4). The only edit under `xtask/src/perf/` is `mod` → `pub(crate) mod` for `home`, `launch`, `logstream` and `probe` (`xtask/src/perf/mod.rs:1-7`). Every private helper in `perf/mod.rs` stays private, `judge` included, so soak keeps its own warm-up, bounded command runner and median.
+2. Reuse of perf code (Weigh W1–W3, agent-decided, D4). The only edit under `xtask/src/perf/` is `mod` → `pub(crate) mod` for `home`, `launch` and `logstream` (`xtask/src/perf/mod.rs:1-7`; `probe` stays private, since soak has its own helper). Every private helper in `perf/mod.rs` stays private, `judge` included, so soak keeps its own warm-up, bounded command runner and median.
 3. Own tree `/tmp/navori-soak-<uid>/navori-perf-<uid>/`. `PerfHome::prepare(base, uid)` names the leaf (`xtask/src/perf/home.rs:36-37`), the soak creates and guards the outer directory itself, and the Docker link that `fresh_run` makes is removed before launch (D5, D18).
 4. The load runs as an ordered plan of timed steps computed up front, a pure function of the tier, and is executed by one driver loop. The schedule is unit-testable without a clock, and the run stays deterministic (SOAK-9.4).
 5. The load's helper processes are:
@@ -73,7 +73,7 @@ listens on nothing new; the load's TCP listeners are soak-owned processes on loo
 9. The open-fd count comes from `proc_pidinfo(PROC_PIDLISTFDS)`: a size call, then a call into a buffer with slack, then the count is bytes / `sizeof(proc_fdinfo)`. Same-uid fds are readable without root: `lsof -p <Finder pid>` returned 385 lines on 2026-11-05. That is weak evidence for libproc on a hardened-runtime app, so the first task proves `SoakProbe::read` against the real `Navori Dev.app` before anything builds on it.
 10. Store holds are phased against the load (design review F2; Weigh W4, soak-interpret review r3). A hold is requested 1 s after a Lease tick, and opens once confirmed (Decision 12), and its commit closes it 4 s after that. Half a second into the hold a `RenewLease` is sent, so a Core writer is queued behind the lock (every Event is journaled, `crates/kernel/src/bus.rs` `publish`) when the Core probe arrives 1 s into the hold. That is the #21 situation. `status` itself reads no table (`crates/ffi/src/app.rs:46-62`), so without that queued writer the probe would pass falsely. Envelopes are spawned and not waited on: each dispatch is a child process tracked with a 10 s deadline and reaped by the loop, so no dispatch delays a probe. The loop blocks only on a probe (at most 2 s), a sample or a spawn. Steps run in order. A step that comes due while an earlier one is still running starts as soon as that one returns, and its actual start time is what the report records.
 11. Menu frames need a drawable display (design review F3). `menuOpened` is logged from the panel's first presented frame (`apps/macos/Navori/StatusBar/StatusPanel.swift:128`), and `show` returns early without a button window (`StatusPanel.swift:97`). The soak therefore holds `/usr/bin/caffeinate -d -i -w <xtask pid>` for the whole run (SOAK-1.12), and starts a fresh `LogStream` just before the menu probe, so a two-hour-old stream cannot void the verdict (F7). A menu hang means "no mark in 2 s" (SOAK-3.4).
-12. The store hold must be confirmed, not assumed (Weigh W5, soak-interpret design review r1). The `sqlite3` shell has no busy timeout of its own, so a `BEGIN IMMEDIATE` that meets a Core write fails at once and the shell carries on (seen on this Mac). The holder is therefore fed `.timeout 2000`, then `BEGIN IMMEDIATE;`, then `SELECT 'held';`. The hold opens when `held` is read on its stdout, within 3 s. The renew (+0.5 s), Core probe (+1 s) and commit (+4 s) are timed from that moment. A missing `held` is a SOAK-1.10 failure.
+12. The store hold must be confirmed, not assumed (Weigh W5, soak-interpret design review r1). The `sqlite3` shell has no busy timeout of its own, so a `BEGIN IMMEDIATE` that meets a Core write fails at once and the shell carries on (seen on this Mac). The holder is therefore fed `.bail on`, `.timeout 2000`, then `BEGIN IMMEDIATE;`, then `SELECT 'held';`. Without `.bail on`, a `BEGIN` that times out still lets `SELECT 'held'` print (plan review, reproduced 2026-11-05); with it, the shell exits 1 and prints no `held`. The hold opens when `held` is read on its stdout, within 3 s. The renew (+0.5 s), Core probe (+1 s) and commit (+4 s) are timed from that moment. A missing `held` is a SOAK-1.10 failure.
 13. No ADR. Every decision is reversible within xtask and follows the perf gate's precedent.
 
 ## Architecture
@@ -119,9 +119,9 @@ Load and sampling start after the settle. Phases, all agent-decided (Decision 10
 
 ### Judge and report
 
-Satisfies: SOAK-1.6, SOAK-1.7, SOAK-1.11, SOAK-2.1, SOAK-2.2, SOAK-2.3, SOAK-2.4, SOAK-2.5, SOAK-3.6, SOAK-3.7, SOAK-5.4, SOAK-9.4
+Satisfies: SOAK-1.6, SOAK-1.7, SOAK-1.11, SOAK-1.13, SOAK-2.1, SOAK-2.2, SOAK-2.3, SOAK-2.4, SOAK-2.5, SOAK-3.6, SOAK-3.7, SOAK-5.4, SOAK-9.4
 Reuse: rung 2 for the rule. It is the perf regression rule, "baseline median + max(10%, floor)", with the perf floors (`docs/standards/performance.md` Method, Floors), applied within one run. The arithmetic (median, least-squares slope) is rung 7: `perf::judge::median` (`xtask/src/perf/judge.rs:120`) stays private under Decision 2, and a median is three lines.
-Interface: `soak::judge::judge(run: &RunFacts) -> Report`, where `RunFacts { readings: Vec<Reading>, hangs: Vec<Hang>, exited_at: Option<Duration>, elapsed: Duration, load_errors: u32, load_timeouts: u32 }`. `Reading { at, footprint_bytes, threads, fds }`. `Hang { side: Core | Menu, at, waited, load_avg }`. `Report::lines(&self) -> Vec<String>` gives the exact output lines of SOAK-1.6, SOAK-1.7 (with the elapsed time), SOAK-1.9, SOAK-1.11, SOAK-2.5 and SOAK-3.6. `Report::passed(&self) -> bool`. `Report::exit_ok(&self, tier: &Tier) -> bool` is `passed()` for Short and always true for Long (SOAK-5.4).
+Interface: `soak::judge::judge(run: &RunFacts) -> Report`, where `RunFacts { settle: Duration, readings: Vec<Reading>, hangs: Vec<Hang>, exited_at: Option<Duration>, elapsed: Duration, load_errors: u32, load_timeouts: u32 }`. `Reading { at, footprint_bytes, threads, fds }`. `Hang { side: Core | Menu, at, waited, load_avg }`. `Report::lines(&self) -> Vec<String>` gives the exact output lines of SOAK-1.6, SOAK-1.7, SOAK-1.9, SOAK-1.11, SOAK-1.13 (elapsed before every verdict), SOAK-2.5 and SOAK-3.6. `Report::passed(&self) -> bool`. `Report::exit_ok(&self, tier: &Tier) -> bool` is `passed()` for Short and always true for Long (SOAK-5.4).
 Depth: callers still need only "the facts of one run in, lines and a pass bit out". Thirds, floors, slope and line wording are hidden.
 Locality: new `xtask/src/soak/judge.rs`. No neighbour edit (leave).
 
@@ -135,7 +135,7 @@ Satisfies: SOAK-7.1, SOAK-7.2, SOAK-7.3, SOAK-7.4, SOAK-7.6, SOAK-9.3
 Reuse: rung 2: `PerfHome { root }` (pub field), `PerfHome::prepare`, `fresh_run`, `record_pid`, `sweep_stale` and `check_socket_len` (`xtask/src/perf/home.rs:17-148`), reached through Decision 2's visibility change.
 Respects: ARCH-14
 Security: TB-2, THR-4
-Interface: `soak::home::SoakHome::prepare(exes: &[&Path]) -> Result<SoakHome>` and `prepare_in(base: &Path, uid: u32, exes: &[&Path])` for tests. `exes` are the app executables a previous soak may have left running: `build/soak/…/Navori` and `build/perf/…/Navori`. `SoakHome::template(&self) -> PathBuf`. `SoakHome::fresh_run(&self) -> Result<PathBuf>` returns a run directory with no Docker link, after the socket-length check. `SoakHome::record_pid(&self, pid)`.
+Interface: `soak::home::SoakHome::prepare(exes: &[&Path]) -> Result<SoakHome>` and `prepare_in(base: &Path, uid: u32, exes: &[&Path])` for tests. `exes` are the app executables a previous soak may have left running: `build/soak/…/Navori` and `build/perf/…/Navori`. `SoakHome::template(&self) -> PathBuf`. `SoakHome::fresh_run(&self) -> Result<PathBuf>` returns a run directory with no Docker link, after the socket-length check. `SoakHome::record_pid(&self, pid)`. `drop_docker_link(run) -> Result<bool>`, the testable removal step.
 Depth: it extends `perf::home::PerfHome` (rung 2) plus a small new guard for the outer directory (rung 7, because perf's `create_dir_mode` is private, `xtask/src/perf/home.rs:173`). If it vanished, callers would still need only "give me a fresh, private run directory with no Docker link".
 Locality: new `xtask/src/soak/home.rs` wraps the perf home. `xtask/src/perf/home.rs` is unchanged (leave).
 
@@ -155,9 +155,9 @@ manual before/after listing in Seams.
 ### Soak probe helper
 
 Satisfies: SOAK-1.5
-Reuse: rung 7, mirroring rung 2. `xtask/assets/soak-probe.swift` copies the structure of `perf-probe.swift` (argument check, `fail`, `cError`, one JSON line) and adds `PROC_PIDLISTFDS`. `perf-probe.swift` is unchanged (requirements Out of Scope), and `Probe::compile` hard-codes its file name (`xtask/src/perf/probe.rs:58-71`), so soak compiles its own helper the same way (`swiftc -O <asset> -o <out_dir>/soak-probe`).
+Reuse: rung 7, mirroring rung 2. `xtask/assets/soak-probe.swift` copies the structure of `perf-probe.swift` (argument check, `fail`, `cError`, one JSON line) and adds `PROC_PIDLISTFDS`. `perf-probe.swift` is unchanged (requirements Out of Scope), and `Probe::compile` hard-codes its file name (`xtask/src/perf/probe.rs:58-71`), so soak compiles its own helper the same way (bare `swiftc -O <asset> -o <out_dir>/soak-probe`, as perf runs it).
 Respects: ARCH-9
-Interface: `soak::probe::SoakProbe::compile(root, out_dir) -> Result<SoakProbe>`. `SoakProbe::read(&self, pid) -> Result<Reading>`. `parse_reading(line) -> Result<Reading>`. The helper prints `{"footprint":…,"threads":…,"fds":…}`.
+Interface: `soak::probe::SoakProbe::compile(root, out_dir) -> Result<SoakProbe>`. `SoakProbe::read(&self, pid, at) -> Result<Reading>`. The fd count is the second `PROC_PIDLISTFDS` call's returned bytes divided by `MemoryLayout<proc_fdinfo>.stride`; the size call over-estimates. `parse_reading(line) -> Result<Reading>`. The helper prints `{"footprint":…,"threads":…,"fds":…}`.
 Depth: callers still need only "pid in, three numbers out". The libproc calls, the buffer-size retry and the JSON stay hidden.
 Locality: new `xtask/assets/soak-probe.swift` and `xtask/src/soak/probe.rs` (leave perf's probe).
 
@@ -173,12 +173,12 @@ Interface:
 - `soak::run(root: &Path, tier: Tier) -> Result<bool>`, used by `cargo xtask soak`, builds into `build/soak/`.
 - `soak::gate(root: &Path, app: &Path) -> Result<bool>`, used by release-check, takes a built `.app`.
 
-Both print the report and return whether the exit should be 0. Internally, `Cli { helper, home }` exposes only `status(timeout) -> Answer` (awaited) and `dispatch(Envelope) -> Pending` (spawned, not awaited). `Pending::poll(now) -> Option<Answer>` returns the answer once the child exits, or `TimedOut` after it has been killed at its 10 s deadline. Here `Envelope` is a closed enum `{ CommandLease(pid), RenewLease, ReleaseAll }`, a subset of SOAK-1.4's allow-list. `ports list` is not sent: it answers from the last scan (`modules/ports/src/action.rs:9-10`) and adds no load (design review F11) and `Answer = Ok | Failed(code) | TimedOut`.
+Both print the report and return whether the exit should be 0. Internally, `Cli { helper, home }` exposes only `status(timeout) -> Answer` (awaited) and `dispatch(&Envelope, deadline) -> Pending` (spawned, not awaited; the driver passes 10 s). `Pending::poll(now) -> Result<Option<Answer>>` returns the answer once the child exits, or `TimedOut` after it has been killed at its 10 s deadline. Here `Envelope` is a closed enum `{ CommandLease(pid), RenewLease, ReleaseAll }`, a subset of SOAK-1.4's allow-list. `ports list` is not sent: it answers from the last scan (`modules/ports/src/action.rs:9-10`) and adds no load (design review F11) and `Answer = Ok | Failed(code) | TimedOut`.
 Depth: callers still need only "tier or app in, printed report and an exit bit out". Launch, warm-up, the loop, children, probes and teardown are hidden. `Cli` has its own deletion test: its callers know only an awaited `status` and a spawned `dispatch`, each ending in a three-way answer. The `env HOME=` invocation, the helper path, the bounded wait, the kill and the exit-code mapping stay inside it.
 Surface:
 - `xtask/src/perf/logstream.rs` `LogStream` is a second consumer of the same `log stream` predicate. Disposition: frozen, built around. Soak reads the marks and does not change the predicate or the `Mark` enum.
 - `apps/macos/Navori/Platform/PerfProbe.swift` SIGUSR1 handler and `menuOpened` line: frozen, built around. They are used as they are; no app edit.
-Locality: new `xtask/src/soak/mod.rs` (driver and `Cli`) and `xtask/src/soak/listen.rs` (listener child). No edit to perf (leave).
+Locality: new `xtask/src/soak/mod.rs` (driver), `xtask/src/soak/cli.rs` (`Cli`, `Pending`), `xtask/src/soak/hold.rs` (`StoreHold`, the confirmed `sqlite3` holder) and `xtask/src/soak/listen.rs` (listener child). No edit to perf (leave).
 
 The flow:
 1. Bundle, unless `gate` was given an app.
@@ -196,7 +196,7 @@ The flow:
    - `RenewLease`: dispatch `{"hold_for":{"seconds":10}}`.
    - `ReleaseAll`: dispatch `"release_all"`.
    - `OpenListener`: spawn `<current_exe> soak-listen --secs 45`.
-   - `HoldStore`: spawn `/usr/bin/sqlite3 <run>/Library/Application Support/Navori Dev/navori.db` and write `.timeout 2000`, `BEGIN IMMEDIATE;` and `SELECT 'held';`. The path follows `crates/config/src/lib.rs:58-62,74`. Wait up to 3 s for `held` on its stdout (otherwise SOAK-1.10). Then, from that moment, dispatch the renew at +0.5 s (spawned), run the Core probe at +1 s, and at +4 s write `COMMIT;`, close stdin and reap. If the soak dies mid-hold, stdin EOF ends `sqlite3` and the transaction rolls back.
+   - `HoldStore`: spawn `/usr/bin/sqlite3 <run>/Library/Application Support/Navori Dev/navori.db` and write `.bail on`, `.timeout 2000`, `BEGIN IMMEDIATE;` and `SELECT 'held';`. The path follows `crates/config/src/lib.rs:58-62,74`. Wait up to 3 s for `held` on its stdout (otherwise SOAK-1.10). Then, from that moment, dispatch the renew at +0.5 s (spawned), run the Core probe at +1 s, and at +4 s write `COMMIT;`, close stdin and reap. If the soak dies mid-hold, stdin EOF ends `sqlite3` and the transaction rolls back.
    - `ProbeCore`: `status(2 s)`; `TimedOut` records a `Hang { side: Core }` with the 1-minute load average from `sysctl -n vm.loadavg`.
    - `Sample`: `SoakProbe::read(pid)`.
    - `ProbeMenu`: start a fresh `LogStream`, then `signal("USR1")` (`Launched::signal` adds the dash itself, `xtask/src/perf/launch.rs:70-71`; perf passes bare names), then `wait_for(pid, MenuOpened, 2 s)`; `None` records a `Hang { side: Menu }`.
@@ -257,9 +257,9 @@ entry point from `release::check` (SOAK-5.5).
 
 Satisfies: SOAK-8.1, SOAK-8.2
 Reuse: rung 2, the existing perf modules.
-Surface: `xtask/src/perf/mod.rs:1-7`, the module declarations for `home`, `launch`, `logstream` and `probe`. They become readable by `crate::soak`. Disposition: replace. The edit is visibility only, with no body edit, so perf's own call sites, tests and output are unchanged (Weigh W1–W3).
+Surface: `xtask/src/perf/mod.rs:1-7`, the module declarations for `home`, `launch` and `logstream`. They become readable by `crate::soak`. Disposition: replace. The edit is visibility only, with no body edit, so perf's own call sites, tests and output are unchanged (Weigh W1–W3).
 Depth: n/a — extends `xtask/src/perf`.
-Locality: four words in `xtask/src/perf/mod.rs` (extend). Any body edit under `perf/` is out of this design and goes to the operator (Ask me).
+Locality: three words in `xtask/src/perf/mod.rs` (extend). Any body edit under `perf/` is out of this design and goes to the operator (Ask me).
 
 ### Documentation
 
@@ -276,12 +276,12 @@ xtask's soak logic is perf logic in the sense of `docs/standards/testing.md` (Ex
 | Seam | Kind | Covers |
 |---|---|---|
 | `soak::plan::plan(Tier)` | unit | SOAK-1.2, SOAK-1.3, SOAK-3.1, SOAK-3.5, SOAK-5.1, SOAK-5.3 |
-| `soak::judge::judge` → `Report::lines / passed / exit_ok` | unit (synthetic run facts) | SOAK-1.6, SOAK-1.7, SOAK-1.9 (lines), SOAK-1.11, SOAK-2.1, SOAK-2.2, SOAK-2.3, SOAK-2.5, SOAK-3.6, SOAK-3.7, SOAK-5.4 |
+| `soak::judge::judge` → `Report::lines / passed / exit_ok` | unit (synthetic run facts) | SOAK-1.6, SOAK-1.7, SOAK-1.13, SOAK-1.9 (lines), SOAK-1.11, SOAK-2.1, SOAK-2.2, SOAK-2.3, SOAK-2.5, SOAK-3.6, SOAK-3.7, SOAK-5.4 |
 | `SoakProbe::read` on a real fixture child that opens one fd per tick (`perl`, as `xtask/src/perf/mod.rs:832` uses a real child), then `judge`; plus one read of a running `Navori Dev.app` (Decision 9) | integration | SOAK-1.5, SOAK-2.4 |
 | `SoakHome::prepare_in` / `fresh_run` in a tempdir (`/tmp`) | unit | SOAK-7.1, SOAK-7.2, SOAK-7.3, SOAK-7.4, SOAK-9.3 |
 | bounded runner (`Cli::status` and `Pending::poll` against a real `sleep`, plus a fake helper script that exits 1, 2 or 3) and the store holder against a temp-dir db already locked by another `sqlite3` (no `held` within 3 s is a failure; `held` once the lock frees) | unit | SOAK-3.2, SOAK-1.10, SOAK-1.8 (kill on timeout) |
 | `find_installed_pid(ps text)` and `parse_duration` | unit | SOAK-6.1, SOAK-6.3, SOAK-5.2 |
-| `cargo xtask soak` on this Mac, with a before/after listing of the SOAK-7.6 paths and `pmset -g assertions` during the run | e2e (manual, printed elapsed time) | SOAK-1.1, SOAK-1.4, SOAK-1.8, SOAK-1.9, SOAK-1.12, SOAK-3.3, SOAK-3.4, SOAK-7.5, SOAK-7.6, SOAK-9.1, SOAK-9.2, SOAK-9.4 (3 runs) |
+| `cargo xtask soak` on this Mac, with `lsof` on the soak app, `find -newer` on the dev paths, hook-file hashes before and after, and `pmset -g assertions` during the run | e2e (manual, printed elapsed time) | SOAK-1.1, SOAK-1.4, SOAK-1.8, SOAK-1.9, SOAK-1.12, SOAK-3.3, SOAK-3.4, SOAK-7.5, SOAK-7.6, SOAK-9.1, SOAK-9.2, SOAK-9.4 (3 runs) |
 | `cargo xtask soak observe [--every 10s]` against the installed app | e2e (manual) | SOAK-6.2, SOAK-6.4 |
 | `cargo xtask release-check` on a clean tree, plus a `--help` listing | e2e (manual) | SOAK-4.1, SOAK-4.2, SOAK-4.3, SOAK-4.4, SOAK-5.5, SOAK-8.3 |
 | `cargo xtask perf` before and after, plus `cargo test -p xtask` | e2e and unit (existing) | SOAK-8.1, SOAK-8.2 |
@@ -291,7 +291,7 @@ New seams: the soak module's own public functions. No existing seam changes.
 ## Coverage check
 
 Every requirement ID in requirements.md appears in exactly one `Satisfies:` line:
-- SOAK-1.1 to 1.12;
+- SOAK-1.1 to 1.13;
 - SOAK-2.1 to 2.5;
 - SOAK-3.1 to 3.7;
 - SOAK-4.1 to 4.4;
