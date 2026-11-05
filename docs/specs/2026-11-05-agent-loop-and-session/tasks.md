@@ -141,7 +141,8 @@ _Requirements: LOOP-8.1_
   - `shielding_a_shielded_text_again_finds_nothing_new`: through `Gateway::shield`, the token and the `password=` assignment get `count` 1 and 1 on the first pass. A second pass over each output gives the same text with `count` 0. This asserts `count`, not the raw findings: `secret_assignment` re-finds its own marker.
   - `a_planted_secret_in_a_tool_result_arrives_redacted_and_counted_once`: the request carries `[REDACTED:github_token]`, the audit row says `kinds "text"`, `outcome authorized`, `redacted_count 1`.
   - `prior_redactions_add_to_the_row`: `prior_redactions: 2` on a clean request gives `redacted_count 2`.
-  - `a_planted_secret_in_a_tool_definition_is_redacted`.
+  - `a_planted_secret_in_a_tool_definition_is_redacted` (in its description).
+  - `a_planted_secret_in_a_parameters_key_blocks_the_call`: a `parameters` object with the key `concat!("ghp_", "abcdefghijklmnopqrstuvwxyz0123456789")` gives a `blocked` row and sends nothing.
   - `a_panicking_shield_on_any_text_writes_blocked_and_sends_nothing`, which uses `with_shield`.
   - `an_audit_failure_sends_nothing`.
   - `a_missing_key_is_no_key`.
@@ -149,7 +150,7 @@ _Requirements: LOOP-8.1_
   - `send_chat_without_a_chat_sender_is_a_send_error`.
 
   Run `cargo test -p navori-context` — expect: unresolved names.
-- [ ] **Step 2: Implement.** `shield` calls the existing private `inspect` (gateway.rs:173-176) and counts only findings whose original span does not start with `[REDACTED:`. In `ai/context/tests/gateway.rs`, `the_context_crate_calls_the_sender_in_one_place` (:725-737) is changed to assert every `.send(` site is in `gateway.rs` (two now: `ask` and `send_chat`). `send_chat` reads the key, then Shields every message text, reasoning, tool-call argument, tool text, `ToolDef` name and description, and every string value inside `parameters` (values only; keys are schema names). Then it writes the row (`prior_redactions` + its fresh count) and sends. `ai/context/Cargo.toml` gains `navori-llm.workspace = true`. Update dependencies.md:29 so `navori-context` gains `navori-llm`, types only. Run `cargo test -p navori-context` — expect: pass, with every other `ai/context/tests/gateway.rs` assertion unchanged.
+- [ ] **Step 2: Implement.** `shield` calls the existing private `inspect` (gateway.rs:173-176) and counts only findings whose original span does not start with `[REDACTED:`. In `ai/context/tests/gateway.rs`, `the_context_crate_calls_the_sender_in_one_place` (:725-737) is changed to assert every `.send(` site is in `gateway.rs` (two now: `ask` and `send_chat`). `send_chat` reads the key, then Shields every message text, reasoning, tool-call argument, tool text, `ToolDef` name and description, and every string inside `parameters`, keys and values (design.md:140). If the Shield would change a key, the call is `blocked` and nothing is sent: a redacted key would no longer be the schema. Then it writes the row (`prior_redactions` + its fresh count) and sends. `ai/context/Cargo.toml` gains `navori-llm.workspace = true`. Update dependencies.md:29 so `navori-context` gains `navori-llm`, types only. Run `cargo test -p navori-context` — expect: pass, with every other `ai/context/tests/gateway.rs` assertion unchanged.
 - [ ] **Step 3: Gate and commit:** `git commit -m "feat(context): shield and audit a structured chat request in the Gateway"`.
 
 _Requirements: LOOP-5.1, LOOP-5.2, LOOP-5.3, LOOP-5.4, LOOP-5.5, LOOP-5.6, LOOP-10.2, LOOP-11.4_
@@ -307,7 +308,7 @@ _Requirements: LOOP-4.1_
   - `an_unknown_conversation_is_refused_before_any_row`.
   - `a_second_turn_started_at_once_on_one_conversation_is_refused`: `TurnStartError::Record(Duplicate)`.
   - `a_reply_cut_at_the_output_limit_with_no_tool_call_completes_with_its_text`.
-  - `no_message_text_reaches_the_logs`, using a captured tracing subscriber.
+  - `no_message_text_reaches_the_logs`, using a tracing subscriber that captures at `info` with debug off.
 
   Run `cargo test -p navori-agent --test turn` — expect: unresolved names.
 - [ ] **Step 2: Implement** `turn.rs` per design.md "Turn driver" steps 1–4. Leave out the step limit, the token limit, cancel handling and appending the reminder, which Task 9 adds and tests: here `run_turn` takes the `CancellationToken` but does not watch it yet. Every `ConversationStore` call goes through `spawn_blocking`. The Event is emitted only after `TurnEnded` is recorded. Run — expect: pass.
@@ -370,7 +371,7 @@ _Requirements: LOOP-6.1, LOOP-6.2, LOOP-7.1, LOOP-7.2_
   - `a_turn_cut_short_by_shutdown_is_repaired_after_restart`: hold the FakeLlm, shut the core down, then read the Conversation id from `ai_session_conversation` through a second `Store` handle (`open_store(&home)`, as ask.rs:454 does). Restart on the same home and continue that Conversation. The old Turn reads `interrupted`, with each call answered.
   - `starting_the_core_builds_no_agent_and_runs_no_ai_session_migration`: `schema_version("ai_session") == 0`.
   - `status_answers_while_a_conversation_write_is_held`: `make_conversations` wraps the store with a `Gate`.
-  - `no_new_action_appears`: `core.actions()` lists exactly the current triples of module, action and Risk, read at the base commit and written into the test as literals (26 today).
+  - `no_new_action_appears`: `core.actions()` lists exactly the current triples of module, action and Risk, read at the base commit and written into the test as literals.
 
   Run `cargo test -p navori-ffi --test agent` — expect: unresolved names.
 - [ ] **Step 2: Implement.** `AiDeps::production()` builds one `Arc<OpenAiCompat>` that both `LlmSender` and `LlmChatSender` share. `StoreConversations` runs `ensure_table()` in `append` and `load`. `AiRuntime::new` takes `bus: EventBus` (cloned before `kernel` moves into `Inner`, lib.rs:318-330). `AiRuntime::agent()` uses `get_or_try_init` and maps a Keychain failure to `TurnStartError::Keychain`. `run_agent_turn` uses `on_runtime`, with `ShutDown` mapped to `TurnStartError::ShutDown`. Update the full `AiDeps` literals at crates/ffi/tests/ask.rs:78 (`Fixture::deps()`), :272, :739, :764, :1140 and apps/cli/tests/cli.rs:102 by adding `..AiDeps::production()`. That fills the new fields; production providers build nothing until a Turn runs. Also update `LlmSender::new` at ask.rs:713 and :834. `crates/ffi/Cargo.toml` gains `navori-agent`, plus `navori-llm` with `fake` as a dev-dependency. Run `cargo test -p navori-ffi && cargo test -p navori-cli` — expect: pass, with `ask.rs` assertions unchanged.
@@ -391,7 +392,7 @@ _Requirements: LOOP-3.8, LOOP-10.3, LOOP-10.4, LOOP-11.2, LOOP-11.3, LOOP-1.1, L
 - Produces: none.
 - Consumes: `navori_kernel::SystemAction`, `navori_mod_awake::AwakeAction`, `navori_mod_ports::PortsAction`, `navori_mod_integrations::IntegrationsAction` and their `ModuleAction::risk`; `NavoriCore::actions()`.
 
-**Depends-on:** none
+**Depends-on:** Task 10
 
 - [ ] **Step 1: Write** `every_action_s_catalog_risk_matches_its_own_risk`. For each `ActionView` of a started core, a `sample(module, name) -> serde_json::Value` match (panicking on an unknown pair) builds a JSON value, which is deserialized into the module's enum. The test then asserts `serde_json::to_value(action.risk())? == serde_json::Value::String(view.risk)` (`Risk` serializes snake_case; `risk_name` is private). The core is started with `start_with` and a minimal `AiDeps` built as ask.rs's `Fixture::deps()` is. Also assert the count of `ActionView`s equals the number of sample arms, so a new Action without a sample fails. Run `cargo test -p navori-ffi --test actions_risk` — expect: pass (it documents present agreement; a drift would fail).
 - [ ] **Step 2: Gate and commit:** `git commit -m "test(ffi): check every Action's catalog Risk against its own Risk"`.

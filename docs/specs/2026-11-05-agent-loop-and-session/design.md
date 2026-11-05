@@ -137,7 +137,7 @@ Locality: extend `ai/context/src/gateway.rs` (and lib.rs re-exports); `ai/contex
 - An audit failure returns `AskError::Audit`; nothing is sent (LOOP-5.5).
 - A send without a chat sender returns `AskError::Send("no chat sender")`.
 
-No message text reaches the row (LOOP-5.6). Tool definitions are Shielded too (ARCH-6 has no own-text exception): each `ToolDef`'s name, its description, and every string inside its `parameters` JSON go through `self.shield`. This is fail-closed like the messages, and their fresh findings, expected 0, are added to the row's count (review-design-r1 finding 1).
+No message text reaches the row (LOOP-5.6). Tool definitions are Shielded too (ARCH-6 has no own-text exception): each `ToolDef`'s name, its description, and every string inside its `parameters` JSON, keys and values, go through `self.shield`. A key the Shield would change blocks the call, and nothing is sent. This is fail-closed like the messages, and their fresh findings, expected 0, are added to the row's count (review-design-r1 finding 1).
 
 ### Tool registry (`ai/agent/src/tools.rs`)
 
