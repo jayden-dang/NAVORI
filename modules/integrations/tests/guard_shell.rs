@@ -105,9 +105,9 @@ fn recording_helper(args: &Path, stdin: &Path, pid: &Path) -> String {
 }
 
 fn assert_silent_success(output: &Output) {
-    assert_eq!(output.status.code(), Some(0));
-    assert!(output.stdout.is_empty());
-    assert!(output.stderr.is_empty());
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    assert!(output.stdout.is_empty(), "{output:?}");
+    assert!(output.stderr.is_empty(), "{output:?}");
 }
 
 #[tokio::test]
@@ -140,7 +140,7 @@ async fn a_present_helper_gets_the_same_arguments_and_stdin() {
 
     let (output, _) = installed.run(b"{\"session\":\"s1\"}\n\x00\xff");
 
-    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
     assert_eq!(std::fs::read_to_string(&args).unwrap(), "hook\n");
     assert_eq!(
         std::fs::read(&stdin).unwrap(),
@@ -155,7 +155,7 @@ async fn the_dev_command_passes_the_profile_and_the_same_stdin() {
 
     let (output, _) = installed.run(b"{\"session\":\"s1\"}\n");
 
-    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
     assert_eq!(
         std::fs::read_to_string(&args).unwrap(),
         "--profile\ndev\nhook\n"
@@ -186,6 +186,10 @@ async fn the_command_finishes_inside_the_shortest_hook_timeout() {
     let started = Instant::now();
     let (output, _) = installed.run(b"{}");
 
-    assert_eq!(output.status.code(), Some(0));
-    assert!(started.elapsed() < Duration::from_secs(1));
+    let elapsed = started.elapsed();
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    assert!(
+        elapsed < Duration::from_secs(1),
+        "the command took {elapsed:?}; {output:?}"
+    );
 }
