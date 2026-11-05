@@ -7,7 +7,7 @@ Run of Task 9, 2026-11-04 to 2026-11-05, against the test tap `jayden-dang/homeb
 | Check | Requirement | Result | Evidence |
 |---|---|---|---|
 | A push to a branch starts no release run | 1.2 | not isolated | The workflow's only trigger is `push: tags: ['v*']` (read, and parsed with PyYAML). Every run on GitHub so far belongs to a tag; no test pushed a branch alone to watch for the absence of a run, and `main` was pushed several times with no run of its own |
-| A tag pushed before `release.yml` is on `main` | — | observed, cause not isolated | `v0.1.0-rc.1` (workflow on the tag's commit, not yet on `main`) started no run in about ten minutes; `v0.1.0-rc.2`, pushed after `main` had the workflow, ran at once. The likely cause is that GitHub registers a workflow from the default branch, but that was not tested |
+| A tag pushed before `release.yml` is on `main` (caveat for 1.1: a tag starts the workflow only once it is on the default branch) | 1.1 | observed, cause not isolated | `v0.1.0-rc.1` (workflow on the tag's commit, not yet on `main`) started no run in about ten minutes; `v0.1.0-rc.2`, pushed after `main` had the workflow, ran at once. The likely cause is that GitHub registers a workflow from the default branch, but that was not tested |
 | Tag, CI gate, signing import, build, draft Release, upload run end to end | 1.1, 1.4, 1.5, 1.8, 1.9, 1.10 | pass | Run 41842439979 (rc.4) up to the upload; run 41954661262 (rc.8) to the end |
 | The signed app keeps the committed designated requirement | 1.7 | pass | rc.4 and rc.8 zips: `designated => identifier "dev.navori.app" and certificate leaf = H"8c56e155bdd4ed3c038035509193fb7d33d302c1"`, same for the helper; `CFBundleShortVersionString` equals the tag |
 | Zip matches its `.sha256` | 1.9 | pass | `shasum -a 256 -c` on the downloaded rc.4 and rc.8 assets |
@@ -43,3 +43,16 @@ Not exercised: a deliberately broken tap step (wrong token) followed by a rerun 
 - Create `jayden-dang/homebrew-navori` and a fine-grained token for it only; store it as `TAP_TOKEN`; set `TAP_REPOSITORY` to it and `PUBLISH_RELEASE` to `true`.
 - `cargo xtask release-check` must pass, performance gate included.
 - Delete the test tap, its token (`navori-release-tap-test`), the release-candidate Releases and the `v0.1.0-rc.*` tags.
+
+## Review findings accepted
+
+Found by the whole-branch review and accepted without a change:
+
+- `.p12` passphrase on argv: the runner is an ephemeral VM and the value is a masked secret, so exposure is limited to that process list.
+- The hook recognizer matches by path suffix: a second Navori install's hooks would be treated as Navori's; one user, one install, so it does not occur.
+- The guarded hook command keeps `exec`, so an unrunnable but present helper (for example a bad interpreter during a half-finished upgrade) can end the shell with a non-zero code past `|| true`; the harness shows a non-blocking hook error. Accepted, revisit if reported.
+- The `rowid` tie-break in `journal_recent` can change after `VACUUM`; only the order of same-millisecond events is affected, and no code relies on it.
+- The shared hook-command template is duplicated in `hookfile.rs` and `identity.rs`; tests cover both and a shared helper is not worth a new seam yet.
+- A `Channel` type instead of a bool for rc versus stable is deferred; there are two channels and one call site.
+- The terms "earlier form" and "legacy" versus "pre-release" and "rc" are used loosely in the docs; they name different things (old hook form versus release channel) and no reader has confused them.
+- `add-trusted-cert` is hosted-runner only: a self-hosted runner would keep a system trust root, so the docs forbid self-hosted runners for this workflow (ADR 0007, `docs/agents/project.md`).
