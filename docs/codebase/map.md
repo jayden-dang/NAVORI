@@ -26,8 +26,9 @@ Where things live in this repository and where new code belongs. Covers the top-
 | `xtask/` | Build, bundle, sign, install, CI, dependency rules (`cargo xtask <command>`). |
 | `crates/macos/` | `navori-macos` — platform FFI behind safe traits `ProcessSource`, `ExitSource` and `PowerAssertions`. The only hand-written `unsafe`. |
 | `crates/procs/` | `navori-procs` — process snapshot, project/worktree resolver, Harness table, child activity and exit watcher. No `unsafe`. |
-| `ai/llm/` | `navori-llm` — provider-neutral LLM client (one `openai_compat` adapter, DeepSeek endpoint). |
-| `ai/context/` | `navori-context` — Context Gateway: Shield pass, audit hand-off and the `Sender` trait. |
+| `ai/llm/` | `navori-llm` — provider-neutral LLM client (one `openai_compat` adapter, DeepSeek endpoint; canonical chat types with tool calls, reasoning and usage; `fake` feature). |
+| `ai/context/` | `navori-context` — Context Gateway: Shield pass, audit hand-off, and the `Sender` and `ChatSender` traits; takes the chat types from `navori-llm`. |
+| `ai/agent/` | `navori-agent` — Agent loop: Toolset, dispatch, repeat guard, Conversation record with crash repair, and the Turn driver. |
 | `modules/awake/` | `navori-mod-awake` — feature Module: Leases and the power assertion. |
 | `modules/integrations/` | `navori-mod-integrations` — feature Module: Navori's hooks in each Harness's config. |
 | `modules/ports/` | `navori-mod-ports` — feature Module: the TCP ports the user's own processes listen on. |

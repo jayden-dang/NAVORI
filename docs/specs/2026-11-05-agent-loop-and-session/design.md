@@ -222,7 +222,8 @@ One Turn, in order:
    - Shield and record the reply with its tool calls' raw arguments (LOOP-3.2), and record its usage, or that none was reported (LOOP-3.4, 3.5).
    - If there are no tool calls, end `completed` with the reply text as the answer (LOOP-1.3).
    - Otherwise, for each call in order, check `cancel.is_cancelled()`, then run a `biased` `select!` with the cancel arm first around `dispatcher.call`. Append the `RepeatGuard` reminder, then Shield and record the result paired by `call_id` (LOOP-3.3).
-   - Record the Step end. If the Turn's summed tokens are at or over `max_tokens`, end `token_limit` (LOOP-6.2).
+   - The token-limit check comes right after the reply and its usage are recorded, before any of its tool calls run: if the Turn's summed tokens are at or over `max_tokens` and the reply has tool calls, the Turn ends `token_limit` and those calls get the "not started" synthetic result at the end (LOOP-6.2). A reply with no tool calls still ends `completed`.
+   - Record the Step end.
 4. **End.** Every recorded call without a result first gets a synthetic error result (LOOP-7.2), using dsh's two texts (repair.ts:14-42): "outcome unknown" for the call that was in flight, and "not started" for calls the Turn never reached. Then the end reason is recorded with those results in one `append` (LOOP-3.7). Only after that write succeeds is `ai.turn_ended` emitted (Decision 13).
 
 - A record write that fails ends the Turn as `error(record)` and sends no further request (LOOP-3.9). The closers and the end are still attempted once. If they fail too, no Event is emitted, and the next open's repair closes the Turn and emits the one `interrupted` Event (LOOP-4.1). LOOP-7.2 then holds once that repair has run, not at the moment the Turn returns.
