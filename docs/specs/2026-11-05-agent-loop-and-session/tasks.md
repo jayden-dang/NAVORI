@@ -294,7 +294,7 @@ _Requirements: LOOP-4.1_
 
 **Depends-on:** Task 3, Task 5, Task 6, Task 7
 
-- [ ] **Step 1: Failing tests** in `ai/agent/tests/turn.rs`:
+- [x] **Step 1: Failing tests** in `ai/agent/tests/turn.rs`:
   - `a_turn_calls_a_read_action_and_answers_from_its_result`: the script is a `probe_look` tool call, then text `"3 things"`. Expect `end Completed`, answer `"3 things"`, `steps 2`, and the second request holding a `Message::Tool` with the probe's reply.
   - `the_record_holds_origin_input_reply_raw_arguments_result_and_usage`: origin `user`; arguments `"{}"` exactly as written; usage `input 120, output 30`; a call with no usage recorded as none reported.
   - `everything_recorded_is_shielded`: the token planted in the input, the reply, the reasoning, the arguments and the probe's result is stored as `[REDACTED:github_token]`, with each message's `redactions` 1.
@@ -312,8 +312,8 @@ _Requirements: LOOP-4.1_
   - `no_message_text_reaches_the_logs`, using a tracing subscriber that captures at `info` with debug off.
 
   Run `cargo test -p navori-agent --test turn` — expect: unresolved names.
-- [ ] **Step 2: Implement** `turn.rs` per design.md "Turn driver" steps 1–4. Leave out the step limit, the token limit, cancel handling and appending the reminder, which Task 9 adds and tests: here `run_turn` takes the `CancellationToken` but does not watch it yet. Every `ConversationStore` call goes through `spawn_blocking`. The Event is emitted only after `TurnEnded` is recorded. Run — expect: pass.
-- [ ] **Step 3: Gate and commit:** `git commit -m "feat(agent): run a Turn that records, continues and journals its end"`.
+- [x] **Step 2: Implement** `turn.rs` per design.md "Turn driver" steps 1–4. Leave out the step limit, the token limit, cancel handling and appending the reminder, which Task 9 adds and tests: here `run_turn` takes the `CancellationToken` but does not watch it yet. Every `ConversationStore` call goes through `spawn_blocking`. The Event is emitted only after `TurnEnded` is recorded. Run — expect: pass.
+- [x] **Step 3: Gate and commit:** `git commit -m "feat(agent): run a Turn that records, continues and journals its end"`.
 
 _Requirements: LOOP-1.3, LOOP-1.4, LOOP-3.1, LOOP-3.2, LOOP-3.3, LOOP-3.4, LOOP-3.5, LOOP-3.6, LOOP-3.7, LOOP-3.9, LOOP-3.10, LOOP-3.11, LOOP-11.5_
 
