@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use super::judge::Reading;
 
-const COMMAND_TIMEOUT: Duration = Duration::from_secs(10);
+pub(super) const TOOL_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug)]
 pub(crate) struct SoakProbe {
@@ -63,7 +63,7 @@ impl SoakProbe {
         let rendered = format!("{} {pid}", self.bin.display());
         let mut command = Command::new(&self.bin);
         command.arg(pid.to_string());
-        let out = command_output(&mut command, &rendered, COMMAND_TIMEOUT)?;
+        let out = command_output(&mut command, &rendered, TOOL_TIMEOUT)?;
         ensure!(
             out.status.success(),
             "{rendered} failed: {}",

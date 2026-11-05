@@ -1,7 +1,7 @@
 pub(crate) mod cli;
-mod drive;
 pub(crate) mod hold;
 pub(crate) mod home;
+mod host;
 pub(crate) mod judge;
 mod listen;
 pub(crate) mod observe;
@@ -17,13 +17,13 @@ use anyhow::{Context, Result, bail, ensure};
 
 use crate::perf::launch::Launched;
 use crate::perf::logstream::{LogStream, Mark};
-use cli::{Answer, Cli, Envelope, Pending};
-use drive::{Children, parse_loadavg, screen_locked, tally};
+use cli::{Answer, AwakeCommand, Cli, Pending};
 use hold::StoreHold;
 use home::SoakHome;
+use host::{Children, Outcome, classify, parse_loadavg, screen_locked};
 use judge::{Hang, Reading, RunFacts, Side, clock, judge};
-use plan::{Event, Tier, plan};
-use probe::{SoakProbe, command_output};
+use plan::{LoadStep, Tier, plan};
+use probe::{SoakProbe, TOOL_TIMEOUT, command_output};
 
 pub(crate) use listen::listen;
 
@@ -35,11 +35,12 @@ const DRAWN_TIMEOUT: Duration = Duration::from_secs(10);
 const WARMUP_EXIT: Duration = Duration::from_secs(15);
 const STOP_GRACE: Duration = Duration::from_secs(5);
 const SLICE: Duration = Duration::from_millis(250);
-const TOOL_TIMEOUT: Duration = Duration::from_secs(10);
+const SUBSCRIBE_SETTLE: Duration = Duration::from_millis(200);
+pub(super) const OUT_DIR: &str = "build/soak";
 
 pub(crate) fn run(root: &Path, tier: Tier) -> Result<bool> {
     let started = Instant::now();
-    let out = root.join("build/soak");
+    let out = root.join(OUT_DIR);
     let app = crate::bundle(root, crate::Profile::Dev, crate::Flavor::Release, &out)?;
     drive(root, &app, &tier, started)
 }
@@ -65,16 +66,16 @@ fn say(line: &str) {
     let _ = out.flush();
 }
 
-fn label(event: &Event) -> &'static str {
-    match event {
-        Event::CommandLease => "command lease",
-        Event::RenewLease => "renew lease",
-        Event::ReleaseAll => "release all",
-        Event::OpenListener { .. } => "open listener",
-        Event::HoldStore { .. } => "hold store",
-        Event::ProbeCore => "probe core",
-        Event::Sample => "sample",
-        Event::ProbeMenu => "probe menu",
+fn label(load: &LoadStep) -> &'static str {
+    match load {
+        LoadStep::CommandLease => "command lease",
+        LoadStep::RenewLease => "renew lease",
+        LoadStep::ReleaseAll => "release all",
+        LoadStep::OpenListener { .. } => "open listener",
+        LoadStep::HoldStore { .. } => "hold store",
+        LoadStep::ProbeCore => "probe core",
+        LoadStep::Sample => "sample",
+        LoadStep::ProbeMenu => "probe menu",
     }
 }
 
@@ -138,7 +139,7 @@ fn warm_up(home: &SoakHome, exe: &Path, log: &mut LogStream) -> Result<()> {
 }
 
 fn drive(root: &Path, app: &Path, tier: &Tier, started: Instant) -> Result<bool> {
-    let out = root.join("build/soak");
+    let out = root.join(OUT_DIR);
     let probe = SoakProbe::compile(root, &out)?;
     let mut children = Children::default();
     children.push(
@@ -163,6 +164,12 @@ fn drive(root: &Path, app: &Path, tier: &Tier, started: Instant) -> Result<bool>
     await_drawn(&mut log, pid)?;
     drop(log);
 
+    let db = run_dir.join("Library/Application Support/Navori Dev/navori.db");
+    ensure!(
+        db.exists(),
+        "the store {} does not exist; the app's data layout may have changed, so update the soak's store path",
+        db.display()
+    );
     let plan = plan(tier);
     let mut driver = Driver {
         cli: Cli::new(app, &run_dir),
@@ -170,7 +177,7 @@ fn drive(root: &Path, app: &Path, tier: &Tier, started: Instant) -> Result<bool>
         app: app_proc,
         pid,
         t0,
-        db: run_dir.join("Library/Application Support/Navori Dev/navori.db"),
+        db,
         children,
         pending: Vec::new(),
         errors: 0,
@@ -179,14 +186,11 @@ fn drive(root: &Path, app: &Path, tier: &Tier, started: Instant) -> Result<bool>
         hangs: Vec::new(),
         exited_at: None,
     };
-    for step in &plan.steps {
-        driver.wait_until(t0 + step.at)?;
-        if driver.exited_at.is_some() {
-            break;
-        }
-        progress(t0.elapsed(), label(&step.event));
-        driver.step(&step.event)?;
+    if let Err(err) = driver.run_steps(&plan) {
+        let _ = driver.stop();
+        return Err(err);
     }
+    driver.tick()?;
     driver.stop()?;
     let facts = RunFacts {
         settle: plan.settle,
@@ -226,8 +230,33 @@ struct Driver<'a> {
 }
 
 impl Driver<'_> {
+    fn run_steps(&mut self, plan: &plan::Plan) -> Result<()> {
+        for step in &plan.steps {
+            self.wait_until(self.t0 + step.at)?;
+            if self.exited_at.is_some() {
+                break;
+            }
+            progress(self.t0.elapsed(), label(&step.load));
+            self.step(&step.load)?;
+        }
+        Ok(())
+    }
+
+    fn count(&mut self, outcome: Outcome) {
+        match outcome {
+            Outcome::Fine => {}
+            Outcome::LoadError => self.errors += 1,
+            Outcome::LoadTimeout => self.timeouts += 1,
+        }
+    }
+
     fn tick(&mut self) -> Result<()> {
-        self.children.reap()?;
+        for status in self.children.reap()? {
+            progress(
+                self.t0.elapsed(),
+                &format!("load child exited with {status}"),
+            );
+        }
         if self.exited_at.is_none() && self.app.wait_exit(Duration::ZERO)? {
             let at = self.t0.elapsed();
             progress(at, "app exited");
@@ -238,7 +267,8 @@ impl Driver<'_> {
         while i < self.pending.len() {
             match self.pending[i].poll(Instant::now())? {
                 Some(answer) => {
-                    tally(answer, alive, &mut self.errors, &mut self.timeouts)?;
+                    let outcome = classify(answer, alive)?;
+                    self.count(outcome);
                     self.pending.swap_remove(i);
                 }
                 None => i += 1,
@@ -258,15 +288,15 @@ impl Driver<'_> {
         }
     }
 
-    fn dispatch(&mut self, envelope: &Envelope) -> Result<()> {
-        let pending = self.cli.dispatch(envelope, DISPATCH_DEADLINE)?;
+    fn dispatch(&mut self, command: &AwakeCommand) -> Result<()> {
+        let pending = self.cli.dispatch(command, DISPATCH_DEADLINE)?;
         self.pending.push(pending);
         Ok(())
     }
 
-    fn step(&mut self, event: &Event) -> Result<()> {
-        match event {
-            Event::CommandLease => {
+    fn step(&mut self, load: &LoadStep) -> Result<()> {
+        match load {
+            LoadStep::CommandLease => {
                 let child = Command::new("/bin/sleep")
                     .arg("3")
                     .stdin(Stdio::null())
@@ -274,11 +304,11 @@ impl Driver<'_> {
                     .context("spawn /bin/sleep for a command lease")?;
                 let child_pid = child.id();
                 self.children.push(child);
-                self.dispatch(&Envelope::CommandLease(child_pid))
+                self.dispatch(&AwakeCommand::CommandLease(child_pid))
             }
-            Event::RenewLease => self.dispatch(&Envelope::RenewLease),
-            Event::ReleaseAll => self.dispatch(&Envelope::ReleaseAll),
-            Event::OpenListener { hold } => {
+            LoadStep::RenewLease => self.dispatch(&AwakeCommand::RenewLease),
+            LoadStep::ReleaseAll => self.dispatch(&AwakeCommand::ReleaseAll),
+            LoadStep::OpenListener { hold } => {
                 let exe = std::env::current_exe().context("locate the xtask binary")?;
                 let child = Command::new(&exe)
                     .args(["soak-listen", "--secs", &hold.as_secs().to_string()])
@@ -288,7 +318,7 @@ impl Driver<'_> {
                 self.children.push(child);
                 Ok(())
             }
-            Event::HoldStore {
+            LoadStep::HoldStore {
                 renew_after,
                 probe_after,
                 commit_after,
@@ -296,15 +326,15 @@ impl Driver<'_> {
                 let hold = StoreHold::open(&self.db, HOLD_CONFIRM)?;
                 let held = Instant::now();
                 self.wait_until(held + *renew_after)?;
-                self.dispatch(&Envelope::RenewLease)?;
+                self.dispatch(&AwakeCommand::RenewLease)?;
                 self.wait_until(held + *probe_after)?;
                 self.probe_core()?;
                 self.wait_until(held + *commit_after)?;
                 hold.commit()
             }
-            Event::ProbeCore => self.probe_core(),
-            Event::Sample => self.sample(),
-            Event::ProbeMenu => self.probe_menu(),
+            LoadStep::ProbeCore => self.probe_core(),
+            LoadStep::Sample => self.sample(),
+            LoadStep::ProbeMenu => self.probe_menu(),
         }
     }
 
@@ -313,13 +343,15 @@ impl Driver<'_> {
         let started = Instant::now();
         let answer = self.cli.status(CORE_TIMEOUT)?;
         let alive = self.exited_at.is_none();
-        tally(answer, alive, &mut 0, &mut 0)?;
+        if classify(answer, alive)? == Outcome::LoadError {
+            self.errors += 1;
+        }
         if answer == Answer::TimedOut {
             self.hangs.push(Hang {
                 side: Side::Core,
                 at,
                 waited: started.elapsed(),
-                load_avg: load_average()?,
+                load_avg: load_average().ok(),
             });
         }
         Ok(())
@@ -349,6 +381,7 @@ impl Driver<'_> {
         }
         let at = self.t0.elapsed();
         let mut log = LogStream::start()?;
+        std::thread::sleep(SUBSCRIBE_SETTLE);
         let started = Instant::now();
         self.app.signal("USR1")?;
         let mark = log.wait_for(
@@ -361,7 +394,7 @@ impl Driver<'_> {
                 side: Side::Menu,
                 at,
                 waited: started.elapsed(),
-                load_avg: load_average()?,
+                load_avg: load_average().ok(),
             });
         }
         Ok(())

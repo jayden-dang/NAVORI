@@ -4,14 +4,12 @@ use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result, ensure};
 
-use super::judge::Reading;
-use super::probe::{SoakProbe, command_output};
+use super::judge::{MIB, Reading};
+use super::probe::{SoakProbe, TOOL_TIMEOUT, command_output};
 
 const INSTALLED_EXECUTABLE: &str = "/Applications/Navori.app/Contents/MacOS/Navori";
-const TOOL_TIMEOUT: Duration = Duration::from_secs(10);
-const MIB: f64 = 1024.0 * 1024.0;
 
 pub(crate) fn find_installed_pid(ps_output: &str) -> Option<u32> {
     ps_output.lines().find_map(|line| {
@@ -22,11 +20,23 @@ pub(crate) fn find_installed_pid(ps_output: &str) -> Option<u32> {
     })
 }
 
-fn require_pid(ps_output: &str) -> Result<u32> {
-    match find_installed_pid(ps_output) {
-        Some(pid) => Ok(pid),
-        None => bail!("Navori is not running"),
+#[derive(Debug)]
+struct NotRunning;
+
+impl std::fmt::Display for NotRunning {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Navori is not running")
     }
+}
+
+impl std::error::Error for NotRunning {}
+
+fn is_not_running(err: &anyhow::Error) -> bool {
+    err.downcast_ref::<NotRunning>().is_some()
+}
+
+fn require_pid(ps_output: &str) -> Result<u32> {
+    find_installed_pid(ps_output).ok_or_else(|| NotRunning.into())
 }
 
 fn format_line(clock: &str, pid: u32, reading: &Reading) -> String {
@@ -65,15 +75,19 @@ fn observe_once(probe: &SoakProbe) -> Result<()> {
 }
 
 pub(crate) fn observe(root: &Path, every: Option<Duration>) -> Result<()> {
-    let probe = SoakProbe::compile(root, &root.join("build/soak"))?;
-    observe_once(&probe)?;
-    if let Some(interval) = every {
-        loop {
-            thread::sleep(interval);
-            observe_once(&probe)?;
+    let probe = SoakProbe::compile(root, &root.join(super::OUT_DIR))?;
+    let Some(interval) = every else {
+        return observe_once(&probe);
+    };
+    loop {
+        if let Err(err) = observe_once(&probe) {
+            if !is_not_running(&err) {
+                return Err(err);
+            }
+            println!("{err}");
         }
+        thread::sleep(interval);
     }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -102,6 +116,7 @@ mod tests {
     fn a_missing_process_reports_that_navori_is_not_running() {
         let err = require_pid("  1 /sbin/launchd\n").unwrap_err();
         assert_eq!(err.to_string(), "Navori is not running");
+        assert!(is_not_running(&err));
     }
 
     #[test]

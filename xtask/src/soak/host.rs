@@ -1,4 +1,4 @@
-use std::process::Child;
+use std::process::{Child, ExitStatus};
 
 use anyhow::{Context, Result, bail};
 
@@ -14,15 +14,29 @@ impl Children {
         self.list.push(child);
     }
 
-    pub(crate) fn reap(&mut self) -> Result<()> {
+    pub(crate) fn reap(&mut self) -> Result<Vec<ExitStatus>> {
+        let mut failed = Vec::new();
+        let mut first_error = None;
         let mut still = Vec::new();
         for mut child in self.list.drain(..) {
-            if child.try_wait().context("poll a load child")?.is_none() {
-                still.push(child);
+            match child.try_wait() {
+                Ok(None) => still.push(child),
+                Ok(Some(status)) => {
+                    if !status.success() {
+                        failed.push(status);
+                    }
+                }
+                Err(err) => {
+                    first_error.get_or_insert(err);
+                    still.push(child);
+                }
             }
         }
         self.list = still;
-        Ok(())
+        match first_error {
+            Some(err) => Err(err).context("poll a load child"),
+            None => Ok(failed),
+        }
     }
 
     #[cfg(test)]
@@ -54,25 +68,26 @@ pub(crate) fn parse_loadavg(text: &str) -> Option<f64> {
         .ok()
 }
 
-pub(crate) fn tally(
-    answer: Answer,
-    app_alive: bool,
-    errors: &mut u32,
-    timeouts: &mut u32,
-) -> Result<()> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Outcome {
+    Fine,
+    LoadError,
+    LoadTimeout,
+}
+
+pub(crate) fn classify(answer: Answer, app_alive: bool) -> Result<Outcome> {
     match answer {
-        Answer::Ok => {}
-        Answer::TimedOut => *timeouts += 1,
-        Answer::Failed(2) => bail!(
+        Answer::Ok => Ok(Outcome::Fine),
+        Answer::TimedOut => Ok(Outcome::LoadTimeout),
+        Answer::Usage => bail!(
             "the navori helper exited 2 (usage error); the soak sent it a bad command, so fix the soak"
         ),
-        Answer::Failed(3) if app_alive => bail!(
+        Answer::AppDown if app_alive => bail!(
             "the navori helper says the app is not running while its process is alive; check the run's socket and logs"
         ),
-        Answer::Failed(3) => {}
-        Answer::Failed(_) => *errors += 1,
+        Answer::AppDown => Ok(Outcome::Fine),
+        Answer::Failed(_) => Ok(Outcome::LoadError),
     }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -114,6 +129,23 @@ mod tests {
     }
 
     #[test]
+    fn reaping_reports_a_child_that_exited_non_zero() {
+        let mut children = Children::default();
+        children.push(
+            Command::new("/usr/bin/false")
+                .stdin(Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
+        children.push(sleeper("0"));
+        std::thread::sleep(Duration::from_millis(300));
+        let failed = children.reap().unwrap();
+        assert_eq!(failed.len(), 1);
+        assert_eq!(failed[0].code(), Some(1));
+        assert_eq!(children.len(), 0);
+    }
+
+    #[test]
     fn dropping_the_guard_kills_every_child() {
         let mut children = Children::default();
         let child = sleeper("30");
@@ -141,16 +173,20 @@ mod tests {
     }
 
     #[test]
-    fn answers_are_tallied_and_tool_failures_stop_the_run() {
-        let (mut errors, mut timeouts) = (0, 0);
-        tally(Answer::Ok, true, &mut errors, &mut timeouts).unwrap();
-        tally(Answer::Failed(1), true, &mut errors, &mut timeouts).unwrap();
-        tally(Answer::TimedOut, true, &mut errors, &mut timeouts).unwrap();
-        tally(Answer::Failed(3), false, &mut errors, &mut timeouts).unwrap();
-        assert_eq!((errors, timeouts), (1, 1));
-        let usage = tally(Answer::Failed(2), true, &mut errors, &mut timeouts).unwrap_err();
+    fn answers_are_classified_and_tool_failures_stop_the_run() {
+        assert_eq!(classify(Answer::Ok, true).unwrap(), Outcome::Fine);
+        assert_eq!(
+            classify(Answer::Failed(1), true).unwrap(),
+            Outcome::LoadError
+        );
+        assert_eq!(
+            classify(Answer::TimedOut, true).unwrap(),
+            Outcome::LoadTimeout
+        );
+        assert_eq!(classify(Answer::AppDown, false).unwrap(), Outcome::Fine);
+        let usage = classify(Answer::Usage, true).unwrap_err();
         assert!(format!("{usage:#}").contains("usage"), "{usage:#}");
-        let gone = tally(Answer::Failed(3), true, &mut errors, &mut timeouts).unwrap_err();
+        let gone = classify(Answer::AppDown, true).unwrap_err();
         assert!(format!("{gone:#}").contains("not running"), "{gone:#}");
     }
 }

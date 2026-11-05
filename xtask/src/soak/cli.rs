@@ -13,13 +13,13 @@ pub(crate) struct Cli {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Envelope {
+pub(crate) enum AwakeCommand {
     CommandLease(u32),
     RenewLease,
     ReleaseAll,
 }
 
-impl Envelope {
+impl AwakeCommand {
     fn json(&self) -> String {
         match self {
             Self::CommandLease(pid) => format!(r#"{{"hold_command":{{"pid":{pid}}}}}"#),
@@ -32,6 +32,8 @@ impl Envelope {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Answer {
     Ok,
+    Usage,
+    AppDown,
     Failed(i32),
     TimedOut,
 }
@@ -85,8 +87,8 @@ impl Cli {
         }
     }
 
-    pub(crate) fn dispatch(&self, envelope: &Envelope, deadline: Duration) -> Result<Pending> {
-        let child = self.spawn(self.command().args(["dispatch", "awake", &envelope.json()]))?;
+    pub(crate) fn dispatch(&self, command: &AwakeCommand, deadline: Duration) -> Result<Pending> {
+        let child = self.spawn(self.command().args(["dispatch", "awake", &command.json()]))?;
         Ok(Pending {
             child,
             deadline: Instant::now() + deadline,
@@ -99,6 +101,8 @@ impl Pending {
         if let Some(status) = self.child.try_wait().context("poll the navori helper")? {
             return Ok(Some(match status.code() {
                 Some(0) => Answer::Ok,
+                Some(2) => Answer::Usage,
+                Some(3) => Answer::AppDown,
                 Some(code) => Answer::Failed(code),
                 None => Answer::Failed(-1),
             }));
@@ -217,7 +221,7 @@ mod tests {
         let start = Instant::now();
         let mut pending = fx
             .cli()
-            .dispatch(&Envelope::ReleaseAll, Duration::from_secs(10))
+            .dispatch(&AwakeCommand::ReleaseAll, Duration::from_secs(10))
             .unwrap();
         assert!(start.elapsed() < Duration::from_millis(500));
         assert_eq!(poll_until_answered(&mut pending), Answer::Ok);
@@ -228,7 +232,7 @@ mod tests {
         let fx = Fixture::new("sleep");
         let mut pending = fx
             .cli()
-            .dispatch(&Envelope::RenewLease, Duration::from_millis(300))
+            .dispatch(&AwakeCommand::RenewLease, Duration::from_millis(300))
             .unwrap();
         std::thread::sleep(Duration::from_millis(500));
         let answer = pending.poll(Instant::now()).unwrap();
@@ -241,7 +245,7 @@ mod tests {
         let fx = Fixture::new("sleep");
         let pending = fx
             .cli()
-            .dispatch(&Envelope::CommandLease(7), Duration::from_secs(10))
+            .dispatch(&AwakeCommand::CommandLease(7), Duration::from_secs(10))
             .unwrap();
         std::thread::sleep(Duration::from_millis(300));
         let pid = fx.child_pid();
@@ -251,31 +255,32 @@ mod tests {
     }
 
     #[test]
-    fn exit_codes_one_two_and_three_are_reported_as_failed_with_the_code() {
-        for (mode, code) in [("one", 1), ("two", 2), ("three", 3)] {
+    fn exit_codes_one_two_and_three_are_reported_by_meaning() {
+        for (mode, answer) in [
+            ("one", Answer::Failed(1)),
+            ("two", Answer::Usage),
+            ("three", Answer::AppDown),
+        ] {
             let fx = Fixture::new(mode);
-            assert_eq!(
-                fx.cli().status(Duration::from_secs(2)).unwrap(),
-                Answer::Failed(code)
-            );
+            assert_eq!(fx.cli().status(Duration::from_secs(2)).unwrap(), answer);
             let mut pending = fx
                 .cli()
-                .dispatch(&Envelope::ReleaseAll, Duration::from_secs(10))
+                .dispatch(&AwakeCommand::ReleaseAll, Duration::from_secs(10))
                 .unwrap();
-            assert_eq!(poll_until_answered(&mut pending), Answer::Failed(code));
+            assert_eq!(poll_until_answered(&mut pending), answer);
         }
     }
 
     #[test]
-    fn envelopes_serialize_to_the_awake_wire_format() {
+    fn awake_commands_serialize_to_the_awake_wire_format() {
         assert_eq!(
-            Envelope::CommandLease(42).json(),
+            AwakeCommand::CommandLease(42).json(),
             r#"{"hold_command":{"pid":42}}"#
         );
         assert_eq!(
-            Envelope::RenewLease.json(),
+            AwakeCommand::RenewLease.json(),
             r#"{"hold_for":{"seconds":10}}"#
         );
-        assert_eq!(Envelope::ReleaseAll.json(), r#""release_all""#);
+        assert_eq!(AwakeCommand::ReleaseAll.json(), r#""release_all""#);
     }
 }

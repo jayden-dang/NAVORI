@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use super::plan::Tier;
 
-const MIB: f64 = 1024.0 * 1024.0;
+pub(super) const MIB: f64 = 1024.0 * 1024.0;
 const MIN_READINGS: usize = 9;
 const FOOTPRINT_FLOOR_MIB: f64 = 1.0;
 const THREADS_FLOOR: f64 = 2.0;
@@ -28,7 +28,7 @@ pub(crate) struct Hang {
     pub side: Side,
     pub at: Duration,
     pub waited: Duration,
-    pub load_avg: f64,
+    pub load_avg: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -189,11 +189,13 @@ pub(crate) fn judge(run: &RunFacts) -> Report {
             Side::Core => "core",
             Side::Menu => "menu",
         };
+        let load = hang
+            .load_avg
+            .map_or_else(|| "unavailable".to_string(), |v| format!("{v:.2}"));
         lines.push(format!(
-            "soak hang {side} at +{} waited {} load {:.2}",
+            "soak hang {side} at +{} waited {} load {load}",
             clock(hang.at),
             hang.waited.as_millis(),
-            hang.load_avg
         ));
         passed = false;
     }
@@ -365,7 +367,7 @@ mod tests {
             side: Side::Core,
             at: secs(754),
             waited: Duration::from_millis(2000),
-            load_avg: 3.2,
+            load_avg: Some(3.2),
         });
         let l = lines(&r);
         let i = l
@@ -382,7 +384,7 @@ mod tests {
             side: Side::Menu,
             at: secs(61),
             waited: Duration::from_millis(2500),
-            load_avg: 0.5,
+            load_avg: Some(0.5),
         });
         assert!(has(
             &lines(&r),
@@ -427,12 +429,76 @@ mod tests {
             side: Side::Core,
             at: secs(754),
             waited: secs(2),
-            load_avg: 3.2,
+            load_avg: Some(3.2),
         });
         let l = lines(&r);
         let n = l.len();
         assert_eq!(l[n - 2], "soak elapsed 21:05");
         assert_eq!(l[n - 1], "soak verdict fail");
+    }
+
+    #[test]
+    fn readings_taken_before_the_settle_point_do_not_count() {
+        let mut early: Vec<Reading> = (0..6)
+            .map(|i| Reading {
+                at: secs(10 * i),
+                footprint_bytes: 30 * MIB,
+                threads: 9,
+                fds: 10,
+            })
+            .collect();
+        early.extend(readings(&[(30.0, 9, 40); 12]));
+        let r = run(early);
+        let l = lines(&r);
+        assert!(has(&l, "soak fds start 40 end 40 trend +0/h ok"), "{l:?}");
+        assert!(judge(&r).passed());
+    }
+
+    #[test]
+    fn a_rise_of_exactly_the_fd_floor_is_ok_and_one_more_is_a_leak() {
+        let at_floor: Vec<u32> = [10, 10, 10, 10, 10, 10, 10, 10, 14, 14, 14, 14].to_vec();
+        let l = lines(&fds(&at_floor));
+        assert!(has(&l, "soak fds start 10 end 14 trend +161/h ok"), "{l:?}");
+        let over: Vec<u32> = [10, 10, 10, 10, 10, 10, 10, 10, 15, 15, 15, 15].to_vec();
+        let l = lines(&fds(&over));
+        assert!(
+            l.iter()
+                .any(|x| x.starts_with("soak fds") && x.ends_with(" LEAK")),
+            "{l:?}"
+        );
+    }
+
+    #[test]
+    fn a_footprint_rise_of_exactly_one_mib_is_ok_and_a_little_more_is_a_leak() {
+        let l = lines(&footprint([5.0, 5.0, 6.0]));
+        assert!(
+            l.iter()
+                .any(|x| x.starts_with("soak footprint") && x.ends_with(" ok")),
+            "{l:?}"
+        );
+        let l = lines(&footprint([5.0, 5.0, 6.1]));
+        assert!(
+            l.iter()
+                .any(|x| x.starts_with("soak footprint") && x.ends_with(" LEAK")),
+            "{l:?}"
+        );
+    }
+
+    #[test]
+    fn a_hang_without_a_load_average_prints_it_as_unavailable() {
+        let mut r = run(readings(&[(30.0, 9, 40); 12]));
+        r.hangs.push(Hang {
+            side: Side::Core,
+            at: secs(754),
+            waited: Duration::from_millis(2000),
+            load_avg: None,
+        });
+        let l = lines(&r);
+        assert!(
+            has(&l, "soak hang core at +12:34 waited 2000 load unavailable"),
+            "{l:?}"
+        );
+        assert_eq!(l.last().unwrap(), "soak verdict fail");
     }
 
     #[test]

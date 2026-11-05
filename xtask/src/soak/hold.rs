@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::Path;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc;
@@ -18,11 +18,12 @@ impl StoreHold {
             .arg(db)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .spawn()
             .with_context(|| format!("spawn sqlite3 to hold {}", db.display()))?;
         let stdin = child.stdin.take();
         let stdout = child.stdout.take();
+        let stderr = child.stderr.take();
         let mut hold = Self { child, stdin };
         let stdout = stdout.context("sqlite3 stdout was not piped")?;
         let (tx, rx) = mpsc::channel();
@@ -41,10 +42,23 @@ impl StoreHold {
                 "sqlite3 answered {line:?} instead of held for {}; the store may be broken",
                 db.display()
             ),
-            Err(_) => bail!(
-                "the store lock on {} was not confirmed within {confirm_within:?}; check that the app is not writing the store",
-                db.display()
-            ),
+            Err(_) => match hold.child.try_wait() {
+                Ok(Some(status)) => {
+                    let mut text = String::new();
+                    if let Some(mut pipe) = stderr {
+                        let _ = pipe.read_to_string(&mut text);
+                    }
+                    bail!(
+                        "sqlite3 exited with {status} before taking the lock on {}: {}",
+                        db.display(),
+                        text.trim()
+                    )
+                }
+                _ => bail!(
+                    "the store lock on {} was not confirmed within {confirm_within:?}; check that the app is not writing the store",
+                    db.display()
+                ),
+            },
         }
     }
 
@@ -111,6 +125,16 @@ mod tests {
         assert!(text.contains("database is locked"), "{text}");
         hold.commit().unwrap();
         assert!(insert(&db).status.success());
+    }
+
+    #[test]
+    fn a_holder_that_exits_early_reports_its_stderr() {
+        let dir = tempfile::tempdir_in("/tmp").unwrap();
+        let db = dir.path().join("missing-dir/t.db");
+        let err = StoreHold::open(&db, Duration::from_secs(3)).unwrap_err();
+        let text = format!("{err:#}");
+        assert!(text.contains("sqlite3 exited"), "{text}");
+        assert!(text.contains("unable to open"), "{text}");
     }
 
     #[test]

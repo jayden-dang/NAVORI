@@ -80,7 +80,7 @@ enum Cmd {
         #[arg(long)]
         long: bool,
         /// With --long, drive the load for this long instead (90s, 20m, 2h).
-        #[arg(long = "for", requires = "long", value_parser = parse_duration)]
+        #[arg(long = "for", requires = "long", value_parser = parse_load_duration)]
         for_: Option<Duration>,
         #[command(subcommand)]
         command: Option<SoakCmd>,
@@ -110,6 +110,9 @@ fn parse_duration(s: &str) -> Result<Duration, String> {
     }
     let (digits, unit) = s.split_at(split);
     let n: u64 = digits.parse().map_err(|_| refuse())?;
+    if n == 0 {
+        return Err(refuse());
+    }
     let per = match unit {
         "s" => 1,
         "m" => 60,
@@ -119,6 +122,18 @@ fn parse_duration(s: &str) -> Result<Duration, String> {
     n.checked_mul(per)
         .map(Duration::from_secs)
         .ok_or_else(refuse)
+}
+
+const MAX_SOAK_LOAD: Duration = Duration::from_secs(24 * 3600);
+
+fn parse_load_duration(s: &str) -> Result<Duration, String> {
+    let load = parse_duration(s)?;
+    if load > MAX_SOAK_LOAD {
+        return Err(format!(
+            "{s:?} is longer than the 24h soak limit; use 24h or less"
+        ));
+    }
+    Ok(load)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1280,13 +1295,31 @@ mod tests {
 
     use std::time::Duration;
 
-    use super::{parse_duration, tool_stdout};
+    use super::{parse_duration, parse_load_duration, tool_stdout};
 
     #[test]
     fn durations_read_seconds_minutes_and_hours() {
         assert_eq!(parse_duration("90s").unwrap(), Duration::from_secs(90));
         assert_eq!(parse_duration("20m").unwrap(), Duration::from_secs(1200));
         assert_eq!(parse_duration("2h").unwrap(), Duration::from_secs(7200));
+    }
+
+    #[test]
+    fn empty_zero_and_unknown_unit_durations_are_refused() {
+        for bad in ["", "0s", "0m", "5d", "s", "-5s"] {
+            let err = parse_duration(bad).unwrap_err();
+            assert!(err.contains(&format!("{bad:?}")), "{err}");
+        }
+    }
+
+    #[test]
+    fn a_soak_load_longer_than_a_day_is_refused_naming_the_value() {
+        assert_eq!(
+            parse_load_duration("24h").unwrap(),
+            Duration::from_secs(86400)
+        );
+        let err = parse_load_duration("25h").unwrap_err();
+        assert!(err.contains("25h") && err.contains("24h"), "{err}");
     }
 
     #[test]
