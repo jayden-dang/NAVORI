@@ -175,7 +175,7 @@ _Requirements: SOAK-1.2, SOAK-1.3, SOAK-3.1, SOAK-3.5, SOAK-5.1, SOAK-5.3_
 
 **Depends-on:** Task 2 (`Tier`)
 
-- [ ] **Step 1: Write the failing tests.** Readings are taken every 10 s after a 60 s settle, 12 per series, so each third holds 4. All expected values are literals:
+- [x] **Step 1: Write the failing tests.** Readings are taken every 10 s after a 60 s settle, 12 per series, so each third holds 4. All expected values are literals:
   - `flat_signals_pass_and_print_start_end_and_trend`: footprint 30 MiB constant, threads 9, fds 40. Lines include `soak footprint start 30.0 end 30.0 trend +0.0/h ok`, `soak threads start 9 end 9 trend +0/h ok`, `soak fds start 40 end 40 trend +0/h ok` and `soak verdict pass`, and `passed()` is true.
   - `one_more_fd_every_reading_is_a_leak_named_with_its_slope`: fds = 40, 41, …, 51. The first-third median is 41.5 and the last-third median 49.5. The rise of 8 exceeds max(4.15, 4), so the line is `soak fds start 41.5 end 49.5 trend +360/h LEAK`, then `soak verdict fail`.
   - `a_rise_within_the_floor_is_not_a_leak`: threads 9, 9, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11. The rise of 1.5 is under the floor of 2, so `ok`.
@@ -190,7 +190,7 @@ _Requirements: SOAK-1.2, SOAK-1.3, SOAK-3.1, SOAK-3.5, SOAK-5.1, SOAK-5.3_
   - `the_long_tier_exits_ok_even_on_a_leak`: `exit_ok(&Tier::Long{..})` is true when `passed()` is false. `exit_ok(&Tier::Short)` equals `passed()`.
 
   Run: `cargo test -p xtask soak::judge` — expect: compile error.
-- [ ] **Step 2: Implement** `judge`:
+- [x] **Step 2: Implement** `judge`:
   - median of a slice;
   - split the post-settle readings into thirds; with a remainder, the extra readings go to the middle third;
   - the leak rule with floors 1 MiB, 2 threads and 4 fds;
@@ -198,7 +198,7 @@ _Requirements: SOAK-1.2, SOAK-1.3, SOAK-3.1, SOAK-3.5, SOAK-5.1, SOAK-5.3_
   - the line formats above, with times as `mm:ss`. Footprint is printed in MiB with one decimal. Threads and fds start and end are printed as integers when whole and with one decimal otherwise (`41.5`). Trends are whole numbers per hour with a sign.
 
   Run: `cargo test -p xtask soak::judge` — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(xtask): judge a soak run for creeping signals and hangs"`
+- [x] **Step 3: Commit** `git commit -m "feat(xtask): judge a soak run for creeping signals and hangs"`
 
 _Requirements: SOAK-1.6, SOAK-1.7, SOAK-1.11, SOAK-1.13, SOAK-2.1, SOAK-2.2, SOAK-2.3, SOAK-2.5, SOAK-3.6, SOAK-3.7, SOAK-5.4_
 
