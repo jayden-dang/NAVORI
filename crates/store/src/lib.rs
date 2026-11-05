@@ -240,7 +240,7 @@ impl Store {
         Ok(())
     }
 
-    /// Newest first; events sharing a millisecond come back in the order they were written.
+    /// Newest first; events sharing a millisecond come back newest write first.
     pub fn journal_recent(&self, limit: usize) -> Result<Vec<Event>> {
         let limit = i64::try_from(limit).unwrap_or(i64::MAX);
         let rows: Vec<(String, i64, String, String, String, String, String)> =
