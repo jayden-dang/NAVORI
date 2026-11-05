@@ -39,7 +39,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | From | To | Rule |
 |---|---|---|
 | `modules/*` | `kernel`, `protocol`, `store`, `config`, `redact`, `procs`, `secrets` | allowed |
-| `ai/agent` | `ai/llm`, `ai/models`, `ai/context`, `ai/memory`, `ai/mcp`, `kernel`, `protocol` | allowed |
+| `ai/agent` | `ai/context`, `ai/models`, `ai/memory`, `ai/mcp`, `kernel`, `protocol` | allowed — never `ai/llm` (`check-deps` enforces; the model is reached through the Context Gateway) |
 | `ai/memory` | `navori-redact` | required — nothing reaches memory unredacted (ARCH-6) |
 | `ai/*` | `navori-secrets` | allowed — provider keys from the Keychain |
 

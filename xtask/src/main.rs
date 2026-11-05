@@ -711,38 +711,8 @@ fn check_deps(root: &Path) -> Result<()> {
             &dep_aliases(p),
         ));
 
-        let is_module = path.contains("/modules/");
-        let is_ai = path.contains("/ai/");
         for dep in &internal {
-            let dep_is_module = dep.starts_with("navori-mod-");
-            let rule = if *dep == "navori-ffi" {
-                Some("nothing may depend on navori-ffi (it is the app's composition root)")
-            } else if name == "navori-protocol" {
-                Some("navori-protocol must stay dependency-free")
-            } else if name == "navori-cli"
-                && !["navori-config", "navori-ipc", "navori-protocol"].contains(dep)
-            {
-                Some("the CLI is a thin client: only config, ipc and protocol")
-            } else if name == "navori-macos" {
-                Some("navori-macos has no internal dependencies")
-            } else if *dep == "navori-macos"
-                && name != "navori-procs"
-                && name != "navori-ffi"
-                && !is_module
-            {
-                Some("only navori-procs, navori-ffi, or a module may depend on navori-macos")
-            } else if is_module && dep_is_module {
-                Some("modules must not depend on other modules (use the event bus)")
-            } else if is_module && dep.starts_with("navori-ai") {
-                Some("modules must not depend on AI crates")
-            } else if is_ai && dep_is_module {
-                Some("AI crates see modules only through ActionSpec / ContextFragment")
-            } else if !is_module && !is_ai && name != "navori-ffi" && dep_is_module {
-                Some("foundation crates must not depend on modules")
-            } else {
-                None
-            };
-            if let Some(rule) = rule {
+            if let Some(rule) = internal_dep_violation(name, path, dep) {
                 violations.push(format!("{name} → {dep}: {rule}"));
             }
         }
@@ -787,6 +757,41 @@ fn check_deps(root: &Path) -> Result<()> {
     } else {
         bail!("dependency rule violations:\n  {}", violations.join("\n  "))
     }
+}
+
+/// The rule an internal dependency edge breaks, if any.
+fn internal_dep_violation(package: &str, path: &str, dep: &str) -> Option<String> {
+    let name = package;
+    let is_module = path.contains("/modules/");
+    let is_ai = path.contains("/ai/");
+    let dep_is_module = dep.starts_with("navori-mod-");
+    let rule: Option<&str> = if dep == "navori-ffi" {
+        Some("nothing may depend on navori-ffi (it is the app's composition root)")
+    } else if name == "navori-protocol" {
+        Some("navori-protocol must stay dependency-free")
+    } else if name == "navori-cli"
+        && !["navori-config", "navori-ipc", "navori-protocol"].contains(&dep)
+    {
+        Some("the CLI is a thin client: only config, ipc and protocol")
+    } else if name == "navori-macos" {
+        Some("navori-macos has no internal dependencies")
+    } else if dep == "navori-macos" && name != "navori-procs" && name != "navori-ffi" && !is_module
+    {
+        Some("only navori-procs, navori-ffi, or a module may depend on navori-macos")
+    } else if is_module && dep_is_module {
+        Some("modules must not depend on other modules (use the event bus)")
+    } else if is_module && dep.starts_with("navori-ai") {
+        Some("modules must not depend on AI crates")
+    } else if name == "navori-agent" && dep == "navori-llm" {
+        Some("navori-agent must not depend on navori-llm")
+    } else if is_ai && dep_is_module {
+        Some("AI crates see modules only through ActionSpec / ContextFragment")
+    } else if !is_module && !is_ai && name != "navori-ffi" && dep_is_module {
+        Some("foundation crates must not depend on modules")
+    } else {
+        None
+    };
+    rule.map(str::to_owned)
 }
 
 /// Crates whose `fake` feature switches on unencrypted in-memory test doubles (ARCH-8).
@@ -1207,10 +1212,22 @@ fn ci(root: &Path) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_agent_crate_must_not_depend_on_the_llm_crate() {
+        assert_eq!(
+            internal_dep_violation("navori-agent", "/repo/ai/agent", "navori-llm").as_deref(),
+            Some("navori-agent must not depend on navori-llm")
+        );
+        assert_eq!(
+            internal_dep_violation("navori-agent", "/repo/ai/agent", "navori-context"),
+            None
+        );
+    }
+
     use std::io::Read;
     use std::process::Command;
 
-    use super::tool_stdout;
+    use super::{internal_dep_violation, tool_stdout};
 
     /// Child tool progress must be on a pipe, not inherited stdout, so
     /// `cargo xtask perf` can emit `build <seconds>s` as the first report line.
