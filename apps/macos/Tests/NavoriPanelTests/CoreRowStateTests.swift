@@ -18,6 +18,24 @@ struct CoreRowStateTests {
         }
     }
 
+    @Test func the_production_menu_shows_the_core_row_only_when_it_needs_attention_or_is_down() {
+        let cases: [(CoreStatus, Bool)] = [
+            (.starting, false),
+            (.running, false),
+            (.needsAttention, true),
+            (.notRunning, true),
+        ]
+        for (status, visible) in cases {
+            #expect(CoreRowState.isVisible(status: status, inDevProfile: false) == visible)
+        }
+    }
+
+    @Test func the_dev_menu_always_shows_the_core_row() {
+        for status in [CoreStatus.starting, .running, .needsAttention, .notRunning] {
+            #expect(CoreRowState.isVisible(status: status, inDevProfile: true))
+        }
+    }
+
     @Test func module_dots_follow_the_module_state() {
         let cases: [(String, StatusDot)] = [
             ("running", .green),
@@ -75,5 +93,29 @@ struct CoreRowStateTests {
 
     @Test func no_snapshot_is_starting() {
         #expect(status(hasSnapshot: false, modules: []) == .starting)
+    }
+}
+
+@Suite
+struct LevelZeroTreeTests {
+    private func ids(_ status: CoreStatus, dev: Bool) -> [String] {
+        LevelZeroTree.rows(
+            running: CascadeNode(id: "running", isActionable: true),
+            core: CascadeNode(id: "core", isActionable: true),
+            status: status,
+            inDevProfile: dev
+        ).map(\.id)
+    }
+
+    @Test func the_core_node_is_in_the_tree_only_where_the_row_is_shown() {
+        let withCore = ["running", "core", "settings", "about", "quit"]
+        let without = ["running", "settings", "about", "quit"]
+        #expect(ids(.running, dev: false) == without)
+        #expect(ids(.starting, dev: false) == without)
+        #expect(ids(.needsAttention, dev: false) == withCore)
+        #expect(ids(.notRunning, dev: false) == withCore)
+        for status in [CoreStatus.starting, .running, .needsAttention, .notRunning] {
+            #expect(ids(status, dev: true) == withCore)
+        }
     }
 }

@@ -116,6 +116,11 @@ final class CoreStore {
 
     var hasSnapshot: Bool { snapshot != nil }
 
+    /// Production hides the Core row while the Core is healthy; the dev profile always shows it.
+    var coreRowVisible: Bool {
+        CoreRowState.isVisible(status: coreStatus, inDevProfile: AppEnvironment.isDev)
+    }
+
     var coreStatus: CoreStatus {
         CoreStatus(health: CoreHealth(
             coreFailed: startupError != nil,

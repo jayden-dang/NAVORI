@@ -58,6 +58,7 @@ final class StatusBarController: NSObject {
     private var didReplaceCoreTree = false
     private var runningHadSubmenu = false
     private var runningTree: [CascadeNode] = []
+    private var coreRowWasVisible = false
     private var motion = StatusIconMotion()
     private var drawn: (state: StatusIconState, loop: Bool)?
     private var accessibilityObserver: NSObjectProtocol?
@@ -205,6 +206,10 @@ final class StatusBarController: NSObject {
             PerfProbe.fault("SIGUSR2 open has no level 0")
             return
         }
+        guard store.coreRowVisible else {
+            PerfProbe.fault("SIGUSR2 open: the Core row is hidden")
+            return
+        }
         panel.cascade.closeSubmenus()
         guard let trigger = PerfProbe.captureTrigger() else { return }
         panel.cascade.open("core") {
@@ -249,6 +254,7 @@ final class StatusBarController: NSObject {
         withObservationTracking {
             _ = store.hasSnapshot
             _ = store.runningTree
+            _ = store.coreRowVisible
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.onSnapshotChange()
@@ -261,12 +267,14 @@ final class StatusBarController: NSObject {
         let hasSubmenu = RunningRowState(running: store.running).hasSubmenu
         let tree = store.runningTree
         let coreArrived = store.hasSnapshot && !didReplaceCoreTree
-        let changed = hasSubmenu != runningHadSubmenu || tree != runningTree
+        let coreRowVisible = store.coreRowVisible
+        let changed = hasSubmenu != runningHadSubmenu || tree != runningTree || coreRowVisible != coreRowWasVisible
         if coreArrived {
             didReplaceCoreTree = true
         }
         runningHadSubmenu = hasSubmenu
         runningTree = tree
+        coreRowWasVisible = coreRowVisible
         guard panelBuilt, panel.isOpen, coreArrived || changed else { return }
         panel.cascade.replaceTree()
     }
@@ -282,13 +290,12 @@ final class StatusBarController: NSObject {
         let runningChildren = store.hasSnapshot && RunningRowState(running: store.running).hasSubmenu
             ? runningCommands + store.runningTree
             : []
-        return [
-            CascadeNode(id: "running", isActionable: true, children: runningChildren),
-            CascadeNode(id: "core", isActionable: true, children: coreChildren),
-            CascadeNode(id: "settings", isActionable: true),
-            CascadeNode(id: "about", isActionable: true),
-            CascadeNode(id: "quit", isActionable: true),
-        ]
+        return LevelZeroTree.rows(
+            running: CascadeNode(id: "running", isActionable: true, children: runningChildren),
+            core: CascadeNode(id: "core", isActionable: true, children: coreChildren),
+            status: store.coreStatus,
+            inDevProfile: AppEnvironment.isDev
+        )
     }
 
     private var runningCommands: [CascadeNode] {

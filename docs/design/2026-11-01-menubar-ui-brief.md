@@ -38,6 +38,7 @@ The user's words (verbatim, in order; the Vietnamese quotes are kept as-is, with
   1. Any banners (the core did not start, an unexpected quit, a config problem).
   2. **Awake** — one line: icon `cup.and.saucer` · name · a green dot while a Lease holds the system assertion, otherwise no dot · chevron. No text value (user, 2026-11-04). No submenu when the record is missing or the module has stopped.
   3. **Core** — one line, with the dev chip on the dev profile. Its submenu is unchanged.
+     *(Amended 2026-11-05, operator decision: in production this row shows only while the Core needs attention or is down; the dev profile always shows it, with the chip. See Amendment 12.)*
   4. Separator → `Settings… ⌘,` · `About Navori` · `Quit Navori ⌘Q`.
   - Ask, Needs you, Ports and Pull Requests are not on level 0. They stay in the dev-only preview until those features ship.
   - No account, API quota, or "updated" row at level 0.
@@ -116,6 +117,7 @@ Locked 2026-11-04 as variant C1. The brief of record is [`docs/specs/2026-11-02-
 10. **The menu is an `NSPanel`, not an `NSMenu`** (user, 2026-11-02, replacing "NSMenu" in constraint 1). The cascade, edge flip, keyboard navigation and VoiceOver are built in the Shell. See the spike evidence below.
 11. **The surface is `NSGlassEffectView` with style `.clear` and a tint** (user, 2026-11-02). Chosen tint: black at 69% in dark appearance, white at 57% in light. Measured WCAG 2 on Preview screenshots: dark on white, primary 5.94:1, secondary 3.04:1; light on black, primary 4.88:1, secondary 3.03:1. Starting 65/55 missed secondary 3:1; 1% steps found these first passers. Text on glass uses `labelColor` and `secondaryLabelColor`. `tertiaryLabelColor` was not remeasured at this pair. Reduce Transparency falls back to an opaque surface. Requires macOS 26 or later.
 12. **Until a feature's data exists, level 0 shows only real Core state** (user, 2026-11-02): banners, a `Core` row, then `Settings…`, `About Navori`, `Quit Navori`. The `Core` row is not in the layout above; its submenu holds module states and recent activity, so the cascade runs on real data before Awake. Whether it stays is decided when the Awake row ships. Ask, Needs you and the feature rows appear only in a dev-only preview until their features ship.
+    *(Amended 2026-11-05, operator decision: "Whether it stays" is answered. The Running row exists, so in production the `Core` row shows only while the Core is `Needs attention` or `Not running`; the dev profile keeps it always. Requirement MENU-3.11. The Core submenu's Events list is the only in-app view of the counts-only `ports.stopped` Events, so they are now visible in the app only while the Core needs attention.)*
 
 ## Spike evidence (2026-11-02)
 

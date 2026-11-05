@@ -39,6 +39,15 @@ public struct CoreRowState: Equatable, Sendable {
     public let dot: StatusDot?
     public let hasSubmenu: Bool
 
+    /// The dev profile always shows the Core row; production shows it only when the Core needs attention or is down.
+    public static func isVisible(status: CoreStatus, inDevProfile: Bool) -> Bool {
+        if inDevProfile { return true }
+        switch status {
+        case .needsAttention, .notRunning: return true
+        case .starting, .running: return false
+        }
+    }
+
     public init(status: CoreStatus) {
         switch status {
         case .starting:
@@ -69,5 +78,26 @@ public enum ModuleDot {
         case "failed": .red
         default: .gray
         }
+    }
+}
+
+public enum LevelZeroTree {
+    /// The level 0 rows of the Cascade; the `core` node is present only where the Core row is shown.
+    public static func rows(
+        running: CascadeNode,
+        core: CascadeNode,
+        status: CoreStatus,
+        inDevProfile: Bool
+    ) -> [CascadeNode] {
+        var rows = [running]
+        if CoreRowState.isVisible(status: status, inDevProfile: inDevProfile) {
+            rows.append(core)
+        }
+        rows += [
+            CascadeNode(id: "settings", isActionable: true),
+            CascadeNode(id: "about", isActionable: true),
+            CascadeNode(id: "quit", isActionable: true),
+        ]
+        return rows
     }
 }

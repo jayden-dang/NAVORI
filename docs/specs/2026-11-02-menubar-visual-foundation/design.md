@@ -133,7 +133,7 @@ It holds an `NSGlassEffectView` with style `.clear`, corner radius 12 and the ti
 
 ### Level 0 and rows
 
-Satisfies: MENU-1.2, MENU-1.3, MENU-1.4, MENU-1.5, MENU-1.6, MENU-1.7, MENU-1.9, MENU-1.10, MENU-2.1, MENU-2.2, MENU-2.3, MENU-2.4, MENU-2.5, MENU-3.1, MENU-3.2, MENU-3.3, MENU-3.4, MENU-3.5, MENU-3.6, MENU-3.7, MENU-3.8, MENU-3.9, MENU-3.10, MENU-6.1, MENU-6.2, MENU-11.3
+Satisfies: MENU-1.2, MENU-1.3, MENU-1.4, MENU-1.5, MENU-1.6, MENU-1.7, MENU-1.9, MENU-1.10, MENU-2.1, MENU-2.2, MENU-2.3, MENU-2.4, MENU-2.5, MENU-3.1, MENU-3.2, MENU-3.3, MENU-3.4, MENU-3.5, MENU-3.6, MENU-3.7, MENU-3.8, MENU-3.9, MENU-3.10, MENU-3.11, MENU-3.12, MENU-3.13, MENU-6.1, MENU-6.2, MENU-11.3
 Reuse: rung 2 — `Banner`, `SectionTitle`, the module and activity row content in `PanelView.swift`, and SwiftUI's `.keyboardShortcut` as the footer uses it today; rung 7 — `MenuRowView`, because no existing row has a value, chevron and selection.
 Respects: ARCH-1, ARCH-2, ARCH-13
 Surface:

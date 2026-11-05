@@ -11,7 +11,9 @@ struct PanelView: View {
         VStack(alignment: .leading, spacing: 0) {
             banners
             MenuRowView(row: runningRow, cascade: cascade)
-            MenuRowView(row: coreRow, cascade: cascade)
+            if store.coreRowVisible {
+                MenuRowView(row: coreRow, cascade: cascade)
+            }
             Divider()
             MenuRowView(row: settingsRow, cascade: cascade)
             MenuRowView(row: aboutRow, cascade: cascade)
