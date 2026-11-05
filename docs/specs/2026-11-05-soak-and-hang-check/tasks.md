@@ -224,7 +224,7 @@ _Requirements: SOAK-1.6, SOAK-1.7, SOAK-1.11, SOAK-1.13, SOAK-2.1, SOAK-2.2, SOA
 
 **Depends-on:** Task 3
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `a_probe_line_parses_into_a_reading`: `{"footprint":31457280,"threads":9,"fds":40}` gives footprint 31457280, threads 9 and fds 40.
   - `a_probe_line_missing_fds_is_an_error_naming_the_field`.
   - (integration) `a_process_that_opens_a_file_every_tick_is_judged_a_leak`:
@@ -234,7 +234,7 @@ _Requirements: SOAK-1.6, SOAK-1.7, SOAK-1.11, SOAK-1.13, SOAK-2.1, SOAK-2.2, SOA
     4. assert fds strictly increase overall, then build a `RunFacts` (settle 0) and assert `judge` prints `soak fds … LEAK`.
 
   Run: `cargo test -p xtask soak::probe` — expect: compile error.
-- [ ] **Step 2: Write `soak-probe.swift`:**
+- [x] **Step 2: Write `soak-probe.swift`:**
   - `proc_pid_rusage(RUSAGE_INFO_V4)` for `ri_phys_footprint`;
   - `proc_pidinfo(PROC_PIDTASKINFO)` for `pti_threadnum`;
   - `proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)` for the size, then a buffer of size + 32 × `MemoryLayout<proc_fdinfo>.stride`; the count is the **second** call's returned bytes / stride (the size call over-estimates);
@@ -243,8 +243,8 @@ _Requirements: SOAK-1.6, SOAK-1.7, SOAK-1.11, SOAK-1.13, SOAK-2.1, SOAK-2.2, SOA
   Write `probe.rs`, which compiles the helper with bare `swiftc -O`, the same way perf does (`xtask/src/perf/probe.rs:58-71`).
 
   Run: `cargo test -p xtask soak::probe` — expect: pass.
-- [ ] **Step 3: Prove it on the real app (design Decision 9).** Call the compiled helper, read-only, on the running installed app's pid (`pgrep -x -f /Applications/Navori.app/Contents/MacOS/Navori`), a hardened-runtime app. Do not start `cargo xtask run`, which would write the real `Navori Dev` data that Task 7 checks the soak leaves alone. The plan review already did this once (17 fds, no EPERM; `.skills/_pending-soak/auto/plan-review.md`). Expect: one JSON line with fds > 0. If it fails with EPERM, stop. That is a design blocker, and it goes back to the operator rather than being worked around.
-- [ ] **Step 4: Commit** `git commit -m "feat(xtask): add a soak probe for footprint, threads and open files"`
+- [x] **Step 3: Prove it on the real app (design Decision 9).** Call the compiled helper, read-only, on the running installed app's pid (`pgrep -x -f /Applications/Navori.app/Contents/MacOS/Navori`), a hardened-runtime app. Do not start `cargo xtask run`, which would write the real `Navori Dev` data that Task 7 checks the soak leaves alone. The plan review already did this once (17 fds, no EPERM; `.skills/_pending-soak/auto/plan-review.md`). Expect: one JSON line with fds > 0. If it fails with EPERM, stop. That is a design blocker, and it goes back to the operator rather than being worked around.
+- [x] **Step 4: Commit** `git commit -m "feat(xtask): add a soak probe for footprint, threads and open files"`
 
 _Requirements: SOAK-1.5, SOAK-2.4_
 
