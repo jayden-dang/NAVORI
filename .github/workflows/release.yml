@@ -186,6 +186,8 @@ jobs:
         if: vars.TAP_REPOSITORY != ''
         env:
           TAP_REPOSITORY: ${{ vars.TAP_REPOSITORY }}
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          PUBLISH: ${{ vars.PUBLISH_RELEASE }}
           VERSION: ${{ steps.tag.outputs.version }}
           PRERELEASE: ${{ steps.tag.outputs.prerelease }}
         run: |
@@ -212,6 +214,16 @@ jobs:
           brew trust --cask "$tap_name/$cask"
           brew style --cask "$tap_name/$cask"
           brew audit --cask "$tap_name/$cask"
+          if [ "$PUBLISH" = "true" ]; then
+            # Prove write access now, before the Release is published.
+            branch=$(git -C tap rev-parse --abbrev-ref HEAD)
+            auth=$(printf 'x-access-token:%s' "$TAP_TOKEN" | base64 | tr -d '\n')
+            echo "::add-mask::$auth"
+            export GIT_CONFIG_COUNT=1
+            export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+            export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth"
+            git -C tap push --dry-run origin "HEAD:$branch"
+          fi
 
       - name: Publish the Release
         if: vars.PUBLISH_RELEASE == 'true'
