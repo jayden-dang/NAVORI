@@ -24,14 +24,18 @@ A wrong tag version that must stop before `ci` (1.3), a deliberately broken tap 
 
 Fixed in separate commits on `main`: Rust toolchain pinned to 1.97.1 and `as_chunks` (a newer clippy rejected `chunks_exact`); a flaky log-capture test in `ai/context`; same-millisecond journal events returned in random order (`ORDER BY ts_ms DESC, rowid DESC`); a 10 ms exit-latency assertion that a shared runner cannot hold (skipped when `CI` is set).
 
-## Not yet done (needs a macOS 26 user account that has never run Navori)
+## Done by the operator on a clean macOS 26 account (reported 2026-11-05)
 
-| Check | Requirement |
-|---|---|
-| `brew tap`, `brew trust --cask`, `brew install --cask navori-rc`; Navori opens with no Gatekeeper dialog | 3.7 |
-| Install the Claude Code hooks, work in a session: `pmset -g assertions` shows `Navori: keeping this Mac awake` | 3.8, 5.7 |
-| Upgrade rc.8 to a later rc keeps settings, the saved AI key (no Keychain prompt) and hooks; `postflight_steps` runs on `brew upgrade` | 4.1, 4.2, 4.3, 4.4, 3.4 |
-| `brew uninstall --zap --cask navori-rc`, then a Claude Code session shows no hook error; the two release directories are in the Trash | 5.1, 5.2, 5.5 |
+The operator reported each group below as passing; no log or screenshot was attached to this record. The cask installed was `navori-rc` from the private test tap; the upgrade went from `0.1.0-rc.8` to `0.1.0-rc.9`.
+
+| Check | Requirement | Result |
+|---|---|---|
+| `brew tap`, `brew trust --cask`, `brew install --cask navori-rc`; Navori opens with no Gatekeeper dialog | 3.7, 3.4 | pass (operator) |
+| Claude Code hooks installed from Settings → Integrations, a session worked: `pmset -g assertions` shows `Navori: keeping this Mac awake` | 3.8, 5.7 | pass (operator) |
+| `brew upgrade --cask navori-rc` from rc.8 to rc.9 keeps settings, the saved AI key (no Keychain prompt) and hooks (installed, not needing repair); no Gatekeeper dialog after the upgrade, so `postflight_steps` runs on upgrade | 4.1, 4.2, 4.3, 4.4, 3.4 | pass (operator) |
+| `brew uninstall --zap --cask navori-rc`, then a Claude Code session shows no hook error; the release directories went to the Trash | 5.1, 5.2, 5.5 | pass (operator) |
+
+Not exercised: a deliberately broken tap step (wrong token) followed by a rerun (7.7); `docs/agents/project.md` still has no `Compat obligation: External` line, which `release-check` requires for a final tag.
 
 ## Before `v0.1.0`
 
