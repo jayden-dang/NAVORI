@@ -1,7 +1,7 @@
 # Roadmap: Navori
 
 Status: Approved
-Date: 2026-11-04
+Date: 2026-11-05
 
 <!--
 The program layer: milestone INTENT, above any single feature and below the product
@@ -25,8 +25,8 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 
 ## Focus
 
-**Now:** ROAD-12, ROAD-17, ROAD-18, ROAD-13, MILE-2
-**Next:** ROAD-27, ROAD-11, ROAD-19, ROAD-20, ROAD-21, ROAD-14, ROAD-37, ROAD-38, ROAD-15, ROAD-16
+**Now:** ROAD-14, ROAD-13, ROAD-12, MILE-2
+**Next:** ROAD-27, ROAD-37, ROAD-11, ROAD-38, ROAD-19, ROAD-20, ROAD-21, ROAD-15, ROAD-16
 
 | ID | Milestone | Outcome | Depends-on | Commitment |
 |---|---|---|---|---|
@@ -82,17 +82,19 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 - **ROAD-10** keychain-secrets — After: none — Surfaces: `crates/secrets/`
 - **ROAD-36** ask-walking-skeleton — After: ROAD-10 — Surfaces: `ai/llm/`, `ai/context/`, `crates/ipc/`, `crates/protocol/`, `crates/ffi/`, `apps/cli/`, `apps/macos/Navori/Features/Settings/` — Delivers text-only `navori ask` end to end: one adapter, one key saved from Settings, and a minimal Context Gateway (Shield on text, audit log, fail-closed). First consumer of `crates/secrets/`, so it takes the handoffs the SECRETS spec wrote for ROAD-11.
 - **ROAD-11** providers-and-model-roles — After: ROAD-36 — Surfaces: `ai/llm/`, `ai/models/`, `crates/ffi/`, `apps/macos/Navori/Features/Settings/` <!-- surfaces edited by an agent (keychain-secrets run, 2026-11-03); approved by the operator 2026-11-04 -->
-- **ROAD-12** shield-and-context-gateway — After: ROAD-36 — Surfaces: `crates/redact/`, `ai/context/`, `crates/ffi/`, `apps/macos/Navori/Platform/` — Also delivers a way for the user to read the Context audit log that ROAD-36 writes (`context_audit`), and its retention, so GOAL-6's "the user can see what the AI has seen" is met. <!-- scope added by an agent (ask-walking-skeleton run, 2026-11-04); approved by the operator 2026-11-04. The reader's surface is set by the spec: Surfaces above is unchanged. -->
+- **ROAD-12** shield-and-context-gateway — After: ROAD-36 — Surfaces: `ai/context/`, `crates/store/`, `crates/ffi/` — Delivers a way for the user to read the Context audit log that ROAD-36 writes (`context_audit`), and its retention, so GOAL-6's "the user can see what the AI has seen" is met. Keeps the text Shield ROAD-36 shipped; the screen-facing Shield layers moved to ROAD-39. <!-- narrowed by the operator 2026-11-05 (ADR 0008 session): app denylist, path blocks, OCR and screenshots deferred until Navori AI sees the screen. The reader's surface is set by the spec. -->
 - **ROAD-13** needs-you-inbox — After: none — Surfaces: `modules/inbox/`, `apps/macos/Navori/Features/Panel/`
-- **ROAD-14** agent-loop-and-session — After: ROAD-11, ROAD-12 — Surfaces: `ai/agent/`, `crates/store/`, `crates/ffi/` — Records what started each turn (THR-11) and usage from the first model call, and sends every tool call through one dispatch point. Runs only `Read` Actions until ROAD-37.
-- **ROAD-37** policy-and-approvals — After: ROAD-13, ROAD-14 — Surfaces: `ai/agent/`, `crates/protocol/`, `crates/ffi/`, `apps/macos/Navori/Features/Panel/`
+- **ROAD-14** agent-loop-and-session — After: ROAD-36 — Surfaces: `ai/agent/`, `crates/store/`, `crates/ffi/` — Ports dsh's agent loop, session log, tool registry and guards to Rust on Navori's Actions and Journal (ADR 0008), using the one adapter ROAD-36 shipped. Records what started each turn (THR-11) and usage from the first model call, and sends every tool call through one dispatch point. Runs only `Read` Actions until ROAD-37.
+- **ROAD-37** policy-and-approvals — After: ROAD-13, ROAD-14 — Surfaces: `ai/agent/`, `crates/protocol/`, `crates/ffi/`, `apps/macos/Navori/Features/Panel/` — Ports dsh's user approval and permission presets (ADR 0008).
 - **ROAD-38** ai-eval-harness — After: ROAD-14 — Surfaces: `xtask/`, `ai/agent/` — Delivers `cargo xtask eval` (`docs/standards/testing.md`).
 - **ROAD-15** chat-and-quick-ask — After: ROAD-37 — Surfaces: `apps/macos/Navori/Features/`, `apps/cli/` — Also moves `navori ask` onto the agent loop.
 - **ROAD-16** memory — After: ROAD-37 — Surfaces: `ai/memory/`, `crates/store/`
 **Depends-on:** MILE-2
 **Commitment:** Planned
 **Closed:** None
-**Deferred:** None
+**Deferred:**
+- ROAD-39 shield-screen-layers → unscheduled (2026-11-05, app denylist, path blocks, OCR and screenshots wait until Navori AI sees the screen; split from ROAD-12)
+- ROAD-40 computer-use → unscheduled (2026-11-05, Navori AI controlling other apps comes after the Agent loop; dsh has no usable base for it, ADR 0008)
 **Blockers:** None
 
 ## MILE-4 — Ports (R3)
