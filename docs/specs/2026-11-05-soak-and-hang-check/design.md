@@ -1,7 +1,8 @@
 # Design: Soak and hang check
 
 Feature code: SOAK
-Status: Draft
+Status: Approved
+Approval: the operator's /shape --go, before reading the spec (operator command: `/shape #27 --auto --go --video --work=opus --interpret=opus --build=sonnet`, relayed by the conductor on 2026-11-05)
 Date: 2026-11-05
 Requirements: ./requirements.md
 
