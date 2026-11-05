@@ -37,6 +37,12 @@ The operator reported each group below as passing; no log or screenshot was atta
 
 Not exercised: a deliberately broken tap step (wrong token) followed by a rerun (7.7); `docs/agents/project.md` still has no `Compat obligation: External` line, which `release-check` requires for a final tag.
 
+## Release decision for `v0.1.0` (2026-11-05)
+
+`cargo xtask release-check` was run in an isolated worktree at commit `7bfb34a`: the preflight and `cargo xtask ci` passed (Rust and Swift tests included). The performance gate then failed one of twelve metrics: `menu_open_after_launch_ms` 85.9 ms against a budget of 80 ms; the other eleven were within budget (cold start 111.9 ms, `snapshot_ms` 6.7 ms, app size 16.5 MB, idle footprint 24.3 MB, and the rest). The Mac was busy with builds from another project (load average 6.7 to 10.5), and the same metric measured 58.9 ms in a standalone `cargo xtask perf` run on an idle Mac earlier the same day and 82.9 ms and 98 ms on busy ones.
+
+The operator decided on 2026-11-05 to skip the rest of `release-check` and release `v0.1.0` with the measurements taken. This is a recorded exception to RELEASE-2.1 and RELEASE-7.1 for this release only: the gate did not pass on a quiet Mac for the tagged commit. Re-measure on an idle Mac and run `cargo xtask perf --record` when convenient.
+
 ## Before `v0.1.0`
 
 - Add the line `- **Compat obligation:** External` to Project posture in `docs/agents/project.md`.
