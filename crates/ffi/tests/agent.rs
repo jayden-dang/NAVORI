@@ -225,7 +225,7 @@ fn the_turn_is_read_back_from_the_ai_session_tables() {
             &store,
             "SELECT seq || '|' || origin || '|' || model || '|' || end_reason FROM ai_session_turn"
         ),
-        vec!["0|user|deepseek-chat|completed"]
+        vec!["1|user|deepseek-chat|completed"]
     );
     assert_eq!(
         texts(
@@ -363,7 +363,7 @@ fn a_turn_cut_short_by_shutdown_is_repaired_after_restart() {
             &store,
             "SELECT seq || '|' || end_reason FROM ai_session_turn ORDER BY seq"
         ),
-        vec!["0|interrupted", "1|completed"]
+        vec!["1|interrupted", "2|completed"]
     );
     assert_eq!(
         texts(

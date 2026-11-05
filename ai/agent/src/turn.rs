@@ -153,7 +153,7 @@ impl Agent {
                     }
                     log = self.load(id).await?;
                 }
-                let next = log.turns.iter().map(|t| t.seq + 1).max().unwrap_or(0);
+                let next = log.turns.iter().map(|t| t.seq + 1).max().unwrap_or(1);
                 (id, next, derive_messages(&log))
             }
             None => {
@@ -163,7 +163,7 @@ impl Agent {
                     id,
                     ts_ms: now_ms(),
                 });
-                (id, 0, Vec::new())
+                (id, 1, Vec::new())
             }
         };
         started.push(Entry::TurnStarted {

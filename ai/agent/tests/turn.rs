@@ -61,7 +61,7 @@ async fn the_record_holds_origin_input_reply_raw_arguments_result_and_usage() {
     let entries = rig.store.entries();
     assert!(entries.iter().any(|e| matches!(
         e,
-        Entry::TurnStarted { origin: Origin::User, model, seq: 0, .. } if model == "deepseek-chat"
+        Entry::TurnStarted { origin: Origin::User, model, seq: 1, .. } if model == "deepseek-chat"
     )));
     let bodies: Vec<RecordedMessage> = entries
         .iter()
@@ -588,4 +588,35 @@ async fn a_repeated_call_gets_the_reminder_with_its_result_and_each_turn_starts_
         last.iter().skip(3).all(|t| t == r#"{"seen":"room"}"#),
         "{last:?}"
     );
+}
+
+#[tokio::test]
+async fn turns_in_a_conversation_are_numbered_from_one() {
+    let rig = common::agent_with(
+        vec![common::text_reply("one"), common::text_reply("two")],
+        Limits::default(),
+    );
+
+    let first = rig
+        .agent
+        .run_turn(&rig.kernel, request("first"), Default::default())
+        .await
+        .unwrap();
+    let mut next = request("second");
+    next.conversation = Some(first.conversation);
+    rig.agent
+        .run_turn(&rig.kernel, next, Default::default())
+        .await
+        .unwrap();
+
+    let seqs: Vec<u32> = rig
+        .store
+        .entries()
+        .into_iter()
+        .filter_map(|e| match e {
+            Entry::TurnStarted { seq, .. } => Some(seq),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(seqs, vec![1, 2]);
 }
