@@ -1,7 +1,7 @@
 # Requirements: Public release
 
 Feature code: RELEASE
-Status: In-progress
+Status: Implemented
 Date: 2026-11-04
 
 <!--
