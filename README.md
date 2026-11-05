@@ -10,8 +10,6 @@ Swift (AppKit + SwiftUI) shell. Architecture: [docs/ARCHITECTURE.md](docs/ARCHIT
 
 ## Install
 
-Not published yet; available once v0.1.0 is released.
-
 ```sh
 brew tap jayden-dang/navori
 brew trust --cask jayden-dang/navori/navori

@@ -74,6 +74,11 @@ Navori's own built-in assistant: it answers the user, reads context through the 
 Gateway and acts only by calling Actions.
 _Avoid_: the agent, assistant (alone), bot
 
+**Agent loop**:
+The loop that runs Navori AI: send a turn to the model, run the Actions it calls, feed the
+results back, and repeat until it answers or a Decision is needed.
+_Avoid_: harness (a Harness is a CLI Navori observes), runtime, engine
+
 **Provider**:
 A cloud LLM service the user configures (Anthropic, OpenAI, DeepSeek, Google, xAI,
 OpenRouter or a custom OpenAI-compatible endpoint), reached through an adapter.
@@ -83,6 +88,16 @@ _Avoid_: vendor, backend, LLM API
 A job Navori AI needs a model for — `chat`, `fast`, `vision`, `embedding` — to which the user
 assigns one model from any Provider.
 _Avoid_: role (alone — collides with a message's user/assistant role), tier
+
+**Computer use**:
+Navori AI operating another Mac app on the user's behalf without taking the user's cursor,
+focus or Space.
+_Avoid_: automation (alone), RPA, remote control
+
+**Control path**:
+One way computer use reaches an app — Navori Action, App Intent or Shortcut, Accessibility
+tree, background input, or pixels — tried cheapest first.
+_Avoid_: tier, rung, backend
 
 ### Needs you
 

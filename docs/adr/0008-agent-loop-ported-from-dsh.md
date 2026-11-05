@@ -1,0 +1,5 @@
+# 0008 — Navori AI's Agent loop is ported from dsh, not embedded or invented
+
+Status: Accepted · 2026-11-05
+
+Writing the Agent loop from nothing meant designing turn handling, tool execution, approvals and context compaction with no evidence that the design holds, while embedding a finished harness is ruled out because dsh (DeepSeek Harness, MIT) runs on Node and ships an Electron and web front end, which ARCH-15, ARCH-11 and the GOAL-11 budget forbid. So dsh is the reference design: its `core/agent-loop`, `core/session`, `core/tools`, `guard` and `interaction/user-approval` packages are ported to Rust on Navori's own Modules, Actions and Journal, with the MIT notice kept beside any ported code, and no Node or JavaScript runtime enters the app. Its Cordis plugin framework is not ported, because Modules and Actions already play that role (ARCH-3, ARCH-4); dsh's coding tools (shell, file system, sandbox, LSP) and computer use are out of scope here, and control of other apps is left for later.
