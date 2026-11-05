@@ -20,21 +20,21 @@ The loop is dsh's design, cut to fit (auto/approaches.md AP1). A Turn is a seque
 
 ## Decisions
 
-1. **Crates.** A new crate, `navori-agent` at `ai/agent` (L17), depends on `navori-context`, `navori-kernel`, `navori-protocol`, `tokio`, `tokio-util`, `futures`, `serde`, `serde_json`, `thiserror`, `tracing` and `ulid` (all already workspace dependencies). It does not depend on `navori-llm`, and a new check-deps rule forbids that edge by its exact name (W15), so no code of the Agent loop can name the provider (LOOP-5.1). It does not depend on `navori-store` or `navori-redact`: the record goes through a trait implemented in `crates/ffi` (the `AuditSink` precedent, ai.rs:116-168), and the Shield through `navori_context::shield`.
+1. **Crates.** A new crate, `navori-agent` at `ai/agent` (L17), depends on `navori-context`, `navori-kernel`, `navori-protocol`, `tokio`, `tokio-util`, `futures`, `serde`, `serde_json`, `thiserror`, `tracing` and `ulid` (all already workspace dependencies). It does not depend on `navori-llm`, and a new check-deps rule forbids that edge by its exact name (W15), so no code of the Agent loop can name the provider (LOOP-5.1). It does not depend on `navori-store` or `navori-redact`: the record goes through a trait implemented in `crates/ffi` (the `AuditSink` precedent, ai.rs:116-168), and the Shield through `Gateway::shield`.
 2. **Canonical types stay in `ai/llm`** (W15; docs/ARCHITECTURE.md:172-186). `ai/context` takes a types-only edge on `ai/llm` and re-exports the types, never `LlmProvider`. `crates/ffi` implements the Gateway's new `ChatSender` over `LlmProvider`. The dependency docs change accordingly (docs/codebase/dependencies.md:29, :42).
-3. **One Shield, applied once per item.** `ai/context` exposes its private fail-closed check (`catch_unwind` around `redact_text` plus `well_formed`, gateway.rs:173-205) as `pub fn shield(text) -> Option<Redacted>`. The loop Shields each item once, when it is recorded (LOOP-3.6), and keeps the item's finding count. A request carries `prior_redactions`, the sum over the messages it sends for the first time. The Gateway Shields every text of the request again, since it is the enforcement point, and writes `redacted_count = prior_redactions + its own findings` (W9: a per-request count, never a Turn total). This depends on the Shield being idempotent on already-redacted text, which a unit test pins.
+3. **One Shield, applied once per item, counted once.** `Gateway::shield(&self, text) -> Option<Shielded>` runs the Gateway's own injectable fail-closed check (`catch_unwind` around the Shield fn, plus `well_formed`, gateway.rs:173-205). It returns `Shielded { text, count }`, where `count` excludes findings whose span is already a `[REDACTED:…]` marker. The design review found that `secret_assignment` and `url_password` re-match their own marker, so the text is idempotent but the raw finding count is not (auto/design-review.md item 8). The loop Shields each item once, when it is recorded (LOOP-3.6), and keeps its `count`. A request carries `prior_redactions`, the sum of the counts of the messages it sends for the first time. The Gateway Shields every text of the request again, since it is the enforcement point, and writes `redacted_count = prior_redactions + its own fresh count` (W9: per request, never a Turn total; resent history adds 0). A unit test pins a second pass over shielded text giving count 0 for every rule.
 4. **Non-streaming, serial Steps, serial tool calls.** Each model call is one `stream:false` request (LOOP-1.5). The tool calls of a Step run one after another, in the model's order (`agent-decided`, S-parallel). A Module actor serialises its own Actions anyway (scan.md §5.9), and the results keep the model's order (LOOP-1.2).
 5. **Tool names.** `{module}_{action}`, for example `ports_list` and `awake_status` (`agent-decided`, S-tools). DeepSeek allows `[a-zA-Z0-9_-]` up to 128 characters (research). Names map back through a table built from `Kernel::actions()` at the start of each Turn, never by splitting the string. Two Actions that would get the same name are both left out, with a warning.
 6. **Per-Action parameter schema.** It is cut from the module's shared `schema_for!` enum schema (runtime.rs:154-163). A unit variant gets `{"type":"object","properties":{},"additionalProperties":false}`. A struct or tuple variant gets the schema under its variant key, with the enum's `$defs` re-attached. The schemars 1.x `oneOf` shape is unverified (scan-design §6), so the first task pins it with a test. An Action whose variant cannot be found is not offered and a warning is logged (`agent-decided`).
-7. **The one dispatch point** is `navori_agent`'s `Dispatcher::call`. It checks, in this order: the name is known; the catalog Risk is `read` (W2, LOOP-2.2); the arguments parse as JSON. Then it builds the Envelope: a unit variant becomes the bare name, any other variant `{name: args}`. It calls `Kernel::dispatch` under a 10 s limit (`agent-decided`, ≤ 30 s; LOOP-1.9). "Dispatch nothing" (LOOP-1.8) means the Module receives no request: an argument that does not fit the schema fails in the Kernel's typed deserialize (`DispatchError::InvalidAction`, runtime.rs:28-40), before anything reaches the Module's inbox.
+7. **The one dispatch point** is `navori_agent`'s `Dispatcher::call`. It checks, in this order: the name is known; the catalog Risk is `read` (W2, LOOP-2.2); the arguments parse as JSON. Then it builds the Envelope: a unit variant becomes the bare name, any other variant `{name: args}`. It calls `Kernel::dispatch` under a 10 s limit (`agent-decided`, ≤ 30 s; LOOP-1.9). The dispatcher receives the arguments as the model wrote them. The Module is local, so nothing leaves the machine (ARCH-6/7 cover what is stored or sent). The record keeps the Shielded copy (LOOP-3.2, 3.6; `agent-decided`). A timed-out or cancelled call leaves its request queued or running in the Module (the dropped receiver is ignored, runtime.rs:25); for Read Actions that is harmless. "Dispatch nothing" (LOOP-1.8) means the Module receives no request: an argument that does not fit the schema fails in the Kernel's typed deserialize (`DispatchError::InvalidAction`, runtime.rs:28-40), before anything reaches the Module's inbox.
 8. **Limits** (`agent-decided`, S-limits): at most 8 Steps per Turn, and a token limit of 200 000. The limit counts the sum of input and output tokens over the Turn's model calls; a call that reported no usage counts 0. Both are fields of `Limits`, which tests inject.
 9. **Turn origin** (`agent-decided`, S-origin): `Origin::User`, stored as `user`. It is the only value until ROAD-15/ROAD-37 add others. It has no CHECK constraint, so new values need no migration.
 10. **Shield refusal mid-Turn** (`agent-decided`, S-shield-refusal): the call is not sent, a `blocked` row is written (LOOP-5.4), and the Turn ends with the error `shield`. The whole request is withheld, as ASK refuses the whole ask (ASK design D6). A model cannot be told about a refusal without sending it something.
 11. **Turn end reasons** (LOOP-3.7, `agent-decided` after dsh `TurnEndReason`): `completed`, `cancelled`, `step_limit`, `token_limit`, `error`, `interrupted`. The `error` reason carries one of the kinds `provider`, `shield`, `audit`, `record`, `no_key` or `keychain`.
-12. **Journal** (W13/W14): one Event when a Turn ends, including a Turn repaired as `interrupted`. Module `ai`, kind `ai.turn_ended`. Severity `info`, or `warn` for `error` and `interrupted`. The summary holds no content, and the payload holds ids, fixed tokens and counts only. The Event is emitted through the Kernel's `EventBus`, which redacts and journals it (kernel/src/bus.rs:31-57).
+12. **Journal** (W13/W14): one Event when a Turn ends, including a Turn repaired as `interrupted`. Module `ai`, kind `ai.turn_ended`. Severity `info`, or `warn` for `error` and `interrupted`. The summary holds no content, and the payload holds ids, fixed tokens and counts only. The Event is emitted through the Kernel's `EventBus`, which redacts and journals it (kernel/src/bus.rs:31-57). It is emitted only after the Turn's end is recorded. If that write fails, no Event goes out, and the repair on the next open emits the single `interrupted` Event, so each Turn has exactly one.
 13. **Storage** (L22, `agent-decided` throughout): Owner `ai_session` with five tables, all in data.md:37's `ai_session_*` family. Message bodies are a versioned JSON encoding owned by `navori-agent` (W16). It is migrated lazily on the first Turn (ARCH-17). Writes run through `spawn_blocking` (LOOP-11.3). See "Persisted formats".
-14. **Starter seam.** `NavoriCore::run_agent_turn(TurnRequest, CancellationToken)` is a plain Rust `pub` method, not `#[uniffi::export]`, beside `start_with` (crates/ffi/src/lib.rs:262). It is not an FFI, IPC, protocol or CLI entry, so LOOP-10.4 holds. ROAD-15/ROAD-37 will wrap it.
-15. **`FakeLlm`** lives in `ai/llm` behind its `fake` feature. It holds a scripted queue of replies and errors, records each request, and can be held at a barrier. It enters ffi tests through a new `AiDeps::make_provider` field. In production, `AiDeps` builds one `Arc<OpenAiCompat>` that both `LlmSender` (ask) and `LlmChatSender` (loop) share, so there is still one HTTP client.
+14. **Starter seam.** `NavoriCore::run_agent_turn(TurnRequest, CancellationToken) -> Result<TurnOutcome, TurnStartError>` is a plain Rust `pub` method, not `#[uniffi::export]`, beside `start_with` (crates/ffi/src/lib.rs:262). It is not an FFI, IPC, protocol or CLI entry, so LOOP-10.4 holds. ROAD-15/ROAD-37 will wrap it.
+15. **`FakeLlm`** lives in `ai/llm` behind its `fake` feature. It holds a scripted queue of replies and errors, records each request, and can be held at a barrier. It enters ffi tests through a new `AiDeps::make_provider` field. `AiDeps` also gains `make_conversations: Arc<dyn Fn(Store) -> Arc<dyn ConversationStore>>` (production: `StoreConversations::new`), so a test can wrap the store with a gate (LOOP-11.3). `navori-llm` joins check-deps' `FAKE_GUARDED` list (xtask/src/main.rs:793), so its `fake` feature is only ever a dev-dependency. In production, `AiDeps` builds one `Arc<OpenAiCompat>` that both `LlmSender` (ask) and `LlmChatSender` (loop) share, so there is still one HTTP client. `LlmSender::new` therefore takes `Arc<OpenAiCompat>`.
 16. **No ADR.** The three-part gate fails. The dependency-edge change is cheap to reverse and is recorded in docs/codebase/dependencies.md. The storage shape is hard to reverse but not surprising: it follows data.md:37 and dsh's log.
 
 Spine this design relies on: ARCH-1, ARCH-3, ARCH-4, ARCH-5, ARCH-6, ARCH-7, ARCH-12, ARCH-15, ARCH-17.
@@ -65,11 +65,12 @@ deep modules — an interface much simpler than what it hides.
 
 Satisfies: LOOP-1.5, LOOP-1.6, LOOP-1.7, LOOP-10.1
 Reuse: rung 2 — extends `ai/llm` (`ChatRequest`, `ChatReply`, `LlmProvider`, `OpenAiCompat`)
-Respects: ARCH-15
+Respects: ARCH-17
 Surface:
-- `crates/ffi/src/ai.rs` `LlmSender` (builds `Message { role: Role::User, text }`, reads `reply.text`) — **replace**: it builds `Message::User { text }` and reads `reply.message.text`. An empty or missing text is still `Malformed` on the ask path, so ASK-4 behavior holds.
-- `ai/llm/tests/openai_compat.rs` (asserts the body keys are exactly `messages, model, stream`, :44-52) — **replace**: the tests stay as they are and must pass. New fields are `skip_serializing_if` empty or `None`, so a plain text request is byte-for-byte the same shape (LOOP-10.1).
-- `ai/llm/tests/live_deepseek.rs` — **replace**: uses `Message::User`.
+- `crates/ffi/src/ai.rs` `LlmSender` (builds `Message { role: Role::User, text }`, reads `reply.text`, ai.rs:58-97) — **replace**: it builds `Message::User { text }`, reads `reply.text` (now an `Option`), and takes `Arc<OpenAiCompat>`. Callers `LlmSender::new` at crates/ffi/tests/ask.rs:713, :834 and the `pub use` at lib.rs:35 — **replace**. An empty or missing text is still `Malformed` on the ask path, so ASK-4 behavior holds.
+- `ai/llm/tests/openai_compat.rs` (`hello()` builds `Message { role: Role::User, .. }`, reads `reply.text` as a `String`, :30; asserts the body keys are exactly `messages, model, stream`, :44-52) — **replace**: the constructors and the reply reads are updated mechanically. The key-set assertion stays unchanged and must pass, because new fields are `skip_serializing_if` empty or `None` (LOOP-10.1).
+- `ai/llm/tests/live_deepseek.rs` — **replace**: uses `Message::User` and the `Option` text.
+- `openai_compat.rs` internals (`WireMessage`, `Role::User =>`, `ChatReply { text }`, `WireContent { content: String }`, :53-56, 86, 132-145) — **replace**.
 - DeepSeek wire (external) — **frozen**: the design builds around it (research-deepseek-tools.md) and changes nothing on the provider side.
 Interface:
 ```rust
@@ -88,7 +89,7 @@ pub enum Finish { Stop, ToolCalls, Length, Other(String) }
 // LlmProvider::complete(ChatRequest, &Secret) -> BoxFuture<Result<ChatReply, LlmError>>  (unchanged signature)
 ```
 Depth: n/a — extends `ai/llm`.
-Locality: extend `ai/llm/src/lib.rs` and `openai_compat.rs` only. Neighbors: `crates/ffi/src/ai.rs` LlmSender is a mechanical update.
+Locality: extend `ai/llm/src/lib.rs` and `openai_compat.rs` only. Neighbors: `crates/ffi/src/ai.rs` LlmSender is a mechanical update. These types are a subset of the seed canonical format (docs/ARCHITECTURE.md:172-186: no `system` role, no `ContentPart`, no `tool_choice`); ROAD-11 reshapes them, and the stored encoding does not depend on them (W16).
 
 Wire mapping in `openai_compat.rs`:
 - **Sending.** `tools` becomes `[{type:"function", function:{name, description, parameters}}]` and is omitted when empty. An assistant message becomes `{role:"assistant", content: text|null, reasoning_content?: reasoning, tool_calls?: [{id, type:"function", function:{name, arguments}}]}`, with `reasoning_content` sent whenever recorded (LOOP-1.7). A tool message becomes `{role:"tool", tool_call_id, content}`. No `thinking` field is sent, so the Provider's default (thinking on) stays (LOOP-1.7 `agent-decided`).
@@ -97,10 +98,10 @@ Wire mapping in `openai_compat.rs`:
 ### `FakeLlm` (`ai/llm`, feature `fake`)
 
 Satisfies: LOOP-8.1
-Reuse: rung 2 — the `fake` feature pattern of `navori-secrets` (crates/secrets/src/fake.rs:16-55), checked by check-deps' fake-feature rules
+Reuse: rung 2 — the `fake` feature pattern of `navori-secrets` (crates/secrets/src/fake.rs:16-55); `navori-llm` is added to check-deps' `FAKE_GUARDED` (xtask/src/main.rs:793)
 Interface: `FakeLlm::new(script: Vec<Result<ChatReply, LlmError>>)`; `requests() -> Vec<ChatRequest>`; `hold_next() -> Release` (parks the next call until released); it implements `LlmProvider`.
 Depth: a scripted queue that answers `complete` in order and records what it was sent. Callers know only the script and the recorded requests.
-Locality: new file `ai/llm/src/fake.rs`; `ai/llm/Cargo.toml` gains `[features] fake = []`. Leave everything else.
+Locality: new file `ai/llm/src/fake.rs`; `ai/llm/Cargo.toml` gains `[features] fake = []`. `ai/llm/tests/default_tests_use_fakes.rs` extends its scan to `ai/agent/tests/` and `crates/ffi/tests/agent.rs`, so LOOP-8.1 is checked rather than left to review.
 
 ### Context Gateway: structured send and the public Shield (`ai/context`)
 
@@ -110,26 +111,27 @@ Respects: ARCH-6, ARCH-7
 Security: THR-1, THR-10
 Surface:
 - `crates/ffi/src/ai.rs` `AiRuntime::gateway()` (builds `Gateway::new(...)`) — **replace**: it adds `.with_chat_sender(Arc<dyn ChatSender>)`. `Gateway::new`'s signature is unchanged.
-- `ai/context` tests building `Gateway::new`/`with_shield` — **replace**: they need no edit, because the builder is additive.
+- `ai/context` tests building `Gateway::new`/`with_shield` (ai/context/tests/gateway.rs:146, :156, :421) — **frozen**: kept unchanged, since the builder is additive.
 - `context_audit` rows (persisted, read by ROAD-12 later) — **frozen**: columns and values are untouched (W6, W7). Only data.md:27's wording changes, from "per ask" to "per model call" (W8). ROAD-12 inherits the meaning.
 - `navori-context` dependency row (docs/codebase/dependencies.md:29) — **replace**: it gains `navori-llm`, types only (W15).
 Interface:
 ```rust
 pub use navori_llm::{Message, ToolCall, ToolDef, ChatRequest, ChatReply, Usage, Finish}; // never LlmProvider
-pub fn shield(text: &str) -> Option<navori_redact::Redacted>;   // fail-closed: None on panic or malformed findings
+pub struct Shielded { pub text: String, pub count: u32 }      // count excludes spans already `[REDACTED:…]`
 pub trait ChatSender: Send + Sync {
     fn send<'a>(&'a self, key: &'a Secret, request: ChatRequest) -> BoxFuture<'a, Result<ChatReply, SendError>>;
 }
 pub struct Outbound { pub request: ChatRequest, pub prior_redactions: u32 }
 impl Gateway {
     pub fn with_chat_sender(self, sender: Arc<dyn ChatSender>) -> Self;
+    pub fn shield(&self, text: &str) -> Option<Shielded>;    // fail-closed: None on panic or malformed findings
     pub async fn send_chat(&self, outbound: Outbound) -> Result<ChatReply, AskError>;
 }
 ```
 Depth: n/a — extends `Gateway`.
 Locality: extend `ai/context/src/gateway.rs` (and lib.rs re-exports); `ai/context/Cargo.toml` gains `navori-llm`. Leave `ask` and its order untouched (LOOP-10.2).
 
-`send_chat` runs in the order `ask` uses: read the key (missing → `NoKey`), Shield every text of every message (user text, assistant text and reasoning, tool-call arguments, tool text) with `shield`, then write the audit row, then send. The audit row is `{provider: "deepseek", kinds: ["text"], redacted_count: prior_redactions + findings, outcome}`.
+`send_chat` runs in the order `ask` uses: read the key (missing → `NoKey`), Shield every text of every message (user text, assistant text and reasoning, tool-call arguments, tool text) with `self.shield`, then write the audit row, then send. The audit row is `{provider: "deepseek", kinds: ["text"], redacted_count: prior_redactions + findings, outcome}`.
 - A Shield failure on any text writes a best-effort `blocked` row and returns `AskError::Shield`; nothing is sent (LOOP-5.4).
 - An audit failure returns `AskError::Audit`; nothing is sent (LOOP-5.5).
 - A send without a chat sender returns `AskError::Send("no chat sender")`.
@@ -153,7 +155,7 @@ Satisfies: LOOP-1.2, LOOP-1.8, LOOP-1.9, LOOP-2.1, LOOP-2.2, LOOP-2.3, LOOP-2.4,
 Reuse: rung 2 — `Kernel::dispatch` and `Envelope` (runtime.rs:330-342; protocol lib.rs:35-39); `tokio::time::timeout` (rung 3)
 Respects: ARCH-3, ARCH-5
 Security: THR-2, THR-11
-Interface: `Dispatcher::call(&self, kernel: &Kernel, toolset: &Toolset, call: &ToolCall) -> ToolOutcome`, where `ToolOutcome { text: String, is_error: bool }`.
+Interface: `Dispatcher::call(&self, kernel: &Kernel, toolset: &Toolset, call: &ToolCall) -> ToolOutcome`, where `ToolOutcome { text: String, is_error: bool }`. `call.arguments` is the raw text the model wrote (Decision 7).
 Depth: if it vanished, callers would need to rebuild "map a tool call to an Envelope only when its catalog Risk is read". The check order, the Envelope shape and the timeout are hidden.
 Locality: new file. It is the only place in `ai/agent` that names `Kernel::dispatch`, and a source test asserts that (LOOP-2.1).
 
@@ -193,11 +195,16 @@ pub struct Agent { /* gateway, store, bus, limits */ }
 impl Agent {
     pub fn new(gateway: Arc<Gateway>, store: Arc<dyn ConversationStore>, bus: EventBus, limits: Limits) -> Self;
     pub async fn run_turn(&self, kernel: &Kernel, request: TurnRequest, cancel: CancellationToken)
-        -> TurnOutcome;
+        -> Result<TurnOutcome, TurnStartError>;
 }
+pub struct ConversationId(String); pub struct TurnId(String);           // ULIDs
+pub enum Origin { User }                                                 // stored `user`
+pub enum TurnErrorKind { Provider, Shield, Audit, Record, NoKey, Keychain }
+pub enum TurnStartError { ShutDown, Keychain(String), UnknownConversation, Record(RecordError) } // before any Turn row exists
+pub struct Toolset { /* name → Tool */ }  pub struct Tool { pub module: String, pub action: String, pub risk: Risk, pub unit: bool }
 pub struct TurnRequest { pub conversation: Option<ConversationId>, pub origin: Origin, pub model: String, pub input: String }
 pub struct TurnOutcome { pub conversation: ConversationId, pub turn: TurnId, pub end: TurnEnd, pub answer: Option<String>, pub steps: u32 }
-pub enum TurnEnd { Completed, Cancelled, StepLimit, TokenLimit, Error(TurnErrorKind), Interrupted }
+pub enum TurnEnd { Completed, Cancelled, StepLimit, TokenLimit, Error(TurnErrorKind) } // `interrupted` exists only in the record, written by repair
 pub struct Limits { pub max_steps: u32, pub max_tokens: u64, pub action_timeout: Duration } // default 8, 200_000, 10 s
 ```
 Depth: if it vanished, callers would still need only "give it an origin, a model, an input and a cancel token; get back an end reason and an answer". The record sequence, message derivation, limits, cancel pairing, guards and Event stay hidden.
@@ -209,14 +216,15 @@ One Turn, in order:
 3. **Step loop.** If `steps == max_steps`, end `step_limit` (LOOP-6.1). Otherwise:
    - Record the Step start.
    - Build `Outbound`: the messages derived from the Conversation (LOOP-3.10) plus `toolset.defs()`, with `prior_redactions` = the counts of the messages first sent in this request.
-   - `select!` on `gateway.send_chat` against `cancel` (LOOP-7.1).
+   - If `cancel.is_cancelled()`, stop here. Otherwise `select! { biased; _ = cancel.cancelled() => …, r = gateway.send_chat(..) => … }` (LOOP-7.1). The cancel arm comes first, so a set cancel is never raced by a send's first poll.
    - Shield and record the reply with its tool calls' raw arguments (LOOP-3.2), and record its usage, or that none was reported (LOOP-3.4, 3.5).
    - If there are no tool calls, end `completed` with the reply text as the answer (LOOP-1.3).
-   - Otherwise, for each call in order, `select!` on `dispatcher.call` against `cancel`. Append the `RepeatGuard` reminder, then Shield and record the result paired by `call_id` (LOOP-3.3).
+   - Otherwise, for each call in order, check `cancel.is_cancelled()`, then run a `biased` `select!` with the cancel arm first around `dispatcher.call`. Append the `RepeatGuard` reminder, then Shield and record the result paired by `call_id` (LOOP-3.3).
    - Record the Step end. If the Turn's summed tokens are at or over `max_tokens`, end `token_limit` (LOOP-6.2).
-4. **End.** Every recorded call without a result first gets the synthetic error result `Error: the Turn ended before this call finished; its outcome is unknown. Retry only if it is read-only.` (LOOP-7.2). Then record the end reason (LOOP-3.7) and emit `ai.turn_ended`.
+4. **End.** Every recorded call without a result first gets a synthetic error result (LOOP-7.2), using dsh's two texts (repair.ts:14-42): "outcome unknown" for the call that was in flight, and "not started" for calls the Turn never reached. Then the end reason is recorded with those results in one `append` (LOOP-3.7). Only after that write succeeds is `ai.turn_ended` emitted (Decision 12).
 
-- A record write that fails ends the Turn as `error(record)`, sends no further request, and still emits the Event best-effort. The end that could not be written is repaired on the next open (LOOP-3.9, LOOP-4.1).
+- A record write that fails ends the Turn as `error(record)` and sends no further request (LOOP-3.9). The closers and the end are still attempted once. If they fail too, no Event is emitted, and the next open's repair closes the Turn and emits the one `interrupted` Event (LOOP-4.1). LOOP-7.2 then holds once that repair has run, not at the moment the Turn returns.
+- A Turn with no key saved creates its Conversation and Turn rows (and runs the lazy migration) before the first `send_chat` finds no key. It then ends `error(no_key)`, which leaves a recorded Turn, as intended.
 - A Gateway error maps to `error(no_key|keychain|shield|audit|provider)`.
 
 Logging: `tracing` fields are ids, counts, end reasons, kinds and tool names only. No message text, reasoning, arguments or results are logged unless debug logging is on (LOOP-11.5).
@@ -227,7 +235,7 @@ Message derivation (dsh surface.ts:120-165): a fold over the Conversation's mess
 
 Satisfies: LOOP-4.1
 Reuse: rung 7 — a port of dsh `core/session/src/repair.ts` `openTurnClosers` / `ToolCallRecovery` (211 TS lines)
-Interface: `repair(log: &ConversationLog) -> Vec<Entry>`. It returns the closers to append, which is empty when the last Turn has an end.
+Interface: `repair(log: &ConversationLog) -> Vec<Entry>`, appended with one `append(&closers)` call, so they land in one transaction. It returns the closers to append, which is empty when the last Turn has an end.
 Depth: callers append what it returns. Finding the open Turn, the open Step and the unanswered calls stays hidden.
 Locality: new file. The Turn driver calls it before a continuing Turn, and the closers end with `TurnEnded(interrupted)`, which also emits `ai.turn_ended` (W13 refinement 2).
 
@@ -241,25 +249,36 @@ Respects: ARCH-12, ARCH-17
 Interface:
 ```rust
 pub trait ConversationStore: Send + Sync {          // blocking; the Agent calls it through spawn_blocking
-    fn append(&self, entry: Entry) -> Result<(), RecordError>;
+    fn append(&self, entries: &[Entry]) -> Result<(), RecordError>;   // all entries in one transaction
     fn load(&self, conversation: &ConversationId) -> Result<ConversationLog, RecordError>;
 }
-pub enum Entry { ConversationStarted{..}, TurnStarted{..}, StepStarted{..}, Message{..}, Usage{..}, StepEnded{..}, TurnEnded{..} }
+pub enum Entry {
+    ConversationStarted { id: ConversationId, ts_ms: i64 },
+    TurnStarted { id: TurnId, conversation: ConversationId, seq: u32, origin: Origin, model: String, ts_ms: i64 },
+    StepStarted { turn: TurnId, seq: u32, ts_ms: i64 },
+    Message { turn: TurnId, seq: u32, step: Option<u32>, body: RecordedMessage, redactions: u32, ts_ms: i64 },
+    Usage { turn: TurnId, step: u32, usage: Option<Usage> },
+    StepEnded { turn: TurnId, seq: u32, ts_ms: i64 },
+    TurnEnded { turn: TurnId, end: String, ts_ms: i64 },          // `completed` … `error:<kind>` | `interrupted`
+}
+pub enum RecordedMessage { Input { text }, Assistant { text, reasoning, tool_calls }, ToolResult { call_id, text, is_error, synthetic } }
+pub struct ConversationLog { pub turns: Vec<LoggedTurn> }        // in seq order; each with its messages, open/closed steps and end
+pub enum RecordError { UnknownConversation, Migration, Write, Read, Duplicate }
 ```
 Depth: two methods, append and load. Tables, the encoding, the lazy migration and the transactions stay hidden in `StoreConversations`.
 Locality: new `ai/agent/src/record.rs` for the trait and the versioned body encoding, and `StoreConversations` in `crates/ffi/src/ai.rs` beside `StoreAudit`. Leave the Store crate as it is (LOOP-10.6).
 
-`StoreConversations::append` runs `ensure_table()` first, which migrates Owner `ai_session` v1 on the first call and does not cache a failed migration (as `StoreAudit` does). Then it writes one statement, or one `unchecked_transaction` for `TurnEnded` with its closers. The Agent wraps each call in `spawn_blocking`, so a held write never blocks the two Core workers (LOOP-11.3). The barrier test holds `append` with a `Gate` (crates/ffi/tests/ask.rs:905-962) while `core.status` answers.
+`StoreConversations::append` and `load` both run `ensure_table()` first (`load` of an unknown id returns `RecordError::UnknownConversation`, not an empty log), which migrates Owner `ai_session` v1 on the first call and does not cache a failed migration (as `StoreAudit` does). Then `append` writes all its entries in one `unchecked_transaction`. A second result for the same `call_id` in a Turn is refused by the partial UNIQUE index (`RecordError::Duplicate`), and the driver treats that as "already answered". The Agent wraps each call in `spawn_blocking`, so a held write never blocks the two Core workers (LOOP-11.3). The barrier test injects, through `AiDeps::make_conversations`, a `ConversationStore` whose `append` parks on a `Gate` (the shape of crates/ffi/tests/ask.rs:905-962), and asserts that `core.status` answers meanwhile.
 
 ### Journal Event (`ai/agent/src/turn.rs`, emitted through `EventBus`)
 
 Satisfies: LOOP-3.11
 Reuse: rung 2 — `EventBus::emit` (kernel/src/bus.rs:40-57), as ffi emits `core.started` (crates/ffi/src/app.rs:521-531)
 Surface:
-- Journal readers (`CoreStore.swift` snapshot events, `navori events`, `core.events`) — **replace**: they read events generically and branch on no kind (W14), so a new kind needs no edit.
+- Journal readers (`CoreStore.swift` snapshot events, `navori events`, `core.events`) — **frozen**: kept unchanged, since they read events generically and branch on no kind (W14).
 Interface: none new. `run_turn` emits `bus.emit("ai", "ai.turn_ended", severity, summary, payload)`.
 Depth: n/a — extends `EventBus` use.
-Locality: inside the Turn driver's end step and the repair closers.
+Locality: inside the Turn driver's end step and the repair closers, emitted only after the end is recorded (Decision 12).
 
 The summary is `Navori AI finished a Turn: <end> after <n> Steps`, with no content. The payload is `{"conversation": "<ulid>", "turn": "<ulid>", "origin": "user", "end": "<reason>", "steps": n}`; for `error`, `end` is `error:<kind>`.
 
@@ -269,18 +288,19 @@ Satisfies: LOOP-9.1, LOOP-10.3, LOOP-10.4, LOOP-11.2
 Reuse: rung 2 — `AiRuntime` lazy `OnceCell` building (crates/ffi/src/ai.rs:192-249), `AiDeps` and `start_with` (lib.rs:262), the `on_runtime` hop (lib.rs:244-257), and the live gate pattern (ai/llm/tests/live_deepseek.rs:15-24)
 Respects: ARCH-1, ARCH-17
 Surface:
-- `AiDeps` literal constructions — **replace**: `AiDeps::production()` and the tests' `Fixture::deps()` gain `make_provider`. ask.rs's `deps_sending` uses `..self.deps()` (ask.rs:390-393) and keeps compiling.
+- `AiDeps` literal constructions — **replace**: `AiDeps::production()`, ask.rs `Fixture::deps()` and the full literals at crates/ffi/tests/ask.rs:272, :739, :764, :1140 and apps/cli/tests/cli.rs:102 gain `make_provider` and `make_conversations`. `deps_sending` uses `..self.deps()` (ask.rs:390-393) and needs no edit.
 - `AiRuntime::new(profile, deps, store)` (lib.rs:319-329) — **replace**: it gains `bus: EventBus` (the Kernel is built first, lib.rs:296).
 - Swift (`CoreStore.swift`) and UniFFI bindings — **frozen**: the design builds around them. `run_agent_turn` is not exported, so the generated bindings are unchanged (LOOP-10.4).
 Interface:
 ```rust
 impl NavoriCore {
-    pub async fn run_agent_turn(&self, request: TurnRequest, cancel: CancellationToken) -> TurnOutcome; // plain Rust, not uniffi
+    pub async fn run_agent_turn(&self, request: TurnRequest, cancel: CancellationToken)
+        -> Result<TurnOutcome, TurnStartError>; // plain Rust, not uniffi; via on_runtime (ShutDown → TurnStartError::ShutDown)
 }
-pub use navori_agent::{TurnRequest, TurnOutcome, TurnEnd, TurnErrorKind, Origin, ConversationId};
+pub use navori_agent::{TurnRequest, TurnOutcome, TurnEnd, TurnErrorKind, TurnStartError, Origin, ConversationId, ConversationStore};
 ```
 Depth: n/a — extends `AiRuntime` and `NavoriCore`.
-Locality: extend `crates/ffi/src/ai.rs` (`AiRuntime::agent()` built lazily with `get_or_try_init`, `LlmChatSender`, `StoreConversations`) and `crates/ffi/src/lib.rs` (the new method and re-exports). Nothing AI is built at start (LOOP-10.3, LOOP-11.2).
+Locality: extend `crates/ffi/src/ai.rs` (`AiRuntime::agent()` built lazily with `get_or_try_init`, `LlmChatSender`, `StoreConversations`) and `crates/ffi/src/lib.rs` (the new method and re-exports). In the `Inner` literal (lib.rs:318-330), clone the bus out of `kernel` before `kernel` is moved. Nothing AI is built at start (LOOP-10.3, LOOP-11.2).
 
 The live Turn (LOOP-9.1) is `crates/ffi/tests/live_agent.rs`, marked `#[ignore]` and gated on `NAVORI_LIVE_LLM=1`, `NAVORI_LIVE_PASS_ENTRY` and `NAVORI_LIVE_MODEL`. It reads the key from `pass`, the same way ai/llm's live test does. It saves the key into a `FakeKeychain`, starts a core with production providers, runs "Which TCP ports are open on this Mac? Use the tools.", and prints the answer, the end reason and the Actions called.
 
@@ -290,10 +310,11 @@ Satisfies: LOOP-10.7, LOOP-10.8
 Reuse: rung 2 — `check-deps` (xtask/src/main.rs:696-762); workspace dependencies (Cargo.toml)
 Surface:
 - `check-deps` — **replace**: one new rule, `navori-agent` must not depend on `navori-llm` (matched by that exact name, since the `navori-ai` prefix rule matches no AI crate, xtask/src/main.rs:736).
-- docs/codebase/dependencies.md :29 (`navori-context` gains `navori-llm`, types only) and :42 (`ai/agent` → `ai/context`, kernel, protocol; not `ai/llm`) — **replace**.
+- docs/codebase/dependencies.md :29 (`navori-context` gains `navori-llm`, types only) and :42 (`ai/agent` → `ai/context`, kernel, protocol; not `ai/llm`), docs/codebase/modules.md:41-42 and map.md:29 — **replace**.
+- `FAKE_GUARDED` (xtask/src/main.rs:793) — **replace**: gains `navori-llm`.
 Interface: none.
 Depth: n/a.
-Locality: `xtask/src/main.rs` (one rule and its test), the workspace `Cargo.toml` (member `ai/agent`), `ai/agent/Cargo.toml` (`[lints] workspace = true`), and `ai/agent/LICENSE-dsh`, which holds dsh's MIT text and copyright line. Each ported file opens with `// Ported from dsh (MIT, Copyright (c) 2026 DeepSeek): <package path>. See ai/agent/LICENSE-dsh.`
+Locality: `xtask/src/main.rs` (one rule, the `FAKE_GUARDED` entry and their tests), the workspace `Cargo.toml` (member `ai/agent`, a `navori-agent = { path = "ai/agent" }` entry in `[workspace.dependencies]`, and `navori-llm` with `fake` as a dev-dependency of ffi), `ai/agent/Cargo.toml` (`[lints] workspace = true`), and `ai/agent/LICENSE-dsh`, which holds dsh's MIT text and copyright line. Each ported file opens with `// Ported from dsh (MIT, Copyright (c) 2026 DeepSeek): <package path>. See ai/agent/LICENSE-dsh.`
 
 ### Existing behavior and performance
 
@@ -309,7 +330,8 @@ Locality: leave. LOOP-11.1 is measured by `cargo xtask perf` at the base and at 
    - `ai_session_conversation (id TEXT PRIMARY KEY, created_ms INTEGER NOT NULL)`, where `id` is a ULID.
    - `ai_session_turn (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL REFERENCES ai_session_conversation(id), seq INTEGER NOT NULL, origin TEXT NOT NULL, model TEXT NOT NULL, started_ms INTEGER NOT NULL, ended_ms INTEGER, end_reason TEXT, UNIQUE (conversation_id, seq))`. `origin` takes `user`. `end_reason` takes `completed|cancelled|step_limit|token_limit|interrupted|error:<kind>`. Neither has a CHECK, so later values need no migration.
    - `ai_session_step (turn_id TEXT NOT NULL REFERENCES ai_session_turn(id), seq INTEGER NOT NULL, started_ms INTEGER NOT NULL, ended_ms INTEGER, PRIMARY KEY (turn_id, seq))`.
-   - `ai_session_message (turn_id TEXT NOT NULL REFERENCES ai_session_turn(id), seq INTEGER NOT NULL, step INTEGER, kind TEXT NOT NULL, body TEXT NOT NULL, redactions INTEGER NOT NULL, created_ms INTEGER NOT NULL, PRIMARY KEY (turn_id, seq))`. `kind` takes `input|assistant|tool_result`, and `step` is NULL for `input`.
+   - `ai_session_message (turn_id TEXT NOT NULL REFERENCES ai_session_turn(id), seq INTEGER NOT NULL, step INTEGER, kind TEXT NOT NULL, call_id TEXT, body TEXT NOT NULL, redactions INTEGER NOT NULL, created_ms INTEGER NOT NULL, PRIMARY KEY (turn_id, seq))`. `kind` takes `input|assistant|tool_result`; `step` is NULL for `input`; `call_id` is set only on `tool_result` rows.
+   - The index `ai_session_one_result_per_call` is a `UNIQUE ON ai_session_message(turn_id, call_id) WHERE kind = 'tool_result'`, so storage refuses a second result for a call (LOOP-7.2).
    - `ai_session_usage (turn_id TEXT NOT NULL REFERENCES ai_session_turn(id), step INTEGER NOT NULL, reported INTEGER NOT NULL CHECK (reported IN (0,1)), input_tokens INTEGER, output_tokens INTEGER, cache_hit_tokens INTEGER, cache_miss_tokens INTEGER, PRIMARY KEY (turn_id, step))`. There is one row per model call; with `reported = 0`, the counts are NULL (LOOP-3.5).
    - The index is `ai_session_turn_by_conversation ON ai_session_turn(conversation_id, seq)`.
 2. **Message body encoding v1** (JSON in `ai_session_message.body`, owned by `navori-agent` with its own serde structs and not derived from `ai/llm` types, W16). All strings are stored after the Shield:
@@ -329,14 +351,14 @@ New seams: two. `Agent::run_turn` lets the loop's logic be tested with a real Ke
 |---|---|---|
 | `OpenAiCompat` against the local `Responder` (ai/llm/tests) | integration | LOOP-1.5, 1.6, 1.7, 10.1 |
 | `FakeLlm` script and recorded requests (ai/llm/tests, feature `fake`) | unit | LOOP-8.1 |
-| `navori_context::shield` (idempotent on already-redacted text; fail-closed) | unit | LOOP-3.6, 5.3 |
+| `Gateway::shield` (second pass over Shielded text gives `count` 0 for every rule, including `secret_assignment` and `url_password`; fail-closed on a panicking injected Shield) | unit | LOOP-3.6, 5.3 |
 | `Gateway::send_chat` with fake `SecretStore`, recording `ChatSender` and in-memory `AuditSink` (ai/context/tests) | unit | LOOP-5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 11.4 |
 | `Gateway::ask` (existing tests unchanged) | unit | LOOP-10.2 |
 | `Toolset::from_specs` with the real `schema_for!` of `SystemAction` and of a test enum (ai/agent/tests) | unit | LOOP-1.1 |
 | `Agent::run_turn` with a `KernelBuilder` Kernel, a scripted `ChatSender` and an in-memory `ConversationStore` (ai/agent/tests) | integration | LOOP-1.2, 1.3, 1.4, 1.8, 1.9, 2.1, 2.3, 2.4, 2.5, 3.1–3.7, 3.9, 3.10, 3.11, 4.1, 6.1, 6.2, 6.3, 7.1, 7.2 |
 | `RepeatGuard::observe` | unit | LOOP-6.3 |
 | `repair(&ConversationLog)` | unit | LOOP-4.1 |
-| `NavoriCore::run_agent_turn` via `start_with` + `AiDeps { make_provider: FakeLlm }` (crates/ffi/tests/agent.rs) | integration | LOOP-1.1, 2.2, 3.8, 5.2, 10.3, 10.4, 11.2, 11.3, 11.5, 11.6 (the demos: `ports.list` answer, `ports.kill` refused with Ports receiving nothing, three-Step audit count, records read back, `ai.turn_ended` in the Journal) |
+| `NavoriCore::run_agent_turn` via `start_with` + `AiDeps { make_provider: FakeLlm, make_conversations: gated or real }` (crates/ffi/tests/agent.rs) | integration | LOOP-1.1, 2.2, 3.8, 4.1, 5.2, 10.3, 10.4, 11.2, 11.3, 11.5, 11.6 (the demos: `ports.list` answer; `ports.kill` refused with Ports receiving nothing; three-Step audit count; records read back; `ai.turn_ended` in the Journal; reopen: a Turn held at `FakeLlm::hold_next` when the core shuts down is repaired as `interrupted` after a restart on the same home) |
 | Risk drift over a started core's `actions()` (crates/ffi/tests/actions_risk.rs) | integration | LOOP-2.6 |
 | Live Turn (crates/ffi/tests/live_agent.rs, `#[ignore]`, operator-run) | e2e | LOOP-9.1 |
 | `check-deps` (xtask test) and `cargo xtask ci` | integration | LOOP-10.7, 10.8 (the `LICENSE-dsh` file and the per-file header, by a source test) |

@@ -83,7 +83,7 @@ Words: Conversation, Turn and Step are defined in CONTEXT.md. "THE SYSTEM" is th
 **Story:** As the starter, I want to cancel a Turn midway and have it end with its history whole, so that a Turn nobody needs any more stops calling the model and every tool call it made still has a result. The demo is the test that cancels a Turn while its fake provider is answering a Step.
 
 - **LOOP-7.1** WHEN the starter cancels a Turn THE SYSTEM SHALL start no further model call or dispatch, stop waiting for the call in flight, and end the Turn as cancelled.
-- **LOOP-7.2** WHEN a Turn ends by cancel, limit or error with recorded tool calls that have no result THE SYSTEM SHALL record an error result for each, so every recorded tool call has exactly one result.
+- **LOOP-7.2** WHEN a Turn ends by cancel, limit or error with recorded tool calls that have no result THE SYSTEM SHALL record an error result for each, so every recorded tool call has exactly one result. IF the store cannot be written at that moment THEN LOOP-4.1 completes this on the next open (design review item 9).
 
 ## 8. Test the loop without a key
 
