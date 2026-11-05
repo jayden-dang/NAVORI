@@ -317,22 +317,35 @@ fn build_zip(root: &Path, out: &Path, zip_name: &str, sha_path: &Path) -> Result
     Ok(())
 }
 
-pub(crate) fn unpinned_actions(workflow: &str) -> Vec<String> {
+/// The `uses:` lines that are not pinned to an immutable ref, with their 1-based line numbers.
+pub(crate) fn unpinned_actions(workflow: &str) -> Vec<(usize, String)> {
     workflow
         .lines()
-        .map(str::trim)
-        .filter(|line| {
+        .enumerate()
+        .map(|(index, line)| (index + 1, line.trim()))
+        .filter(|(_, line)| {
             let Some(value) = uses_value(line) else {
                 return false;
             };
             if value.starts_with("./") {
                 return false;
             }
-            let pin = value.rsplit_once('@').map_or("", |(_, pin)| pin);
-            !(pin.len() == 40 && pin.bytes().all(|b| b.is_ascii_hexdigit()))
+            !is_immutable_pin(value)
         })
-        .map(str::to_owned)
+        .map(|(number, line)| (number, line.to_owned()))
         .collect()
+}
+
+fn is_immutable_pin(value: &str) -> bool {
+    let all_hex = |pin: &str| pin.bytes().all(|b| b.is_ascii_hexdigit());
+    if let Some(image) = value.strip_prefix("docker://") {
+        let digest = image
+            .rsplit_once("@sha256:")
+            .map_or("", |(_, digest)| digest);
+        return digest.len() == 64 && all_hex(digest);
+    }
+    let pin = value.rsplit_once('@').map_or("", |(_, pin)| pin);
+    pin.len() == 40 && all_hex(pin)
 }
 
 fn uses_value(line: &str) -> Option<&str> {
@@ -351,8 +364,12 @@ pub(crate) fn check_workflows(root: &Path) -> Result<()> {
         return Ok(());
     }
     let mut violations = Vec::new();
+    let mut paths = Vec::new();
     for entry in std::fs::read_dir(&dir).with_context(|| format!("read {}", dir.display()))? {
-        let path = entry?.path();
+        paths.push(entry?.path());
+    }
+    paths.sort();
+    for path in paths {
         if !matches!(
             path.extension().and_then(|e| e.to_str()),
             Some("yml" | "yaml")
@@ -361,8 +378,8 @@ pub(crate) fn check_workflows(root: &Path) -> Result<()> {
         }
         let text =
             std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
-        for line in unpinned_actions(&text) {
-            violations.push(format!("{}: {line}", path.display()));
+        for (number, line) in unpinned_actions(&text) {
+            violations.push(format!("{}:{number}: {line}", path.display()));
         }
     }
     ensure!(
@@ -376,9 +393,9 @@ pub(crate) fn check_workflows(root: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        bundle_version_mismatch, cask_file, cask_text, create_out_unless, designated_lines,
-        identity_problem, is_prerelease, preflight, requirement_mismatch, sha_names_zip,
-        tag_version, unpinned_actions,
+        bundle_version_mismatch, cask_file, cask_text, check_workflows, create_out_unless,
+        designated_lines, identity_problem, is_prerelease, preflight, requirement_mismatch,
+        sha_names_zip, tag_version, unpinned_actions,
     };
 
     const COMPAT: &str = "# Project\n- **Compat obligation:** External\n";
@@ -743,7 +760,7 @@ mod tests {
     #[test]
     fn an_action_pinned_to_a_tag_is_reported() {
         let found = unpinned_actions("steps:\n      - uses: actions/checkout@v4\n");
-        assert_eq!(found, vec!["- uses: actions/checkout@v4".to_owned()]);
+        assert_eq!(found, vec![(2, "- uses: actions/checkout@v4".to_owned())]);
     }
 
     #[test]
@@ -755,6 +772,37 @@ mod tests {
     #[test]
     fn a_local_action_passes() {
         assert!(unpinned_actions("      - uses: ./.github/actions/x\n").is_empty());
+    }
+
+    #[test]
+    fn a_docker_ref_pinned_to_a_sha256_digest_passes_and_a_tag_is_reported() {
+        let digest = "a".repeat(64);
+        let pinned = format!("uses: docker://alpine@sha256:{digest}\n");
+        assert!(unpinned_actions(&pinned).is_empty());
+        assert_eq!(unpinned_actions("uses: docker://alpine:3.20\n").len(), 1);
+        let short = "uses: docker://alpine@sha256:abc123\n";
+        assert_eq!(unpinned_actions(short).len(), 1);
+    }
+
+    #[test]
+    fn the_workflow_directory_check_reads_yml_and_yaml_files_and_names_each_line() {
+        let root = std::env::temp_dir().join(format!("navori-wf-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        check_workflows(&root).unwrap();
+
+        let dir = root.join(".github/workflows");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("notes.txt"), "uses: actions/x@v1\n").unwrap();
+        check_workflows(&root).unwrap();
+
+        std::fs::write(dir.join("b.yaml"), "a:\n  uses: actions/y@v2\n").unwrap();
+        std::fs::write(dir.join("a.yml"), "uses: actions/x@v1\n").unwrap();
+        let err = check_workflows(&root).unwrap_err().to_string();
+        let _ = std::fs::remove_dir_all(&root);
+        let first = err.find("a.yml:1:").expect(&err);
+        let second = err.find("b.yaml:2:").expect(&err);
+        assert!(first < second, "{err}");
     }
 
     #[test]
