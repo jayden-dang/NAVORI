@@ -189,6 +189,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release edit "$GITHUB_REF_NAME" --draft=false
 
+      - name: Check the public asset against the recorded hash
+        if: vars.PUBLISH_RELEASE == 'true'
+        env:
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          zip="Navori-$VERSION.zip"
+          check_dir=$(mktemp -d)
+          curl -L --fail --silent --show-error \
+            -o "$check_dir/$zip" \
+            "https://github.com/$REPOSITORY/releases/download/$GITHUB_REF_NAME/$zip"
+          cp "dist/$zip.sha256" "$check_dir/$zip.sha256"
+          (cd "$check_dir" && shasum -a 256 -c "$zip.sha256")
+
       - name: Push the cask to the tap
         if: vars.PUBLISH_RELEASE == 'true' && vars.TAP_REPOSITORY != ''
         env:
