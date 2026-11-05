@@ -272,7 +272,7 @@ _Requirements: SOAK-1.5, SOAK-2.4_
 
 **Depends-on:** Task 1, Task 2
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `a_new_soak_base_is_created_private_to_the_user`: mode 0700 and owner = uid.
   - `a_soak_base_that_is_a_symlink_is_refused`: the error names the path.
   - `a_soak_base_with_a_wider_mode_is_refused`: 0755.
@@ -284,14 +284,14 @@ _Requirements: SOAK-1.5, SOAK-2.4_
   - `a_base_that_would_make_the_socket_path_too_long_is_refused`.
 
   Run: `cargo test -p xtask soak::home` — expect: compile error.
-- [ ] **Step 2: Implement:**
+- [x] **Step 2: Implement:**
   - the outer-directory guard: `DirBuilder` mode 0700, then `symlink_metadata` checks for a real directory, owner and mode;
   - `sweep_stale` for each exe on `PerfHome { root: base.join(format!("navori-perf-{uid}")) }`;
   - `PerfHome::prepare(base, uid)`, then `check_socket_len(root.join("run-1"))`;
   - `fresh_run`: `PerfHome::fresh_run(1)`, then `remove_file` on the docker link when `symlink_metadata` says it is a symlink.
 
   Run: `cargo test -p xtask soak::home` — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(xtask): give the soak its own private home with no Docker link"`
+- [x] **Step 3: Commit** `git commit -m "feat(xtask): give the soak its own private home with no Docker link"`
 
 _Requirements: SOAK-7.1, SOAK-7.2, SOAK-7.3, SOAK-7.4, SOAK-9.3_
 
