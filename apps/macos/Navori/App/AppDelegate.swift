@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         log.info("launching \(AppEnvironment.displayName, privacy: .public) \(AppEnvironment.version, privacy: .public)")
+        EditMenu.install()
         if !AppEnvironment.perfFlagWithoutHome {
             store.start()
             wakeObserver = WakeObserver { [weak self] in
