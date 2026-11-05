@@ -264,7 +264,7 @@ _Requirements: LOOP-6.3_
 
 **Depends-on:** Task 6
 
-- [ ] **Step 1: Failing tests** in `ai/agent/tests/record.rs`:
+- [x] **Step 1: Failing tests** in `ai/agent/tests/record.rs`:
   - `bodies_round_trip_in_encoding_v1`, with the literals `{"v":1,"text":"hi"}`, `{"v":1,"text":null,"reasoning":"r","tool_calls":[{"id":"c1","name":"probe_look","arguments":"{}"}]}` and `{"v":1,"call_id":"c1","text":"[]","is_error":false,"synthetic":false}`.
   - `a_body_with_another_version_is_unreadable`.
   - `messages_are_derived_in_order_and_steps_add_nothing`.
@@ -273,8 +273,8 @@ _Requirements: LOOP-6.3_
   - `repair_run_twice_adds_nothing_the_second_time`.
 
   Run `cargo test -p navori-agent --test record` — expect: unresolved names.
-- [ ] **Step 2: Implement** `record.rs` (serde structs of its own; no `derive(Serialize)` on `navori_llm` types) and `repair.rs`, each with its port header. Run — expect: pass.
-- [ ] **Step 3: Gate and commit:** `git commit -m "feat(agent): add the Conversation record types and port dsh's crash repair"`.
+- [x] **Step 2: Implement** `record.rs` (serde structs of its own; no `derive(Serialize)` on `navori_llm` types) and `repair.rs`, each with its port header. Run — expect: pass.
+- [x] **Step 3: Gate and commit:** `git commit -m "feat(agent): add the Conversation record types and port dsh's crash repair"`.
 
 _Requirements: LOOP-4.1_
 
