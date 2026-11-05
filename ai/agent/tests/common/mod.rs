@@ -4,12 +4,25 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
+use futures::future::BoxFuture;
+use navori_agent::{Agent, Limits};
+use navori_context::{
+    AuditError, AuditRow, AuditSink, ChatReply, ChatRequest, ChatSender, Finish, Gateway,
+    SendError, Sender, ToolCall, Usage,
+};
 use navori_kernel::{
     ActionDoc, ActionError, Kernel, Module, ModuleAction, ModuleCtx, NoConfig, Risk,
 };
+use navori_protocol::Event;
+use navori_redact::Redacted;
+use navori_secrets::fake::{FakeKeychain, MemoryStore};
+use navori_secrets::{KeychainService, Secret, SecretKey, SecretStore};
 use navori_store::Store;
 use serde::Deserialize;
 use serde_json::json;
+use tokio::sync::{broadcast, oneshot};
+
+pub const PLANTED: &str = concat!("ghp_", "abcdefghijklmnopqrstuvwxyz0123456789");
 
 pub fn kernel(store: Store) -> Kernel {
     Kernel::builder(store).start()
@@ -26,6 +39,8 @@ pub enum TestAction {
     Change,
     /// Answer after a long wait.
     Slow,
+    /// Show what was found.
+    Leak,
 }
 
 impl ModuleAction for TestAction {
@@ -47,6 +62,7 @@ impl ModuleAction for TestAction {
             doc("look_at", "Look at item n.", Risk::Read),
             doc("change", "Change something.", Risk::Write),
             doc("slow", "Answer after a long wait.", Risk::Read),
+            doc("leak", "Show what was found.", Risk::Read),
         ]
     }
 }
@@ -70,6 +86,7 @@ impl Module for TestModule {
                 TestAction::Look => req.respond(Ok(json!({"seen": "room"}))),
                 TestAction::LookAt { n } => req.respond(Ok(json!({"seen": n}))),
                 TestAction::Change => req.respond::<()>(Err(ActionError::Failed("changed".into()))),
+                TestAction::Leak => req.respond(Ok(json!({"found": PLANTED}))),
                 TestAction::Slow => {
                     tokio::time::sleep(Duration::from_secs(2)).await;
                     req.respond(Ok(json!({"seen": "late"})));
@@ -162,5 +179,180 @@ impl navori_agent::ConversationStore for MemoryConversations {
             return Err(navori_agent::RecordError::UnknownConversation);
         }
         navori_agent::ConversationLog::from_entries(scoped)
+    }
+}
+
+impl MemoryConversations {
+    pub fn entries(&self) -> Vec<navori_agent::Entry> {
+        let guard = self.state.lock().unwrap();
+        guard.entries.iter().map(|(_, e)| e.clone()).collect()
+    }
+}
+
+pub struct ScriptedChat {
+    replies: std::sync::Mutex<std::collections::VecDeque<ChatReply>>,
+    requests: std::sync::Mutex<Vec<ChatRequest>>,
+    hold: std::sync::Mutex<Option<oneshot::Receiver<()>>>,
+}
+
+impl ScriptedChat {
+    pub fn new(script: Vec<ChatReply>) -> Self {
+        Self {
+            replies: std::sync::Mutex::new(script.into()),
+            requests: std::sync::Mutex::default(),
+            hold: std::sync::Mutex::default(),
+        }
+    }
+
+    pub fn requests(&self) -> Vec<ChatRequest> {
+        self.requests.lock().unwrap().clone()
+    }
+
+    pub fn hold_next(&self) -> oneshot::Sender<()> {
+        let (release, held) = oneshot::channel();
+        *self.hold.lock().unwrap() = Some(held);
+        release
+    }
+}
+
+impl ChatSender for ScriptedChat {
+    fn send<'a>(
+        &'a self,
+        _key: &'a Secret,
+        request: ChatRequest,
+    ) -> BoxFuture<'a, Result<ChatReply, SendError>> {
+        self.requests.lock().unwrap().push(request);
+        let held = self.hold.lock().unwrap().take();
+        Box::pin(async move {
+            if let Some(held) = held {
+                let _ = held.await;
+            }
+            self.replies
+                .lock()
+                .unwrap()
+                .pop_front()
+                .ok_or_else(|| SendError("the script ran out".to_owned()))
+        })
+    }
+}
+
+#[derive(Default)]
+pub struct MemoryAudit {
+    rows: std::sync::Mutex<Vec<AuditRow>>,
+}
+
+impl MemoryAudit {
+    pub fn rows(&self) -> Vec<AuditRow> {
+        self.rows.lock().unwrap().clone()
+    }
+}
+
+impl AuditSink for MemoryAudit {
+    fn record(&self, row: AuditRow) -> Result<(), AuditError> {
+        self.rows.lock().unwrap().push(row);
+        Ok(())
+    }
+}
+
+pub struct StubSender;
+
+impl Sender for StubSender {
+    fn send<'a>(
+        &'a self,
+        _: &'a Secret,
+        _: &'a str,
+        _: &'a str,
+    ) -> BoxFuture<'a, Result<String, SendError>> {
+        Box::pin(async { Err(SendError("plain asks are not used here".to_owned())) })
+    }
+}
+
+pub fn text_reply(text: &str) -> ChatReply {
+    ChatReply {
+        text: Some(text.to_owned()),
+        reasoning: None,
+        tool_calls: vec![],
+        usage: None,
+        finish: Finish::Stop,
+    }
+}
+
+pub fn call_reply(id: &str, name: &str, arguments: &str) -> ChatReply {
+    ChatReply {
+        text: None,
+        reasoning: None,
+        tool_calls: vec![ToolCall {
+            id: id.to_owned(),
+            name: name.to_owned(),
+            arguments: arguments.to_owned(),
+        }],
+        usage: None,
+        finish: Finish::ToolCalls,
+    }
+}
+
+pub fn usage(input: u64, output: u64) -> Usage {
+    Usage {
+        input,
+        output,
+        cache_hit: None,
+        cache_miss: None,
+    }
+}
+
+pub struct Rig {
+    pub agent: Agent,
+    pub kernel: Kernel,
+    pub chat: Arc<ScriptedChat>,
+    pub store: Arc<MemoryConversations>,
+    pub audit: Arc<MemoryAudit>,
+    pub events: broadcast::Receiver<Event>,
+    pub probe: Arc<AtomicUsize>,
+}
+
+pub fn agent_with(script: Vec<ChatReply>, limits: Limits) -> Rig {
+    build_rig(script, limits, true, navori_redact::redact_text)
+}
+
+pub fn build_rig(
+    script: Vec<ChatReply>,
+    limits: Limits,
+    with_key: bool,
+    shield: fn(&str) -> Redacted,
+) -> Rig {
+    let vault = FakeKeychain::new();
+    let secrets: Arc<dyn SecretStore> = Arc::new(MemoryStore::new(KeychainService::DEV, &vault));
+    let slot = SecretKey::new("provider", "deepseek").unwrap();
+    if with_key {
+        secrets.set(&slot, &Secret::new("stored-key-QQ7")).unwrap();
+    }
+    let chat = Arc::new(ScriptedChat::new(script));
+    let audit = Arc::new(MemoryAudit::default());
+    let gateway = Gateway::with_shield(
+        secrets,
+        slot,
+        Arc::new(StubSender),
+        audit.clone(),
+        "deepseek",
+        shield,
+    )
+    .with_chat_sender(chat.clone());
+    let (kernel, probe) = kernel_with_probe();
+    let events = kernel.bus().subscribe();
+    let store = Arc::new(MemoryConversations::default());
+    let agent = Agent::new(
+        Arc::new(gateway),
+        store.clone(),
+        kernel.bus().clone(),
+        limits,
+    );
+    Rig {
+        agent,
+        kernel,
+        chat,
+        store,
+        audit,
+        events,
+        probe,
     }
 }

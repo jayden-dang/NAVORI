@@ -23,6 +23,7 @@ ulid.workspace = true
 [dev-dependencies]
 navori-store.workspace = true
 navori-secrets = { workspace = true, features = ["fake"] }
+navori-redact.workspace = true
 schemars.workspace = true
 anyhow.workspace = true
 tracing-subscriber.workspace = true

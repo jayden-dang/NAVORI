@@ -17,7 +17,7 @@ fn the_dsh_licence_text_keeps_its_copyright_line() {
     assert!(text.contains("Permission is hereby granted, free of charge"));
 }
 
-const PORTED: &[&str] = &["guard.rs", "repair.rs"];
+const PORTED: &[&str] = &["guard.rs", "repair.rs", "turn.rs"];
 
 #[test]
 fn every_ported_file_opens_with_the_port_header() {

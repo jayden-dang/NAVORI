@@ -1137,6 +1137,7 @@ dependencies = [
  "navori-context",
  "navori-kernel",
  "navori-protocol",
+ "navori-redact",
  "navori-secrets",
  "navori-store",
  "schemars",
