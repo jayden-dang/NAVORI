@@ -17,7 +17,7 @@ impl RepeatGuard {
         RepeatGuard::default()
     }
 
-    pub fn observe(&mut self, name: &str, arguments: &str) -> Option<String> {
+    pub fn observe(&mut self, name: &str, arguments: &str, shown: &str) -> Option<String> {
         let canonical = canonicalize(arguments);
         let key = (name.to_owned(), canonical.clone());
         if self.last.as_ref() == Some(&key) {
@@ -28,7 +28,11 @@ impl RepeatGuard {
         }
         match self.count {
             3 => Some(FIRST_REMINDER.to_owned()),
-            5 | 8 => Some(detailed_reminder(name, self.count, &preview(&canonical))),
+            5 | 8 => Some(detailed_reminder(
+                name,
+                self.count,
+                &preview(&canonicalize(shown)),
+            )),
             _ => None,
         }
     }
@@ -69,6 +73,15 @@ fn preview(canonical: &str) -> String {
     if total <= PREVIEW_CHARS {
         return canonical.to_owned();
     }
-    let head: String = canonical.chars().take(PREVIEW_CHARS).collect();
-    format!("{head}… (+{} more chars)", total - PREVIEW_CHARS)
+    let mut end = canonical
+        .char_indices()
+        .nth(PREVIEW_CHARS)
+        .map_or(canonical.len(), |(i, _)| i);
+    if let Some(open) = canonical[..end].rfind("[REDACTED:")
+        && !canonical[open..end].contains(']')
+    {
+        end = open;
+    }
+    let shown = canonical[..end].chars().count();
+    format!("{}… (+{} more chars)", &canonical[..end], total - shown)
 }

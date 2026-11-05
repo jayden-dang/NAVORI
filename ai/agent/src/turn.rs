@@ -350,7 +350,7 @@ impl Agent {
             if tool_calls.is_empty() {
                 return Ok(text);
             }
-            for call in &raw_calls {
+            for (call, shown) in raw_calls.iter().zip(&tool_calls) {
                 if cancel.is_cancelled() {
                     return Err(TurnEnd::Cancelled);
                 }
@@ -360,7 +360,10 @@ impl Agent {
                     () = cancel.cancelled() => return Err(TurnEnd::Cancelled),
                     outcome = dispatcher.call(kernel, &toolset, call) => outcome,
                 };
-                if let Some(reminder) = run.guard.observe(&call.name, &call.arguments) {
+                if let Some(reminder) =
+                    run.guard
+                        .observe(&call.name, &call.arguments, &shown.arguments)
+                {
                     outcome.text = format!("{}\n\n{reminder}", outcome.text);
                 }
                 let result = self.shield(&outcome.text)?;

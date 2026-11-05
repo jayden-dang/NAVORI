@@ -773,3 +773,46 @@ async fn a_failed_record_write_leaves_a_log_line_without_message_text() {
         assert!(!logs.contains(text), "{text} in {logs}");
     }
 }
+
+#[tokio::test]
+async fn a_secret_straddling_the_repeat_reminder_cut_never_reaches_the_record_or_the_model() {
+    let arguments = format!(
+        r#"{{"n":1,"note":"{} {}"}}"#,
+        "x".repeat(479),
+        common::PLANTED
+    );
+    let mut script: Vec<ChatReply> = (1..=5)
+        .map(|n| common::call_reply(&format!("c{n}"), "probe_look_at", &arguments))
+        .collect();
+    script.push(common::text_reply("done"));
+    let rig = common::agent_with(script, Limits::default());
+
+    let outcome = rig
+        .agent
+        .run_turn(&rig.kernel, request("look"), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.end, TurnEnd::Completed);
+    let last = rig.chat.requests().pop().unwrap();
+    let reminder = last
+        .messages
+        .iter()
+        .filter_map(|m| match m {
+            Message::Tool { text, .. } if text.contains("Repeated tool call detected") => {
+                Some(text.clone())
+            }
+            _ => None,
+        })
+        .next_back()
+        .expect("the fifth call carries the detailed reminder");
+    assert!(!reminder.contains("ghp_"), "{reminder}");
+    for request in rig.chat.requests() {
+        assert!(!format!("{:?}", request.messages).contains("ghp_"));
+    }
+    for entry in rig.store.entries() {
+        if let Entry::Message { body, .. } = entry {
+            assert!(!body.to_body().contains("ghp_"));
+        }
+    }
+}
