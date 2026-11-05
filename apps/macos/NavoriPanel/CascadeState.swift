@@ -104,6 +104,9 @@ public struct CascadeState: Sendable {
             return (hadPending ? [.cancelHoverTimer] : []) + effects
         }
         // Counted from the first entry into the row: movement inside it must not postpone the open.
+        // pendingRow == row means a timer is already armed for this row (intent, or the diagonal rest timer);
+        // re-arming would postpone the open. A stale rest timer firing for a row that can no longer open is a no-op:
+        // `handleHoverTimerFired` opens through `apply`, which checks `mayOpen`.
         if pendingRow == row { return effects }
         pendingRow = row
         return effects + [.armHoverTimer(after: Self.intentDelay)]

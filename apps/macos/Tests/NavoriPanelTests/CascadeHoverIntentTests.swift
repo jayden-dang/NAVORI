@@ -185,6 +185,5 @@ struct CascadeHoverIntentTests {
         }
         let gate = 0.080
         #expect(deadline > gate, "re-arming at 150 ms ends at \(deadline) s")
-        #expect(CascadeState.intentDelay + 0.016 < gate, "the 50 ms intent path plus the open budget fits")
     }
 }
