@@ -322,7 +322,7 @@ _Requirements: SOAK-7.1, SOAK-7.2, SOAK-7.3, SOAK-7.4, SOAK-9.3_
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Write the failing tests.** Use a fake helper: a tempdir `<app>/Contents/Helpers/navori` shell script that reads `$HOME/mode` and then does `exec sleep 5`, `exit 1`, `exit 2`, `exit 3` or `exit 0`.
+- [x] **Step 1: Write the failing tests.** Use a fake helper: a tempdir `<app>/Contents/Helpers/navori` shell script that reads `$HOME/mode` and then does `exec sleep 5`, `exit 1`, `exit 2`, `exit 3` or `exit 0`.
   - `a_status_that_does_not_answer_in_two_seconds_times_out_and_the_child_is_killed`.
   - `a_status_that_exits_zero_is_ok`.
   - `a_dispatch_returns_at_once_and_is_answered_later`.
@@ -332,10 +332,10 @@ _Requirements: SOAK-7.1, SOAK-7.2, SOAK-7.3, SOAK-7.4, SOAK-9.3_
   - `a_store_hold_that_cannot_take_the_lock_in_time_fails`: another holder keeps the lock, so `open` with `confirm_within` 3 s returns an error naming the db.
 
   Run: `cargo test -p xtask soak::` — expect: compile error.
-- [ ] **Step 2: Implement** the bounded wait (a `try_wait` loop, then `kill` and `wait`), the spawned `Pending`, and `StoreHold`, which reads stdout on a thread that sends lines to a channel and uses `recv_timeout` for `held`.
+- [x] **Step 2: Implement** the bounded wait (a `try_wait` loop, then `kill` and `wait`), the spawned `Pending`, and `StoreHold`, which reads stdout on a thread that sends lines to a channel and uses `recv_timeout` for `held`.
 
   Run: `cargo test -p xtask soak::` — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(xtask): add bounded CLI calls and a confirmed store hold for the soak"`
+- [x] **Step 3: Commit** `git commit -m "feat(xtask): add bounded CLI calls and a confirmed store hold for the soak"`
 
 _Requirements: SOAK-1.10, SOAK-3.2_
 
