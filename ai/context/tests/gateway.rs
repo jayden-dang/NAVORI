@@ -732,5 +732,5 @@ fn the_context_crate_calls_the_sender_in_one_place() {
             sites.push(path.file_name().unwrap().to_string_lossy().into_owned());
         }
     }
-    assert_eq!(sites, ["gateway.rs"]);
+    assert_eq!(sites, ["gateway.rs", "gateway.rs"]);
 }

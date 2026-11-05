@@ -1165,8 +1165,10 @@ name = "navori-context"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "navori-llm",
  "navori-redact",
  "navori-secrets",
+ "serde_json",
  "thiserror",
  "tokio",
  "tracing",

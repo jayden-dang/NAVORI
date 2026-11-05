@@ -26,7 +26,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | `navori-procs` | `navori-macos` | allowed — through the safe traits |
 | `navori-secrets` | — | allowed: none — leaf; consumed by `modules/*` and `ai/*` (rows below) and may be opened by the composition root `navori-ffi` (it may depend on any foundation crate) |
 | `navori-llm` | `navori-secrets` | allowed — provider-neutral LLM client; takes only the `Secret` type from `navori-secrets`; no edge to `navori-context` or any Module |
-| `navori-context` | `navori-redact`, `navori-secrets` | allowed — Context Gateway; `redact` is required (nothing reaches an LLM unredacted, ARCH-6); no edge to `navori-llm` (the `Sender` trait is wired in `navori-ffi`) |
+| `navori-context` | `navori-llm`, `navori-redact`, `navori-secrets` | allowed — Context Gateway; `redact` is required (nothing reaches an LLM unredacted, ARCH-6); `navori-llm` is for its chat types only, never `LlmProvider` (the `Sender` and `ChatSender` traits are wired in `navori-ffi`) |
 | `navori-mod-awake` | `navori-kernel`, `navori-macos`, `navori-procs`, `navori-store` | allowed — feature Module; depends on no other Module |
 | `navori-mod-ports` | `navori-kernel`, `navori-macos`, `navori-procs` | allowed — feature Module; depends on no other Module |
 | `navori-mod-integrations` | `navori-kernel` | allowed — feature Module; depends on no other Module, and not on `navori-macos`, `navori-procs` or `navori-store` (the last only as a dev-dependency) |
