@@ -30,7 +30,7 @@ The single source of engineering rules. Feature work, reviews and "done" claims 
 ## Commits
 
 - Conventional Commits (`feat(scope):`, `fix:`, `docs:`, `build:`, `test:`…), English, imperative subject.
-- One logical change per commit, and every commit builds and passes the tests of the crates it adds.
+- One logical change per commit; what is pushed passes `cargo xtask ci`, and a single commit is not required to.
 - Secret-shaped test fixtures are split at compile time (`concat!`) so secret scanners (GitHub push protection) do not flag them.
 - Never commit build output, generated bindings (`apps/macos/Generated`), signing material, or `/draft-ui` scaffolding.
 

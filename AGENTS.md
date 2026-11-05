@@ -37,7 +37,7 @@ Talk to a running dev build: `"build/dev/Navori Dev.app/Contents/Helpers/navori"
 
 - English everywhere: docs, code, comments, commits, UI strings.
 - Test-first at agreed seams (`docs/standards/testing.md`); fakes only at system boundaries.
-- Conventional Commits; one logical change per commit; every commit builds.
+- Conventional Commits; one logical change per commit; `cargo xtask ci` passes on what you push.
 - Never commit `target/`, `build/`, `apps/macos/Generated/`, signing material or `/draft-ui`.
 - Commit or push only when the user asks.
 
