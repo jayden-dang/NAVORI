@@ -790,7 +790,7 @@ fn check_deps(root: &Path) -> Result<()> {
 }
 
 /// Crates whose `fake` feature switches on unencrypted in-memory test doubles (ARCH-8).
-const FAKE_GUARDED: [&str; 2] = ["navori-macos", "navori-secrets"];
+const FAKE_GUARDED: [&str; 3] = ["navori-llm", "navori-macos", "navori-secrets"];
 
 /// Reports `fake` enabled for a guarded crate through a non-dev dependency edge.
 fn fake_feature_violation(krate: &str, dep: &str, kind: &str, features: &[&str]) -> Option<String> {
@@ -1252,6 +1252,14 @@ mod tests {
             .expect("fake on a normal dependency must be rejected");
         assert!(v.contains("navori-ffi"), "{v}");
         assert!(v.contains("navori-secrets"), "{v}");
+        assert!(v.contains("fake"), "{v}");
+    }
+
+    #[test]
+    fn fake_through_a_normal_dependency_on_llm_is_rejected() {
+        let v = fake_feature_violation("navori-ffi", "navori-llm", "normal", &["fake"])
+            .expect("fake on a normal dependency must be rejected");
+        assert!(v.contains("navori-llm"), "{v}");
         assert!(v.contains("fake"), "{v}");
     }
 

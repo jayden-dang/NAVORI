@@ -1,5 +1,7 @@
 //! Provider-neutral LLM client.
 
+#[cfg(feature = "fake")]
+pub mod fake;
 mod openai_compat;
 
 use futures::future::BoxFuture;
