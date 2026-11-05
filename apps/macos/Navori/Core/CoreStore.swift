@@ -319,8 +319,6 @@ final class CoreStore {
         }
     }
 
-    func copyPort(_ port: Int) { PortActions.copy(port: port, desktop: desktop) }
-
     func reveal(_ path: String) { PortActions.reveal(path, desktop: desktop) }
 
     func dismissOpenFailure(_ row: String) { openFailures[row] = nil }
@@ -489,11 +487,6 @@ final class SnapshotRelay: SnapshotListener, @unchecked Sendable {
 @MainActor
 private final class AppDesktop: Desktop {
     func open(_ url: URL) { NSWorkspace.shared.open(url) }
-
-    func copy(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-    }
 
     func reveal(_ path: String) {
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])

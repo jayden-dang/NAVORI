@@ -76,7 +76,7 @@ struct RunningSubmenuView: View {
                 id: CoreStore.stopAllId,
                 title: "Stop all ports\u{2026}",
                 confirmation: offer.confirmation,
-                note: offer.systemNote,
+                detail: offer.explanation,
                 stopLabel: offer.spoken,
                 store: store,
                 cascade: cascade,

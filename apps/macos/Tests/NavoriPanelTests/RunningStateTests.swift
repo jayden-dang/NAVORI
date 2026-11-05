@@ -467,6 +467,21 @@ struct ProjectChildStateTests {
         #expect(state.ports[0].stop?.spoken == "Stop 1 port")
     }
 
+    @Test func a_port_rows_icon_actions_have_words_and_exist_only_where_the_core_allows_them() {
+        let state = child(ports: [
+            RunningPortInput(port: 4318, name: "klynt-otel-collector", stopRequest: "{}", openable: true),
+            RunningPortInput(port: 5432, name: "postgres", stopRequest: "", openable: false),
+        ])
+        let web = state.ports[0]
+        #expect(web.openHelp == "Open http://localhost:4318")
+        #expect(web.stopHelp == "Stop klynt-otel-collector, port 4318")
+        #expect(web.confirmation == "Stop klynt-otel-collector :4318?")
+        let db = state.ports[1]
+        #expect(db.openHelp == nil)
+        #expect(db.stopHelp == nil)
+        #expect(db.confirmation == nil)
+    }
+
     @Test func a_port_rows_tooltip_and_spoken_sentence_name_its_worktree_and_harness_and_none_for_docker() {
         let state = child(ports: [
             listener(3000, "next-server", worktree: "feat-x", harness: "claude_code"),
@@ -660,12 +675,6 @@ struct PortActionsTests {
         #expect(PortActions.hasOpen(RunningPortInput(port: 1, name: "a", stopRequest: "", openable: false)) == false)
     }
 
-    @Test func copy_text_is_localhost_and_the_port() {
-        #expect(PortActions.copyText(3000) == "localhost:3000")
-        let state = child([RunningPortInput(port: 8080, name: "node", stopRequest: "")])
-        #expect(state.ports[0].copyText == "localhost:8080")
-    }
-
     @Test func the_header_reveals_the_full_path_while_showing_it_abbreviated() {
         let state = ProjectChildState(
             project: RunningProjectInput(
@@ -689,11 +698,9 @@ struct PortActionsTests {
 @MainActor
 private final class FakeDesktop: Desktop {
     var opened: [URL] = []
-    var copied: [String] = []
     var revealed: [String] = []
 
     func open(_ url: URL) { opened.append(url) }
-    func copy(_ text: String) { copied.append(text) }
     func reveal(_ path: String) { revealed.append(path) }
 }
 
@@ -762,13 +769,6 @@ struct PortDesktopActionTests {
         }
         #expect(failure == "Could not open :70000")
         #expect(sent == false)
-    }
-
-    @Test func copy_puts_localhost_and_the_port_on_the_pasteboard() {
-        let desktop = FakeDesktop()
-        PortActions.copy(port: 3000, desktop: desktop)
-        #expect(desktop.copied == ["localhost:3000"])
-        #expect(desktop.opened.isEmpty)
     }
 
     @Test func reveal_shows_the_full_path() {

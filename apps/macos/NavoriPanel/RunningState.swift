@@ -257,12 +257,19 @@ public struct StopAllOffer: Equatable, Sendable {
 extension StopAllOffer {
     public var spoken: String { "Stop \(counted(ports, "port"))" }
 
+    /// The one-line question on the row. It names ports and carries no other count.
     public var confirmation: String {
-        var text = "Stop \(counted(ports, "port")) in \(counted(projects, "project"))?"
+        ports == 1 ? "Stop 1 port?" : "Stop all \(ports) ports?"
+    }
+
+    /// The longer sentence for the tooltip and VoiceOver: ports, projects, and what stays running.
+    public var explanation: String {
+        var text = "Stop \(counted(ports, "port")) in \(counted(projects, "project"))."
         var left: [String] = []
         if inUse > 0 { left.append("\(counted(inUse, "port")) in use") }
         if otherLeft > 0 { left.append("\(counted(otherLeft, "port")) in Other") }
         if left.isEmpty == false { text += " \(left.joined(separator: " and ")) stay running." }
+        if let note = systemNote { text += " \(note)." }
         return text
     }
 
@@ -369,13 +376,10 @@ public struct SessionRowState: Equatable, Sendable {
 @MainActor
 public protocol Desktop: AnyObject {
     func open(_ url: URL)
-    func copy(_ text: String)
     func reveal(_ path: String)
 }
 
 public enum PortActions {
-    public static func copyText(_ port: Int) -> String { "localhost:\(port)" }
-
     public static func openFailure(port: Int) -> String { "Could not open :\(port)" }
 
     /// Returns nil once the Core's URL is opened, else the sentence to show on the row.
@@ -401,9 +405,6 @@ public enum PortActions {
     }
 
     @MainActor
-    public static func copy(port: Int, desktop: Desktop) { desktop.copy(copyText(port)) }
-
-    @MainActor
     public static func reveal(_ path: String, desktop: Desktop) { desktop.reveal(path) }
 
     private struct OpenReply: Decodable { let url: String }
@@ -415,7 +416,6 @@ public struct PortRowState: Equatable, Sendable {
     public let id: String
     public let port: Int
     public let offersOpen: Bool
-    public let copyText: String
     public let mark: PortMark
     public let name: String
     public let suffix: String?
@@ -424,18 +424,25 @@ public struct PortRowState: Equatable, Sendable {
     public let spoken: String
     public let stop: StopOffer?
     public let target: StopTarget?
+    /// Words for the icon actions: tooltip and VoiceOver label. Nil where the action does not exist.
+    public let openHelp: String?
+    public let stopHelp: String?
+    /// The one-line question for a single port's Stop.
+    public let confirmation: String?
     private let sentence: String
 
     init(_ port: RunningPortInput, projectId: String) {
         id = ProjectChildState.portId(project: projectId, port: port)
         self.port = port.port
         offersOpen = PortActions.hasOpen(port)
-        copyText = PortActions.copyText(port.port)
         name = port.name
         portText = ":\(port.port)"
         suffix = port.container ? "docker" : nil
         stop = port.canStop ? StopOffer(count: 1, request: port.stopRequest) : nil
         target = port.target
+        openHelp = offersOpen ? "Open http://localhost:\(port.port)" : nil
+        stopHelp = stop == nil ? nil : "Stop \(port.name), port \(port.port)"
+        confirmation = stop == nil ? nil : "Stop \(port.name) :\(port.port)?"
         if port.container {
             mark = .container
         } else {

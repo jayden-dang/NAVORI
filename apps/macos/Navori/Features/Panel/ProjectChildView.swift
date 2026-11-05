@@ -48,6 +48,7 @@ struct ProjectChildView: View {
                     id: state.stopId,
                     title: stop.spoken,
                     confirmation: stop.confirmation,
+                    detail: nil,
                     stopLabel: stop.spoken,
                     store: store,
                     cascade: cascade,
@@ -230,59 +231,31 @@ private struct PortRowView: View {
     var body: some View {
         let selected = cascade.selection == state.id
         let flow = store.stopFlow(state.id)
-        let entry = state.target.flatMap { store.stopProgress.entry(for: $0) }
+        let entry = stopEntry
         let stopping = flow == .running || entry == .stopping
+        let asking = isAsking(flow)
         VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .trailing) {
-                HStack(spacing: 6) {
-                    PortLead(mark: state.mark, selected: selected)
-                        .frame(width: 20, height: 20)
-                    Text(state.name)
-                        .font(.system(size: 14))
-                        .foregroundStyle(selected ? Color.white : Color(nsColor: .labelColor))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    if let suffix = state.suffix {
-                        Text("\u{00B7} \(suffix)")
-                            .font(.system(size: 11.5))
-                            .foregroundStyle(selected ? Color.white.opacity(0.8) : Color(nsColor: .secondaryLabelColor))
-                            .lineLimit(1)
-                            .fixedSize()
+                if asking, let stop = state.stop, let question = state.confirmation {
+                    InlineConfirmRow(
+                        message: question,
+                        stopLabel: state.stopHelp ?? stop.spoken,
+                        selected: selected,
+                        onConfirm: { store.confirmStop(state.id, offer: stop) },
+                        onCancel: { store.dismissStop(state.id) }
+                    ) {
+                        PortLead(mark: state.mark, selected: selected)
+                            .frame(width: 20, height: 20)
                     }
-                    Spacer(minLength: 8)
-                    if showsPort(selected: selected, flow: flow, stopping: stopping) {
-                        Text(state.portText)
-                            .font(.system(size: 11.5, design: .monospaced))
-                            .foregroundStyle(selected ? Color.white.opacity(0.85) : Color(nsColor: .secondaryLabelColor))
-                    }
+                } else {
+                    rowContent(selected: selected, hovering: selected, stopping: stopping)
+                    trailing(selected: selected, stopping: stopping)
                 }
-                .padding(.horizontal, 8)
-                .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
-                .background {
-                    if selected {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color(nsColor: .selectedContentBackgroundColor))
-                    }
-                }
-                .contentShape(Rectangle())
-                .help(state.tooltip ?? "")
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(state.spoken(for: stopping ? .stopping : entry))
-                trailing(selected: selected, flow: flow, stopping: stopping)
             }
             .onGeometryChange(for: CGRect.self) { proxy in
                 proxy.frame(in: .global)
             } action: { frame in
                 cascade.setRowFrame(state.id, frame)
-            }
-            if case .asking = flow, let stop = state.stop {
-                InlineConfirmation(
-                    text: stop.confirmation,
-                    leading: MenuColumn.childName,
-                    stopLabel: stop.spoken,
-                    onConfirm: { store.confirmStop(state.id, offer: stop) },
-                    onCancel: { store.dismissStop(state.id) }
-                )
             }
             if let sentence = store.openFailures[state.id] {
                 StopFailureLines(reasons: [sentence], leading: MenuColumn.childName)
@@ -313,47 +286,72 @@ private struct PortRowView: View {
         return nil
     }
 
-    private func showsPort(selected: Bool, flow: StopFlow, stopping: Bool) -> Bool {
-        stopping == false && (selected == false || isAsking(flow))
+    /// The name never moves: on hover the secondary text only fades, and the icons sit over its place.
+    private func rowContent(selected: Bool, hovering: Bool, stopping: Bool) -> some View {
+        let secondary = hovering || stopping ? 0.0 : 1.0
+        return HStack(spacing: 6) {
+            PortLead(mark: state.mark, selected: selected)
+                .frame(width: 20, height: 20)
+            Text(state.name)
+                .font(.system(size: 14))
+                .foregroundStyle(selected ? Color.white : Color(nsColor: .labelColor))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            if let suffix = state.suffix {
+                Text("\u{00B7} \(suffix)")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(selected ? Color.white.opacity(0.8) : Color(nsColor: .secondaryLabelColor))
+                    .lineLimit(1)
+                    .fixedSize()
+                    .opacity(secondary)
+            }
+            Spacer(minLength: 8)
+            Text(state.portText)
+                .font(.system(size: 11.5, design: .monospaced))
+                .foregroundStyle(selected ? Color.white.opacity(0.85) : Color(nsColor: .secondaryLabelColor))
+                .opacity(secondary)
+        }
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
+        .background {
+            if selected {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color(nsColor: .selectedContentBackgroundColor))
+            }
+        }
+        .contentShape(Rectangle())
+        .help(state.tooltip ?? "")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(state.spoken(for: stopping ? .stopping : stopEntry))
+    }
+
+    private var stopEntry: StopProgress.Entry? {
+        state.target.flatMap { store.stopProgress.entry(for: $0) }
     }
 
     @ViewBuilder
-    private func trailing(selected: Bool, flow: StopFlow, stopping: Bool) -> some View {
+    private func trailing(selected: Bool, stopping: Bool) -> some View {
         if stopping {
             Text("Stopping\u{2026}")
                 .font(.system(size: 13))
                 .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
                 .padding(.trailing, 8)
                 .accessibilityHidden(true)
-        } else if selected, isAsking(flow) == false {
-            HStack(spacing: 4) {
-                if state.offersOpen {
-                    capsule("Open", label: "Open \(state.name) in the browser") {
+        } else if selected {
+            HStack(spacing: 0) {
+                if let help = state.openHelp {
+                    RowActionButton(symbol: "arrow.up.right.square", label: help, selected: selected) {
                         Task { await store.openPort(row: state.id, port: state.port) }
                     }
                 }
-                capsule("Copy", label: "Copy \(state.copyText)") {
-                    store.copyPort(state.port)
-                }
-                if let stop = state.stop {
-                    capsule("Stop", label: "Stop \(state.name)") { store.askStop(state.id, count: stop.count) }
+                if let stop = state.stop, let help = state.stopHelp {
+                    RowActionButton(symbol: "stop.fill", label: help, selected: selected) {
+                        store.askStop(state.id, count: stop.count)
+                    }
                 }
             }
-            .padding(.trailing, 6)
+            .padding(.trailing, 5)
         }
-    }
-
-    private func capsule(_ title: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Color.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(Capsule().fill(Color.white.opacity(0.22)))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
     }
 
     private func isAsking(_ flow: StopFlow) -> Bool {
@@ -392,12 +390,13 @@ private struct PortLead: View {
     }
 }
 
-/// A row that stops a group of ports: the label, then the inline confirmation, then the failure lines.
+/// A row that stops a group of ports: the label, then the one-line confirmation, then the failure lines.
 struct StopLineView: View {
     let id: String
     let title: String
     let confirmation: String
-    var note: String?
+    /// The longer sentence for the confirmation's tooltip and VoiceOver label.
+    var detail: String?
     let stopLabel: String
     let store: CoreStore
     let cascade: CascadeController
@@ -412,14 +411,16 @@ struct StopLineView: View {
         VStack(alignment: .leading, spacing: 0) {
             switch flow {
             case .asking:
-                InlineConfirmation(
-                    text: confirmation,
-                    note: note,
-                    leading: leading,
+                InlineConfirmRow(
+                    message: confirmation,
+                    detail: detail,
                     stopLabel: stopLabel,
+                    selected: selected,
                     onConfirm: onConfirm,
                     onCancel: { store.dismissStop(id) }
-                )
+                ) {
+                    stopMark(selected: selected)
+                }
             case .running:
                 label("Stopping\u{2026}", selected: selected)
             case let .failed(reasons):
@@ -442,13 +443,17 @@ struct StopLineView: View {
         }
     }
 
+    private func stopMark(selected: Bool) -> some View {
+        Image(systemName: "stop.fill")
+            .font(.system(size: 9))
+            .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
+            .frame(width: narrow ? 14 : 20, height: 20)
+    }
+
     private func label(_ text: String, selected: Bool) -> some View {
         Button(action: { cascade.click(id) }) {
             HStack(spacing: 6) {
-                Image(systemName: "stop.fill")
-                    .font(.system(size: 9))
-                    .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
-                    .frame(width: narrow ? 14 : 20, height: 20)
+                stopMark(selected: selected)
                 Text(text)
                     .font(.system(size: 14))
                     .foregroundStyle(selected ? Color.white : Color(nsColor: .labelColor))

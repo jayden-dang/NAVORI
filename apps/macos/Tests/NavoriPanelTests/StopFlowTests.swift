@@ -225,19 +225,24 @@ struct StopFlowTests {
         #expect(flow == .failed(["Navori is not running."]))
     }
 
-    @Test func a_confirmation_text_names_ports_and_the_in_use_and_other_counts() {
+    @Test func a_confirmation_line_names_ports_and_the_longer_sentence_keeps_the_other_counts() {
         #expect(StopOffer(count: 3, request: "x").confirmation == "Stop 3 ports?")
         #expect(StopOffer(count: 1, request: "x").confirmation == "Stop 1 port?")
 
         let all = StopAllOffer(requests: ["a", "b"], ports: 5, projects: 2, inUse: 3, otherLeft: 1, systemHidden: 4)
-        #expect(all.confirmation == "Stop 5 ports in 2 projects? 3 ports in use and 1 port in Other stay running.")
+        #expect(all.confirmation == "Stop all 5 ports?")
+        #expect(all.explanation == "Stop 5 ports in 2 projects. 3 ports in use and 1 port in Other stay running. 4 system ports hidden.")
         #expect(all.systemNote == "4 system ports hidden")
 
         let plain = StopAllOffer(requests: ["a"], ports: 1, projects: 1, inUse: 0, otherLeft: 0, systemHidden: 0)
-        #expect(plain.confirmation == "Stop 1 port in 1 project?")
+        #expect(plain.confirmation == "Stop 1 port?")
+        #expect(plain.explanation == "Stop 1 port in 1 project.")
         #expect(plain.systemNote == nil)
 
-        for text in [all.confirmation, plain.confirmation, StopOffer(count: 2, request: "x").confirmation] {
+        for text in [
+            all.confirmation, all.explanation, plain.confirmation, plain.explanation,
+            StopOffer(count: 2, request: "x").confirmation,
+        ] {
             #expect(text.localizedCaseInsensitiveContains("process") == false)
         }
     }
