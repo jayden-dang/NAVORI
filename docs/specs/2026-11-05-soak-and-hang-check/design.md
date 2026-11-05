@@ -52,7 +52,7 @@ listens on nothing new; the load's TCP listeners are soak-owned processes on loo
 ## Decisions
 
 1. External soak in xtask, with nothing added to the app, the Core or the `navori` CLI (Lock: card Must keep and Decided).
-2. Reuse of perf code (Weigh W1–W3, agent-decided, D4). The only edit under `xtask/src/perf/` is `mod` → `pub(crate) mod` for `home`, `launch` and `logstream` (`xtask/src/perf/mod.rs:1-7`; `probe` stays private, since soak has its own helper). Every private helper in `perf/mod.rs` stays private, `judge` included, so soak keeps its own warm-up, bounded command runner and median.
+2. Reuse of perf code (Lock: operator, 2026-11-05, "OK, not a change"; guards Weigh W2–W3; D4). The only edit under `xtask/src/perf/` is `mod` → `pub(crate) mod` for `home`, `launch` and `logstream` (`xtask/src/perf/mod.rs:1-7`; `probe` stays private, since soak has its own helper). Every private helper in `perf/mod.rs` stays private, `judge` included, so soak keeps its own warm-up, bounded command runner and median.
 3. Own tree `/tmp/navori-soak-<uid>/navori-perf-<uid>/` (Weigh W2, agent-decided; D5). `PerfHome::prepare(base, uid)` names the leaf (`xtask/src/perf/home.rs:36-37`), the soak creates and guards the outer directory itself, and the Docker link that `fresh_run` makes is removed before launch (D5, D18).
 4. The load runs as an ordered plan of timed steps computed up front, a pure function of the tier, and is executed by one driver loop. The schedule is unit-testable without a clock, and the run stays deterministic (SOAK-9.4).
 5. The load's helper processes are:
@@ -258,7 +258,7 @@ entry point from `release::check` (SOAK-5.5).
 
 Satisfies: SOAK-8.1, SOAK-8.2
 Reuse: rung 2, the existing perf modules.
-Surface: `xtask/src/perf/mod.rs:1-7`, the module declarations for `home`, `launch` and `logstream`. They become readable by `crate::soak`. Disposition: replace. The edit is visibility only, with no body edit, so perf's own call sites, tests and output are unchanged (Weigh W1–W3).
+Surface: `xtask/src/perf/mod.rs:1-7`, the module declarations for `home`, `launch` and `logstream`. They become readable by `crate::soak`. Disposition: replace. The edit is visibility only, with no body edit, so perf's own call sites, tests and output are unchanged (Lock: operator, 2026-11-05; guards Weigh W2–W3).
 Depth: n/a — extends `xtask/src/perf`.
 Locality: three words in `xtask/src/perf/mod.rs` (extend). Any body edit under `perf/` is out of this design and goes to the operator (Ask me).
 

@@ -103,11 +103,11 @@ IDs are immutable once Status is Approved. Retire a requirement by striking it t
 **Story:** As the operator, I want `cargo xtask perf` and every existing `cargo xtask` command to behave exactly as before, so that adding the soak costs nothing I already rely on.
 
 - **SOAK-8.1** (guard) WHEN `cargo xtask perf` runs THE SYSTEM SHALL CONTINUE TO measure, judge and print the same metrics, budgets, floors and lines, in the same phases, from the same `/tmp/navori-perf-<uid>/` home (`xtask/src/perf/mod.rs:34-81,92-102`; `xtask/src/perf/home.rs:37`; `docs/standards/performance.md`).
-- **SOAK-8.2** (guard) WHEN the xtask test suite runs THE SYSTEM SHALL CONTINUE TO pass every existing perf test unchanged (Weigh, D4).
+- **SOAK-8.2** (guard) WHEN the xtask test suite runs THE SYSTEM SHALL CONTINUE TO pass every existing perf test unchanged (Weigh W3, D4).
 - **SOAK-8.3** (guard) WHEN any existing `cargo xtask` subcommand is invoked THE SYSTEM SHALL CONTINUE TO accept the same arguments and do the same work (`xtask/src/main.rs:140-163`).
 
 Files this change touches:
-- `xtask/src/perf/mod.rs`: guarded by SOAK-8.1 and SOAK-8.2. The only edit is `mod` → `pub(crate) mod` for `home`, `launch` and `logstream` (Weigh, D4; narrowed from four modules to three by the plan review, because soak does not use `perf::probe`).
+- `xtask/src/perf/mod.rs`: guarded by SOAK-8.1 and SOAK-8.2. The only edit is `mod` → `pub(crate) mod` for `home`, `launch` and `logstream` (Lock: operator, 2026-11-05, "OK, not a change"; D4; narrowed from four modules to three by the plan review, because soak does not use `perf::probe`).
 - `xtask/src/release.rs`: guarded by SOAK-4.3 and SOAK-4.4.
 - `xtask/src/main.rs`: guarded by SOAK-8.3.
 - `xtask/src/soak/` (new): no behavior to guard.
@@ -141,6 +141,6 @@ Files this change touches:
 
 ## Open Questions
 
-- Whether releases stay blocked while issue #21 is open. Under this spec's Locks, the short gate's store holds are expected to record `soak hang core` and fail `cargo xtask release-check` until #21 is fixed. The spec has no skip flag and no exception for it. Owner: the operator. Date: 2026-11-05. Forbid-guess.
+- ~~Whether releases stay blocked while issue #21 is open.~~ **Resolved by the operator, 2026-11-05 (Lock):** "Keep it, fix #21 first". Build as specified, with no skip and no override; releases wait until #21 is fixed under its own ticket. Under this spec's Locks, the short gate's store holds are expected to record `soak hang core` and fail `cargo xtask release-check` until then.
 
-- Whether "the perf gate unchanged" covers source as well as behavior. This spec reads it as behavior, so the 3-word visibility diff in `xtask/src/perf/mod.rs:1-7` is the one candidate Ask-me item (Weigh W1–W3). If the operator reads it as source, D4 switches to copying the code. Owner: the operator. Date: 2026-11-05. Forbid-guess.
+- ~~Whether "the perf gate unchanged" covers source as well as behavior.~~ **Resolved by the operator, 2026-11-05 (Lock):** "OK, not a change". Behavior is what counts, so the 3-line `mod` → `pub(crate) mod` edit for `home`, `launch` and `logstream` in `xtask/src/perf/mod.rs:1-7` stays, with perf's output and tests unchanged.
