@@ -333,7 +333,7 @@ _Requirements: LOOP-1.3, LOOP-1.4, LOOP-3.1, LOOP-3.2, LOOP-3.3, LOOP-3.4, LOOP-
 
 **Depends-on:** Task 8
 
-- [ ] **Step 1: Failing tests** in `ai/agent/tests/limits.rs`:
+- [x] **Step 1: Failing tests** in `ai/agent/tests/limits.rs`:
   - `a_model_that_never_stops_is_ended_at_the_step_limit`: `max_steps 3` with a script of endless `probe_look` calls gives `end StepLimit`, `steps 3` and exactly 3 requests.
   - `a_turn_over_its_token_limit_ends`: `max_tokens 300`, two replies of usage `120+30`, gives `end TokenLimit` after the second.
   - `a_cancel_during_a_model_call_ends_the_turn_and_sends_nothing_more`: hold, cancel, release gives `end Cancelled` and no second request.
@@ -342,8 +342,8 @@ _Requirements: LOOP-1.3, LOOP-1.4, LOOP-3.1, LOOP-3.2, LOOP-3.3, LOOP-3.4, LOOP-
   - `a_repeated_call_carries_the_reminder_in_its_result`.
 
   Run `cargo test -p navori-agent --test limits` — expect: failures on the missing limits and the cancel handling.
-- [ ] **Step 2: Implement** the step and token checks, `biased` `select!` with the cancel arm first plus `is_cancelled()` before each send and dispatch, the two synthetic texts, and the reminder appended after a blank line. Run `cargo test -p navori-agent` — expect: pass.
-- [ ] **Step 3: Gate and commit:** `git commit -m "feat(agent): stop a Turn at its limits or on cancel with every call answered"`.
+- [x] **Step 2: Implement** the step and token checks, `biased` `select!` with the cancel arm first plus `is_cancelled()` before each send and dispatch, the two synthetic texts, and the reminder appended after a blank line. Run `cargo test -p navori-agent` — expect: pass.
+- [x] **Step 3: Gate and commit:** `git commit -m "feat(agent): stop a Turn at its limits or on cancel with every call answered"`.
 
 _Requirements: LOOP-6.1, LOOP-6.2, LOOP-7.1, LOOP-7.2_
 
