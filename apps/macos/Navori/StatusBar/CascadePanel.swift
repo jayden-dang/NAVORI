@@ -96,6 +96,8 @@ final class CascadePanel: NSPanel {
 
     func setRootView(_ view: AnyView) {
         hosting.rootView = view
+        scroll.contentView.scroll(to: .zero)
+        scroll.reflectScrolledClipView(scroll.contentView)
         layoutDocument()
     }
 

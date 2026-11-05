@@ -18,7 +18,7 @@ final class CascadeController {
     @ObservationIgnored private var lastClickAt: CFTimeInterval = 0
     @ObservationIgnored private var pendingFirstFrame: (@MainActor () -> Void)?
     @ObservationIgnored private var placing = false
-    @ObservationIgnored private var placePending = false
+    @ObservationIgnored private var placePendingRow: String?
     @ObservationIgnored private let tree: () -> [CascadeNode]
     @ObservationIgnored private let submenu: (String) -> AnyView
     @ObservationIgnored private let activateRow: (String) -> Void
@@ -172,10 +172,13 @@ final class CascadeController {
         child.onKey = { [weak self] key in
             self?.key(key)
         }
-        child.setRootView(AnyView(submenu(row).environment(self)))
+        // The closure goes first: laying out the new content must schedule a place for THIS row, not the last one.
         child.onFittingSizeChange = { [weak self] in
             self?.schedulePlace(row)
         }
+        // `.id(row)` makes the panel's content a new view: the reused panel must not keep the previous
+        // row's `CappedScroll` height or scroll offset, which sized and scrolled the new child like the old one.
+        child.setRootView(AnyView(submenu(row).environment(self).id(row)))
         let firstFrame = pendingFirstFrame
         pendingFirstFrame = nil
         placing = true
@@ -186,10 +189,11 @@ final class CascadeController {
     }
 
     private func schedulePlace(_ row: String) {
-        guard !placePending else { return }
-        placePending = true
+        // Per row: a place pending for one row must not swallow the corrective place of the row that replaced it.
+        guard placePendingRow != row else { return }
+        placePendingRow = row
         DispatchQueue.main.async { [weak self] in
-            self?.placePending = false
+            if self?.placePendingRow == row { self?.placePendingRow = nil }
             self?.placeSubmenu(row)
         }
     }
