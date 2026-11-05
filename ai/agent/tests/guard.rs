@@ -1,0 +1,91 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
+use navori_agent::RepeatGuard;
+
+const ARGS: &str = r#"{"q":"x"}"#;
+
+#[test]
+fn the_third_identical_call_gets_the_first_reminder() {
+    let mut guard = RepeatGuard::new();
+    assert_eq!(guard.observe("probe_look", ARGS), None);
+    assert_eq!(guard.observe("probe_look", ARGS), None);
+    let reminder = guard.observe("probe_look", ARGS).unwrap();
+    assert!(
+        reminder
+            .starts_with("You are repeating the exact same tool call with identical arguments.")
+    );
+}
+
+#[test]
+fn the_fifth_and_eighth_calls_get_the_detailed_reminder() {
+    let mut guard = RepeatGuard::new();
+    let mut reminders = Vec::new();
+    for n in 1..=8 {
+        if let Some(text) = guard.observe("probe_look", ARGS) {
+            reminders.push((n, text));
+        }
+    }
+    let counts: Vec<i32> = reminders.iter().map(|(n, _)| *n).collect();
+    assert_eq!(counts, [3, 5, 8]);
+    assert!(reminders[1].1.contains("- tool: probe_look"));
+    assert!(reminders[1].1.contains("- consecutive_calls: 5"));
+    assert!(reminders[1].1.contains(r#"- arguments: {"q":"x"}"#));
+    assert!(reminders[2].1.contains("- consecutive_calls: 8"));
+}
+
+#[test]
+fn a_different_call_resets_the_count() {
+    let mut guard = RepeatGuard::new();
+    assert_eq!(guard.observe("probe_look", ARGS), None);
+    assert_eq!(guard.observe("probe_look", ARGS), None);
+    assert_eq!(guard.observe("probe_look", r#"{"q":"y"}"#), None);
+    assert_eq!(guard.observe("probe_look", ARGS), None);
+    assert_eq!(guard.observe("probe_look", ARGS), None);
+    assert_eq!(guard.observe("probe_other", ARGS), None);
+    assert!(guard.observe("probe_other", ARGS).is_none());
+    assert!(guard.observe("probe_other", ARGS).is_some());
+}
+
+#[test]
+fn key_order_does_not_make_a_call_different() {
+    let mut guard = RepeatGuard::new();
+    assert_eq!(guard.observe("probe_look", r#"{"a":1,"b":2}"#), None);
+    assert_eq!(guard.observe("probe_look", r#"{"b":2,"a":1}"#), None);
+    let reminder = guard.observe("probe_look", r#"{"a":1,"b":2}"#);
+    assert!(reminder.is_some());
+}
+
+#[test]
+fn unparseable_arguments_compare_as_raw_text() {
+    let mut guard = RepeatGuard::new();
+    assert_eq!(guard.observe("probe_look", "{not json"), None);
+    assert_eq!(guard.observe("probe_look", "{not json"), None);
+    let reminder = guard.observe("probe_look", "{not json");
+    assert!(reminder.is_some());
+    assert_eq!(guard.observe("probe_look", "{not  json"), None);
+}
+
+#[test]
+fn long_arguments_are_cut_at_500_characters() {
+    let mut guard = RepeatGuard::new();
+    let long = format!(r#"{{"q":"{}"}}"#, "é".repeat(600));
+    let mut fifth = None;
+    for n in 1..=5 {
+        let out = guard.observe("probe_look", &long);
+        if n == 5 {
+            fifth = out;
+        }
+    }
+    let text = fifth.unwrap();
+    let line = text
+        .lines()
+        .find(|l| l.starts_with("- arguments: "))
+        .unwrap();
+    let shown = line.trim_start_matches("- arguments: ");
+    let expected = format!(
+        "{}… (+{} more chars)",
+        long.chars().take(500).collect::<String>(),
+        608 - 500
+    );
+    assert_eq!(shown, expected);
+}
