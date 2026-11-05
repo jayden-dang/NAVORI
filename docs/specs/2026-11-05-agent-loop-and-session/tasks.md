@@ -116,9 +116,9 @@ _Requirements: LOOP-1.5, LOOP-1.6, LOOP-1.7, LOOP-10.1_
 
 **Depends-on:** Task 1
 
-- [ ] **Step 1: Failing tests** in `ai/llm/tests/fake.rs`, run with `--features fake` (a `[[test]] required-features = ["fake"]` entry). `the_fake_answers_its_script_in_order_and_records_requests`: two scripted replies come back in order and `requests()` holds both requests. `a_fake_with_an_empty_script_fails_as_malformed`. `a_held_call_waits_until_released`: a `complete` future stays pending until `release()`. Extend `every_default_test_uses_fakes` to also scan `ai/agent/tests/` and `crates/ffi/tests/agent.rs`, each only when it exists (the existing fixed paths keep their `is_file()` asserts), with `crates/ffi/tests/live_agent.rs` the only exempt file. Run `cargo test -p navori-llm --features fake` — expect: unresolved `fake`.
-- [ ] **Step 2: Implement** `fake.rs` behind `#[cfg(feature = "fake")]`, with `[features] fake = []`. Add `"navori-llm"` to `FAKE_GUARDED` (making the array length 3) and add an xtask test showing that a normal `[dependencies]` entry with `features = ["fake"]` is refused. Run `cargo test -p navori-llm --features fake && cargo test -p xtask` — expect: pass.
-- [ ] **Step 3: Gate and commit:** `git commit -m "test(llm): add a scripted FakeLlm behind the fake feature"`.
+- [x] **Step 1: Failing tests** in `ai/llm/tests/fake.rs`, run with `--features fake` (a `[[test]] required-features = ["fake"]` entry). `the_fake_answers_its_script_in_order_and_records_requests`: two scripted replies come back in order and `requests()` holds both requests. `a_fake_with_an_empty_script_fails_as_malformed`. `a_held_call_waits_until_released`: a `complete` future stays pending until `release()`. Extend `every_default_test_uses_fakes` to also scan `ai/agent/tests/` and `crates/ffi/tests/agent.rs`, each only when it exists (the existing fixed paths keep their `is_file()` asserts), with `crates/ffi/tests/live_agent.rs` the only exempt file. Run `cargo test -p navori-llm --features fake` — expect: unresolved `fake`.
+- [x] **Step 2: Implement** `fake.rs` behind `#[cfg(feature = "fake")]`, with `[features] fake = []`. Add `"navori-llm"` to `FAKE_GUARDED` (making the array length 3) and add an xtask test showing that a normal `[dependencies]` entry with `features = ["fake"]` is refused. Run `cargo test -p navori-llm --features fake && cargo test -p xtask` — expect: pass.
+- [x] **Step 3: Gate and commit:** `git commit -m "test(llm): add a scripted FakeLlm behind the fake feature"`.
 
 _Requirements: LOOP-8.1_
 
