@@ -415,8 +415,8 @@ _Requirements: LOOP-2.6_
 
 **Depends-on:** Task 10
 
-- [ ] **Step 1: Write** `a_live_turn_answers_from_a_real_read_action`, marked `#[ignore = "calls DeepSeek with a key from pass; run by hand with NAVORI_LIVE_LLM=1 and --ignored"]`. It returns early unless `NAVORI_LIVE_LLM=1`, and reads `NAVORI_LIVE_PASS_ENTRY` and `NAVORI_LIVE_MODEL`. It reads the key with `pass show <entry>` inside the test, saves it into a `FakeKeychain`, and starts a core with production providers. It runs the input `Which TCP ports are open on this Mac? Use the tools.` and prints the answer, the end and the Actions called. It asserts only `end` is `Completed` or `StepLimit`. Run `cargo test -p navori-ffi --test live_agent` — expect: 1 ignored. No agent sets the variables.
-- [ ] **Step 2: Gate and commit:** `git commit -m "test(ffi): add the operator-run live Agent loop Turn"`.
+- [x] **Step 1: Write** `a_live_turn_answers_from_a_real_read_action`, marked `#[ignore = "calls DeepSeek with a key from pass; run by hand with NAVORI_LIVE_LLM=1 and --ignored"]`. It returns early unless `NAVORI_LIVE_LLM=1`, and reads `NAVORI_LIVE_PASS_ENTRY` and `NAVORI_LIVE_MODEL`. It reads the key with `pass show <entry>` inside the test, saves it into a `FakeKeychain`, and starts a core with production providers. It runs the input `Which TCP ports are open on this Mac? Use the tools.` and prints the answer, the end and the Actions called. It asserts only `end` is `Completed` or `StepLimit`. Run `cargo test -p navori-ffi --test live_agent` — expect: 1 ignored. No agent sets the variables.
+- [x] **Step 2: Gate and commit:** `git commit -m "test(ffi): add the operator-run live Agent loop Turn"`.
 
 _Requirements: LOOP-9.1_
 
