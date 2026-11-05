@@ -20,7 +20,7 @@ If the Shield fails or returns a malformed result, nothing is sent. If the audit
 
 ## The audit table
 
-Each ask that reaches the Shield writes one row to the table `context_audit` in the Navori database before any send: `ts_ms`, `provider` (`deepseek`), `kinds` (`text`), `redacted_count` and `outcome` (`authorized` or `blocked`). A row never holds the prompt, the redacted text or the reply. The table is created on the first ask. Nothing reads it yet: the user cannot see what the AI has seen, so GOAL-6 is not met by this feature.
+Each ask that reaches the Shield writes one row to the table `context_audit` in the Navori database before any send: `ts_ms`, `provider` (`deepseek`), `kinds` (`text`), `redacted_count` and `outcome` (`authorized` or `blocked`). Each model call of an Agent loop Turn leaves one such row too (see `docs/architecture/data.md`). A row never holds the prompt, the redacted text or the reply. The table is created on the first ask. Nothing reads it yet: the user cannot see what the AI has seen, so GOAL-6 is not met by this feature.
 
 ## Exit codes and failures
 
