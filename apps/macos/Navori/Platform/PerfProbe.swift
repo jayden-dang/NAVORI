@@ -66,6 +66,20 @@ enum PerfProbe {
         log.notice("submenuOpened ms=\(format(ms), privacy: .public)")
     }
 
+    /// From a pointer entering the Core row to the first frame of its Submenu, intent delay included.
+    static func markSubmenuIntentOpened(since: UInt64) {
+        guard AppEnvironment.perfMode else { return }
+        guard let now = nowMicroseconds() else {
+            log.fault("submenu intent open clock read failed")
+            return
+        }
+        guard let ms = milliseconds(from: since, to: now) else {
+            log.fault("submenu intent open clock went backwards")
+            return
+        }
+        log.notice("submenuIntentOpened ms=\(format(ms), privacy: .public)")
+    }
+
     /// Clock sample taken after a panel close and before the panel is shown.
     static func captureTrigger() -> UInt64? {
         guard let now = nowMicroseconds() else {
@@ -84,6 +98,7 @@ enum PerfProbe {
         _ = signal(SIGUSR1, SIG_IGN)
         _ = signal(SIGUSR2, SIG_IGN)
         _ = signal(SIGTERM, SIG_IGN)
+        _ = signal(SIGINFO, SIG_IGN)
 
         let openMenu = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
         openMenu.setEventHandler {
@@ -108,7 +123,14 @@ enum PerfProbe {
             }
         }
         terminate.resume()
-        sources = [openMenu, openSubmenu, terminate]
+        let openSubmenuByHover = DispatchSource.makeSignalSource(signal: SIGINFO, queue: .main)
+        openSubmenuByHover.setEventHandler {
+            MainActor.assumeIsolated {
+                statusBar?.openCoreSubmenuByHoverFresh()
+            }
+        }
+        openSubmenuByHover.resume()
+        sources = [openMenu, openSubmenu, openSubmenuByHover, terminate]
     }
 
     private static func nowMicroseconds() -> UInt64? {

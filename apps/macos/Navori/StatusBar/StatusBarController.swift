@@ -212,6 +212,19 @@ final class StatusBarController: NSObject {
         }
     }
 
+    /// Perf mode only (SIGINFO): the pointer enters the Core row, the real intent timer fires, the Submenu opens.
+    func openCoreSubmenuByHoverFresh() {
+        guard panelBuilt, panel.isOpen else {
+            PerfProbe.fault("SIGINFO open has no level 0")
+            return
+        }
+        panel.cascade.closeSubmenus()
+        guard let trigger = PerfProbe.captureTrigger() else { return }
+        panel.cascade.pointer(on: "core", at: CGPoint(x: 100, y: 200)) {
+            PerfProbe.markSubmenuIntentOpened(since: trigger)
+        }
+    }
+
     private func showMenu() {
         panel.close()
         #if DEBUG

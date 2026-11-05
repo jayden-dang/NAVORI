@@ -144,4 +144,47 @@ struct CascadeHoverIntentTests {
         #expect(state.handle(.key(.down)) == [.cancelHoverTimer])
         #expect(state.handle(.hoverTimerFired).isEmpty)
     }
+
+    // MARK: what the submenu_intent_open_ms gate (80 ms) is made of
+
+    /// Replays pointer moves through the state and returns when the hover timer would fire, in seconds after the
+    /// first entry, following arm and cancel effects the way the controller does.
+    private static func timerFiresAfter(moves: [(row: String, x: CGFloat, t: Double)], submenu: CGRect?) -> Double? {
+        var state = CascadeState(root: tree)
+        var deadline: Double?
+        for move in moves {
+            let effects = state.handle(.pointerOn(row: move.row, at: point(move.x), submenu: submenu))
+            for effect in effects {
+                switch effect {
+                case let .armHoverTimer(delay): deadline = move.t + delay
+                case .cancelHoverTimer: deadline = nil
+                default: break
+                }
+            }
+        }
+        return deadline
+    }
+
+    @Test func a_pointer_that_keeps_moving_inside_the_row_still_opens_fifty_ms_after_entry() {
+        let moves = (0..<12).map { (row: "core", x: CGFloat(100 + $0 * 3), t: Double($0) * 0.016) }
+        #expect(Self.timerFiresAfter(moves: moves, submenu: nil) == CascadeState.intentDelay)
+    }
+
+    @Test func a_timer_that_rearms_on_every_move_at_150_ms_would_miss_the_80_ms_gate() {
+        // The old bug re-armed 150 ms after the LAST move. The safe-diagonal branch still works that way, so it
+        // is the live model of it: 12 moves 16 ms apart end at 176 ms and the timer fires at 326 ms. The gate
+        // (intent delay + the 16 ms open budget, measured against 80 ms) separates the two shapes.
+        var state = CascadeState(root: Self.tree)
+        _ = state.handle(.pointerOn(row: "awake", at: Self.point(100), submenu: nil))
+        _ = state.handle(.click(row: "awake"))
+        var deadline = 0.0
+        for index in 0..<12 {
+            let effects = state.handle(.pointerOn(row: "core", at: Self.point(250 + CGFloat(index) * 3), submenu: Self.submenu))
+            #expect(effects == [Self.rest])
+            deadline = Double(index) * 0.016 + CascadeState.restDelay
+        }
+        let gate = 0.080
+        #expect(deadline > gate, "re-arming at 150 ms ends at \(deadline) s")
+        #expect(CascadeState.intentDelay + 0.016 < gate, "the 50 ms intent path plus the open budget fits")
+    }
 }

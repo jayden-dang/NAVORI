@@ -39,7 +39,9 @@ final class CascadeController {
         self.selection = state.selection
     }
 
-    func pointer(on row: String, at screenPoint: CGPoint) {
+    /// `onFirstFrame` is for the perf probe: it fires on the first frame of the Submenu this entry opens.
+    func pointer(on row: String, at screenPoint: CGPoint, onFirstFrame: (@MainActor () -> Void)? = nil) {
+        if let onFirstFrame { pendingFirstFrame = onFirstFrame }
         apply(state.handle(.pointerOn(row: row, at: screenPoint, submenu: openSubmenuRect)))
     }
 
