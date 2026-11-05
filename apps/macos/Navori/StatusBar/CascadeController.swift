@@ -41,8 +41,18 @@ final class CascadeController {
 
     /// `onFirstFrame` is for the perf probe: it fires on the first frame of the Submenu this entry opens.
     func pointer(on row: String, at screenPoint: CGPoint, onFirstFrame: (@MainActor () -> Void)? = nil) {
-        if let onFirstFrame { pendingFirstFrame = onFirstFrame }
-        apply(state.handle(.pointerOn(row: row, at: screenPoint, submenu: openSubmenuRect)))
+        let effects = state.handle(.pointerOn(row: row, at: screenPoint, submenu: openSubmenuRect))
+        if let onFirstFrame {
+            // Keep the callback only when this entry opens a Submenu: now, or when the intent timer fires.
+            let opens = effects.contains { effect in
+                switch effect {
+                case .open, .armHoverTimer(after: CascadeState.intentDelay): true
+                default: false
+                }
+            }
+            pendingFirstFrame = opens ? onFirstFrame : nil
+        }
+        apply(effects)
     }
 
     func pointerLeft(_ row: String) {
