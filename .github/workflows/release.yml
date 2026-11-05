@@ -136,6 +136,12 @@ jobs:
       - name: Build the release artifacts
         run: cargo xtask release --tag "$GITHUB_REF_NAME" --out dist
 
+      - name: Require a tap for a published final release
+        if: vars.PUBLISH_RELEASE == 'true' && steps.tag.outputs.prerelease != 'true' && vars.TAP_REPOSITORY == ''
+        run: |
+          echo "::error::PUBLISH_RELEASE is true for a final release but TAP_REPOSITORY is empty; refusing to publish it without a cask."
+          exit 1
+
       - name: Create the draft Release
         if: steps.existing.outputs.exists != 'true'
         env:
