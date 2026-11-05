@@ -722,16 +722,26 @@ impl Capture {
     }
 }
 
+static GLOBAL_LOGS: std::sync::OnceLock<Capture> = std::sync::OnceLock::new();
+
+fn every_log_line() -> Capture {
+    GLOBAL_LOGS
+        .get_or_init(|| {
+            let capture = Capture::default();
+            let _ = tracing::subscriber::set_global_default(
+                tracing_subscriber::fmt()
+                    .with_max_level(tracing::Level::TRACE)
+                    .with_writer(capture.clone())
+                    .with_ansi(false)
+                    .finish(),
+            );
+            capture
+        })
+        .clone()
+}
+
 fn capturing_logs() -> (Capture, tracing::subscriber::DefaultGuard) {
-    static ONCE: std::sync::Once = std::sync::Once::new();
-    ONCE.call_once(|| {
-        let _ = tracing::subscriber::set_global_default(
-            tracing_subscriber::fmt()
-                .with_max_level(tracing::Level::TRACE)
-                .with_writer(std::io::sink)
-                .finish(),
-        );
-    });
+    every_log_line();
     let capture = Capture::default();
     let guard = tracing::subscriber::set_default(
         tracing_subscriber::fmt()
@@ -767,4 +777,53 @@ fn a_failed_conversation_write_logs_the_sqlite_code_and_none_of_the_text() {
     assert!(logs.contains("conversation write failed"), "{logs}");
     assert!(logs.contains("code"), "{logs}");
     assert!(!logs.contains("a private question"), "{logs}");
+}
+
+const PLANTED: &str = concat!("ghp_", "abcdefghijklmnopqrstuvwxyz0123456789");
+const MARKER: &str = "[REDACTED:github_token]";
+
+#[test]
+fn a_planted_token_never_leaves_the_machine_or_reaches_a_stored_row_or_a_log() {
+    let logs = every_log_line();
+    let home = home();
+    let mut first = call_reply("c1", "system_ping", "{}");
+    first.text = Some(format!("Checking with {PLANTED}."));
+    first.reasoning = Some(format!("The user pasted {PLANTED}."));
+    first.tool_calls.push(ToolCall {
+        id: "c2".into(),
+        name: "system_ping".into(),
+        arguments: format!(r#"{{"note":"{PLANTED}"}}"#),
+    });
+    let fake = Arc::new(FakeLlm::new(vec![
+        Ok(first),
+        Ok(text_reply(&format!("Done, {PLANTED}."))),
+    ]));
+    let core = started(&home, deps(&FakeKeychain::new(), &fake));
+
+    let outcome = ask_navori_ai(&core, &format!("Is {PLANTED} still valid?"));
+
+    assert_eq!(outcome.end, TurnEnd::Completed);
+    let sent = format!("{:?}", fake.requests());
+    assert!(!sent.contains(PLANTED), "{sent}");
+    assert!(sent.contains(MARKER), "{sent}");
+    let store = open_store(&home);
+    let stored = texts(
+        &store,
+        "SELECT ifnull(group_concat(body, ' '), '') FROM ai_session_message \
+         UNION ALL SELECT ifnull(group_concat(id || ' ' || created_ms, ' '), '') FROM ai_session_conversation \
+         UNION ALL SELECT ifnull(group_concat(model || ' ' || ifnull(end_reason, ''), ' '), '') FROM ai_session_turn \
+         UNION ALL SELECT ifnull(group_concat(provider || ' ' || kinds || ' ' || redacted_count, ' '), '') FROM context_audit \
+         UNION ALL SELECT ifnull(group_concat(module || ' ' || kind || ' ' || summary || ' ' || payload, ' '), '') FROM events",
+    )
+    .join(" ");
+    assert!(!stored.contains(PLANTED), "{stored}");
+    assert!(stored.contains(MARKER), "{stored}");
+    let audit = texts(
+        &store,
+        "SELECT kinds || ':' || redacted_count FROM context_audit ORDER BY id",
+    );
+    assert_eq!(audit, vec!["text:1", "text:3"]);
+    core.shutdown();
+    let logged = logs.text();
+    assert!(!logged.contains(PLANTED), "{logged}");
 }
