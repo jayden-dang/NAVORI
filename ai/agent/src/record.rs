@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
 const BODY_VERSION: u32 = 1;
+const UNREADABLE_BODY: &str = r#"{"v":0}"#;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ConversationId(Ulid);
@@ -322,7 +323,10 @@ impl RecordedMessage {
                 synthetic: *synthetic,
             }),
         };
-        json.unwrap_or_default()
+        json.unwrap_or_else(|error| {
+            tracing::error!(%error, "conversation body could not be serialized");
+            UNREADABLE_BODY.to_owned()
+        })
     }
 
     pub fn from_body(body: &str) -> Result<RecordedMessage, RecordError> {
