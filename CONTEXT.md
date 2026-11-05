@@ -74,6 +74,11 @@ Navori's own built-in assistant: it answers the user, reads context through the 
 Gateway and acts only by calling Actions.
 _Avoid_: the agent, assistant (alone), bot
 
+**Agent loop**:
+The loop that runs Navori AI: send a turn to the model, run the Actions it calls, feed the
+results back, and repeat until it answers or a Decision is needed.
+_Avoid_: harness (a Harness is a CLI Navori observes), runtime, engine
+
 **Provider**:
 A cloud LLM service the user configures (Anthropic, OpenAI, DeepSeek, Google, xAI,
 OpenRouter or a custom OpenAI-compatible endpoint), reached through an adapter.
