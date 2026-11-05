@@ -131,7 +131,7 @@ _Requirements: SOAK-8.1, SOAK-8.2_
 
 **Depends-on:** none
 
-- [ ] **Step 1: Write the failing tests.** Each is a behavior sentence over `plan(&Tier::Short)` and `plan(&Tier::Long { load: 2h })`:
+- [x] **Step 1: Write the failing tests.** Each is a behavior sentence over `plan(&Tier::Short)` and `plan(&Tier::Long { load: 2h })`:
   - `the_short_tier_settles_for_a_minute_then_loads_for_twenty`: settle is 60 s, load is 1200 s, and every step's `at` is ≥ 60 s.
   - `the_short_tier_takes_a_command_lease_every_five_seconds`: the `CommandLease` count is 240, and consecutive gaps are 5 s.
   - `the_short_tier_releases_all_every_minute_at_half_past`: the `ReleaseAll` `at` values, minus 60 s, are 30, 90, 150 and so on.
@@ -144,11 +144,11 @@ _Requirements: SOAK-8.1, SOAK-8.2_
   - `the_long_tier_runs_the_same_steps_at_its_own_rates`: lease 25 s, release_all 300 s (offset 150), listener 100 s, store 600 s, sample 60 s, core probe 30 s, and load equal to the given duration.
 
   Run: `cargo test -p xtask soak::plan` — expect: compile error, no `plan` yet.
-- [ ] **Step 2: Implement** `plan()`. One rate table per tier (the design's "Load plan" table). Generate each event series from `settle + phase + k × period` while it stays below `settle + load`. Append one `ProbeMenu` at `settle + load`. Sort stably by `at`.
+- [x] **Step 2: Implement** `plan()`. One rate table per tier (the design's "Load plan" table). Generate each event series from `settle + phase + k × period` while it stays below `settle + load`. Append one `ProbeMenu` at `settle + load`. Sort stably by `at`.
 
   Run: `cargo test -p xtask soak::plan` — expect: pass.
-- [ ] **Step 3: Run** `cargo clippy -p xtask --all-targets -- -D warnings` — expect: pass. The module-level attribute on `mod soak;` covers items unused until Tasks 7 to 9.
-- [ ] **Step 4: Commit** `git commit -m "feat(xtask): plan the soak load for the short and long tiers"`
+- [x] **Step 3: Run** `cargo clippy -p xtask --all-targets -- -D warnings` — expect: pass. The module-level attribute on `mod soak;` covers items unused until Tasks 7 to 9.
+- [x] **Step 4: Commit** `git commit -m "feat(xtask): plan the soak load for the short and long tiers"`
 
 _Requirements: SOAK-1.2, SOAK-1.3, SOAK-3.1, SOAK-3.5, SOAK-5.1, SOAK-5.3_
 
