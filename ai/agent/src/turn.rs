@@ -256,6 +256,7 @@ impl Agent {
         cancel: &CancellationToken,
     ) -> Result<Option<String>, TurnEnd> {
         let toolset = Toolset::from_specs(&kernel.actions());
+        let defs = toolset.defs();
         let dispatcher = Dispatcher::new(self.limits.action_timeout);
         let turn = run.turn;
         let input = self.shield(&input)?;
@@ -289,7 +290,7 @@ impl Agent {
                 request: ChatRequest {
                     model: model.to_owned(),
                     messages: run.messages.clone(),
-                    tools: toolset.defs(),
+                    tools: defs.clone(),
                 },
                 prior_redactions: std::mem::take(&mut run.unsent),
             });
@@ -323,8 +324,9 @@ impl Agent {
                 let arguments = self.shield(&call.arguments)?;
                 redactions += arguments.count;
                 shielded_calls.push(ToolCall {
+                    id: call.id.clone(),
+                    name: call.name.clone(),
                     arguments: arguments.text,
-                    ..call.clone()
                 });
             }
             let raw_calls = tool_calls;
