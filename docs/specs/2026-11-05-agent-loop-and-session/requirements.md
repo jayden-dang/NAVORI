@@ -8,7 +8,7 @@ Date: 2026-11-05
 Roadmap item: ROAD-14 agent-loop-and-session (MILE-3). Claim: GitHub issue #28 (open, label status:shaping, unassigned: the assign in this run was refused by the harness; the operator can run `gh issue edit 28 --add-assignee jayden-dang`).
 Written in an unattended run under /Users/jayden/Developer/experiments/NAVORI/.skills/_pending-agent-loop/auto/charter.md (`.skills/` is gitignored, so the run files are not in the repository). A value marked `agent-decided` was picked by an agent session, not by the operator; the operator confirms or reverses it on review. A value marked `Weigh W-n` is agent-loop-interpret's pick in the run ledger. Unmarked lines restate a Lock or a repo default (auto/close-package.md, auto/ledger.md).
 Reference design: dsh (MIT, /Users/jayden/Developer/dsh), ported per docs/adr/0008-agent-loop-ported-from-dsh.md.
-Persisted formats: this file names no new table, column, Owner or encoding (Weigh W5). The Conversation's stored shape is design work, and design is a hard stop in this run (Open Questions, S-stop). The one existing format it touches, `context_audit`, keeps its columns and values (LOOP-5.2).
+Persisted formats: this file names no new table, column, Owner or encoding (Weigh W5). The Conversation's stored shape is in design.md "Persisted formats", under charter Lock L22 (charter.md:42). The Journal Event kind of LOOP-3.11 is named here. The one existing format it touches, `context_audit`, keeps its columns and values (LOOP-5.2).
 Words: Conversation, Turn and Step are defined in CONTEXT.md. "THE SYSTEM" is the Navori Core (its AI runtime in `crates/ffi`, the `ai/*` crates and the Kernel), unless a criterion names a part. "The starter" is the code inside the Core that starts a Turn. In this road that is a test or the live demo; ROAD-15 and ROAD-37 add the person-facing entries. "Fake provider" is the scripted provider used by default tests; no default test touches the network or the real Keychain.
 -->
 
@@ -23,7 +23,7 @@ Words: Conversation, Turn and Step are defined in CONTEXT.md. "THE SYSTEM" is th
 - **LOOP-1.5** THE SYSTEM SHALL make every model call of a Turn a single non-streaming request through the `openai_compat` adapter and the provider key that ROAD-36 shipped (streaming is ROAD-15's, docs/roadmap/INDEX.md:90).
 - **LOOP-1.6** THE SYSTEM SHALL accept a model reply that carries tool calls with empty or null text. Today the adapter rejects any reply whose `content` is not a string, as `Malformed` (ai/llm/src/openai_compat.rs:143-145).
 - **LOOP-1.7** WHEN a request follows earlier assistant messages of the Conversation THE SYSTEM SHALL resend each of them with every part the Provider requires back, including its reasoning text. With tools in the request, DeepSeek answers 400 when an earlier `reasoning_content` is missing (Weigh W5; auto/research-deepseek-tools.md). The reasoning text resent is the recorded one, after the Shield (LOOP-3.6, LOOP-5.3) (`agent-decided`: thinking is left at the Provider's default, which is on, and its reasoning is replayed, rather than sending `thinking` disabled; research-deepseek-tools.md:7,53). Whether DeepSeek accepts reasoning the Shield changed is in Open Questions.
-- **LOOP-1.8** IF a tool call's arguments are not valid JSON, or do not fit the Action's parameter schema, THEN THE SYSTEM SHALL dispatch nothing for that call and return to the model an error result that names the problem.
+- **LOOP-1.8** IF a tool call's arguments are not valid JSON, or do not fit the Action's parameter schema, THEN THE SYSTEM SHALL dispatch nothing for that call, so the Module receives no request, and return to the model an error result that names the problem.
 - **LOOP-1.9** IF a dispatched Action returns an error, or does not answer within the Agent loop's time limit for one Action, THEN THE SYSTEM SHALL return that failure to the model as an error result, a timeout result when the limit passed, and continue the Turn (dsh `timeout-policy`; `agent-decided`: the limit, no longer than the Kernel's 30 s dispatch timeout, crates/kernel/src/runtime.rs:308).
 
 ## 2. Run only Read Actions until approvals exist
@@ -51,12 +51,13 @@ Words: Conversation, Turn and Step are defined in CONTEXT.md. "THE SYSTEM" is th
 - **LOOP-3.8** THE SYSTEM SHALL keep the Conversation in the app's SQLite store, created on the first Turn and never at startup (L18, ARCH-12, ARCH-17; its stored shape is design, Open Questions S-stop).
 - **LOOP-3.9** IF a record write fails THEN THE SYSTEM SHALL end the Turn with an error and send no further model request in it (`agent-decided`, after dsh's "model-visible means logged"). An end that cannot itself be recorded is repaired by LOOP-4.1 on the next open.
 - **LOOP-3.10** WHEN a Turn continues an existing Conversation THE SYSTEM SHALL send the model that Conversation's earlier messages, as recorded after the Shield (LOOP-3.6), before the new input (`agent-decided`, after dsh's session history and CONTEXT.md's "a sequence of Turns").
+- **LOOP-3.11** WHEN a Turn ends THE SYSTEM SHALL write one Event to the Journal, from module `ai` with kind `ai.turn_ended`. Its summary SHALL carry no content, and its payload only the Conversation and Turn ids, the origin, the end reason and the number of Steps (Weigh W13, W14; `agent-decided`: the kind, the keys and the summary; L1 "on … Journal").
 
 ## 4. Repair a Turn cut short by a crash
 
 **Story:** As the user, I want a Turn that a crash or a quit cut short to be closed and its open tool calls answered before the next Turn runs, so that a Conversation never resumes with half a Turn in it. The demo is the test that leaves a Turn without an end, reopens the Core and reads the repaired record.
 
-- **LOOP-4.1** WHEN the Core next opens a Conversation whose last Turn has no recorded end THE SYSTEM SHALL record that Turn as interrupted, and give each of its unanswered tool calls an error result, before any new Turn of that Conversation starts (`agent-decided`, after dsh's crash repair).
+- **LOOP-4.1** WHEN the Core next opens a Conversation whose last Turn has no recorded end THE SYSTEM SHALL record that Turn as interrupted, and give each of its unanswered tool calls an error result, before any new Turn of that Conversation starts, and write that Turn's `ai.turn_ended` Event with the end `interrupted` (`agent-decided`, after dsh's crash repair; Weigh W13).
 
 ## 5. Send every model call through the Gateway, audited
 
@@ -65,7 +66,7 @@ Words: Conversation, Turn and Step are defined in CONTEXT.md. "THE SYSTEM" is th
 - **LOOP-5.1** THE SYSTEM SHALL send every model call of a Turn through the Context Gateway, and no other code of the Agent loop SHALL reach the provider (ARCH-7).
 - **LOOP-5.2** WHEN a model call is about to be sent THE SYSTEM SHALL first write one `context_audit` row for that call, with the columns and values ASK writes (ASK-5.2): Provider `deepseek`, kinds `text`, outcome `authorized`, and as `redacted_count` the number of items the Shield redacted in that request. This row is never a total for the Turn (Weigh W7, W9).
 - **LOOP-5.3** THE SYSTEM SHALL pass every message of a request through the Shield before sending it: the input, the earlier messages, each tool call's arguments and each tool result (ARCH-6).
-- **LOOP-5.4** IF the Shield fails on a request THEN THE SYSTEM SHALL write a `blocked` row for that call and send nothing for that call (Weigh W9). What the Turn does next is in Open Questions, S-shield-refusal.
+- **LOOP-5.4** IF the Shield fails on a request THEN THE SYSTEM SHALL write a `blocked` row for that call, send nothing for that call, and end the Turn with an error (Weigh W9; `agent-decided`: ending the Turn, design Decision 10).
 - **LOOP-5.5** IF the audit row for a call cannot be written THEN THE SYSTEM SHALL send nothing for that call and end the Turn with an error.
 - **LOOP-5.6** THE SYSTEM SHALL keep message text, tool arguments and tool results out of every `context_audit` row.
 
@@ -153,14 +154,8 @@ Files this change touches, and what each guards:
 
 ## Open Questions
 
-- S-stop: the Conversation's stored shape (Owner, tables, columns, payload encoding, migration) — owner: operator — date: before design-solution runs — forbid-guess: no requirement or test names a table, column, Owner or encoding until the operator adds ASK charter.md:45's clause or an Under --go section.
 - S-cost: estimated cost per Turn (Locks L19/L20 partly deferred to ROAD-11) — owner: operator — date: at the review of this file — forbid-guess: no price or cost value is computed or stored by this road.
-- S-journal: what a Turn writes to the Journal (L1 and ADR 0008:5 say the port runs "on … Journal") — owner: design-solution, after S-stop — date: design — forbid-guess: no requirement says the Journal is untouched or names an Event kind.
-- S-shield-refusal: after the Shield refuses a later call, does the Turn end or does the model get an error result, and is only the refused part withheld (docs/ARCHITECTURE.md:247)? — owner: design-solution — date: design — forbid-guess: tests assert only LOOP-5.4.
-- S-limits: the step-limit and token-limit values, and which token counts the limit sums — owner: design-solution — date: design — forbid-guess: tests use injected limits, not fixed values.
-- S-origin: the set of Turn origin values — owner: design-solution — date: design — forbid-guess: tests assert that the starter's value is recorded unchanged.
-- S-parallel: serial or parallel tool calls within a Step — owner: design-solution — date: design — forbid-guess: no test depends on the order in which Actions run, only on the order of their results (LOOP-1.2).
-- S-tools: tool names for Actions (for example `module.action`; DeepSeek allows a-z, A-Z, 0-9, `_` and `-`, up to 128 characters) and cutting each Action's parameter schema from its Module's shared enum schema (crates/protocol/src/lib.rs:27) — owner: design-solution — date: design — forbid-guess: no test pins a tool name.
+- Answered in design.md (2026-11-05), no longer open: S-stop (charter Lock L22 and design "Persisted formats"), S-journal (Decision 12, LOOP-3.11), S-shield-refusal (Decision 10, LOOP-5.4), S-limits (Decision 8: 8 Steps, 200 000 tokens summed over input and output), S-origin (Decision 9: `user`), S-parallel (Decision 4: serial), S-tools (Decisions 5–6: `{module}_{action}`, schema cut from the enum's `oneOf`).
 - Whether DeepSeek sends `content` as null or as an empty string with tool calls (research: unconfirmed) — owner: author of the live test — date: when LOOP-9.1 first runs — forbid-guess: fixtures cover both (LOOP-1.6).
 - Does DeepSeek accept a replayed `reasoning_content` that the Shield changed (research-deepseek-tools.md:38-40, unconfirmed)? — owner: author of the live test — date: when LOOP-9.1 first runs — forbid-guess: a fixture covers a redacted replay; no test asserts the Provider accepts it.
 - The `pass` entry that holds the DeepSeek key — owner: operator — date: before LOOP-9.1 first runs — forbid-guess: no agent runs `pass show` or invents a name.
