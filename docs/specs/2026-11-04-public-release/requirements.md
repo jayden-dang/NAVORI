@@ -31,8 +31,10 @@ Terms used below:
 
 Files this change touches, and what in them is guarded:
 - `xtask/src/main.rs` — bundle, sign, install, run, ci, perf: RELEASE-1.13, 1.14, 1.15, 2.8.
+- `Cargo.toml` (workspace version) and `rust-toolchain.toml` (toolchain pinned to 1.97.1) — a newer clippy rejected the code, so the release gate needs a fixed toolchain. *(Amended 2026-11-05.)*
+- `xtask/src/perf/` — perf checks; guarded by RELEASE-2.8. *(Amended 2026-11-05.)*
 - `modules/integrations/src/domain/hookfile.rs`, `identity.rs` — hook command and recognition: RELEASE-5.6–5.10.
-- `crates/store/` — startup backup and migrations, read not changed: RELEASE-4.5.
+- `crates/store/` — startup backup and migrations stay untouched (RELEASE-4.5); `crates/store/src/lib.rs` changed only in `journal_recent`, whose order now breaks same-millisecond ties newest write first (`ORDER BY ts_ms DESC, rowid DESC`), because a flaky test found random order on CI. *(Amended 2026-11-05.)*
 - `.github/workflows/release.yml` (new), the tap's `Casks/navori.rb` (new), the committed designated requirement file (new) — no behavior to guard.
 - `docs/agents/project.md` — release steps text only: no behavior to guard.
 
@@ -48,7 +50,7 @@ Files this change touches, and what in them is guarded:
 - **RELEASE-1.6** IF the signing identity cannot be imported or is not found in the workflow THEN THE SYSTEM SHALL fail the workflow and SHALL NOT sign ad-hoc.
 - **RELEASE-1.7** IF the designated requirement of the built `Navori.app` differs from the one committed in the repository THEN THE SYSTEM SHALL fail the workflow before publishing, showing both requirements.
 - **RELEASE-1.8** WHEN the release bundle is built from a release tag THE SYSTEM SHALL set `CFBundleShortVersionString` to the tag's version and `CFBundleVersion` to the number of commits reachable from the tagged commit.
-- **RELEASE-1.9** WHEN the bundle is built and verified THE SYSTEM SHALL publish a GitHub Release named `v<version>` on `jayden-dang/NAVORI` carrying the release zip and a file `Navori-<version>.zip.sha256` holding the zip's SHA-256.
+- **RELEASE-1.9** WHEN the bundle is built and verified THE SYSTEM SHALL publish a GitHub Release named `v<version>` on `jayden-dang/NAVORI` carrying the release zip and a file `Navori-<version>.zip.sha256` holding the zip's SHA-256, subject to RELEASE-6.1. *(Amended 2026-11-05: the Release stays a draft while the Publish switch is off.)*
 - **RELEASE-1.10** WHEN the release tag is a pre-release tag THE SYSTEM SHALL mark its GitHub Release as a pre-release.
 - **RELEASE-1.11** IF any step before the GitHub Release is created fails THEN THE SYSTEM SHALL create no Release and change no cask.
 - **RELEASE-1.12** WHEN the release workflow is run again for a tag whose GitHub Release already exists THE SYSTEM SHALL finish the remaining steps without creating a second Release or a second asset of the same name.
@@ -65,9 +67,9 @@ Files this change touches, and what in them is guarded:
 - **RELEASE-2.3** IF the workspace version is not a valid Semantic Versioning 2.0 version THEN THE SYSTEM SHALL fail before running the gate, naming the version.
 - **RELEASE-2.4** IF the tag `v<workspace version>` already exists locally or on `origin` THEN THE SYSTEM SHALL fail before running the gate, naming the tag.
 - **RELEASE-2.5** IF the working tree has uncommitted changes to tracked files THEN THE SYSTEM SHALL fail before running the gate, listing the changed files.
-- **RELEASE-2.6** IF the workspace version has no pre-release part and `docs/agents/project.md` does not state `**Compat obligation:** External` THEN THE SYSTEM SHALL fail before running the gate, naming the missing line.
+- **RELEASE-2.6** IF the workspace version has no pre-release part and `docs/agents/project.md` does not state `**Compat obligation:** External` THEN THE SYSTEM SHALL fail before running the gate, naming the missing line. *(Amended 2026-11-05: the implemented rule is stricter: a line of `docs/agents/project.md` must START with `- **Compat obligation:** External`; the phrase elsewhere in a line does not count.)*
 - **RELEASE-2.7** THE SYSTEM SHALL NOT create or push any tag from `cargo xtask release-check`.
-- **RELEASE-2.8** (guard) WHEN `cargo xtask ci` or `cargo xtask perf` runs on its own THE SYSTEM SHALL CONTINUE TO run every check it runs today, with the same exit codes; the only check added is the one RELEASE-7.4 asks for.
+- **RELEASE-2.8** (guard) WHEN `cargo xtask ci` or `cargo xtask perf` runs on its own THE SYSTEM SHALL CONTINUE TO run every check it runs today, with the same exit codes; the only check added is the one RELEASE-7.4 asks for. *(Amended 2026-11-05: this spec adds only the RELEASE-7.4 lint to `ci`; checks that other features add to `perf` after this spec, for example `submenu_intent_open_ms`, are allowed and are not a violation.)*
 
 ## 3. Install Navori from the tap
 
@@ -77,10 +79,10 @@ Files this change touches, and what in them is guarded:
 - **RELEASE-3.2** THE SYSTEM SHALL declare in the cask that Navori needs an arm64 Mac and macOS 26 or later.
 - **RELEASE-3.3** WHEN the cask is installed THE SYSTEM SHALL place `Navori.app` in the Homebrew app directory and link `Contents/Helpers/navori` onto the Homebrew `bin` path as `navori`.
 - **RELEASE-3.4** WHEN the cask is installed or upgraded THE SYSTEM SHALL remove the `com.apple.quarantine` attribute from the installed `Navori.app` and everything inside it.
-- **RELEASE-3.5** WHEN the cask is installed THE SYSTEM SHALL print caveats saying that Navori is self-signed and not notarized, that the cask removed the quarantine flag, and that hooks are removed from Settings → Integrations before uninstalling.
+- **RELEASE-3.5** WHEN the cask is installed THE SYSTEM SHALL print caveats saying that Navori is self-signed and not notarized, that the cask removed the quarantine flag, and that hooks are removed from Settings → Integrations before uninstalling. *(Amended 2026-11-05: the cask of a release candidate also prints one extra caveat line saying it is a release candidate, RELEASE-3.9; intended.)*
 - **RELEASE-3.6** IF `brew style` or `brew audit --cask` reports an error for the written cask THEN THE SYSTEM SHALL push nothing to the tap and fail the workflow.
 - **RELEASE-3.7** WHEN a person on a macOS 26 account that has never run Navori runs `brew tap`, `brew trust --cask` and `brew install --cask` for the tap's `navori` and opens Navori THE SYSTEM SHALL show the menubar icon with no Gatekeeper dialog — checked by hand on a clean account.
-- **RELEASE-3.9** WHEN the release tag is a pre-release tag THE SYSTEM SHALL write the cask as the cask `navori-rc` in `Casks/navori-rc.rb` and SHALL leave `Casks/navori.rb` unchanged, and WHEN it is any other release tag THE SYSTEM SHALL write the cask `navori` in `Casks/navori.rb` and SHALL leave `Casks/navori-rc.rb` unchanged. *(Added 2026-11-04, so that a release candidate never replaces the stable cask.)*
+- **RELEASE-3.9** WHEN the release tag is a pre-release tag THE SYSTEM SHALL write the cask as the cask `navori-rc` in `Casks/navori-rc.rb` and SHALL leave `Casks/navori.rb` unchanged, and WHEN it is any other release tag THE SYSTEM SHALL write the cask `navori` in `Casks/navori.rb` and SHALL leave `Casks/navori-rc.rb` unchanged. *(Added 2026-11-04, so that a release candidate never replaces the stable cask. Amended 2026-11-05: the `navori-rc` description carries the suffix ` (RC)`, intended.)*
 - **RELEASE-3.10** THE SYSTEM SHALL declare in each of the casks `navori` and `navori-rc` that it conflicts with the other, so that only one of them installs `Navori.app` and the `navori` command. *(Added 2026-11-04.)*
 - **RELEASE-3.8** WHEN that person installs the Claude Code hooks from Settings → Integrations and works in a Claude Code session THE SYSTEM SHALL list the assertion `Navori: keeping this Mac awake` in `pmset -g assertions` — checked by hand on the same account.
 
