@@ -29,7 +29,8 @@ public enum CascadeEvent: Sendable {
 public enum CascadeEffect: Equatable, Sendable {
     case open(row: String)
     case close(depth: Int)
-    case armHoverTimer
+    /// Start (or restart) the hover timer; `hoverTimerFired` follows after `after` seconds unless cancelled.
+    case armHoverTimer(after: TimeInterval)
     case cancelHoverTimer
     case activate(row: String)
     case closeAll
@@ -44,6 +45,9 @@ public struct CascadeState: Sendable {
     private var pendingRow: String?
     private var lastPoint: CGPoint?
     private var anchor: CGPoint?
+
+    /// How long the pointer rests before a Submenu opens while it travels the safe diagonal.
+    public static let restDelay: TimeInterval = 0.150
 
     private static let diagonalSegment: CGFloat = 16
     private static let diagonalSlack: CGFloat = 26
@@ -85,7 +89,7 @@ public struct CascadeState: Sendable {
             anchor = point
             effects.append(contentsOf: apply(row, shouldOpen: false))
         }
-        effects.append(.armHoverTimer)
+        effects.append(.armHoverTimer(after: Self.restDelay))
         return effects
     }
 

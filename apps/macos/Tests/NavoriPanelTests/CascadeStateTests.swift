@@ -9,7 +9,7 @@ struct CascadeStateTests {
         let armed = state.handle(
             .pointerOn(row: "core", at: CGPoint(x: 100, y: 200), submenu: nil)
         )
-        #expect(armed.contains(.armHoverTimer))
+        #expect(armed.contains(.armHoverTimer(after: CascadeState.restDelay)))
         #expect(state.openPath == [])
         #expect(state.selection == "core")
         let opened = state.handle(.hoverTimerFired)
@@ -46,7 +46,7 @@ struct CascadeStateTests {
                 submenu: Self.submenu
             )
         )
-        #expect(effects == [.armHoverTimer])
+        #expect(effects == [.armHoverTimer(after: CascadeState.restDelay)])
         #expect(state.selection == "core")
         #expect(state.openPath == ["core"])
     }
@@ -85,7 +85,7 @@ struct CascadeStateTests {
                 submenu: Self.submenu
             )
         )
-        #expect(effects == [.close(depth: 1), .armHoverTimer])
+        #expect(effects == [.close(depth: 1), .armHoverTimer(after: CascadeState.restDelay)])
         #expect(state.selection == "settings")
         #expect(state.openPath == [])
     }
@@ -95,7 +95,7 @@ struct CascadeStateTests {
         let first = state.handle(
             .pointerOn(row: "core", at: CGPoint(x: 100, y: 200), submenu: nil)
         )
-        #expect(first == [.armHoverTimer])
+        #expect(first == [.armHoverTimer(after: CascadeState.restDelay)])
         #expect(state.selection == "core")
         #expect(state.openPath == [])
         _ = state.handle(.click(row: "core"))
@@ -108,7 +108,7 @@ struct CascadeStateTests {
                 submenu: Self.submenu
             )
         )
-        #expect(second == [.armHoverTimer])
+        #expect(second == [.armHoverTimer(after: CascadeState.restDelay)])
         #expect(state.selection == "core")
         #expect(state.openPath == ["core"])
         let third = state.handle(
@@ -118,7 +118,7 @@ struct CascadeStateTests {
                 submenu: Self.submenu
             )
         )
-        #expect(third == [.armHoverTimer])
+        #expect(third == [.armHoverTimer(after: CascadeState.restDelay)])
         #expect(state.selection == "core")
         #expect(state.openPath == ["core"])
     }
@@ -127,7 +127,7 @@ struct CascadeStateTests {
         var state = CascadeState(root: Self.tree)
         let point = CGPoint(x: 100, y: 200)
         let first = state.handle(.pointerOn(row: "core", at: point, submenu: nil))
-        #expect(first == [.armHoverTimer])
+        #expect(first == [.armHoverTimer(after: CascadeState.restDelay)])
         #expect(state.selection == "core")
         #expect(state.openPath == [])
         let second = state.handle(.pointerOn(row: "core", at: point, submenu: nil))
@@ -171,7 +171,7 @@ struct CascadeStateTests {
         let armed = state.handle(
             .pointerOn(row: "core", at: CGPoint(x: 100, y: 200), submenu: nil)
         )
-        #expect(armed == [.armHoverTimer])
+        #expect(armed == [.armHoverTimer(after: CascadeState.restDelay)])
         #expect(state.selection == "core")
         #expect(state.openPath == [])
         let left = state.handle(.pointerLeft(row: "settings"))
@@ -213,7 +213,7 @@ struct CascadeStateTests {
         let armed = state.handle(
             .pointerOn(row: "core.a.x", at: CGPoint(x: 20, y: 20), submenu: nil)
         )
-        #expect(armed == [.armHoverTimer])
+        #expect(armed == [.armHoverTimer(after: CascadeState.restDelay)])
         #expect(state.selection == "core.a.x")
         let timed = state.handle(.hoverTimerFired)
         #expect(timed.isEmpty)
@@ -227,7 +227,7 @@ struct CascadeStateTests {
         let pointed = state.handle(
             .pointerOn(row: "heading", at: CGPoint(x: 8, y: 8), submenu: nil)
         )
-        #expect(pointed == [.armHoverTimer])
+        #expect(pointed == [.armHoverTimer(after: CascadeState.restDelay)])
         #expect(state.selection == nil)
         #expect(state.openPath == [])
         let timed = state.handle(.hoverTimerFired)
@@ -501,7 +501,7 @@ struct CascadeStateTests {
         let moved = state.handle(
             .pointerOn(row: "quit", at: CGPoint(x: 40, y: 40), submenu: nil)
         )
-        #expect(moved == [.armHoverTimer])
+        #expect(moved == [.armHoverTimer(after: CascadeState.restDelay)])
         #expect(state.selection == "quit")
         #expect(state.openPath == [])
     }

@@ -27,8 +27,6 @@ final class CascadeController {
     @ObservationIgnored weak var panel: StatusPanel?
     @ObservationIgnored private var surfaceTint: NSColor = GlassTint.standard
 
-    private static let hoverDelay: TimeInterval = 0.150
-
     init(
         tree: @escaping () -> [CascadeNode],
         submenu: @escaping (String) -> AnyView,
@@ -138,8 +136,8 @@ final class CascadeController {
                 presentSubmenu(row)
             case let .close(depth):
                 hideFrom(depth: depth)
-            case .armHoverTimer:
-                armHoverTimer()
+            case let .armHoverTimer(delay):
+                armHoverTimer(after: delay)
             case .cancelHoverTimer:
                 hoverTimer?.cancel()
                 hoverTimer = nil
@@ -263,7 +261,7 @@ final class CascadeController {
         return search(tree(), depth: 0)
     }
 
-    private func armHoverTimer() {
+    private func armHoverTimer(after delay: TimeInterval) {
         hoverTimer?.cancel()
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
@@ -271,7 +269,7 @@ final class CascadeController {
             }
         }
         hoverTimer = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.hoverDelay, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     private func hoverTimerFired() {
