@@ -14,7 +14,7 @@ struct CascadeHoverIntentTests {
     ]
     private static let submenu = CGRect(x: 400, y: 100, width: 200, height: 200)
     private static let intent = CascadeEffect.armHoverTimer(after: CascadeState.intentDelay)
-    private static func entry(_ row: String) -> [CascadeEffect] { [intent, .prepare(row: row)] }
+    private static func entry(_ row: String) -> [CascadeEffect] { [.prepare(row: row), intent] }
     private static let rest = CascadeEffect.armHoverTimer(after: CascadeState.restDelay)
 
     private static func point(_ x: CGFloat, _ y: CGFloat = 200) -> CGPoint { CGPoint(x: x, y: y) }
@@ -148,10 +148,10 @@ struct CascadeHoverIntentTests {
 
     // MARK: prepare: the invisible half of an open starts at entry, inside the intent window
 
-    @Test func entering_a_row_with_a_submenu_prepares_it_after_arming_the_intent_delay() {
+    @Test func entering_a_row_with_a_submenu_prepares_it_before_arming_the_intent_delay() {
         var state = CascadeState(root: Self.tree)
         let entered = state.handle(.pointerOn(row: "awake", at: Self.point(100), submenu: nil))
-        #expect(entered == [Self.intent, .prepare(row: "awake")])
+        #expect(entered == [.prepare(row: "awake"), Self.intent])
     }
 
     @Test func movement_inside_the_row_and_the_timer_firing_do_not_prepare_again() {

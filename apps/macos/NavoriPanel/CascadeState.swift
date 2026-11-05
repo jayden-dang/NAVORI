@@ -108,8 +108,7 @@ public struct CascadeState: Sendable {
         // Counted from the first entry into the row: movement inside it must not postpone the open.
         if pendingRow == row { return effects }
         pendingRow = row
-        // Arm first: the intent delay counts from entry, not from the end of the preparation.
-        return effects + [.armHoverTimer(after: Self.intentDelay), .prepare(row: row)]
+        return effects + [.prepare(row: row), .armHoverTimer(after: Self.intentDelay)]
     }
 
     private func hasOpenSibling(of row: String) -> Bool {
