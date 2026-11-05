@@ -20,11 +20,16 @@ impl RepeatGuard {
 
     pub fn observe(&mut self, name: &str, arguments: &str, shown: &str) -> Option<String> {
         let canonical = canonicalize(arguments);
-        let key = (name.to_owned(), canonical.clone());
-        if self.last.as_ref() == Some(&key) {
+        let unchanged = self
+            .last
+            .as_ref()
+            .is_some_and(|(last_name, last_canonical)| {
+                last_name == name && *last_canonical == canonical
+            });
+        if unchanged {
             self.count += 1;
         } else {
-            self.last = Some(key);
+            self.last = Some((name.to_owned(), canonical));
             self.count = 1;
         }
         match self.count {
