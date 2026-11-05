@@ -103,7 +103,7 @@ IDs are immutable once Status is Approved. Retire a requirement by striking it t
 **Story:** As the operator, I want `cargo xtask perf` and every existing `cargo xtask` command to behave exactly as before, so that adding the soak costs nothing I already rely on.
 
 - **SOAK-8.1** (guard) WHEN `cargo xtask perf` runs THE SYSTEM SHALL CONTINUE TO measure, judge and print the same metrics, budgets, floors and lines, in the same phases, from the same `/tmp/navori-perf-<uid>/` home (`xtask/src/perf/mod.rs:34-81,92-102`; `xtask/src/perf/home.rs:37`; `docs/standards/performance.md`).
-- **SOAK-8.2** (guard) WHEN the xtask test suite runs THE SYSTEM SHALL CONTINUE TO pass every existing perf test unchanged (Weigh W3, D4).
+- **SOAK-8.2** (guard) WHEN the xtask test suite runs THE SYSTEM SHALL CONTINUE TO pass every existing perf test unchanged (Lock: operator, 2026-11-05, "perf output and tests unchanged"; guard first raised as Weigh W3; D4).
 - **SOAK-8.3** (guard) WHEN any existing `cargo xtask` subcommand is invoked THE SYSTEM SHALL CONTINUE TO accept the same arguments and do the same work (`xtask/src/main.rs:140-163`).
 
 Files this change touches:
