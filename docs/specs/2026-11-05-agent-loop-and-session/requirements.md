@@ -147,7 +147,7 @@ Files this change touches, and what each guards:
 - Estimated cost per Turn: pending S-cost (ROAD-11's catalog prices, docs/roadmap/INDEX.md:84). Token counts are recorded now (LOOP-3.4).
 - Running `write` or `destructive` Actions, approvals, permission presets and Decisions in Needs you: ROAD-37.
 - Providers other than DeepSeek through `openai_compat`, the model catalog, Model roles and fallback: ROAD-11.
-- Memory (ROAD-16), the eval harness (ROAD-38), computer use (ROAD-40), other Shield layers (ROAD-39), and a reader or retention for `context_audit` or the Conversation (ROAD-12 owns the audit-log reader).
+- Memory (ROAD-16), the eval harness (ROAD-38), computer use (ROAD-40), other Shield layers (ROAD-39), and a reader or retention for `context_audit` (ROAD-12). Reading past Conversations and retention of the `ai_session_*` tables: ROAD-15, which ships the first person-facing writer (docs/roadmap/INDEX.md:90; Weigh W17, pending the operator).
 - A new `context_audit` column or `kinds` value (Weigh W6).
 - dsh's inbox and steering, fork, compaction, presentation, subagents, coding tools and Cordis (ADR 0008; auto/approaches.md).
 - Writing a migration in this run.
