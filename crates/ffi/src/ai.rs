@@ -641,24 +641,15 @@ impl AiRuntime {
     pub(crate) async fn agent(&self) -> Result<Arc<Agent>, TurnStartError> {
         self.agent
             .get_or_try_init(|| async {
-                let secrets = self
-                    .secrets()
+                let gateway = self
+                    .build_gateway()
                     .await
-                    .map_err(|error| TurnStartError::Keychain(error.to_string()))?;
+                    .map_err(TurnStartError::Keychain)?;
                 let chat: Arc<dyn ChatSender> =
                     Arc::new(LlmChatSender::new((self.deps.make_provider)()));
-                let audit = Arc::new(StoreAudit::new(self.store.clone()));
-                let gateway = Gateway::new(
-                    secrets,
-                    slot().map_err(|error| TurnStartError::Keychain(error.to_string()))?,
-                    (self.deps.make_sender)(),
-                    audit,
-                    DEEPSEEK_PROVIDER,
-                )
-                .with_chat_sender(chat);
                 let conversations = (self.deps.make_conversations)(self.store.clone());
                 Ok(Arc::new(Agent::new(
-                    Arc::new(gateway),
+                    Arc::new(gateway.with_chat_sender(chat)),
                     conversations,
                     self.bus.clone(),
                     Limits::default(),
@@ -671,22 +662,27 @@ impl AiRuntime {
     pub(crate) async fn gateway(&self) -> Result<Arc<Gateway>, AskError> {
         self.gateway
             .get_or_try_init(|| async {
-                let secrets = self
-                    .secrets()
+                self.build_gateway()
                     .await
-                    .map_err(|error| AskError::Keychain(error.to_string()))?;
-                let sender = (self.deps.make_sender)();
-                let audit = Arc::new(StoreAudit::new(self.store.clone()));
-                Ok(Arc::new(Gateway::new(
-                    secrets,
-                    slot().map_err(|error| AskError::Keychain(error.to_string()))?,
-                    sender,
-                    audit,
-                    DEEPSEEK_PROVIDER,
-                )))
+                    .map(Arc::new)
+                    .map_err(AskError::Keychain)
             })
             .await
             .cloned()
+    }
+
+    /// A fresh Gateway over the shared Keychain, the Store audit and the profile's sender.
+    async fn build_gateway(&self) -> Result<Gateway, String> {
+        let secrets = self.secrets().await.map_err(|error| error.to_string())?;
+        let sender = (self.deps.make_sender)();
+        let audit = Arc::new(StoreAudit::new(self.store.clone()));
+        Ok(Gateway::new(
+            secrets,
+            slot().map_err(|error| error.to_string())?,
+            sender,
+            audit,
+            DEEPSEEK_PROVIDER,
+        ))
     }
 
     /// Opens the Keychain on first use. A failed open is not remembered, so the next call retries.
