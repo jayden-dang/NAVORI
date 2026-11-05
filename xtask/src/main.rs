@@ -13,6 +13,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 
 mod perf;
 mod release;
+#[cfg_attr(not(test), allow(dead_code))]
+mod soak;
 
 const SIGNING_IDENTITY: &str = "Navori Local Signing";
 const MIN_MACOS: &str = "26.0";
