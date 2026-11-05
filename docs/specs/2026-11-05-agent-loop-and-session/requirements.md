@@ -1,8 +1,9 @@
 # Requirements: Agent loop and Conversation
 
 Feature code: LOOP
-Status: Draft
+Status: Approved
 Date: 2026-11-05
+Approved by the operator ("approve", 2026-11-05 21:02 +07, on the review sheet at 4c30a7d).
 
 <!--
 Roadmap item: ROAD-14 agent-loop-and-session (MILE-3). Claim: GitHub issue #28 (open, label status:shaping, unassigned: the assign in this run was refused by the harness; the operator can run `gh issue edit 28 --add-assignee jayden-dang`).
@@ -144,17 +145,17 @@ Files this change touches, and what each guards:
 
 - A CLI command, IPC method, protocol type, FFI method or any UI that starts or shows a Turn: chat, quick ask and moving `navori ask` onto the loop are ROAD-15; the first agent IPC entry comes with ROAD-37 (docs/roadmap/INDEX.md:88, 90; Weigh W1).
 - Streaming replies: ROAD-15, their first consumer (moved from ROAD-14, docs/roadmap/INDEX.md:90).
-- Estimated cost per Turn: pending S-cost (ROAD-11's catalog prices, docs/roadmap/INDEX.md:84). Token counts are recorded now (LOOP-3.4).
+- Estimated cost per Turn: ROAD-11, from its catalog prices (docs/roadmap/INDEX.md:84; Locks L19/L20 partly deferred, approved by the operator 2026-11-05). Token counts are recorded now (LOOP-3.4).
 - Running `write` or `destructive` Actions, approvals, permission presets and Decisions in Needs you: ROAD-37.
 - Providers other than DeepSeek through `openai_compat`, the model catalog, Model roles and fallback: ROAD-11.
-- Memory (ROAD-16), the eval harness (ROAD-38), computer use (ROAD-40), other Shield layers (ROAD-39), and a reader or retention for `context_audit` (ROAD-12). Reading past Conversations and retention of the `ai_session_*` tables: ROAD-15, which ships the first person-facing writer (docs/roadmap/INDEX.md:90; Weigh W17, pending the operator).
+- Memory (ROAD-16), the eval harness (ROAD-38), computer use (ROAD-40), other Shield layers (ROAD-39), and a reader or retention for `context_audit` (ROAD-12). Reading past Conversations and retention of the `ai_session_*` tables: ROAD-15, which ships the first person-facing writer (docs/roadmap/INDEX.md:90; Weigh W17, approved by the operator 2026-11-05).
 - A new `context_audit` column or `kinds` value (Weigh W6).
 - dsh's inbox and steering, fork, compaction, presentation, subagents, coding tools and Cordis (ADR 0008; auto/approaches.md).
 - Writing a migration in this run.
 
 ## Open Questions
 
-- S-cost: estimated cost per Turn (Locks L19/L20 partly deferred to ROAD-11) — owner: operator — date: at the review of this file — forbid-guess: no price or cost value is computed or stored by this road.
+- Answered by the operator (2026-11-05), no longer open: S-cost (estimated cost goes to ROAD-11; Locks L19/L20 partly deferred).
 - Answered in design.md (2026-11-05), no longer open: S-stop (charter Lock L22 and design "Persisted formats"), S-journal (Decision 13, LOOP-3.11), S-shield-refusal (Decision 10, LOOP-5.4), S-limits (Decision 8: 8 Steps, 200 000 tokens summed over input and output), S-origin (Decision 9: `user`), S-parallel (Decision 4: serial), S-tools (Decisions 5–6: `{module}_{action}`, schema cut from the enum's `oneOf`).
 - Whether DeepSeek sends `content` as null or as an empty string with tool calls (research: unconfirmed) — owner: author of the live test — date: when LOOP-9.1 first runs — forbid-guess: fixtures cover both (LOOP-1.6).
 - Does DeepSeek accept a replayed `reasoning_content` that the Shield changed (research-deepseek-tools.md:38-40, unconfirmed)? — owner: author of the live test — date: when LOOP-9.1 first runs — forbid-guess: a fixture covers a redacted replay; no test asserts the Provider accepts it.

@@ -7,8 +7,9 @@
 > for tracking.
 
 Feature code: LOOP
-Status: Draft
+Status: Approved
 Date: 2026-11-05
+Approved by the operator ("approve", 2026-11-05 21:02 +07, on the review sheet at 4c30a7d).
 Execution-mode: unset
 Max-concurrency: auto
 Requirements: ./requirements.md
@@ -439,7 +440,7 @@ _Requirements: LOOP-9.1_
   - The `ai_session_*` row moves from Planned to built, with the five tables, the two indexes and body encoding v1.
   - system.md:69/72 states what is built.
   - modules.md:41-42 and map.md:29 gain `navori-agent` and the `navori-context` → `navori-llm` types edge.
-  - Estimated cost stays named as pending S-cost (ROAD-11).
+  - Estimated cost stays named as ROAD-11's (approved by the operator 2026-11-05).
 - [ ] **Step 2: Unchanged behavior:** `git diff --stat $(git merge-base main HEAD) -- crates/kernel crates/store modules` shows no change. `cargo test -p navori-kernel -p navori-store -p navori-mod-awake -p navori-mod-ports -p navori-mod-integrations` passes.
 - [ ] **Step 3: Whole gate:** `cargo xtask ci` — expect: pass.
 - [ ] **Step 4: Perf, on an idle machine:** run `cargo xtask perf` at the merge base and at the head, without `--record`. Compare each metric's head median with the base median + max(10%, the metric's floor) (performance.md:35-36), and write both tables into the task report. A failing metric blocks the merge, not this plan.

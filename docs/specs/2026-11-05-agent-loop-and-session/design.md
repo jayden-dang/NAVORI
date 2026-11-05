@@ -1,8 +1,9 @@
 # Design: Agent loop and Conversation
 
 Feature code: LOOP
-Status: Draft
+Status: Approved
 Date: 2026-11-05
+Approved by the operator ("approve", 2026-11-05 21:02 +07, on the review sheet at 4c30a7d).
 Requirements: ./requirements.md
 
 <!--
@@ -345,7 +346,7 @@ Locality: leave. LOOP-11.1 is measured by `cargo xtask perf` at the base and at 
 3. **Journal Event kind `ai.turn_ended`**, module `ai`. Payload keys: `conversation`, `turn`, `origin`, `end` and `steps` (W13, W14).
 4. **Unchanged:** `context_audit`'s columns and values (W6, W7). The wording of data.md:27 changes from "per ask" to "per model call" (W8).
 
-Not stored: estimated cost (S-cost, ROAD-11). Retention and pruning of `ai_session_*`, and reading past Conversations, are not in this road: ROAD-15 owns them (docs/roadmap/INDEX.md:90; Weigh W17, pending the operator). ROAD-12 keeps the reader and retention of `context_audit`.
+Not stored: estimated cost (ROAD-11, approved by the operator 2026-11-05). Retention and pruning of `ai_session_*`, and reading past Conversations, are not in this road: ROAD-15 owns them (docs/roadmap/INDEX.md:90; Weigh W17, approved by the operator 2026-11-05). ROAD-12 keeps the reader and retention of `context_audit`.
 
 ## Seams for testing
 
