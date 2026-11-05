@@ -158,7 +158,7 @@ Level 0: `MenuRow(id: "running", icon: <the brief's cup icon>, title: "Running",
 
 ### J. Project rows and the stop flows (`apps/macos`)
 
-Satisfies: PSTOP-6.9, PSTOP-5.1, PSTOP-5.2, PSTOP-5.3, PSTOP-5.4, PSTOP-5.5, PSTOP-5.6, PSTOP-5.7, PSTOP-5.8, PSTOP-6.1, PSTOP-6.2, PSTOP-6.3, PSTOP-6.4, PSTOP-6.5, PSTOP-6.6, PSTOP-6.7, PSTOP-6.8, PSTOP-7.1, PSTOP-7.2, PSTOP-7.3, PSTOP-7.4, PSTOP-7.5, PSTOP-9.1, PSTOP-9.2, PSTOP-9.3, PSTOP-9.4, PSTOP-9.5
+Satisfies: PSTOP-6.9, PSTOP-5.1, PSTOP-5.2, PSTOP-5.3, PSTOP-5.4, PSTOP-5.5, PSTOP-5.6, PSTOP-5.7, PSTOP-5.8, PSTOP-6.1, PSTOP-6.2, PSTOP-6.3, PSTOP-6.4, PSTOP-6.5, PSTOP-6.6, PSTOP-6.7, PSTOP-6.8, PSTOP-7.1, PSTOP-7.2, PSTOP-7.3, PSTOP-7.4, PSTOP-7.5, PSTOP-9.1, PSTOP-9.2, PSTOP-9.4, PSTOP-9.5
 Reuse: rung 2 — `CoreStore.dispatch(module:actionJSON:)` (CoreStore.swift:73) and its failure pattern (`perform`, `AwakeActionFailure`, `CoreStartupBanner.menuFailure`); `HarnessMarkImage`; the cascade hover selection. `NSWorkspace` (platform, rung 4) opens the URL and reveals the folder; `NSPasteboard` copies.
 Respects: ARCH-1, ARCH-2
 Surface: no existing reader changes beyond section I (new views and store members).
@@ -200,14 +200,14 @@ A11y: VoiceOver reads the state (`klynt, working`, `openklynt-main, 3 idle ports
 ### Project child menu
 
 Layout: about 330 pt wide; header (name, path in SF Mono 11.5 pt, `up 2d 20h` for a project with no working session), `Sessions` (Harness mark, title, dot, `branch · state`), `Ports` (kind mark, process or container name, kind word after a container as in the screenshot, `:port` right-aligned), then `Stop N ports`; the child of `Other` also says `N system ports hidden`.
-Components: rung 2 — `MenuRowView`, `HarnessMarkImage`; `new (rung 7)` — the inline confirmation and the port row's hover controls (`Open` web only, `Copy`, `Stop`).
-States: hover swaps the port for `Open` / `Copy` / `Stop`; `Stop` running; `Stop` failed with the reason; a stopped session dimmed; a section with no rows left out; `Stop N ports` present for a working project too (it is where a working project is stopped, Weigh, card 6).
+Components: rung 2 — `MenuRowView`, `HarnessMarkImage`; `new (rung 7)` — the inline confirmation and the port row's hover controls (`Open` web only, `Stop`). *(Amended 2026-11-05, operator decision: one shared `InlineConfirmRow` and one `RowActionButton` (icon, 22 pt); `Copy` retired with PSTOP-9.3.)*
+States: hover swaps the port for `Open` / `Stop` icons *(Amended 2026-11-05: up to two icons; the name keeps its width, the kind suffix and the port fade; `Copy` retired)*; `Stop` running; `Stop` failed with the reason; a stopped session dimmed; a section with no rows left out; `Stop N ports` present for a working project too (it is where a working project is stopped, Weigh, card 6).
 Type & color: as Surface 1 of the 2026-11-01 brief; SF Mono 11.5 pt for ports and path.
 A11y: each row reads as one sentence with its state word, so state is never colour alone; every control is reachable by keyboard.
 
 ### Inline confirmation (shared by `Stop N`, a port's `Stop`, `Stop N ports` and `Stop all ports…`)
 
-Layout: replaces the control on the same row; text, `Stop`, `Cancel`.
+Layout: replaces the control on the same row; text, `Stop`, `Cancel`. *(Amended 2026-11-05, operator decision: one 26 pt line, no height change: lead, question, flat `Cancel`, flat `Stop` (semibold, red; white on a selected row). Single port `Stop <name> :<port>?`, group `Stop N ports?`, all `Stop all N ports?`, with the projects and what stays running in the tooltip and VoiceOver label. Return still does nothing while a confirmation is open; Esc cancels.)*
 Components: `new (rung 7)`.
 States: asking (text names the ports, and for `Stop all ports…` the projects and the "in use" count); running; dismissed by `Esc`, `Cancel`, the pointer leaving the menu or the menu closing (nothing sent).
 Type & color: system semantic colours; the destructive button uses the system destructive role (`agent-decided`).
@@ -227,7 +227,7 @@ A11y: focus lands on `Cancel`; VoiceOver reads the full sentence (`agent-decided
 | `RunningRowState`, `RunningSubmenuState`, `StopFlow` (`Tests/NavoriPanelTests`, Swift Testing) | unit | PSTOP-4.8, 4.9, 4.10, 4.11, 4.13, 4.14, 4.17, 5.1-5.8, 6.3-6.8, 7.1-7.5, 9.1 |
 | `CascadeState.handleReplaceTree` focus-to-parent | unit | PSTOP-4.16 |
 | `navori dispatch ports` against a dev core (`docs/agents/verify.md` drive; it signals only a throwaway process the test spawned, never a real listener) | e2e | PSTOP-1.17, 10.3 |
-| Cold-start drive in the dev app (Launch, Doctor, Drive, Evidence of `docs/agents/verify.md`; a stop is pressed only on a throwaway listener the drive spawned, never on a real listener) | e2e | PSTOP-4.8, 4.15, 5.2-5.3, 6.4, 9.2, 9.3, 9.4, 8.1 |
+| Cold-start drive in the dev app (Launch, Doctor, Drive, Evidence of `docs/agents/verify.md`; a stop is pressed only on a throwaway listener the drive spawned, never on a real listener) | e2e | PSTOP-4.8, 4.15, 5.2-5.3, 6.4, 9.2, 9.4, 8.1 |
 | `cargo xtask perf` (`submenu_open_ms`, `menu_reopen_ms`, `port_scan_ms`) | e2e (existing) | PSTOP-10.1, 1.19 |
 | `cargo xtask check-deps` and `cargo xtask ci` | e2e (existing) | PSTOP-1.16, 1.20 |
 
@@ -256,4 +256,4 @@ Three requirement texts change, all made in requirements.md and re-surfaced for 
 
 ## Coverage check
 
-Every ID of requirements.md appears in exactly one `Satisfies:` line above: 1.1-1.4, 1.17, 1.18 (B); 1.5, 1.6 (C); 1.7-1.10 (D); 1.11-1.15, 1.19, 1.20 (F); 1.16 (A); 2.1-2.4 (C); 2.5, 2.6 (B); 3.1, 3.2 (C); 3.3, 3.4, 3.6-3.9 (E); 3.5 (F); 3.10 (K); 4.1-4.7, 4.12, 4.20 (H); 4.8-4.11, 4.13-4.18, 4.22 (I); 4.19 (K); 5.1-5.8, 6.1-6.8, 7.1-7.5, 9.1-9.4 (J); 8.1, 8.2 (K); 10.1, 10.5 (I); 10.2 (F); 10.3 (C); 10.4 (D). Section G is infrastructure for 4.6 and carries a `Satisfies:` line only for 2.7. Amended 2026-11-05: 1.21 (F), 1.22 (D), 2.7 (G), 6.10 (H) and 9.5 (J) were added to the lines above. No ID is deliberately unmapped. Amended 2026-11-05: 4.22 was added to section I.
+Every ID of requirements.md appears in exactly one `Satisfies:` line above: 1.1-1.4, 1.17, 1.18 (B); 1.5, 1.6 (C); 1.7-1.10 (D); 1.11-1.15, 1.19, 1.20 (F); 1.16 (A); 2.1-2.4 (C); 2.5, 2.6 (B); 3.1, 3.2 (C); 3.3, 3.4, 3.6-3.9 (E); 3.5 (F); 3.10 (K); 4.1-4.7, 4.12, 4.20 (H); 4.8-4.11, 4.13-4.18, 4.22 (I); 4.19 (K); 5.1-5.8, 6.1-6.8, 7.1-7.5, 9.1, 9.2, 9.4 (J); 9.3 retired 2026-11-05; 8.1, 8.2 (K); 10.1, 10.5 (I); 10.2 (F); 10.3 (C); 10.4 (D). Section G is infrastructure for 4.6 and carries a `Satisfies:` line only for 2.7. Amended 2026-11-05: 1.21 (F), 1.22 (D), 2.7 (G), 6.10 (H) and 9.5 (J) were added to the lines above. No ID is deliberately unmapped. Amended 2026-11-05: 4.22 was added to section I.

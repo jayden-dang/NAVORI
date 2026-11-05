@@ -512,7 +512,7 @@ _Requirements: PSTOP-5.2, PSTOP-5.3, PSTOP-5.4, PSTOP-5.5, PSTOP-5.6, PSTOP-5.7,
 - Consumes: `RunningProjectInput.sessions/ports/path/upSinceMs/stopRequest`, `RunningPort.stopRequest`, `StopFlow` (Tasks 9, 11).
 - Produces:
   - `ProjectChildState` (pure, in `RunningState.swift`): header (name, path, `up 2d 20h` only when no working session), `Sessions` and `Ports` sections (a section with no rows is left out), `Stop N ports` for any project whose stoppable list is not empty, `N system ports hidden` for `Other`, per-row spoken sentences with the state word
-  - `ProjectChildView` at about 330 pt; port rows swap the port for `Stop` on hover (the `Open` and `Copy` controls of Task 13 sit beside it); `Stop` running and `Stop` failed with the reason
+  - `ProjectChildView` at about 330 pt; port rows swap the port for `Stop` on hover (the `Open` control of Task 13 sits beside it; *amended 2026-11-05: icon buttons, one-line confirmation*); `Stop` running and `Stop` failed with the reason
 
 **Depends-on:** Task 10, Task 11
 
@@ -548,7 +548,9 @@ _Requirements: PSTOP-6.1, PSTOP-6.2, PSTOP-6.3, PSTOP-6.4, PSTOP-6.5, PSTOP-6.6,
 - [x] **Step 4: Verify** in the dev app on the throwaway listener: `Open` opens the browser at `http://localhost:<port>`; `Copy` puts `localhost:<port>` on the pasteboard and sends nothing (check `navori --profile dev events`); the path reveals in Finder.
 - [x] **Step 5: Run** `cargo xtask ci` — expect: pass. Commit `git commit -m "feat(shell): open, copy and reveal from the project menu"`
 
-_Requirements: PSTOP-9.1, PSTOP-9.2, PSTOP-9.3, PSTOP-9.4, PSTOP-9.5_
+_Requirements: PSTOP-9.1, PSTOP-9.2, PSTOP-9.4, PSTOP-9.5_
+
+*(Amended 2026-11-05, operator decision: `Copy` is retired (PSTOP-9.3); its helper, test, pasteboard method and icon are removed. The port row hover shows `Open` and `Stop` icons and the confirmation is one line, shared by `InlineConfirmRow`.)*
 
 ---
 
