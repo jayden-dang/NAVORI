@@ -277,16 +277,12 @@ final class StatusBarController: NSObject {
         let runningChildren = store.hasSnapshot && RunningRowState(running: store.running).hasSubmenu
             ? runningCommands + store.runningTree
             : []
-        var rows = [CascadeNode(id: "running", isActionable: true, children: runningChildren)]
-        if store.coreRowVisible {
-            rows.append(CascadeNode(id: "core", isActionable: true, children: coreChildren))
-        }
-        rows += [
-            CascadeNode(id: "settings", isActionable: true),
-            CascadeNode(id: "about", isActionable: true),
-            CascadeNode(id: "quit", isActionable: true),
-        ]
-        return rows
+        return LevelZeroTree.rows(
+            running: CascadeNode(id: "running", isActionable: true, children: runningChildren),
+            core: CascadeNode(id: "core", isActionable: true, children: coreChildren),
+            status: store.coreStatus,
+            inDevProfile: AppEnvironment.isDev
+        )
     }
 
     private var runningCommands: [CascadeNode] {

@@ -95,3 +95,27 @@ struct CoreRowStateTests {
         #expect(status(hasSnapshot: false, modules: []) == .starting)
     }
 }
+
+@Suite
+struct LevelZeroTreeTests {
+    private func ids(_ status: CoreStatus, dev: Bool) -> [String] {
+        LevelZeroTree.rows(
+            running: CascadeNode(id: "running", isActionable: true),
+            core: CascadeNode(id: "core", isActionable: true),
+            status: status,
+            inDevProfile: dev
+        ).map(\.id)
+    }
+
+    @Test func the_core_node_is_in_the_tree_only_where_the_row_is_shown() {
+        let withCore = ["running", "core", "settings", "about", "quit"]
+        let without = ["running", "settings", "about", "quit"]
+        #expect(ids(.running, dev: false) == without)
+        #expect(ids(.starting, dev: false) == without)
+        #expect(ids(.needsAttention, dev: false) == withCore)
+        #expect(ids(.notRunning, dev: false) == withCore)
+        for status in [CoreStatus.starting, .running, .needsAttention, .notRunning] {
+            #expect(ids(status, dev: true) == withCore)
+        }
+    }
+}

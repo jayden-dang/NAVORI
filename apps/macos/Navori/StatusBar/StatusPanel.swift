@@ -325,7 +325,7 @@ final class StatusPanel: NSPanel {
         case quit: id = "quit"
         case about: id = "about"
         case settings: id = "settings"
-        case core: id = "core"
+        case core where content.tree().contains(where: { $0.id == "core" }): id = "core"
         default: return
         }
         cascade.click(id)
