@@ -139,17 +139,12 @@ impl Agent {
                 if !closers.is_empty() {
                     self.append(closers).await.map_err(TurnStartError::Record)?;
                     for turn in log.turns.iter().filter(|t| t.end.is_none()) {
-                        let steps = turn
-                            .messages
-                            .iter()
-                            .filter(|(_, _, m)| matches!(m, RecordedMessage::Assistant { .. }))
-                            .count();
                         self.announce(
                             id,
                             turn.id,
                             turn.origin,
                             "interrupted",
-                            u32::try_from(steps).unwrap_or(u32::MAX),
+                            u32::try_from(turn.steps()).unwrap_or(u32::MAX),
                         );
                     }
                     log = self.load(id).await?;

@@ -125,6 +125,16 @@ pub struct LoggedTurn {
     pub end: Option<String>,
 }
 
+impl LoggedTurn {
+    /// A Step is one Assistant message.
+    pub fn steps(&self) -> usize {
+        self.messages
+            .iter()
+            .filter(|(_, _, m)| matches!(m, RecordedMessage::Assistant { .. }))
+            .count()
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ConversationLog {
     pub turns: Vec<LoggedTurn>,
