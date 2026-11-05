@@ -169,7 +169,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Outcome:** Anyone on an Apple Silicon Mac with macOS 26 installs Navori with `brew install --cask` from the Navori tap, and every later release reaches them through `brew upgrade` with their config, database, hooks and Keychain access intact.
 **Goals:** GOAL-8, GOAL-11
 **Members:**
-- **ROAD-27** open-source-distribution — After: none — Surfaces: `xtask/`, `.github/workflows/`, `modules/integrations/`, `docs/adr/`, `docs/agents/project.md`, external repo `jayden-dang/homebrew-navori` — A self-signed release built and published by GitHub Actions on a `v*` tag that matches the workspace version, a zip and sha256 on the NAVORI GitHub Release, and a cask in the personal tap; a local `cargo xtask release-check` (ci, perf, version) before tagging; a hook command that does nothing once the app is gone. Un-deferred from MILE-1 on 2026-11-04.
+- **ROAD-27** open-source-distribution — After: none — Surfaces: `xtask/`, `.github/workflows/`, `modules/integrations/`, `docs/adr/`, `docs/agents/project.md`, external repo `jayden-dang/homebrew-navori` — A self-signed release built and published by GitHub Actions on a `v*` tag that matches the workspace version, a zip and sha256 on the NAVORI GitHub Release, and a cask in the personal tap; a local `cargo xtask release-check` (ci, perf, the soak gate, version) before tagging; a hook command that does nothing once the app is gone. Un-deferred from MILE-1 on 2026-11-04.
 **Depends-on:** MILE-2, MILE-4
 **Commitment:** Planned
 **Closed:** None

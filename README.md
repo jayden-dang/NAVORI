@@ -35,6 +35,8 @@ cargo xtask run             # build + launch "Navori Dev.app" (separate data, lo
 cargo xtask install         # build release → /Applications/Navori.app (old one kept as .previous)
 cargo xtask ci              # fmt, clippy -D warnings, tests, dependency rules, Swift build
 cargo xtask perf            # GOAL-11 budget; --record writes perf-baseline.json when the run passes
+cargo xtask soak            # isolated Navori under load: footprint, threads, fds, hangs (--long [--for 2h])
+cargo xtask soak observe    # print the installed Navori's footprint, threads and fds (--every 30s)
 cargo xtask outdated        # compare dependencies with the latest stable crates.io releases
 ```
 

@@ -11,7 +11,7 @@ Today a release is a local act: `cargo xtask install` builds the release bundle,
 
 The binding constraint is the signing identity. Keychain access and privacy grants follow the designated requirement, which for Navori is `identifier "dev.navori.app" and certificate leaf = H"8c56e155…"` — the SHA-1 of this Mac's self-signed certificate. A release built on CI keeps users' grants across upgrades only if CI signs with that very certificate, exported as a `.p12`. That rules out the obvious CI shortcut of generating a fresh certificate per run (`signing-setup`, `:548-606`), or signing ad-hoc when the identity is missing: either would give every release a new designated requirement and make every user re-grant Keychain access after each `brew upgrade`. So the release path refuses to sign without the identity and checks the designated requirement against a committed copy before anything is published.
 
-The second constraint is that the perf gate cannot run on CI: the baseline is tied to this Mac's hardware and macOS (`docs/standards/performance.md`). So the gate is split: a local `cargo xtask release-check` runs `ci` and `perf` and prints the tag to push; CI re-runs `ci` only and does the build, sign, publish and cask update.
+The second constraint is that the perf gate cannot run on CI: the baseline is tied to this Mac's hardware and macOS (`docs/standards/performance.md`). So the gate is split: a local `cargo xtask release-check` runs `ci` and `perf`, then the soak gate (SOAK-4.x), and prints the tag to push; CI re-runs `ci` only and does the build, sign, publish and cask update.
 
 The hook change follows from uninstall: today's hook command `'<path>' hook` fails in the Harness once the app is gone. A guarded form `[ -f '<path>' ] && [ -x '<path>' ] && exec '<path>' hook || true` runs the same helper with the same arguments and stdin when it exists and exits 0 otherwise. `exec` keeps the process tree as it is today (the helper replaces the shell, so its parent is still the Harness's shell); Awake resolves the Harness by walking ancestors anyway (`crates/procs/src/lookup.rs:28-52`). The recognizer in `identity.rs` only knows the old form, so it must learn the new one, or status, repair and remove would stop seeing Navori's hooks.
 
@@ -21,7 +21,7 @@ Retrieval (fresh, catalog query over `xtask/`, `modules/integrations/`, `.github
 
 1. Releases are signed with the existing `Navori Local Signing` certificate exported once as a `.p12` into the `release` Environment; the release path never signs ad-hoc. (ADR 0007, amending ADR 0004.)
 2. A release runs only on a pushed `v*` tag; the tag's version must equal the workspace version, which is bumped by a normal commit before tagging.
-3. `cargo xtask release-check` (local) runs `ci` then `perf`; CI runs `ci` and never `perf`.
+3. `cargo xtask release-check` (local) runs `ci` then `perf`, then the soak gate (SOAK-4.x); CI runs `ci` and never `perf`.
 4. CI builds and checks through one new command, `cargo xtask release --tag <tag> --out <dir>`, so the workflow holds no build logic and the logic is unit-tested in Rust.
 5. The designated requirements of `Navori.app` and its helper are committed in `xtask/assets/designated-requirement.txt`; a mismatch fails the release before publishing.
 6. The cask is generated from a template in `xtask/assets/navori.rb.in` and pushed to the tap named by the repository variable `TAP_REPOSITORY`, but only once the Release is public, which `PUBLISH_RELEASE=true` decides (amended 2026-11-04); while that variable is unset, the Release stays a draft and no cask changes.
@@ -105,7 +105,7 @@ Interface: `cargo xtask release-check` → on success prints `v<version>` and `g
 Depth: the maintainer knows one command and one printed tag; the four preconditions and the ci → perf order stay inside.
 Locality: `release.rs` — extend; one `Cmd::ReleaseCheck` arm in `main.rs`.
 
-Order: `preflight` first (2.3–2.6) using `git tag -l v<v>`, `git ls-remote --tags origin v<v>`, `git status --porcelain --untracked-files=no` and the text of `docs/agents/project.md` (a final version needs the line `**Compat obligation:** External`); then `ci`, then `perf` (2.1, 7.1); then print (2.2). It runs no `git tag` or `git push` (2.7).
+Order: `preflight` first (2.3–2.6) using `git tag -l v<v>`, `git ls-remote --tags origin v<v>`, `git status --porcelain --untracked-files=no` and the text of `docs/agents/project.md` (a final version needs the line `**Compat obligation:** External`); then `ci`, then `perf`, then the soak gate (SOAK-4.x) (2.1, 7.1); then print (2.2). It runs no `git tag` or `git push` (2.7).
 
 ### Workflow pin lint inside `cargo xtask ci`
 

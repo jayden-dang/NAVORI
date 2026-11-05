@@ -25,6 +25,8 @@ cargo xtask perf        # GOAL-11 budget; --record writes perf-baseline.json whe
 cargo xtask run         # build + launch "Navori Dev.app" (dev profile; separate data/logs/socket)
 cargo xtask install     # release build → /Applications/Navori.app
 cargo xtask check-deps  # crate dependency rules (ARCH-3)
+cargo xtask soak        # isolated Navori under load: footprint, threads, fds, hangs
+cargo xtask soak observe # installed Navori footprint, threads, fds (--every 30s)
 cargo xtask outdated    # dependency versions vs latest stable
 cargo test -p <crate>   # one crate's tests
 ```
