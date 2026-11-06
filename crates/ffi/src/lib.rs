@@ -32,14 +32,13 @@ use tokio_util::sync::CancellationToken;
 use crate::ai::AiRuntime;
 use crate::app::{Inner, IpcBridge};
 
-pub use ai::{
-    AiDeps, LlmChatSender, LlmSender, StoreAudit, StoreConversations, ask_error_to_rpc, service_for,
-};
+pub use ai::{AiDeps, LlmChatSender, LlmSender, ask_error_to_rpc, service_for};
 pub use app::{awake_check, awake_view, config_notice, lid_check, ports_check, running_view};
 pub use navori_agent::{
-    ConversationId, ConversationStore, Origin, TurnEnd, TurnErrorKind, TurnOutcome, TurnRequest,
-    TurnStartError,
+    ConversationId, ConversationStore, Origin, StoreConversations, TurnEnd, TurnErrorKind,
+    TurnOutcome, TurnRequest, TurnStartError,
 };
+pub use navori_context::StoreAudit;
 
 uniffi::setup_scaffolding!();
 
