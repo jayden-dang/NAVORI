@@ -41,7 +41,7 @@ Terms: **Lease**, **Tracking agents** and **Running** as in `CONTEXT.md`.
 - **LID-1.9** IF macOS refuses the call that turns the lid setting off THEN THE SYSTEM SHALL show the problem line, set `Lid closed` to off, store that value and delete the `lid_held` marker, because the setting never changed (marker delete added in design, agent-decided).
 - **LID-1.10** WHEN Navori quits normally while holding the lid setting THE SYSTEM SHALL give lid sleep back and then delete the `lid_held` marker (agent-decided).
 - **LID-1.11** WHEN the Awake module is dropped while holding the lid setting, after repeated crashes or on an aborted shutdown, THE SYSTEM SHALL give lid sleep back, with the `lid_held` marker left in place (agent-decided).
-- **LID-1.12** WHEN the condition behind a lid problem ends THE SYSTEM SHALL clear that problem: a later lid call macOS accepts, a re-armed power-source watch, a stored marker or value that saves, or the user setting `Lid closed` (agent-decided in design review).
+- **LID-1.12** WHEN the condition behind a lid problem ends THE SYSTEM SHALL clear that problem: a later lid call macOS accepts, a re-armed power-source watch, a stored marker or value that saves, or the user setting `Lid closed`, except a pending give-back failure, which stays until the lid is given back (agent-decided in the build, see the implementation notes) (agent-decided in design review).
 
 ## 2. Adapter only
 
