@@ -2,9 +2,10 @@ use std::collections::BTreeSet;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use navori_kernel::{ActionError, ModuleCtx, Request, Severity, WaitHandle, Wake};
-use navori_macos::StartTime;
+use navori_macos::{PowerKind, PowerWatch, StartTime};
 use navori_procs::{Exited, ProcId, ProcWatcher, ProcsError};
 use serde_json::{Value, json};
+use tokio::io::unix::AsyncFd;
 
 use crate::action::AwakeAction;
 use crate::domain::{
@@ -24,6 +25,7 @@ const RELEASE_PROBLEM: &str = "Releasing a power assertion failed.";
 const EXITS_PROBLEM: &str =
     "Exit watches stopped, so a command lease has no end signal. Navori retries in 60 seconds.";
 const LID_READ_PROBLEM: &str = "Awake could not read the Lid closed setting, so it reads as off.";
+const POWER_PROBLEM: &str = "Awake could not watch the power source, so it reads as on battery. Navori retries in 60 seconds.";
 const STORE_PROBLEM: &str = "Awake could not save a lease. Navori retries in 60 seconds.";
 const PLATFORM_PROBLEM: &str = "Awake could not watch a process, so a stored lease stays on disk. Navori retries in 60 seconds.";
 
@@ -56,6 +58,8 @@ pub struct Awake {
     published: AwakeState,
     lid_on: bool,
     lid_problem: Option<String>,
+    power: Option<AsyncFd<PowerWatch>>,
+    on_adapter: Option<bool>,
     watcher: Option<ProcWatcher>,
     problems: Problems,
     retry_at: Option<SystemTime>,
@@ -83,6 +87,8 @@ impl Awake {
             published: AwakeState::idle(),
             lid_on: false,
             lid_problem: None,
+            power: None,
+            on_adapter: None,
             watcher: None,
             problems: Problems::default(),
             retry_at: None,
@@ -96,12 +102,18 @@ impl Awake {
         stored::migrate(&ctx.store)?;
         self.load_tracking(ctx);
         self.load_lid(ctx);
+        if self.lid_on {
+            self.arm_power(wait.now());
+        }
         self.restore_if_needed(ctx, wait.now()).await;
         loop {
             let now = wait.now();
             let due = self.take_due_retry(now);
             if due && self.problems.exits.is_some() {
                 self.rebuild_exits_now(now);
+            }
+            if due && self.lid_on && self.power.is_none() {
+                self.rebuild_power_now(now);
             }
             if due && !self.restored {
                 self.restore_if_needed(ctx, now).await;
@@ -114,6 +126,12 @@ impl Awake {
                     match exit {
                         Some(exited) => self.on_process_exit(ctx, exited.id, wait.now()),
                         None => self.note_exits_dead(wait.now()),
+                    }
+                }
+                event = power_next(&mut self.power) => {
+                    match event {
+                        PowerEvent::Changed => self.read_power(wait.now()),
+                        PowerEvent::Dead => self.note_power_dead(wait.now()),
                     }
                 }
                 req = ctx.recv() => {
@@ -154,6 +172,67 @@ impl Awake {
                 self.lid_problem = Some(LID_READ_PROBLEM.to_owned());
             }
         }
+    }
+
+    /// Registers the watch before the read, so a change in between is not lost.
+    fn arm_power(&mut self, now: SystemTime) {
+        let watch = match self.platform.watch_power() {
+            Ok(watch) => watch,
+            Err(err) => {
+                tracing::warn!(error = %err, "the power source could not be watched");
+                self.note_power_dead(now);
+                return;
+            }
+        };
+        // The crate forbids unsafe, so it cannot call `AsyncFd::register`; `PowerWatch` owns its
+        // descriptor and is never closed elsewhere, which is what `register` requires.
+        #[expect(
+            deprecated,
+            reason = "AsyncFd::register is unsafe and this crate forbids unsafe"
+        )]
+        let registered = AsyncFd::new(watch);
+        match registered {
+            Ok(fd) => self.power = Some(fd),
+            Err(err) => {
+                tracing::warn!(error = %err, "the power source watch could not be polled");
+                self.note_power_dead(now);
+                return;
+            }
+        }
+        self.read_power(now);
+        if self.power.is_some() {
+            self.lid_problem = None;
+        }
+    }
+
+    fn disarm_power(&mut self) {
+        self.power = None;
+        self.on_adapter = None;
+    }
+
+    fn read_power(&mut self, now: SystemTime) {
+        match self.platform.power_kind() {
+            Ok(kind) => self.on_adapter = Some(kind == PowerKind::Adapter),
+            Err(err) => {
+                tracing::warn!(error = %err, "the power source could not be read");
+                self.note_power_dead(now);
+            }
+        }
+    }
+
+    fn note_power_dead(&mut self, now: SystemTime) {
+        self.power = None;
+        if !self.lid_on {
+            return;
+        }
+        tracing::warn!("the power-source watch stopped; it reads as battery until the retry");
+        self.on_adapter = Some(false);
+        self.lid_problem = Some(POWER_PROBLEM.to_owned());
+        self.schedule_retry(now);
+    }
+
+    fn rebuild_power_now(&mut self, now: SystemTime) {
+        self.arm_power(now);
     }
 
     fn deadline(&self) -> Option<SystemTime> {
@@ -221,7 +300,7 @@ impl Awake {
                 Ok(None)
             }
             AwakeAction::Tracking { on } => self.set_tracking(ctx, *on),
-            AwakeAction::Lid { on } => self.set_lid(ctx, *on),
+            AwakeAction::Lid { on } => self.set_lid(ctx, *on, now),
             AwakeAction::Slept { .. } | AwakeAction::Woke => Err(ActionError::Failed(
                 "this action is not available yet".to_owned(),
             )),
@@ -299,7 +378,12 @@ impl Awake {
     }
 
     /// Stores first, so a failure changes nothing, as Tracking agents does.
-    fn set_lid(&mut self, ctx: &ModuleCtx<Self>, on: bool) -> Result<Option<Started>, ActionError> {
+    fn set_lid(
+        &mut self,
+        ctx: &ModuleCtx<Self>,
+        on: bool,
+        now: SystemTime,
+    ) -> Result<Option<Started>, ActionError> {
         if self.lid_on == on {
             return Ok(None);
         }
@@ -311,6 +395,11 @@ impl Awake {
         }
         self.lid_on = on;
         self.lid_problem = None;
+        if on {
+            self.arm_power(now);
+        } else {
+            self.disarm_power();
+        }
         ctx.emit(
             LID_CHANGED,
             Severity::Info,
@@ -728,6 +817,7 @@ impl Awake {
             || !self.dirty.is_empty()
             || self.problems.platform.is_some()
             || self.problems.exits.is_some()
+            || (self.lid_on && self.power.is_none())
             || !self.restored
     }
 
@@ -735,6 +825,7 @@ impl Awake {
         let mut state = self.table.snapshot(held.system, held.display);
         state.problem = self.problems.first();
         state.lid = self.lid_on;
+        state.on_adapter = self.on_adapter;
         state.lid_problem.clone_from(&self.lid_problem);
         if state != self.published {
             self.published = state.clone();
@@ -1169,6 +1260,27 @@ enum Started {
     Display,
     Command { key: String, name: String },
     Session { key: String, name: String },
+}
+
+enum PowerEvent {
+    Changed,
+    Dead,
+}
+
+async fn power_next(power: &mut Option<AsyncFd<PowerWatch>>) -> PowerEvent {
+    let Some(power) = power.as_ref() else {
+        return std::future::pending().await;
+    };
+    loop {
+        let Ok(mut guard) = power.readable().await else {
+            return PowerEvent::Dead;
+        };
+        match guard.try_io(|watch| watch.get_ref().read_tokens()) {
+            Ok(Ok(0) | Err(_)) => return PowerEvent::Dead,
+            Ok(Ok(_)) => return PowerEvent::Changed,
+            Err(_would_block) => {}
+        }
+    }
 }
 
 async fn watcher_next(watcher: &mut Option<ProcWatcher>) -> Option<Exited> {

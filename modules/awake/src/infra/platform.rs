@@ -132,6 +132,14 @@ impl Platform {
         self
     }
 
+    pub(crate) fn watch_power(&self) -> Result<PowerWatch, PowerSourceError> {
+        self.power_source.watch()
+    }
+
+    pub(crate) fn power_kind(&self) -> Result<PowerKind, PowerSourceError> {
+        self.power_source.current()
+    }
+
     pub(crate) fn power(&self) -> Arc<dyn PowerAssertions> {
         Arc::clone(&self.power)
     }
