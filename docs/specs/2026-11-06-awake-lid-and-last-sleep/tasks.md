@@ -113,7 +113,7 @@ Compact delta every task inherits:
 | `modules/awake/tests/sleep.rs` | new | `slept` Action, last sleep, Journal |
 | `crates/ffi/src/lib.rs` | changed | `AwakeView` fields, `NavoriCore::system_will_sleep` |
 | `crates/ffi/src/app.rs` | changed | `From<AwakeState>`, `awake_view` blanking, `lid_check`, doctor order |
-| `crates/ffi/tests/{awake,core,integrations,running,actions_risk}.rs` | changed | view literal, doctor order, `lid_check`, will-sleep, `SAMPLED` |
+| `crates/ffi/tests/{awake,core,integrations,running,actions_risk,agent}.rs` | changed | view literal, doctor order, `lid_check`, will-sleep, `SAMPLED`, the pinned agent catalog |
 | `apps/cli/src/main.rs`, `apps/cli/tests/cli.rs` | changed | `navori awake lid on\|off`, `Lid closed:` status line |
 | `docs/features/awake.md`, `docs/agents/verify.md` | changed | lid Action, CLI verb, adapter-only support |
 | `modules/awake/tests/restart.rs` | read only | `restart.rs` line 89 already covers in-memory Leases kept on restart (LID-7.4) |
@@ -273,7 +273,7 @@ _Requirements: LID-2.3_
   - `modules/awake/src/infra/platform.rs`, `infra/stored.rs`, `state.rs`, `domain/table.rs`, `action.rs`, `event.rs`, `lib.rs`, `actor.rs`
   - `crates/ffi/src/lib.rs`, `crates/ffi/src/app.rs`
   - `modules/awake/tests/common/mod.rs`, `tests/actions.rs`, `tests/manual.rs`, `tests/display.rs`, `tests/duration.rs`, `tests/session.rs`, `tests/idle.rs`, `tests/tray.rs`
-  - `crates/ffi/tests/running.rs`, `crates/ffi/tests/actions_risk.rs`, `crates/ffi/tests/awake.rs`
+  - `crates/ffi/tests/running.rs`, `crates/ffi/tests/actions_risk.rs`, `crates/ffi/tests/awake.rs`, `crates/ffi/tests/agent.rs`
 - Create: `modules/awake/tests/lid.rs`
 - Test: `modules/awake/tests/lid.rs`, `modules/awake/tests/actions.rs`, `crates/ffi/tests/actions_risk.rs`, `crates/ffi/tests/awake.rs`
 
@@ -311,7 +311,7 @@ _Requirements: LID-2.3_
   - `an_unreadable_lid_value_reads_as_off_and_raises_a_lid_problem`
   - `setting_tracking_still_stores_first_and_journals_tracking_changed`
 
-  Add `lid` and `slept` to `actions.rs`: `sample()`, the ordered names list and `every_catalog_name_decodes_as_an_action`. Add them to the not-ending lists in `manual.rs` and `display.rs`. In `actions_risk.rs`, set `SAMPLED = 26`, with samples asserting `Write` for both.
+  Add `lid` and `slept` to `actions.rs`: `sample()`, the ordered names list and `every_catalog_name_decodes_as_an_action`. Add them to the not-ending lists in `manual.rs` and `display.rs`. In `actions_risk.rs`, set `SAMPLED = 26`, with samples asserting `Write` for both. In `crates/ffi/tests/agent.rs` `no_new_action_appears` (line 606), insert `"awake lid write"` and `"awake slept write"` after `"awake tracking write"` (line 634); LOOP-10.5 allows additions.
 - [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test lid --test actions`. Expect: unknown variant `lid`.
 - [ ] **Step 3: Implement** the Platform builders and defaults, the stored helpers (kv namespace `awake`), the `AwakeState` fields (set in `LeaseTable::snapshot` and `AwakeState::idle`, filled by the actor in `publish`), the two Action variants with risk and catalog, and the event constants and summaries.
 - [ ] **Step 4: Implement `set_lid`** by copying `set_tracking`: unchanged → `Ok(None)`; save first; set `lid_on`; emit `LID_CHANGED`. Load `lid` on the first `run_loop` entry.
