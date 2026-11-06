@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::process::{ExitCode, Stdio};
 use std::time::{Duration, Instant};
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use navori_config::{Paths, Profile};
 use navori_ipc::{Client, IpcError};
 use navori_protocol::rpc::method;
@@ -92,12 +92,23 @@ enum AwakeCommand {
         #[arg(long)]
         json: bool,
     },
+    /// Keep this Mac awake with the lid closed (needs a power adapter).
+    Lid {
+        #[arg(value_enum)]
+        state: OnOff,
+    },
     /// Run a command and keep this Mac awake while it runs.
     Run {
         /// The command and its arguments.
         #[arg(last = true, required = true)]
         command: Vec<OsString>,
     },
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum OnOff {
+    On,
+    Off,
 }
 
 enum Failure {
@@ -282,6 +293,10 @@ async fn run(cli: Cli) -> Result<(), Failure> {
                 } else {
                     print_awake_status(&v);
                 }
+            }
+            AwakeCommand::Lid { state } => {
+                let on = matches!(state, OnOff::On);
+                dispatch_awake(&mut client, json!({ "lid": { "on": on } })).await?;
             }
             AwakeCommand::Run { .. } => unreachable!("handled before connect"),
         },
@@ -487,6 +502,15 @@ fn print_awake_status(v: &Value) {
         println!("Tracking agents: off");
     } else {
         println!("Tracking agents: on");
+    }
+    let lid = v["lid"].as_bool().unwrap_or(false);
+    let held = v["lid_held"].as_bool().unwrap_or(false);
+    let on_adapter = v["on_adapter"].as_bool().unwrap_or(true);
+    match (lid, held, on_adapter) {
+        (false, ..) => println!("Lid closed: off"),
+        (true, true, _) => println!("Lid closed: on (held)"),
+        (true, false, false) => println!("Lid closed: on (needs adapter)"),
+        (true, false, true) => println!("Lid closed: on"),
     }
 }
 
