@@ -8,13 +8,7 @@ use navori_macos::Marker;
 
 use crate::snapshot::{ProcId, Process, Snapshot};
 
-/// A recognized coding-agent harness.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Harness {
-    ClaudeCode,
-    Codex,
-    Grok,
-}
+pub use navori_protocol::Harness;
 
 /// The terminal application an Agent session was launched from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

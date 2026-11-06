@@ -28,7 +28,7 @@ pub(crate) enum Read {
 
 pub(crate) fn dir_name(harness: Harness) -> &'static str {
     match harness {
-        Harness::Claude => ".claude",
+        Harness::ClaudeCode => ".claude",
         Harness::Codex => ".codex",
         Harness::Grok => ".grok",
     }
@@ -41,7 +41,7 @@ fn config_dir(home: &Path, harness: Harness) -> PathBuf {
 pub(crate) fn hook_file(home: &Path, harness: Harness) -> PathBuf {
     let dir = config_dir(home, harness);
     match harness {
-        Harness::Claude => dir.join("settings.json"),
+        Harness::ClaudeCode => dir.join("settings.json"),
         Harness::Codex => dir.join("hooks.json"),
         Harness::Grok => dir.join("hooks").join("navori.json"),
     }

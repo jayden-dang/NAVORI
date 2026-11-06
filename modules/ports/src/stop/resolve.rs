@@ -15,7 +15,6 @@ use crate::state::{DockerStatus, PortEntry, PortKind};
 
 const MAX_ANCESTORS: usize = 64;
 
-/// What a fresh scan and a fresh Docker read found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FreshRead {
     pub scan: Scan,

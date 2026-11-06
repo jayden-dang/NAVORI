@@ -12,7 +12,7 @@ use navori_procs::{
     harness_of, resolve_location,
 };
 
-use crate::domain::Reading;
+use crate::domain::{Reading, SessionPlace};
 
 pub type ProcessFactory = Box<dyn FnMut() -> Result<Arc<dyn ProcessSource>, PlatformError> + Send>;
 pub type ExitsFactory =
@@ -166,15 +166,17 @@ impl Platform {
 
     /// Harness for `pid`, or for `ppid` when `pid` is not running.
     ///
-    /// The snapshot runs on a blocking thread. The label is the project location, or `None`
-    /// when the working directory cannot be read. A Codex session uses `reported`, when absolute,
-    /// instead of the process's directory. `Err` from the join means that task stopped.
+    /// The snapshot runs on a blocking thread. The place is the project and worktree
+    /// (or branch), or `None` when the working directory cannot be read. A Codex session
+    /// uses `reported`, when absolute, instead of the process's directory. `Err` from the
+    /// join means that task stopped.
     pub(crate) async fn resolve_session(
         &mut self,
         pid: i32,
         ppid: i32,
         reported: Option<&str>,
-    ) -> Result<Result<(Harness, ProcId, Option<String>), Rejected>, tokio::task::JoinError> {
+    ) -> Result<Result<(Harness, ProcId, Option<SessionPlace>), Rejected>, tokio::task::JoinError>
+    {
         let source = match self.ensure_processes() {
             Ok(source) => source,
             Err(err) => return Ok(Err(Rejected::Platform(err))),
@@ -318,7 +320,7 @@ fn resolve_open(
     pid: i32,
     ppid: i32,
     reported: Option<PathBuf>,
-) -> Result<(Harness, ProcId, Option<String>), Rejected> {
+) -> Result<(Harness, ProcId, Option<SessionPlace>), Rejected> {
     let snapshot = Snapshot::take(source).map_err(|err| match err {
         ProcsError::Platform { source } => Rejected::Platform(source),
         ProcsError::Watch { errno } => Rejected::Platform(PlatformError::Kqueue {
@@ -335,11 +337,11 @@ fn resolve_open(
             HarnessLookup::NotRunning => return Err(Rejected::NotRunning),
         },
     };
-    let label = match reported.filter(|cwd| harness == Harness::Codex && cwd.is_absolute()) {
+    let place = match reported.filter(|cwd| harness == Harness::Codex && cwd.is_absolute()) {
         Some(cwd) => Some(place(&resolve_location(&cwd))),
         None => location_label(&snapshot, process),
     };
-    Ok((harness, process, label))
+    Ok((harness, process, place))
 }
 
 fn classify_descendants(
@@ -381,7 +383,7 @@ fn started_after(start: StartTime, first_hold: SystemTime) -> bool {
 #[derive(Debug)]
 pub(crate) struct FreshLabels {
     pub commands: Vec<Option<String>>,
-    pub sessions: Vec<Option<String>>,
+    pub sessions: Vec<Option<SessionPlace>>,
 }
 
 fn label_snapshot(
@@ -422,7 +424,7 @@ fn command_label(snapshot: &Snapshot, id: ProcId) -> Option<String> {
         .filter(|name| !name.is_empty())
 }
 
-fn location_label(snapshot: &Snapshot, process: ProcId) -> Option<String> {
+fn location_label(snapshot: &Snapshot, process: ProcId) -> Option<SessionPlace> {
     match snapshot.cwd(process) {
         Ok(cwd) => Some(place(&resolve_location(&cwd))),
         Err(_) => {
@@ -432,9 +434,9 @@ fn location_label(snapshot: &Snapshot, process: ProcId) -> Option<String> {
     }
 }
 
-/// `project/worktree`, or `project/branch` when the checkout is not a linked worktree.
-fn place(location: &Location) -> String {
-    let second = location
+/// Project plus worktree, or the branch when the checkout is not a linked worktree.
+fn place(location: &Location) -> SessionPlace {
+    let name = location
         .worktree
         .clone()
         .unwrap_or_else(|| match &location.branch {
@@ -442,5 +444,8 @@ fn place(location: &Location) -> String {
             Some(Branch::Detached { abbrev }) => abbrev.clone(),
             None => "unknown".to_owned(),
         });
-    format!("{}/{}", location.project, second)
+    SessionPlace {
+        project: location.project.clone(),
+        name,
+    }
 }

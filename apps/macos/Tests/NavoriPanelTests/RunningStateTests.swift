@@ -609,7 +609,7 @@ struct ProjectChildStateTests {
 
     @Test func a_port_rows_tooltip_and_spoken_sentence_name_its_worktree_and_harness_and_none_for_docker() {
         let state = child(ports: [
-            listener(3000, "next-server", worktree: "feat-x", harness: "claude_code"),
+            listener(3000, "next-server", worktree: "feat-x", harness: "claude"),
             listener(3001, "vite", harness: "codex"),
             listener(3002, "bun", worktree: "main"),
             listener(6379, "klynt-redis", container: true, kind: "docker"),

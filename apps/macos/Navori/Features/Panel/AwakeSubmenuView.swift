@@ -25,7 +25,7 @@ struct KeepAwakeSubmenuView: View {
                 )
             }
         }
-        .padding(5)
+        .padding(MenuMetrics.pad)
         .frame(width: 180, alignment: .topLeading)
         .fixedSize(horizontal: true, vertical: true)
     }

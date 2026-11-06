@@ -18,7 +18,7 @@ struct ProjectChildView: View {
                 }
             }
         }
-        .padding(5)
+        .padding(MenuMetrics.pad)
         .frame(width: Self.width, alignment: .topLeading)
         .fixedSize(horizontal: true, vertical: true)
         .onDisappear { store.dismissAskingStops() }
@@ -206,7 +206,7 @@ private struct SessionRowView: View {
         }
         .opacity(state.dimmed ? 0.45 : 1)
         .padding(.horizontal, 8)
-        .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: MenuMetrics.rowHeight, maxHeight: MenuMetrics.rowHeight, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(state.spoken)
     }
@@ -333,7 +333,7 @@ private struct PortRowView: View {
                 .opacity(secondary)
         }
         .padding(.horizontal, 8)
-        .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: MenuMetrics.rowHeight, maxHeight: MenuMetrics.rowHeight, alignment: .leading)
         .background {
             if selected {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -484,7 +484,7 @@ struct StopLineView: View {
                     .truncationMode(.tail)
             }
             .padding(.horizontal, 8)
-            .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: MenuMetrics.rowHeight, maxHeight: MenuMetrics.rowHeight, alignment: .leading)
             .background {
                 if selected {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)

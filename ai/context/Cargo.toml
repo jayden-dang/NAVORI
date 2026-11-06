@@ -11,6 +11,7 @@ publish.workspace = true
 navori-llm.workspace = true
 navori-redact.workspace = true
 navori-secrets.workspace = true
+navori-store.workspace = true
 tokio.workspace = true
 futures.workspace = true
 thiserror.workspace = true

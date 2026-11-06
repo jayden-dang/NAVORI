@@ -8,7 +8,7 @@ use navori_procs::{Harness, ProcId, Process, ProcsError, Snapshot, Unavailable, 
 
 use crate::kind::{is_docker_backend, kind};
 use crate::place::place_listener_cached;
-use crate::state::{HarnessName, Placement, PortEntry};
+use crate::state::{Placement, PortEntry};
 
 /// A listener of the Docker backend, which a later stage attributes to a container.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,7 +24,6 @@ pub struct BackendPort {
 /// A read that failed has no entry, so the next scan reads again.
 pub type HarnessMemo = HashMap<ProcId, Option<Harness>>;
 
-/// What one scan found.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Scan {
     pub entries: Vec<PortEntry>,
@@ -175,7 +174,7 @@ fn harness_for(
     id: ProcId,
     memo: &HarnessMemo,
     kept: &mut HarnessMemo,
-) -> Option<HarnessName> {
+) -> Option<Harness> {
     let found = match memo.get(&id) {
         Some(found) => *found,
         None => match started_by(snapshot, id) {
@@ -184,5 +183,5 @@ fn harness_for(
         },
     };
     kept.insert(id, found);
-    found.map(HarnessName::from)
+    found
 }

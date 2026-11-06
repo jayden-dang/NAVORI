@@ -41,9 +41,6 @@ pub(crate) fn display_source() -> &'static str {
 }
 
 pub(crate) fn duration_source(seconds: u64) -> String {
-    if seconds == HOUR {
-        return "1 hour".to_owned();
-    }
     if seconds.is_multiple_of(DAY) {
         return counted(seconds / DAY, "day");
     }

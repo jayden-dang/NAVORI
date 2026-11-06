@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use navori_procs::{Harness, ProcId};
 
-use crate::state::{AwakeState, LeaseState};
+use crate::state::{AwakeState, LeaseKind, LeaseState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Timing {
@@ -144,6 +144,12 @@ struct CommandLease {
     label: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionPlace {
+    pub project: String,
+    pub name: String,
+}
+
 #[derive(Debug, Clone)]
 struct SessionLease {
     session_id: String,
@@ -154,6 +160,7 @@ struct SessionLease {
     stop_mark: Option<SystemTime>,
     next_check: Option<SystemTime>,
     label: Option<String>,
+    project: Option<String>,
     /// Running subagents, from hooks. Not stored: after a reopen the descendant reading decides.
     agents: BTreeSet<String>,
     /// The session's name, for the menu only. Never stored, so a reopen waits for the next hook.
@@ -277,7 +284,7 @@ impl LeaseTable {
         process: ProcId,
         first_hold: SystemTime,
         deadline: SystemTime,
-        label: Option<String>,
+        place: Option<SessionPlace>,
     ) -> bool {
         if let Some(existing) = self
             .sessions
@@ -287,7 +294,7 @@ impl LeaseTable {
             existing.harness = harness;
             existing.process = process;
             existing.deadline = deadline;
-            existing.label = label;
+            apply_place(existing, place);
             existing.stop_mark = None;
             existing.next_check = None;
             existing.background = false;
@@ -302,7 +309,8 @@ impl LeaseTable {
             deadline,
             stop_mark: None,
             next_check: None,
-            label,
+            label: place.as_ref().map(|place| place.name.clone()),
+            project: place.as_ref().map(|place| place.project.clone()),
             agents: BTreeSet::new(),
             title: None,
             background: false,
@@ -311,13 +319,13 @@ impl LeaseTable {
         true
     }
 
-    pub(crate) fn set_session_label(&mut self, session_id: &str, label: Option<String>) {
+    pub(crate) fn set_session_place(&mut self, session_id: &str, place: Option<SessionPlace>) {
         if let Some(lease) = self
             .sessions
             .iter_mut()
             .find(|lease| lease.session_id == session_id)
         {
-            lease.label = label;
+            apply_place(lease, place);
         }
     }
 
@@ -750,11 +758,7 @@ fn saved_session(lease: &SessionLease) -> SessionSaved {
 }
 
 pub(crate) fn harness_name(harness: Harness) -> &'static str {
-    match harness {
-        Harness::ClaudeCode => "Claude Code",
-        Harness::Codex => "Codex",
-        Harness::Grok => "Grok",
-    }
+    harness.id()
 }
 
 fn manual_label(lease: &Manual) -> Option<String> {
@@ -770,13 +774,19 @@ fn manual_label(lease: &Manual) -> Option<String> {
     }
 }
 
+fn apply_place(lease: &mut SessionLease, place: Option<SessionPlace>) {
+    lease.project = place.as_ref().map(|place| place.project.clone());
+    lease.label = place.as_ref().map(|place| place.name.clone());
+}
+
 fn manual_state(lease: &Manual) -> LeaseState {
     match lease {
         Manual::Duration { deadline, .. } => LeaseState {
             key: LeaseKey::Manual.text(),
-            kind: "duration".to_owned(),
+            kind: LeaseKind::Duration,
             harness: None,
             label: manual_label(lease),
+            project: None,
             pid: None,
             stopped: false,
             ends_at_ms: Some(wall_ms(*deadline)),
@@ -784,9 +794,10 @@ fn manual_state(lease: &Manual) -> LeaseState {
         },
         Manual::UntilOff { .. } => LeaseState {
             key: LeaseKey::Manual.text(),
-            kind: "until_off".to_owned(),
+            kind: LeaseKind::UntilOff,
             harness: None,
             label: manual_label(lease),
+            project: None,
             pid: None,
             stopped: false,
             ends_at_ms: None,
@@ -798,9 +809,10 @@ fn manual_state(lease: &Manual) -> LeaseState {
 fn display_state() -> LeaseState {
     LeaseState {
         key: LeaseKey::Display.text(),
-        kind: "display".to_owned(),
+        kind: LeaseKind::Display,
         harness: None,
         label: Some("Display".to_owned()),
+        project: None,
         pid: None,
         stopped: false,
         ends_at_ms: None,
@@ -811,9 +823,10 @@ fn display_state() -> LeaseState {
 fn command_state(lease: &CommandLease) -> LeaseState {
     LeaseState {
         key: command_key(lease.process),
-        kind: "command".to_owned(),
+        kind: LeaseKind::Command,
         harness: None,
         label: lease.label.clone(),
+        project: None,
         pid: Some(lease.process.pid),
         stopped: false,
         ends_at_ms: None,
@@ -850,9 +863,10 @@ fn session_state(lease: &SessionLease) -> LeaseState {
             session_id: lease.session_id.clone(),
         }
         .text(),
-        kind: "session".to_owned(),
+        kind: LeaseKind::Session,
         harness: Some(harness_name(lease.harness).to_owned()),
         label: lease.label.clone(),
+        project: lease.project.clone(),
         pid: Some(lease.process.pid),
         stopped: lease.stopped(),
         ends_at_ms: Some(wall_ms(lease.deadline)),

@@ -4,17 +4,18 @@ mod common;
 
 use common::Rig;
 use navori_kernel::{Module, TrayContribution, TrayGlyph};
-use navori_mod_awake::{Awake, AwakeState, LeaseState};
+use navori_mod_awake::{Awake, AwakeState, LeaseKind, LeaseState};
 use serde_json::json;
 
 const SYSTEM_PROBLEM: &str = "macOS refused the request. Navori keeps trying.";
 
-fn lease(kind: &str) -> LeaseState {
+fn lease(kind: LeaseKind) -> LeaseState {
     LeaseState {
         key: "manual".to_owned(),
-        kind: kind.to_owned(),
+        kind,
         harness: None,
         label: None,
+        project: None,
         pid: None,
         stopped: false,
         ends_at_ms: None,
@@ -52,7 +53,7 @@ fn no_lease_reports_nothing() {
 
 #[test]
 fn a_held_lease_reports_the_lease_glyph() {
-    let contribution = tray(&state(vec![lease("duration")], true, None));
+    let contribution = tray(&state(vec![lease(LeaseKind::Duration)], true, None));
 
     assert_eq!(
         contribution.glyph,
@@ -63,7 +64,7 @@ fn a_held_lease_reports_the_lease_glyph() {
 
 #[test]
 fn a_display_lease_counts_as_a_lease() {
-    let contribution = tray(&state(vec![lease("display")], true, None));
+    let contribution = tray(&state(vec![lease(LeaseKind::Display)], true, None));
 
     assert_eq!(
         contribution.glyph,
@@ -73,7 +74,11 @@ fn a_display_lease_counts_as_a_lease() {
 
 #[test]
 fn a_refused_lease_reports_the_problem_glyph_and_says_it_cannot_hold() {
-    let contribution = tray(&state(vec![lease("duration")], false, Some(SYSTEM_PROBLEM)));
+    let contribution = tray(&state(
+        vec![lease(LeaseKind::Duration)],
+        false,
+        Some(SYSTEM_PROBLEM),
+    ));
 
     assert_eq!(
         contribution.glyph,
@@ -95,7 +100,7 @@ fn other_problems_do_not_report_the_problem_glyph() {
         "Awake could not watch for exits.",
     ];
     for text in texts {
-        let contribution = tray(&state(vec![lease("duration")], true, Some(text)));
+        let contribution = tray(&state(vec![lease(LeaseKind::Duration)], true, Some(text)));
 
         assert_eq!(
             contribution.glyph,

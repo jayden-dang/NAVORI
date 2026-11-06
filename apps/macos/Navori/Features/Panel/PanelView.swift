@@ -2,7 +2,6 @@ import AppKit
 import NavoriPanel
 import SwiftUI
 
-/// Content of the menubar panel.
 struct PanelView: View {
     let store: CoreStore
     @Environment(CascadeController.self) private var cascade
@@ -19,8 +18,8 @@ struct PanelView: View {
             MenuRowView(row: aboutRow, cascade: cascade)
             MenuRowView(row: quitRow, cascade: cascade)
         }
-        .padding(5)
-        .frame(width: 360, alignment: .topLeading)
+        .padding(MenuMetrics.pad)
+        .frame(width: MenuMetrics.level0Width, alignment: .topLeading)
         .fixedSize(horizontal: true, vertical: true)
     }
 

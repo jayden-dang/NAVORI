@@ -83,7 +83,7 @@ struct MenuRowView: View {
                 }
             }
             .padding(.horizontal, 8)
-            .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: MenuMetrics.rowHeight, maxHeight: MenuMetrics.rowHeight, alignment: .leading)
             .background {
                 if selected {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)

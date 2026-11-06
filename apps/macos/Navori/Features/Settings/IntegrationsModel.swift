@@ -14,12 +14,7 @@ struct IntegrationRow: Decodable, Equatable, Identifiable {
     var id: String { harness }
 
     var title: String {
-        switch harness {
-        case "claude": "Claude Code"
-        case "codex": "Codex"
-        case "grok": "Grok Build"
-        default: harness
-        }
+        HarnessCopy.display(harness) ?? harness
     }
 
     var stateLabel: String {

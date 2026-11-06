@@ -5,8 +5,8 @@ import Testing
 @Suite
 struct LeaseLabelFixtureTests {
     private struct Case: Decodable {
-        let label: String?
         let project: String?
+        let name: String?
     }
 
     private static func cases() throws -> [Case] {
@@ -22,12 +22,16 @@ struct LeaseLabelFixtureTests {
         #expect(cases.isEmpty == false)
         for entry in cases {
             let lease = AwakeLeaseInput(
-                kind: .session, harness: "Claude Code", label: entry.label, pid: 1, stopped: false, until: nil
+                kind: .session, harness: "Claude Code", label: entry.name, pid: 1, stopped: false, until: nil,
+                project: entry.project
             )
             let state = AwakeSubmenuState(
                 status: .on(sources: []), leases: [lease], displayHeld: true, tracking: true
             )
-            #expect(state.holdingGroups.map(\.title) == [entry.project ?? "Other"], "label \(entry.label ?? "nil")")
+            #expect(
+                state.holdingGroups.map(\.title) == [entry.project ?? "Other"],
+                "project \(entry.project ?? "nil") name \(entry.name ?? "nil")"
+            )
         }
     }
 }

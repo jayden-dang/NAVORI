@@ -29,7 +29,7 @@ final class CascadePanel: NSPanel {
         scroll.automaticallyAdjustsContentInsets = false
         scroll.documentView = hosting
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 200),
+            contentRect: NSRect(x: 0, y: 0, width: MenuMetrics.level0Width, height: 200),
             styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
             backing: .buffered,
             defer: true
@@ -80,16 +80,7 @@ final class CascadePanel: NSPanel {
             || event.modifierFlags.contains(.option) {
             return false
         }
-        let key: CascadeKey
-        switch event.keyCode {
-        case 126: key = .up
-        case 125: key = .down
-        case 123: key = .left
-        case 124: key = .right
-        case 36, 76: key = .return
-        case 53: key = .escape
-        default: return false
-        }
+        guard let key = CascadeKey.fromKeyCode(event.keyCode) else { return false }
         onKey?(key)
         return true
     }

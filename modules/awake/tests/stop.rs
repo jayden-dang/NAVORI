@@ -103,7 +103,7 @@ async fn hold(rig: &Rig) -> Value {
 fn assert_held(state: &Value) {
     assert_eq!(state["leases"].as_array().map(Vec::len), Some(1));
     assert_eq!(state["system_held"], true);
-    assert_eq!(state["leases"][0]["harness"], "Claude Code");
+    assert_eq!(state["leases"][0]["harness"], "claude");
     assert_eq!(state["leases"][0]["pid"], CLAUDE);
     assert_eq!(state["since_ms"], ORIGIN_MS as i64);
 }

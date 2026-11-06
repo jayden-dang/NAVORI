@@ -35,7 +35,6 @@ navori-protocol.workspace = true
 navori-redact.workspace = true
 navori-secrets.workspace = true
 navori-store.workspace = true
-rusqlite.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

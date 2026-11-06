@@ -11,6 +11,8 @@ publish.workspace = true
 navori-context.workspace = true
 navori-kernel.workspace = true
 navori-protocol.workspace = true
+navori-store.workspace = true
+rusqlite.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 serde.workspace = true
@@ -21,7 +23,6 @@ ulid.workspace = true
 
 [dev-dependencies]
 futures.workspace = true
-navori-store.workspace = true
 navori-secrets = { workspace = true, features = ["fake"] }
 navori-redact.workspace = true
 schemars.workspace = true

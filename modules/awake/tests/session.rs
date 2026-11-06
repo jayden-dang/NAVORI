@@ -39,9 +39,16 @@ impl Checkout {
         Self { path }
     }
 
+    fn project(&self) -> String {
+        self.path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned()
+    }
+
     fn label(&self) -> String {
-        let name = self.path.file_name().unwrap().to_string_lossy();
-        format!("{name}/feature-awake")
+        format!("{}/feature-awake", self.project())
     }
 }
 
@@ -83,12 +90,13 @@ fn hook_chain(rig: &Rig, checkout: &Checkout) {
     ));
 }
 
-fn session_row(label: &str, ends_at_ms: i64) -> Value {
+fn session_row(checkout: &Checkout, ends_at_ms: i64) -> Value {
     json!({
         "key": format!("session:{SESSION}"),
         "kind": "session",
-        "harness": "Claude Code",
-        "label": label,
+        "harness": "claude",
+        "label": "feature-awake",
+        "project": checkout.project(),
         "pid": CLAUDE,
         "stopped": false,
         "ends_at_ms": ends_at_ms,
@@ -169,7 +177,7 @@ async fn a_session_lease_watches_the_harness_not_the_hook() {
     assert_eq!(
         state,
         json!({
-            "leases": [session_row(&checkout.label(), ORIGIN_MS as i64 + TTL_MS)],
+            "leases": [session_row(&checkout, ORIGIN_MS as i64 + TTL_MS)],
             "system_held": true,
             "display_held": false,
             "since_ms": ORIGIN_MS as i64,
@@ -222,7 +230,7 @@ async fn a_dead_hook_pid_falls_back_to_its_parent() {
 
     assert_eq!(
         state["leases"],
-        json!([session_row(&checkout.label(), ORIGIN_MS as i64 + TTL_MS)])
+        json!([session_row(&checkout, ORIGIN_MS as i64 + TTL_MS)])
     );
     assert_eq!(rig.exits.watched(), vec![CLAUDE]);
     assert!(rig.exits.tokens(SHELL).is_empty());
@@ -463,7 +471,7 @@ async fn a_session_id_outside_the_allowed_characters_is_invalid() {
         .unwrap();
     assert_eq!(lease_count(&held), 1);
     assert_eq!(held["leases"][0]["key"], format!("session:{accepted}"));
-    assert_eq!(held["leases"][0]["harness"], "Claude Code");
+    assert_eq!(held["leases"][0]["harness"], "claude");
     assert_eq!(held["leases"][0]["label"], Value::Null);
     assert_eq!(held["leases"][0]["pid"], CLAUDE);
     rig.shutdown().await;
@@ -622,8 +630,9 @@ async fn a_codex_session_is_labelled_by_the_directory_it_reports_not_its_daemons
         .await
         .unwrap();
 
-    assert_eq!(state["leases"][0]["harness"], "Codex");
-    assert_eq!(state["leases"][0]["label"], json!(project.label()));
+    assert_eq!(state["leases"][0]["harness"], "codex");
+    assert_eq!(state["leases"][0]["project"], json!(project.project()));
+    assert_eq!(state["leases"][0]["label"], "feature-awake");
     assert_eq!(state["leases"][0]["pid"], CODEX_DAEMON);
 }
 
@@ -648,15 +657,18 @@ async fn two_codex_sessions_under_one_daemon_keep_their_own_labels() {
             .unwrap();
     }
 
-    let labels: Vec<&str> = state["leases"]
+    let projects: Vec<&str> = state["leases"]
         .as_array()
         .unwrap()
         .iter()
-        .map(|lease| lease["label"].as_str().unwrap())
+        .map(|lease| lease["project"].as_str().unwrap())
         .collect();
-    assert_eq!(labels.len(), 2);
-    assert!(labels.contains(&first.label().as_str()), "{labels:?}");
-    assert!(labels.contains(&second.label().as_str()), "{labels:?}");
+    assert_eq!(projects.len(), 2);
+    assert!(projects.contains(&first.project().as_str()), "{projects:?}");
+    assert!(
+        projects.contains(&second.project().as_str()),
+        "{projects:?}"
+    );
 }
 
 #[tokio::test]
@@ -675,7 +687,8 @@ async fn a_codex_directory_that_is_not_absolute_falls_back_to_the_process() {
         .await
         .unwrap();
 
-    assert_eq!(state["leases"][0]["label"], json!(daemon.label()));
+    assert_eq!(state["leases"][0]["project"], json!(daemon.project()));
+    assert_eq!(state["leases"][0]["label"], "feature-awake");
 }
 
 #[tokio::test]
@@ -695,5 +708,6 @@ async fn a_claude_session_keeps_the_label_of_its_process_when_a_directory_is_sen
         .await
         .unwrap();
 
-    assert_eq!(state["leases"][0]["label"], json!(checkout.label()));
+    assert_eq!(state["leases"][0]["project"], json!(checkout.project()));
+    assert_eq!(state["leases"][0]["label"], "feature-awake");
 }

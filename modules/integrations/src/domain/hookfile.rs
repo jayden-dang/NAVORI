@@ -29,7 +29,7 @@ const SESSION_END: Event = "SessionEnd";
 
 pub(crate) fn required_events(harness: Harness) -> &'static [Event] {
     match harness {
-        Harness::Claude => &CLAUDE_EVENTS,
+        Harness::ClaudeCode => &CLAUDE_EVENTS,
         Harness::Codex => &CODEX_EVENTS,
         Harness::Grok => &GROK_EVENTS,
     }

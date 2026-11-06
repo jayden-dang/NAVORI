@@ -3,41 +3,33 @@ import Foundation
 /// Plain lease fields from a snapshot, with no generated core types.
 public enum AwakeLeaseMap {
     /// Level-0 source. A session names the harness; other leases use the published label.
-    public static func sourceName(kind: String, harness: String?, label: String?) -> String? {
-        let name = kind == "session" ? harness : label
+    public static func sourceName(kind: AwakeLeaseInput.Kind, harness: String?, label: String?) -> String? {
+        let name = kind == .session ? harness.flatMap(HarnessCopy.display) : label
         guard let name, name.isEmpty == false else { return nil }
         return name
     }
 
-    /// Nil when `kind` is not a lease the menu can show.
     public static func lease(
-        kind: String,
+        kind: AwakeLeaseInput.Kind,
         harness: String?,
         label: String?,
         pid: Int32?,
         stopped: Bool,
         endsAtMs: Int64?,
         title: String? = nil,
+        project: String? = nil,
         timeZone: TimeZone = .current
-    ) -> AwakeLeaseInput? {
-        let mapped: AwakeLeaseInput.Kind
-        switch kind {
-        case "duration": mapped = .duration
-        case "until_off": mapped = .untilOff
-        case "display": mapped = .display
-        case "command": mapped = .command
-        case "session": mapped = .session
-        default: return nil
-        }
-        let until = mapped == .duration ? endsAtMs.map { clockText($0, timeZone: timeZone) } : nil
+    ) -> AwakeLeaseInput {
+        let until = kind == .duration ? endsAtMs.map { clockText($0, timeZone: timeZone) } : nil
         return AwakeLeaseInput(
-            kind: mapped,
-            harness: nonempty(harness),
+            kind: kind,
+            harness: nonempty(harness).flatMap(HarnessCopy.display),
             label: nonempty(label),
             pid: pid,
             stopped: stopped,
             until: until,
-            title: nonempty(title)
+            title: nonempty(title),
+            project: nonempty(project)
         )
     }
 

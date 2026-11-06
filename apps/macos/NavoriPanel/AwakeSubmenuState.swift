@@ -12,6 +12,7 @@ public struct AwakeLeaseInput: Equatable, Sendable {
     public let kind: Kind
     public let harness: String?
     public let label: String?
+    public let project: String?
     public let pid: Int32?
     public let stopped: Bool
     public let until: String?
@@ -25,11 +26,13 @@ public struct AwakeLeaseInput: Equatable, Sendable {
         pid: Int32?,
         stopped: Bool,
         until: String?,
-        title: String? = nil
+        title: String? = nil,
+        project: String? = nil
     ) {
         self.kind = kind
         self.harness = harness
         self.label = label
+        self.project = project
         self.pid = pid
         self.stopped = stopped
         self.until = until
@@ -202,16 +205,14 @@ public struct AwakeSubmenuState: Equatable, Sendable {
         return (left.pid ?? 0) < (right.pid ?? 0)
     }
 
-    /// `project/branch`. The branch keeps any further slashes.
     private static func place(_ lease: AwakeLeaseInput) -> (project: String, name: String) {
-        guard let label = text(lease.label) else {
-            return ("Other", text(lease.harness) ?? "Session")
+        if let project = text(lease.project) {
+            return (project, text(lease.label) ?? project)
         }
-        guard let slash = label.firstIndex(of: "/") else { return (label, label) }
-        let project = String(label[..<slash])
-        let name = String(label[label.index(after: slash)...])
-        guard project.isEmpty == false, name.isEmpty == false else { return (label, label) }
-        return (project, name)
+        if let label = text(lease.label) {
+            return (label, label)
+        }
+        return ("Other", lease.harness.flatMap(HarnessCopy.display) ?? "Session")
     }
 
     private static func shownName(_ lease: AwakeLeaseInput) -> String {
@@ -220,10 +221,11 @@ public struct AwakeSubmenuState: Equatable, Sendable {
 
     private static func sessionRow(_ lease: AwakeLeaseInput) -> HoldingRow {
         let word = lease.stopped ? "stopped" : "working"
-        let source = [text(lease.title), text(lease.harness), text(lease.label)].compactMap { $0 }
+        let located = [text(lease.project), text(lease.label)].compactMap { $0 }.joined(separator: "/")
+        let source = [text(lease.title), text(lease.harness), text(located.isEmpty ? nil : located)].compactMap { $0 }
         let pid = lease.pid.map { "pid \($0)" }
         return HoldingRow(
-            mark: harnessMark(lease.harness),
+            mark: HarnessCopy.mark(lease.harness),
             name: shownName(lease),
             word: word,
             showsDot: lease.stopped == false,
@@ -272,15 +274,6 @@ public struct AwakeSubmenuState: Equatable, Sendable {
             help: nil,
             accessibilitySentence: word.isEmpty ? name : "\(name), \(word)"
         )
-    }
-
-    static func harnessMark(_ harness: String?) -> HoldingMark {
-        switch harness {
-        case "Claude Code": .claude
-        case "Codex": .codex
-        case "Grok": .grok
-        default: .terminal
-        }
     }
 
     private static func text(_ value: String?) -> String? {

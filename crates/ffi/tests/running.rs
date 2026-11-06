@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use navori_ffi::running::{Own, ProjectState, RunningProject, RunningView, StopTargetView, build};
-use navori_ffi::{AwakeView, LeaseView};
+use navori_ffi::{AwakeView, LeaseKindView, LeaseView};
 use navori_mod_ports::PortsState;
 use serde_json::{Value, json};
 
@@ -20,12 +20,22 @@ fn own() -> Own {
     }
 }
 
-fn session(label: Option<&str>, stopped: bool) -> LeaseView {
+fn session(place: Option<&str>, stopped: bool) -> LeaseView {
+    let (project, name) = match place {
+        Some(place) => match place.split_once('/') {
+            Some((project, name)) if !project.is_empty() && !name.is_empty() => {
+                (Some(project.to_owned()), Some(name.to_owned()))
+            }
+            _ => (Some(place.to_owned()), None),
+        },
+        None => (None, None),
+    };
     LeaseView {
-        key: format!("session-{}", label.unwrap_or("none")),
-        kind: "session".into(),
-        harness: Some("claude_code".into()),
-        label: label.map(str::to_owned),
+        key: format!("session-{}", place.unwrap_or("none")),
+        kind: LeaseKindView::Session,
+        harness: Some("claude".into()),
+        label: name,
+        project,
         pid: Some(900),
         stopped,
         ends_at_ms: None,
@@ -165,16 +175,23 @@ fn dev_servers() -> PortsState {
 }
 
 #[test]
-fn a_label_joins_the_project_before_its_first_slash() {
+fn a_session_joins_the_project_the_lease_publishes() {
     let cases: Vec<Value> =
         serde_json::from_str(include_str!("fixtures/lease_labels.json")).unwrap();
     for case in cases {
-        let label = case["label"].as_str();
-        let lease = session(label, false);
+        let project = case["project"].as_str();
+        let name = case["name"].as_str();
+        let mut lease = session(None, false);
+        lease.project = project.map(str::to_owned);
+        lease.label = name.map(str::to_owned);
         let view = view_of(Some(&awake(vec![lease])), Some(&PortsState::default()));
-        match case["project"].as_str() {
+        match project {
             Some(expected) => {
-                assert_eq!(names(&view), [expected], "label {label:?}");
+                assert_eq!(
+                    names(&view),
+                    [expected],
+                    "project {project:?} name {name:?}"
+                );
                 assert_eq!(view.projects[0].state, ProjectState::Working);
                 assert_eq!(view.unknown_reason, None);
             }
@@ -182,7 +199,7 @@ fn a_label_joins_the_project_before_its_first_slash() {
                 assert_eq!(
                     view.unknown_reason.as_deref(),
                     Some(NO_LABEL),
-                    "label {label:?}"
+                    "project {project:?} name {name:?}"
                 );
                 assert!(view.projects.is_empty());
             }
@@ -200,7 +217,7 @@ fn a_session_lease_with_a_working_flag_makes_its_project_working() {
     let klynt = project(&view, "klynt");
     assert_eq!(klynt.state, ProjectState::Working);
     assert_eq!(klynt.sessions.len(), 1);
-    assert_eq!(klynt.sessions[0].harness.as_deref(), Some("claude_code"));
+    assert_eq!(klynt.sessions[0].harness.as_deref(), Some("claude"));
     assert_eq!(klynt.sessions[0].title.as_deref(), Some("Fix the build"));
     assert_eq!(klynt.sessions[0].branch.as_deref(), Some("feature/x"));
     assert!(!klynt.sessions[0].stopped);
@@ -533,7 +550,7 @@ fn a_port_row_carries_its_worktree_and_harness_and_a_docker_port_carries_no_harn
     let dev = with(
         with(port(3000, 10), "worktree", json!("klynt-feature")),
         "harness",
-        json!("claude_code"),
+        json!("claude"),
     );
     let docker = with(
         container(port(8080, 50), "ab12", "node"),
@@ -545,7 +562,7 @@ fn a_port_row_carries_its_worktree_and_harness_and_a_docker_port_carries_no_harn
     let klynt = project(&view, "klynt");
     let dev = klynt.ports.iter().find(|p| p.port == 3000).unwrap();
     assert_eq!(dev.worktree.as_deref(), Some("klynt-feature"));
-    assert_eq!(dev.harness.as_deref(), Some("claude_code"));
+    assert_eq!(dev.harness.as_deref(), Some("claude"));
     let docker = klynt.ports.iter().find(|p| p.port == 8080).unwrap();
     assert_eq!(docker.harness, None);
     assert_eq!(docker.name, "c-ab12");

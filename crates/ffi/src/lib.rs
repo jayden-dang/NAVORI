@@ -32,14 +32,13 @@ use tokio_util::sync::CancellationToken;
 use crate::ai::AiRuntime;
 use crate::app::{Inner, IpcBridge};
 
-pub use ai::{
-    AiDeps, LlmChatSender, LlmSender, StoreAudit, StoreConversations, ask_error_to_rpc, service_for,
-};
+pub use ai::{AiDeps, LlmChatSender, LlmSender, ask_error_to_rpc, service_for};
 pub use app::{awake_check, awake_view, config_notice, lid_check, ports_check, running_view};
 pub use navori_agent::{
-    ConversationId, ConversationStore, Origin, TurnEnd, TurnErrorKind, TurnOutcome, TurnRequest,
-    TurnStartError,
+    ConversationId, ConversationStore, Origin, StoreConversations, TurnEnd, TurnErrorKind,
+    TurnOutcome, TurnRequest, TurnStartError,
 };
+pub use navori_context::StoreAudit;
 
 uniffi::setup_scaffolding!();
 
@@ -101,12 +100,22 @@ pub struct CheckView {
     pub detail: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, uniffi::Enum)]
+pub enum LeaseKindView {
+    Duration,
+    UntilOff,
+    Display,
+    Command,
+    Session,
+}
+
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct LeaseView {
     pub key: String,
-    pub kind: String,
+    pub kind: LeaseKindView,
     pub harness: Option<String>,
     pub label: Option<String>,
+    pub project: Option<String>,
     pub pid: Option<i32>,
     pub stopped: bool,
     pub ends_at_ms: Option<i64>,

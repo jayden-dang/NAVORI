@@ -865,7 +865,7 @@ fn internal_dep_violation(package: &str, path: &str, dep: &str) -> Option<String
         Some("only navori-procs, navori-ffi, or a module may depend on navori-macos")
     } else if is_module && dep_is_module {
         Some("modules must not depend on other modules (use the event bus)")
-    } else if is_module && dep.starts_with("navori-ai") {
+    } else if is_module && ["navori-llm", "navori-context", "navori-agent"].contains(&dep) {
         Some("modules must not depend on AI crates")
     } else if package == "navori-agent" && dep == "navori-llm" {
         Some("navori-agent must not depend on navori-llm")

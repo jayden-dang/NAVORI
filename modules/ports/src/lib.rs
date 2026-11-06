@@ -33,7 +33,6 @@ pub use stop::{
 /// Opens the process source, once, when the first scan needs it.
 pub type OpenProcesses = Box<dyn FnMut() -> Result<Arc<dyn ProcessSource>, PlatformError> + Send>;
 
-/// What the Module reads from outside.
 pub struct PortsEnv {
     pub home: PathBuf,
     pub processes: OpenProcesses,
@@ -75,7 +74,6 @@ impl PortsEnv {
     }
 }
 
-/// The Ports Module.
 pub struct Ports {
     env: PortsEnv,
     source: Option<Arc<dyn ProcessSource>>,

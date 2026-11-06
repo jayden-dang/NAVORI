@@ -19,7 +19,7 @@ final class StatusPanel: NSPanel {
     private(set) var isOpen = false
     /// Extra click can resign key (async close) then fire `toggle` and reopen.
     private var closedAt: CFTimeInterval = 0
-    private static let width: CGFloat = 360
+    private static let width: CGFloat = MenuMetrics.level0Width
     private let hosting: MenuHostingView<AnyView>
     private let scroll: NSScrollView
 
@@ -287,7 +287,7 @@ final class StatusPanel: NSPanel {
             || event.modifierFlags.contains(.option) {
             return false
         }
-        guard let key = Self.cascadeKey(event.keyCode) else { return false }
+        guard let key = CascadeKey.fromKeyCode(event.keyCode) else { return false }
         if firstResponder is NSText, key != .escape {
             return false
         }
@@ -295,39 +295,13 @@ final class StatusPanel: NSPanel {
         return true
     }
 
-    private static func cascadeKey(_ keyCode: UInt16) -> CascadeKey? {
-        switch keyCode {
-        case 126: return .up
-        case 125: return .down
-        case 123: return .left
-        case 124: return .right
-        case 36, 76: return .return
-        case 53: return .escape
-        default: return nil
-        }
-    }
-
     /// SwiftUI Button does not see first mouse-up in this non-activating panel.
     private func activateRow(at windowPoint: CGPoint) {
-        let pad: CGFloat = 5
-        let row: CGFloat = 26
-        let x = windowPoint.x
-        let y = windowPoint.y
-        guard x >= pad, x <= frame.width - pad else { return }
-        let quit = pad..<(pad + row)
-        let about = quit.upperBound..<(quit.upperBound + row)
-        let settings = about.upperBound..<(about.upperBound + row)
-        let divider: CGFloat = 1
-        let coreStart = settings.upperBound + divider
-        let core = coreStart..<(coreStart + row)
-        let id: String
-        switch y {
-        case quit: id = "quit"
-        case about: id = "about"
-        case settings: id = "settings"
-        case core where content.tree().contains(where: { $0.id == "core" }): id = "core"
-        default: return
-        }
+        guard let id = MenuHitMap.rowId(
+            at: windowPoint,
+            width: frame.width,
+            tree: content.tree()
+        ) else { return }
         cascade.click(id)
     }
 }

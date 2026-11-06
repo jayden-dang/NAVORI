@@ -78,11 +78,7 @@ fn session_line(session: &AgentSession) -> String {
 }
 
 fn harness_name(harness: Harness) -> &'static str {
-    match harness {
-        Harness::ClaudeCode => "Claude Code",
-        Harness::Codex => "Codex",
-        Harness::Grok => "Grok",
-    }
+    harness.display()
 }
 
 fn place(location: &Field<Location>) -> String {

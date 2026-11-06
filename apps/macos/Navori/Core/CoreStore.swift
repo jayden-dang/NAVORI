@@ -165,7 +165,7 @@ final class CoreStore {
             systemHeld: awake.systemHeld,
             hasLease: awake.leases.isEmpty == false,
             sources: awake.leases.compactMap {
-                AwakeLeaseMap.sourceName(kind: $0.kind, harness: $0.harness, label: $0.label)
+                AwakeLeaseMap.sourceName(kind: Self.kind($0.kind), harness: $0.harness, label: $0.label)
             }
         )
     }
@@ -182,25 +182,36 @@ final class CoreStore {
     private static func marks(of awake: AwakeView?) -> AwakeHeldMarks {
         let leases = awake?.leases ?? []
         return AwakeHeldMarks(
-            durationEndsAtMs: leases.first { $0.kind == "duration" }?.endsAtMs,
-            hasUntilOff: leases.contains { $0.kind == "until_off" },
-            hasDisplay: leases.contains { $0.kind == "display" },
+            durationEndsAtMs: leases.first { $0.kind == .duration }?.endsAtMs,
+            hasUntilOff: leases.contains { $0.kind == .untilOff },
+            hasDisplay: leases.contains { $0.kind == .display },
             tracking: awake?.tracking ?? true
         )
     }
 
     var awakeLeases: [AwakeLeaseInput] {
-        snapshot?.awake?.leases.compactMap { lease in
+        snapshot?.awake?.leases.map { lease in
             AwakeLeaseMap.lease(
-                kind: lease.kind,
+                kind: Self.kind(lease.kind),
                 harness: lease.harness,
                 label: lease.label,
                 pid: lease.pid,
                 stopped: lease.stopped,
                 endsAtMs: lease.endsAtMs,
-                title: lease.title
+                title: lease.title,
+                project: lease.project
             )
         } ?? []
+    }
+
+    private static func kind(_ kind: LeaseKindView) -> AwakeLeaseInput.Kind {
+        switch kind {
+        case .duration: .duration
+        case .untilOff: .untilOff
+        case .display: .display
+        case .command: .command
+        case .session: .session
+        }
     }
 
     var awakeSubmenu: AwakeSubmenuState {
