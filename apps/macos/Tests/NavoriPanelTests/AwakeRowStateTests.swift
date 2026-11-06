@@ -169,4 +169,16 @@ struct AwakeRowStateTests {
         #expect(turnOff.visible(against: on) == turnOff.message)
         #expect(turnOff.visible(against: Self.marks(tracking: false)) == nil)
     }
+
+    @Test func a_lid_action_failure_is_reported() {
+        let before = Self.marks()
+        let failure = AwakeActionFailure(
+            request: .lid(true),
+            message: "The Navori core is not running.",
+            marks: before
+        )
+        let shown = failure.visible(against: before)
+        #expect(shown == "The Navori core is not running.")
+        #expect(AwakeRowState(status: .off, actionFailure: shown).label == "Needs attention")
+    }
 }

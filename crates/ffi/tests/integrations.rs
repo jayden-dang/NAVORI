@@ -116,7 +116,8 @@ fn the_existing_rows_keep_their_order() {
             "awake",
             "integrations",
             "logs",
-            "ports"
+            "ports",
+            "lid"
         ]
     );
     core.shutdown();

@@ -678,6 +678,66 @@ fn a_system_wake_with_a_running_core_is_harmless() {
     core.shutdown();
 }
 
+fn now_ms() -> i64 {
+    i64::try_from(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn will_sleep_records_a_time_taken_at_the_call() {
+    let home = home();
+    let (core, _) = start(&home);
+    let before = now_ms();
+
+    core.system_will_sleep();
+    let after = now_ms();
+
+    eventually(|| awake_of(&core).last_sleep_ms.is_some());
+    let recorded = awake_of(&core).last_sleep_ms.unwrap();
+    assert!(
+        (before..=after).contains(&recorded),
+        "{before} {recorded} {after}"
+    );
+    core.shutdown();
+}
+
+#[test]
+fn a_wake_leaves_the_core_serving() {
+    let home = home();
+    let (core, _) = start(&home);
+
+    core.system_did_wake();
+
+    let out =
+        futures::executor::block_on(core.dispatch("system".into(), "\"ping\"".into())).unwrap();
+    assert_eq!(out, "\"pong\"");
+    eventually(|| awake_of(&core).tracking);
+    core.shutdown();
+}
+
+#[test]
+fn will_sleep_after_shutdown_does_not_panic() {
+    let home = home();
+    let (core, _) = start(&home);
+    core.shutdown();
+
+    core.system_will_sleep();
+}
+
+#[test]
+fn did_wake_after_shutdown_does_not_panic() {
+    let home = home();
+    let (core, _) = start(&home);
+    core.shutdown();
+
+    core.system_did_wake();
+}
+
 #[test]
 fn calling_shutdown_twice_is_harmless() {
     let home = home();
@@ -784,7 +844,8 @@ fn an_idle_core_reports_a_passing_awake_row_and_keeps_the_other_rows() {
             "awake",
             "integrations",
             "logs",
-            "ports"
+            "ports",
+            "lid"
         ]
     );
     let awake = checks.iter().find(|check| check.name == "awake").unwrap();

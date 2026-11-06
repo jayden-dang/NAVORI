@@ -205,6 +205,7 @@ struct RunningSubmenuStateTests {
         #expect(state.items == [
             .keepAwake,
             .trackingAgents,
+            .lidClosed,
             .note("Awake cannot be read, so Stop is off."),
             .separator,
             .project(state.rows[0]),
@@ -213,10 +214,65 @@ struct RunningSubmenuStateTests {
         ])
     }
 
+    @Test func a_recorded_sleep_leads_the_submenu_with_a_separator() {
+        let sleep = LastSleepText(value: "09:20", spoken: "today at 09:20")
+        let state = RunningSubmenuState(running: running([]), lastSleep: sleep)
+        #expect(Array(state.items.prefix(3)) == [.lastSleep(sleep), .separator, .keepAwake])
+    }
+
+    @Test func no_recorded_sleep_shows_no_row_and_no_separator() {
+        let state = RunningSubmenuState(running: running([]))
+        #expect(state.items.first == .keepAwake)
+    }
+
+    @Test func the_full_order_runs_from_last_sleep_to_stop_all() {
+        let sleep = LastSleepText(value: "09:20", spoken: "today at 09:20")
+        let idle = project("api", state: .idle, ports: [port(1, stop: "a")], stoppable: 1, childStop: "r")
+        let commands = AwakeSubmenuState(
+            status: .on(sources: []),
+            leases: [AwakeLeaseInput(kind: .command, harness: nil, label: "make test", pid: 77, stopped: false, until: nil)],
+            displayHeld: false,
+            tracking: true
+        ).commandRows
+        let state = RunningSubmenuState(
+            running: running([idle], stopAll: ["r"], stopAllPorts: 1),
+            problem: "Awake cannot hold",
+            commands: commands,
+            lastSleep: sleep
+        )
+        #expect(state.items.map(Self.kind) == [
+            "lastSleep", "separator", "keepAwake", "trackingAgents", "lidClosed", "problem", "separator",
+            "project", "separator", "commands", "separator", "stopAll",
+        ])
+    }
+
+    @Test func the_last_sleep_item_has_no_action_id() {
+        let sleep = LastSleepText(value: "09:20", spoken: "today at 09:20")
+        #expect(RunningSubmenuItem.lastSleep(sleep).actionId == nil)
+        #expect(RunningSubmenuItem.lidClosed.actionId == "awake.lid")
+        #expect(RunningSubmenuItem.trackingAgents.actionId == "awake.tracking")
+    }
+
+    private static func kind(_ item: RunningSubmenuItem) -> String {
+        switch item {
+        case .lastSleep: "lastSleep"
+        case .keepAwake: "keepAwake"
+        case .trackingAgents: "trackingAgents"
+        case .lidClosed: "lidClosed"
+        case .note: "note"
+        case .problem: "problem"
+        case .separator: "separator"
+        case .nothingRunning: "nothingRunning"
+        case .project: "project"
+        case .commands: "commands"
+        case .stopAll: "stopAll"
+        }
+    }
+
     @Test func no_note_means_no_problem_line_and_no_stop_all_means_no_closing_separator() {
         let state = RunningSubmenuState(running: running([project("klynt", state: .working, sessions: [live])]))
         #expect(state.items == [
-            .keepAwake, .trackingAgents, .separator, .project(state.rows[0]),
+            .keepAwake, .trackingAgents, .lidClosed, .separator, .project(state.rows[0]),
         ])
     }
 
@@ -243,6 +299,57 @@ struct RunningSubmenuStateTests {
         )
         #expect(fromAwake.items.contains(.problem(text)))
         #expect(fromAwake.items.contains(.note(text)) == false)
+    }
+
+    @Test func the_core_note_still_takes_the_slot_before_any_problem() {
+        let state = RunningSubmenuState(
+            running: running(
+                [project("klynt", state: .unknown, ports: [port(1)])],
+                unknownReason: "Awake cannot be read, so Stop is off."
+            ),
+            problem: "macOS refused the lid setting"
+        )
+        #expect(state.items.contains(.note("Awake cannot be read, so Stop is off.")))
+        #expect(state.items.contains(.problem("macOS refused the lid setting")) == false)
+    }
+
+    @Test func a_lid_problem_shows_only_when_no_note_or_awake_problem_does() {
+        let awake = AwakeSubmenuState(
+            status: .on(sources: []),
+            leases: [],
+            displayHeld: false,
+            tracking: true,
+            lid: true,
+            onAdapter: true,
+            lidProblem: "macOS refused the lid setting"
+        )
+        let shown = RunningSubmenuState(
+            running: running([project("klynt", state: .working, sessions: [live])]),
+            problem: awake.problem?.title
+        )
+        #expect(shown.items == [
+            .keepAwake, .trackingAgents, .lidClosed, .problem("macOS refused the lid setting"),
+            .separator, .project(shown.rows[0]),
+        ])
+        let broken = AwakeSubmenuState(
+            status: .unavailable,
+            leases: [],
+            displayHeld: false,
+            tracking: true,
+            lidProblem: "macOS refused the lid setting"
+        )
+        #expect(broken.problem?.title == "Unavailable")
+    }
+
+    @Test func project_rows_and_stop_all_are_unchanged() {
+        let idle = project("api", state: .idle, ports: [port(1, stop: "a")], stoppable: 1, childStop: "r")
+        let state = RunningSubmenuState(running: running([idle], stopAll: ["r"], stopAllPorts: 1))
+        #expect(state.items.dropFirst(3) == [
+            .separator,
+            .project(state.rows[0]),
+            .separator,
+            .stopAll(StopAllOffer(requests: ["r"], ports: 1, projects: 1, inUse: 0, otherLeft: 0, systemHidden: 0)),
+        ])
     }
 
     @Test func stop_all_is_absent_when_no_named_project_is_idle() {
@@ -656,7 +763,7 @@ struct RunningCommandRowsTests {
             default: "other"
             }
         }
-        #expect(kinds == ["other", "other", "separator", "project", "separator", "commands", "separator", "stopAll"])
+        #expect(kinds == ["other", "other", "other", "separator", "project", "separator", "commands", "separator", "stopAll"])
     }
 
     @Test func no_commands_leave_the_list_as_it_was() {

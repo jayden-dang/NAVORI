@@ -151,6 +151,15 @@ The on/off setting that decides whether **Agent session** **Leases** keep the Ma
 is off, Navori still follows each session, and turning it on holds for them at once.
 _Avoid_: pause, sleep mode
 
+**Lid closed**:
+The on/off setting that lets held **Leases** keep the Mac awake with its lid closed, only while it is on the power
+adapter. On battery it stays on but holds nothing. "Held" is the state of the macOS setting while a **Lease** holds it.
+_Avoid_: clamshell mode, closed-display mode, lid hold
+
+**Last sleep**:
+The time the Mac last went to sleep, shown at the top of the Running submenu. Navori stores it, so it survives a restart.
+_Avoid_: last wake, uptime
+
 **Integration**:
 Navori's entries installed into another tool's config — today a Harness's hooks, later its
 MCP server entry — installed, repaired and removed from Settings → Integrations.

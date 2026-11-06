@@ -14,9 +14,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         EditMenu.install()
         if !AppEnvironment.perfFlagWithoutHome {
             store.start()
-            wakeObserver = WakeObserver { [weak self] in
-                self?.store.systemDidWake()
-            }
+            wakeObserver = WakeObserver(
+                onWake: { [weak self] in self?.store.systemDidWake() },
+                onSleep: { [weak self] in self?.store.systemWillSleep() }
+            )
         }
         statusBar = StatusBarController(
             store: store,

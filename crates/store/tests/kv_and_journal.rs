@@ -39,6 +39,32 @@ fn kv_namespaces_do_not_collide() {
 }
 
 #[test]
+fn a_deleted_key_reads_as_absent() {
+    let store = Store::open_in_memory().unwrap();
+    store.kv_set("awake", "lid_held", &json!(true)).unwrap();
+    store.kv_delete("awake", "lid_held").unwrap();
+    assert_eq!(store.kv_get("awake", "lid_held").unwrap(), None);
+}
+
+#[test]
+fn deleting_a_missing_key_is_not_an_error() {
+    let store = Store::open_in_memory().unwrap();
+    store.kv_delete("awake", "lid_held").unwrap();
+    assert_eq!(store.kv_get("awake", "lid_held").unwrap(), None);
+}
+
+#[test]
+fn deleting_one_key_leaves_its_neighbours() {
+    let store = Store::open_in_memory().unwrap();
+    store.kv_set("awake", "lid_held", &json!(true)).unwrap();
+    store.kv_set("awake", "tracking", &json!(1)).unwrap();
+    store.kv_set("other", "lid_held", &json!(2)).unwrap();
+    store.kv_delete("awake", "lid_held").unwrap();
+    assert_eq!(store.kv_get("awake", "tracking").unwrap(), Some(json!(1)));
+    assert_eq!(store.kv_get("other", "lid_held").unwrap(), Some(json!(2)));
+}
+
+#[test]
 fn journal_returns_newest_events_first_up_to_the_limit() {
     let store = Store::open_in_memory().unwrap();
     for (i, ts) in [100, 300, 200].into_iter().enumerate() {

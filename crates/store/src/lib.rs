@@ -224,6 +224,11 @@ impl Store {
         .transpose()
     }
 
+    pub fn kv_delete(&self, ns: &str, key: &str) -> Result<()> {
+        self.with_conn(|c| c.execute("DELETE FROM kv WHERE ns = ?1 AND key = ?2", [ns, key]))?;
+        Ok(())
+    }
+
     /// Persists `event` after redacting its summary and payload.
     pub fn journal_append(&self, event: &Event) -> Result<()> {
         let summary = navori_redact::redact_text(&event.summary).text;

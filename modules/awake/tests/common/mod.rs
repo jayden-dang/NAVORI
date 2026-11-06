@@ -5,8 +5,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use navori_kernel::{DispatchError, Envelope, Kernel, RestartPolicy, WallClock};
-use navori_macos::fake::{FakeExitsHandle, FakePower, FakeProcesses};
-use navori_macos::{PowerAssertions, ProcessSource};
+use navori_macos::fake::{FakeExitsHandle, FakeLid, FakePower, FakePowerSource, FakeProcesses};
+use navori_macos::{LidSetting, PowerAssertions, PowerKind, PowerSource, ProcessSource};
 use navori_mod_awake::{Awake, ExitsFactory, Platform, Timing};
 use navori_store::Store;
 use serde_json::Value;
@@ -46,14 +46,30 @@ impl WallClock for FakeClock {
     }
 }
 
+pub struct Seams {
+    pub lid: FakeLid,
+    pub power_source: FakePowerSource,
+}
+
+impl Default for Seams {
+    fn default() -> Self {
+        Self {
+            lid: FakeLid::new(),
+            power_source: FakePowerSource::new(PowerKind::Battery),
+        }
+    }
+}
+
 pub struct Rig {
     pub kernel: Kernel,
     pub power: Arc<FakePower>,
+    pub lid: FakeLid,
+    pub power_source: FakePowerSource,
     pub processes: Arc<FakeProcesses>,
     pub exits: FakeExitsHandle,
     pub clock: FakeClock,
     source: Arc<dyn ProcessSource>,
-    store: Store,
+    pub store: Store,
     timing: Timing,
     policy: RestartPolicy,
 }
@@ -78,6 +94,7 @@ impl Rig {
             factory,
             timing,
             RestartPolicy::default(),
+            Seams::default(),
         )
     }
 
@@ -89,7 +106,15 @@ impl Rig {
             let exits = exits.clone();
             Box::new(move |sink| exits.clone().factory()(sink)) as ExitsFactory
         };
-        Self::assemble(processes, source, exits, factory, Timing::FIXED, policy)
+        Self::assemble(
+            processes,
+            source,
+            exits,
+            factory,
+            Timing::FIXED,
+            policy,
+            Seams::default(),
+        )
     }
 
     pub fn with_source(processes: Arc<FakeProcesses>, source: Arc<dyn ProcessSource>) -> Self {
@@ -105,6 +130,7 @@ impl Rig {
             factory,
             Timing::FIXED,
             RestartPolicy::default(),
+            Seams::default(),
         )
     }
 
@@ -118,6 +144,7 @@ impl Rig {
             factory,
             Timing::FIXED,
             RestartPolicy::default(),
+            Seams::default(),
         )
     }
 
@@ -128,6 +155,7 @@ impl Rig {
         factory: ExitsFactory,
         timing: Timing,
         policy: RestartPolicy,
+        Seams { lid, power_source }: Seams,
     ) -> Self {
         let clock = FakeClock::at(ORIGIN_MS);
         let power = Arc::new(FakePower::new());
@@ -139,7 +167,9 @@ impl Rig {
                 move || Ok(Arc::clone(&source))
             }),
             factory,
-        );
+        )
+        .with_lid(Arc::new(lid.clone()) as Arc<dyn LidSetting>)
+        .with_power_source(Arc::new(power_source.clone()) as Arc<dyn PowerSource>);
         let kernel = Kernel::builder_with_clock(store.clone(), Arc::new(clock.clone()))
             .pause_journal_sweep()
             .restart_policy(policy)
@@ -148,6 +178,8 @@ impl Rig {
         Self {
             kernel,
             power,
+            lid,
+            power_source,
             processes,
             exits,
             clock,
@@ -168,7 +200,9 @@ impl Rig {
             Arc::clone(&self.power) as Arc<dyn PowerAssertions>,
             Box::new(move || Ok(Arc::clone(&source))),
             factory,
-        );
+        )
+        .with_lid(Arc::new(self.lid.clone()) as Arc<dyn LidSetting>)
+        .with_power_source(Arc::new(self.power_source.clone()) as Arc<dyn PowerSource>);
         self.kernel = Kernel::builder_with_clock(self.store.clone(), Arc::new(self.clock.clone()))
             .pause_journal_sweep()
             .restart_policy(self.policy)

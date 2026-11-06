@@ -348,6 +348,101 @@ fn awake_status_states_tracking_agents() {
         .stdout(predicate::str::contains("Tracking agents: off"));
 }
 
+const LID_OFF: &str = r#"{"leases":[],"system_held":false,"tracking":true,"lid":false}"#;
+
+fn lid_status_stdout(state: &'static str) -> String {
+    let server = recording_server_replying(Reply::Fixed(state));
+    let out = navori(&server.home)
+        .args(["awake", "status"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    String::from_utf8(out).unwrap()
+}
+
+#[test]
+fn awake_lid_on_dispatches_the_lid_action() {
+    let server = recording_server_replying(Reply::Fixed(LID_OFF));
+    navori(&server.home)
+        .args(["awake", "lid", "on"])
+        .assert()
+        .success();
+    let requests = server.requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"lid": {"on": true}})
+    );
+}
+
+#[test]
+fn awake_lid_off_dispatches_the_lid_action() {
+    let server = recording_server_replying(Reply::Fixed(LID_OFF));
+    navori(&server.home)
+        .args(["awake", "lid", "off"])
+        .assert()
+        .success();
+    let requests = server.requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        dispatched_action(&requests[0]),
+        &serde_json::json!({"lid": {"on": false}})
+    );
+}
+
+#[test]
+fn status_prints_lid_closed_after_tracking_agents() {
+    let cases: [(&'static str, &str); 4] = [
+        (LID_OFF, "Lid closed: off"),
+        (
+            r#"{"leases":[],"tracking":true,"lid":true,"lid_held":false,"on_adapter":true}"#,
+            "Lid closed: on",
+        ),
+        (
+            r#"{"leases":[],"tracking":true,"lid":true,"lid_held":true,"on_adapter":true}"#,
+            "Lid closed: on (held)",
+        ),
+        (
+            r#"{"leases":[],"tracking":true,"lid":true,"lid_held":false,"on_adapter":false}"#,
+            "Lid closed: on (needs adapter)",
+        ),
+    ];
+    for (state, expected) in cases {
+        let out = lid_status_stdout(state);
+        let lines: Vec<&str> = out.lines().collect();
+        let tracking = lines
+            .iter()
+            .position(|l| l.starts_with("Tracking agents:"))
+            .unwrap();
+        assert_eq!(lines.get(tracking + 1), Some(&expected), "{out}");
+    }
+}
+
+#[test]
+fn status_reads_a_missing_lid_field_as_off() {
+    let out = lid_status_stdout(r#"{"leases":[],"tracking":true}"#);
+    assert!(out.contains("Lid closed: off"), "{out}");
+}
+
+#[test]
+fn status_json_carries_the_lid_fields() {
+    let state = r#"{"leases":[],"tracking":true,"lid":true,"lid_held":true,"on_adapter":false}"#;
+    let server = recording_server_replying(Reply::Fixed(state));
+    let out = navori(&server.home)
+        .args(["awake", "status", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let v: Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(v["lid"], true);
+    assert_eq!(v["lid_held"], true);
+    assert_eq!(v["on_adapter"], false);
+}
+
 #[test]
 fn awake_hold_with_no_flag_is_until_off() {
     let r = running_core();
@@ -506,6 +601,7 @@ struct Recorder {
 #[derive(Clone, Copy)]
 enum Reply {
     Result,
+    Fixed(&'static str),
     Invalid,
     Never,
 }
@@ -549,6 +645,11 @@ fn serve(
                             "jsonrpc": "2.0",
                             "id": request["id"],
                             "result": {},
+                        }),
+                        Reply::Fixed(state) => serde_json::json!({
+                            "jsonrpc": "2.0",
+                            "id": request["id"],
+                            "result": serde_json::from_str::<Value>(state).unwrap(),
                         }),
                         Reply::Invalid => serde_json::json!({
                             "jsonrpc": "2.0",

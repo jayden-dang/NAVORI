@@ -132,7 +132,7 @@ private struct DiagnosticsTab: View {
             }
             .overlay {
                 if store.checks.isEmpty {
-                    Text("Run the checks to verify config, database, IPC, modules, awake, integrations, logs and ports.")
+                    Text("Run the checks to verify config, database, IPC, modules, awake, integrations, logs, ports and lid.")
                         .foregroundStyle(.secondary)
                 }
             }

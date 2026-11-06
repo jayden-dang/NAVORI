@@ -279,8 +279,10 @@ extension StopAllOffer {
 }
 
 public enum RunningSubmenuItem: Equatable, Sendable {
+    case lastSleep(LastSleepText)
     case keepAwake
     case trackingAgents
+    case lidClosed
     case note(String)
     case problem(String)
     case separator
@@ -288,6 +290,16 @@ public enum RunningSubmenuItem: Equatable, Sendable {
     case project(ProjectRowState)
     case commands([HoldingRow])
     case stopAll(StopAllOffer)
+
+    /// The cascade id of a row the keyboard can act on. Static rows have none.
+    public var actionId: String? {
+        switch self {
+        case .keepAwake: "awake.keep"
+        case .trackingAgents: "awake.tracking"
+        case .lidClosed: "awake.lid"
+        default: nil
+        }
+    }
 }
 
 public struct RunningSubmenuState: Equatable, Sendable {
@@ -297,11 +309,16 @@ public struct RunningSubmenuState: Equatable, Sendable {
     public let nothingRunning: Bool
     /// The one line in the problem line's place: why Stop is off, else the Awake problem.
     public let note: String?
+    public let lastSleep: LastSleepText?
     private let noteIsProblem: Bool
 
     /// `problem` is the Awake problem text, shown only when the Core gives no reason of its own.
-    public init(running: RunningInput, problem: String? = nil, commands: [HoldingRow] = []) {
+    public init(running: RunningInput, problem: String? = nil,
+        commands: [HoldingRow] = [],
+        lastSleep: LastSleepText? = nil
+    ) {
         self.commands = commands
+        self.lastSleep = lastSleep
         nothingRunning = running.isActive == false
         rows = nothingRunning ? [] : running.projects.map(ProjectRowState.init)
         let reason = running.unknownReason.flatMap { $0.isEmpty ? nil : $0 }
@@ -318,7 +335,8 @@ public struct RunningSubmenuState: Equatable, Sendable {
     }
 
     public var items: [RunningSubmenuItem] {
-        var items: [RunningSubmenuItem] = [.keepAwake, .trackingAgents]
+        var items: [RunningSubmenuItem] = lastSleep.map { [.lastSleep($0), .separator] } ?? []
+        items += [.keepAwake, .trackingAgents, .lidClosed]
         if let note { items.append(noteIsProblem ? .problem(note) : .note(note)) }
         items.append(.separator)
         items += nothingRunning ? [.nothingRunning] : rows.map(RunningSubmenuItem.project)

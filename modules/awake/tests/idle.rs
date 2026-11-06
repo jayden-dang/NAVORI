@@ -25,7 +25,13 @@ fn idle_state() -> Value {
         "display_held": false,
         "since_ms": null,
         "problem": null,
-        "tracking": true
+        "tracking": true,
+        "lid": false,
+        "lid_held": false,
+        "on_adapter": null,
+        "lid_marker": false,
+        "last_sleep_ms": null,
+        "lid_problem": null
     })
 }
 

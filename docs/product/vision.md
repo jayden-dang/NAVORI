@@ -33,7 +33,7 @@ Other developers install it themselves, for their own use, with `brew install --
 - Replacing the IDE, terminal, GitHub web or any specialised app — Navori coordinates; it is not where the work happens.
 - Building its own coding agent or agent harness.
 - Windows, Linux, or Intel Macs.
-- Keeping the Mac running with the lid closed (needs a privileged root helper).
+- ~~Keeping the Mac running with the lid closed (needs a privileged root helper).~~ Superseded on 2026-11-06: lid tests on this Mac showed the lid setting can be turned off without root. ROAD-41 keeps the Mac awake with the lid closed on the power adapter while a Lease is held; root and helper processes stay out.
 - Letting the AI perform a `Destructive` action without approval.
 - Telemetry, analytics, or any Navori-owned account or server — the only network calls go to GitHub, the AI providers the user configures and the external services the user explicitly connects (a Connected account or an MCP server).
 

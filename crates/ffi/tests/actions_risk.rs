@@ -61,7 +61,7 @@ fn config(home: &tempfile::TempDir) -> CoreConfig {
     }
 }
 
-const SAMPLED: usize = 24;
+const SAMPLED: usize = 27;
 
 fn sample(module: &str, name: &str) -> Value {
     match (module, name) {
@@ -82,6 +82,9 @@ fn sample(module: &str, name: &str) -> Value {
         ("awake", "keep_indefinitely") => json!("keep_indefinitely"),
         ("awake", "keep_off") => json!("keep_off"),
         ("awake", "tracking") => json!({"tracking": {"on": true}}),
+        ("awake", "lid") => json!({"lid": {"on": true}}),
+        ("awake", "slept") => json!({"slept": {"at_ms": 1}}),
+        ("awake", "woke") => json!("woke"),
         ("awake", "subagent_start") => {
             json!({"subagent_start": {"session_id": "s", "agent_id": "a", "pid": 1, "ppid": 1}})
         }

@@ -64,6 +64,10 @@ final class CoreStore {
         core?.systemDidWake()
     }
 
+    func systemWillSleep() {
+        core?.systemWillSleep()
+    }
+
     func runChecks() {
         guard let core, !isRunningChecks else { return }
         isRunningChecks = true
@@ -205,6 +209,9 @@ final class CoreStore {
             leases: awakeLeases,
             displayHeld: snapshot?.awake?.displayHeld ?? false,
             tracking: snapshot?.awake?.tracking ?? true,
+            lid: snapshot?.awake?.lid ?? false,
+            onAdapter: snapshot?.awake?.onAdapter,
+            lidProblem: snapshot?.awake?.lidProblem,
             actionFailure: awakeActionMessage
         )
     }
@@ -224,7 +231,12 @@ final class CoreStore {
 
     var runningSubmenu: RunningSubmenuState? {
         running.map {
-            RunningSubmenuState(running: $0, problem: awakeSubmenu.problem?.title, commands: awakeSubmenu.commandRows)
+            RunningSubmenuState(
+                running: $0,
+                problem: awakeSubmenu.problem?.title,
+                commands: awakeSubmenu.commandRows,
+                lastSleep: snapshot?.awake?.lastSleepMs.map { lastSleepText(ms: $0, now: Date(), calendar: .current) }
+            )
         }
     }
 

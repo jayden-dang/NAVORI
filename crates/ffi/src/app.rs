@@ -148,6 +148,7 @@ impl Inner {
             module_is_down(&self.kernel, Ports::ID),
             ports_state(&self.kernel).as_ref(),
         ));
+        checks.push(lid_check(awake_view(&self.kernel).as_ref()));
 
         checks
     }
@@ -307,6 +308,12 @@ impl From<AwakeState> for crate::AwakeView {
             since_ms,
             problem,
             tracking,
+            lid,
+            lid_held,
+            on_adapter,
+            lid_marker,
+            last_sleep_ms,
+            lid_problem,
         } = state;
         Self {
             leases: leases.into_iter().map(crate::LeaseView::from).collect(),
@@ -315,6 +322,12 @@ impl From<AwakeState> for crate::AwakeView {
             since_ms,
             problem,
             tracking,
+            lid,
+            lid_held,
+            on_adapter,
+            lid_marker,
+            last_sleep_ms,
+            lid_problem,
         }
     }
 }
@@ -332,6 +345,8 @@ pub fn awake_view(kernel: &Kernel) -> Option<crate::AwakeView> {
     if module_is_down(kernel, Awake::ID) {
         view.system_held = false;
         view.display_held = false;
+        view.lid_held = false;
+        view.on_adapter = None;
         view.problem = Some(crate::running::AWAKE_STOPPED.to_owned());
     }
     Some(view)
@@ -440,6 +455,33 @@ pub fn awake_check(view: Option<&crate::AwakeView>) -> Check {
     let count = view.leases.len();
     let noun = if count == 1 { "Lease" } else { "Leases" };
     check("awake", true, format!("{count} {noun}"))
+}
+
+/// The lid doctor row: always the four facts when healthy, the lid problem when not.
+pub fn lid_check(view: Option<&crate::AwakeView>) -> Check {
+    let Some(view) = view else {
+        return check("lid", false, "Awake's state could not be read.".to_owned());
+    };
+    if let Some(problem) = &view.lid_problem {
+        return check("lid", false, problem.clone());
+    }
+    let on_off = if view.lid { "on" } else { "off" };
+    let held = if view.lid_held { "held" } else { "not held" };
+    let power = match view.on_adapter {
+        Some(true) => "adapter",
+        Some(false) => "battery",
+        None => "not watched",
+    };
+    let marker = if view.lid_marker {
+        "marker"
+    } else {
+        "no marker"
+    };
+    check(
+        "lid",
+        true,
+        format!("Lid closed {on_off} \u{b7} {held} \u{b7} {power} \u{b7} {marker}"),
+    )
 }
 
 /// JSON-RPC handler for the local socket.

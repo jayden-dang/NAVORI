@@ -696,6 +696,12 @@ impl LeaseTable {
             since_ms: self.earliest_start().map(wall_ms),
             problem: None,
             tracking: self.tracking,
+            lid: false,
+            lid_held: false,
+            on_adapter: None,
+            lid_marker: false,
+            last_sleep_ms: None,
+            lid_problem: None,
         }
     }
 

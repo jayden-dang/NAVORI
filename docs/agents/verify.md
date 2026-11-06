@@ -45,10 +45,10 @@ One read-only check: is this instance worth driving?
 ```
 
 Pass: exit 0, every line ✓ (app reachable at the dev socket, config, database, IPC,
-modules, logs, awake, integrations, ports). The `integrations` row fails, and doctor exits 1, when a
+modules, logs, awake, integrations, ports, lid). The `integrations` row fails, and doctor exits 1, when a
 Harness hook needs repair or its file is unreadable. A dev build run from another worktree can
 cause this, because the hook entry names that build's path; that is not a defect of this
-instance. Exit 3 = app not running → Launch first. Any other failure: do not Drive;
+instance. A failing `lid` row also makes doctor exit 1; it shows the lid problem. Exit 3 = app not running → Launch first. Any other failure: do not Drive;
 fix Launch or record the blocker.
 
 ## Drive
@@ -63,7 +63,7 @@ fields, not on aligned text columns.
 | `"$CLI" --profile dev events [--limit N] [--json]` | journal, newest first |
 | `"$CLI" --profile dev actions [--json]` | every action modules accept, with risk level |
 | `"$CLI" --profile dev dispatch <module> '<action-json>'` | send an action, prints the reply JSON |
-| `"$CLI" --profile dev awake status [--json]` | leases keeping this Mac awake; also `hold`, `release-all`, `run -- <cmd>` |
+| `"$CLI" --profile dev awake status [--json]` | leases keeping this Mac awake; also `hold`, `release-all`, `lid on\|off`, `run -- <cmd>` |
 
 CLI exit codes: 0 success · 1 command failed · 2 usage error · 3 app not running.
 
@@ -97,7 +97,7 @@ Index:
 | Journal survives restart | `events --json` across a quit + relaunch | the previous session's `core.started` and `core.stopped` events are still listed after relaunch, plus a new `core.started` |
 | Action catalog | `actions --json` | lists `system.ping` (read) and `system.prune_journal` |
 | Dispatch | `dispatch system '"ping"'` | prints `"pong"` |
-| Awake | `awake status`, `hold`, `release-all`, `run -- <cmd>` | a lease is listed while held; gone after `release-all` or when the command exits |
+| Awake | `awake status`, `hold`, `release-all`, `lid on\|off`, `run -- <cmd>` | a lease is listed while held; gone after `release-all` or when the command exits |
 | Integrations | `dispatch integrations ...`, `doctor` | Install writes the Harness hook entries into the Hook file under the temp home; Remove takes them out |
 | Ports | `dispatch ports '"list"'`, `doctor` | the listening ports of the user's processes, grouped by project; the `ports` row passes (`not scanned yet` before the first scan) and fails with the outcome after a failed scan |
 | Menubar panel | click the Navori Dev menu bar icon | manual drive only for now (see below) |
@@ -148,11 +148,12 @@ Index:
 ### Awake
 
 - **Sub-features:** duration, until-off, command, session, and display leases
-- **How to get to it (user POV):** `navori awake hold`, `release-all`, `status`, `run -- <cmd>`.
+- **How to get to it (user POV):** `navori awake hold`, `release-all`, `status`, `lid on|off`, `run -- <cmd>`.
 - **Driving it with the CLI:**
   1. `"$CLI" --profile dev awake hold --for 1h` then `"$CLI" --profile dev awake status --json`.
   2. `"$CLI" --profile dev awake release-all`.
-  3. `"$CLI" --profile dev awake run -- sleep 5` — the command's exit code, even 3; with the Core off the command still runs.
+  3. Do not run `awake lid on` against a real app: it sets the real lid. `awake status` prints the `Lid closed:` line.
+  4. `"$CLI" --profile dev awake run -- sleep 5` — the command's exit code, even 3; with the Core off the command still runs.
 - **Gotchas:** no flag on `hold` means until turned off. `Display on` has no CLI verb; dispatch `{"display":{"on":true}}`. Session hold is `dispatch`, not a CLI verb. Tracking agents is `dispatch` too: `{"tracking":{"on":false}}`. While it is off, `status` lists no session, though Navori still follows them.
 - **Persist check:** a command or session lease is still listed after quit and relaunch if the process is still the same; a duration or until-off lease is not. Tracking agents reads the same after relaunch.
 

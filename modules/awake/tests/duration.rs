@@ -46,7 +46,13 @@ async fn a_one_hour_lease_holds_one_system_assertion_with_the_given_name() {
             "display_held": false,
             "since_ms": ORIGIN_MS as i64,
             "problem": null,
-            "tracking": true
+            "tracking": true,
+            "lid": false,
+            "lid_held": false,
+            "on_adapter": null,
+            "lid_marker": false,
+            "last_sleep_ms": null,
+            "lid_problem": null
         })
     );
     assert_eq!(state, rig.kernel.state("awake").unwrap());
@@ -350,7 +356,13 @@ async fn status_answers_the_state() {
             "display_held": false,
             "since_ms": null,
             "problem": null,
-            "tracking": true
+            "tracking": true,
+            "lid": false,
+            "lid_held": false,
+            "on_adapter": null,
+            "lid_marker": false,
+            "last_sleep_ms": null,
+            "lid_problem": null
         })
     );
 

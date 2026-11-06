@@ -40,6 +40,7 @@ public enum AwakeCommand: Equatable, Sendable {
     case keepIndefinitely
     case keepOff
     case tracking(Bool)
+    case lid(Bool)
 
     public var actionJSON: String {
         switch self {
@@ -47,6 +48,7 @@ public enum AwakeCommand: Equatable, Sendable {
         case .keepIndefinitely: "\"keep_indefinitely\""
         case .keepOff: "\"keep_off\""
         case .tracking(let on): "{\"tracking\":{\"on\":\(on)}}"
+        case .lid(let on): "{\"lid\":{\"on\":\(on)}}"
         }
     }
 }

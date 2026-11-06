@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use navori_ffi::running::Own;
-use navori_ffi::{awake_check, awake_view, running_view};
+use navori_ffi::{AwakeView, awake_check, awake_view, lid_check, running_view};
 use navori_kernel::{DispatchError, Envelope, Kernel, ModuleState, RestartPolicy};
 use navori_macos::fake::{FakeExitsHandle, FakePower, FakeProcesses};
 use navori_macos::{PowerAssertions, ProcessSource};
@@ -208,4 +208,83 @@ async fn no_running_view_is_built_once_awake_has_stopped_and_ports_is_not_regist
         Some(STOPPED)
     );
     assert_eq!(running_view(&kernel, awake.as_ref(), own()), None);
+}
+
+fn idle_view() -> AwakeView {
+    AwakeView {
+        leases: Vec::new(),
+        system_held: false,
+        display_held: false,
+        since_ms: None,
+        problem: None,
+        tracking: true,
+        lid: false,
+        lid_held: false,
+        on_adapter: None,
+        lid_marker: false,
+        last_sleep_ms: None,
+        lid_problem: None,
+    }
+}
+
+#[test]
+fn the_lid_check_passes_with_lid_closed_off() {
+    let row = lid_check(Some(&idle_view()));
+    assert_eq!(row.name, "lid");
+    assert!(row.ok);
+    assert_eq!(
+        row.detail,
+        "Lid closed off \u{b7} not held \u{b7} not watched \u{b7} no marker"
+    );
+}
+
+#[test]
+fn the_lid_check_reports_held_adapter_and_marker() {
+    let view = AwakeView {
+        lid: true,
+        lid_held: true,
+        on_adapter: Some(true),
+        lid_marker: true,
+        ..idle_view()
+    };
+    let row = lid_check(Some(&view));
+    assert!(row.ok);
+    assert_eq!(
+        row.detail,
+        "Lid closed on \u{b7} held \u{b7} adapter \u{b7} marker"
+    );
+}
+
+#[test]
+fn the_lid_check_reports_battery_while_on_and_unplugged() {
+    let view = AwakeView {
+        lid: true,
+        on_adapter: Some(false),
+        ..idle_view()
+    };
+    let row = lid_check(Some(&view));
+    assert!(row.ok);
+    assert_eq!(
+        row.detail,
+        "Lid closed on \u{b7} not held \u{b7} battery \u{b7} no marker"
+    );
+}
+
+#[test]
+fn the_lid_check_fails_with_the_lid_problem_text() {
+    let view = AwakeView {
+        lid_problem: Some("The lid setting could not be changed.".to_owned()),
+        ..idle_view()
+    };
+    let row = lid_check(Some(&view));
+    assert!(!row.ok);
+    assert_eq!(row.detail, "The lid setting could not be changed.");
+}
+
+#[test]
+fn the_lid_check_fails_when_awake_cannot_be_read() {
+    let row = lid_check(None);
+    assert_eq!(row.name, "lid");
+    assert!(!row.ok);
+    assert_eq!(row.detail, "Awake's state could not be read.");
 }

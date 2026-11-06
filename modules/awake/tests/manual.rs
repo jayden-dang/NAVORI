@@ -44,7 +44,13 @@ async fn an_until_off_lease_has_no_deadline_and_holds_past_any_hour() {
             "display_held": false,
             "since_ms": ORIGIN_MS as i64,
             "problem": null,
-            "tracking": true
+            "tracking": true,
+            "lid": false,
+            "lid_held": false,
+            "on_adapter": null,
+            "lid_marker": false,
+            "last_sleep_ms": null,
+            "lid_problem": null
         })
     );
     assert_eq!(state, rig.kernel.state("awake").unwrap());
@@ -262,6 +268,9 @@ fn only_display_release_all_and_the_keep_actions_end_a_manual_lease() {
         "stop_session",
         "end_session",
         "tracking",
+        "lid",
+        "slept",
+        "woke",
         "subagent_start",
         "subagent_stop",
     ];

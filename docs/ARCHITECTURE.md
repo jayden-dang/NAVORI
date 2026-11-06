@@ -59,7 +59,7 @@ Hard-to-reverse decisions live as ADRs in `docs/adr/`; the rest are recorded whe
 | D3 | **GitHub**: OAuth App + Device Flow | [ADR 0002](adr/0002-github-oauth-app-device-flow.md) |
 | D4 | **CPU**: Apple Silicon only (`aarch64-apple-darwin`) | Non-goals in `docs/product/vision.md` (cheap to reverse: build config only) |
 | D5 | **Harness**: Claude Code, Grok Build, Codex via hooks; others auto-detected | The Awake seed below (hooks verified on the machine 2026-11-01) |
-| D6 | **Running with the lid closed**: not supported | Non-goals in `docs/product/vision.md` |
+| D6 | **Running with the lid closed**: on the power adapter while a Lease is held, without root (amended 2026-11-06; was "not supported") | Non-goals in `docs/product/vision.md`; ROAD-41 |
 | D7 | **AI observation scope**: everything except secrets | [ADR 0003](adr/0003-ai-sees-everything-except-secrets.md) |
 | D8 | **App signing**: self-signed identity, no paid Apple Developer account yet | [ADR 0004](adr/0004-self-signed-code-signing.md) |
 | D9 | **Menubar menu**: hand-built cascade on NSPanel with NSGlassEffectView (macOS 26), not NSMenu | [ADR 0006](adr/0006-menubar-menu-on-nspanel.md) |
@@ -133,6 +133,7 @@ impl NavoriCore {
 
     fn set_panel_visible(&self, visible: bool);                          // throttles polling / coalescing
     fn system_did_wake(&self);                                           // one wake pulse after the Mac wakes
+    fn system_will_sleep(&self);                                         // records when the Mac is about to sleep
     async fn shutdown(&self);
 }
 ```
@@ -314,7 +315,7 @@ Important details:
 - **Installation**: Settings → Integrations has Install/Repair/Remove buttons per harness. Navori **merges** into the existing config file (backup before writing, never overwriting other hooks), and `navori doctor` checks whether the hook is still correct.
 - **Safety net**: if a hook fails or does not run → kqueue (process death) + TTL still guarantee the lease cannot hang forever.
 
-Out of scope (decided): staying awake with the lid closed.
+Out of scope (decided): staying awake with the lid closed on battery, and any root or helper process for it. On the power adapter, while a Lease is held, the lid stays closed without sleep (ROAD-41, amended 2026-11-06).
 
 ### Seed: Ports (R3)
 

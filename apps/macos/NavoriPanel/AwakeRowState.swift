@@ -61,6 +61,8 @@ public struct AwakeActionFailure: Equatable, Sendable {
             return later.durationEndsAtMs == nil && later.hasUntilOff == false && later.hasDisplay == false
         case .tracking(let on):
             return later.tracking == on
+        case .lid:
+            return false
         }
     }
 }
