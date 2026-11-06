@@ -492,7 +492,7 @@ _Requirements: LID-3.13, LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.4_
 
 **Depends-on:** Task 4, Task 8 (all of Tasks 5–9 edit `actor.rs`, so they run in order)
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
   - In `sleep.rs`:
     - `a_recorded_sleep_is_published_and_journaled_with_its_reason`, where the payload is `{"at_ms": 1793931600000, "reason": "Clamshell Sleep"}` (2026-11-06 09:20 +07), with the summary `The Mac went to sleep.`
     - `an_unreadable_reason_is_journaled_as_null`
@@ -508,11 +508,11 @@ _Requirements: LID-3.13, LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.4_
     - `the_wake_pulse_still_runs_on_wake`
     - `will_sleep_after_shutdown_records_nothing_and_does_not_panic`
     - `did_wake_after_shutdown_dispatches_nothing_and_does_not_panic`
-- [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test sleep`. Expect: the `slept` handler fails.
-- [ ] **Step 3: Implement `record_sleep`:** reason → save → set → emit `SLEPT` (one-sentence summary).
-- [ ] **Step 4: Implement `system_will_sleep`** next to `system_did_wake`. Extend `system_did_wake` to dispatch `woke` after its unchanged wake pulse, and implement `on_woke` in the actor.
-- [ ] **Step 5: Run** `cargo test -p navori-mod-awake && cargo test -p navori-ffi`. Expect: pass.
-- [ ] **Step 6: Commit** `feat(awake): record when the Mac went to sleep`
+- [x] **Step 2: Run** `cargo test -p navori-mod-awake --test sleep`. Expect: the `slept` handler fails.
+- [x] **Step 3: Implement `record_sleep`:** reason → save → set → emit `SLEPT` (one-sentence summary).
+- [x] **Step 4: Implement `system_will_sleep`** next to `system_did_wake`. Extend `system_did_wake` to dispatch `woke` after its unchanged wake pulse, and implement `on_woke` in the actor.
+- [x] **Step 5: Run** `cargo test -p navori-mod-awake && cargo test -p navori-ffi`. Expect: pass.
+- [x] **Step 6: Commit** `feat(awake): record when the Mac went to sleep`
 
 _Requirements: LID-2.8, LID-5.1, LID-5.2, LID-5.3, LID-5.8, LID-5.9, LID-7.5_
 
