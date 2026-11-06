@@ -10,13 +10,14 @@ public struct LastSleepText: Equatable, Sendable {
     }
 }
 
+@MainActor
 private enum Formats {
-    // Shared and mutated per call (the zone): safe only because the menu builds rows on the main actor.
-    nonisolated(unsafe) static let clock = make("HH:mm")
-    nonisolated(unsafe) static let shortWeekday = make("EEE")
-    nonisolated(unsafe) static let longWeekday = make("EEEE")
-    nonisolated(unsafe) static let day = make("d MMM")
-    nonisolated(unsafe) static let dayAndYear = make("d MMM yyyy")
+    // Shared and re-zoned per call; main-actor isolation makes that exclusive.
+    static let clock = make("HH:mm")
+    static let shortWeekday = make("EEE")
+    static let longWeekday = make("EEEE")
+    static let day = make("d MMM")
+    static let dayAndYear = make("d MMM yyyy")
 
     static func make(_ pattern: String) -> DateFormatter {
         let formatter = DateFormatter()
@@ -33,6 +34,7 @@ private enum Formats {
 }
 
 /// How long ago the Mac last slept, by calendar day in the calendar's zone.
+@MainActor
 public func lastSleepText(ms: Int64, now: Date, calendar: Calendar) -> LastSleepText {
     let slept = Date(timeIntervalSince1970: TimeInterval(ms) / 1000)
     let zone = calendar.timeZone

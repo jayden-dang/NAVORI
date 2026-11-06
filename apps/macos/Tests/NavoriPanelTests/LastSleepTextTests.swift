@@ -2,7 +2,7 @@ import Foundation
 import NavoriPanel
 import Testing
 
-@Suite
+@Suite @MainActor
 struct LastSleepTextTests {
     private static let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
