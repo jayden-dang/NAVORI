@@ -1,6 +1,6 @@
 # 0010 — The Mac stays awake with the lid closed through the root domain's clamshell selector, with a stored marker for crash restore
 
-Status: Proposed · 2026-11-06 (LID, ROAD-41; Draft until the LID spec is approved)
+Status: Accepted · 2026-11-06 (LID, ROAD-41; accepted with the LID spec under the operator's `/shape #34 --auto --go`, before reading the spec)
 
 Navori's `PreventUserIdleSystemSleep` assertion never stops lid-close sleep, and the usual fixes need root: `pmset disablesleep`, or a privileged helper as Amphetamine's Closed-Display Mode installs. Lid tests on 2026-11-06 showed that selector 12 on the `IOPMrootDomain` user client works as uid 501 (`kPMSetClamshellSleepState`, `IOPMLibDefs.h:43`), and that the setting outlives the process.
 So `navori-macos` sets that one global bit only while `Lid closed` is on, a Lease is held and the Mac is on its adapter, and the Awake actor owns it as a guard that gives it back on release, quit and drop. The actor writes a `lid_held` marker to the store before setting the bit and deletes it after clearing it, and at the next launch it gives lid sleep back only when that marker is present. Navori does not restore at every launch, because that would clobber another app's setting.

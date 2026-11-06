@@ -179,7 +179,7 @@ It changes three things in MENU's spec: MENU-1.2 gains the Awake row before the 
 - **AWAKE-11.4** WHILE a Lease exists with no System assertion THE SYSTEM SHALL NOT show a green dot on the Awake row. *(Amended 2026-11-04: the row shows a dot and no text.)*
 - ~~**AWAKE-11.5**~~ superseded by AWAKE-14.1 and AWAKE-15.2.
 - **AWAKE-11.6** THE SYSTEM SHALL NOT show `Pause 15m`, `Let my Mac sleep now`, an Agent sessions row, an Integrations row or a per-Lease release button in the Awake Submenu.
-- **AWAKE-11.7** THE SYSTEM SHALL write menu text about Navori's own Leases only. *(Amended 2026-11-04 by PSTOP: the Running submenu also writes about the user's ports, containers and projects, and about whether `Stop` is on, PSTOP-4.11 and 4.21; a sentence about Leases still speaks of Navori's own Leases only.)* *(Amended 2026-11-06 by LID, Draft until LID is approved: the Running submenu also shows when the Mac last slept and the `Lid closed` switch, LID-3.7 and LID-5.4.)*
+- **AWAKE-11.7** THE SYSTEM SHALL write menu text about Navori's own Leases only. *(Amended 2026-11-04 by PSTOP: the Running submenu also writes about the user's ports, containers and projects, and about whether `Stop` is on, PSTOP-4.11 and 4.21; a sentence about Leases still speaks of Navori's own Leases only.)* *(Amended 2026-11-06 by LID (approved under the operator's /shape --go): the Running submenu also shows when the Mac last slept and the `Lid closed` switch, LID-3.7 and LID-5.4.)*
 - **AWAKE-11.8** THE SYSTEM SHALL NOT say in the menu that the Mac will sleep.
 - **AWAKE-11.9** THE SYSTEM SHALL NOT say in the menu that another app is holding the Mac awake.
 - **AWAKE-11.10** WHEN the app opens the Awake Submenu THE SYSTEM SHALL NOT read the process table or the system's assertions.

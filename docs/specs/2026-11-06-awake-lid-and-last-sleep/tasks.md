@@ -7,7 +7,9 @@
 > for tracking.
 
 Feature code: LID
-Status: Draft
+Status: Approved
+Approved by the operator's command `/shape #34 --auto --go` (relayed by the conductor navori-e7 in .skills/_pending-awake-lid/auto/operator-reply.md, 2026-11-06 11:47 +07).
+Approval: the operator's /shape --go, before reading the spec
 Date: 2026-11-06
 Execution-mode: unset
 Max-concurrency: auto
@@ -16,7 +18,7 @@ Design: ./design.md
 
 <!--
 This plan was written in an unattended run under `.skills/_pending-awake-lid/auto/charter.md`.
-- requirements.md, design.md and this file stay Draft until the operator reads the spec sheet.
+- requirements.md, design.md and this file were approved under the operator's `/shape #34 --auto --go`, before they read the spec (see the Status lines).
 - Per the charter, plan-tasks publishes no issue (ticket #34 is the only ticket) and offers no execution route in this run.
 -->
 
