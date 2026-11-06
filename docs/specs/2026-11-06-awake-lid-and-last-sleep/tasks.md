@@ -423,14 +423,14 @@ _Requirements: LID-1.1, LID-1.2, LID-1.3, LID-1.4, LID-1.5, LID-1.6, LID-1.7, LI
 
 **Depends-on:** Task 6
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
   - `a_clean_shutdown_gives_the_lid_back_then_deletes_the_marker`, through kernel shutdown
   - `a_module_that_fails_permanently_gives_the_lid_back_and_keeps_the_marker`. Copy `permanent_failure_releases_every_assertion` (`modules/awake/tests/restart.rs` lines 243-262): `Rig::with_policy(restarts(0))`, hold the lid (Lease + adapter + switch on), then `rig.power.panic_on_hold(1)` and dispatch `display_on()`; wait for `awake_failed`
   - `dropping_the_kernel_while_holding_gives_the_lid_back`
-- [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test lid`. Expect: the quit test fails, because the marker stays.
-- [ ] **Step 3: Implement** the quit release. Drop paths need no code beyond the `LidGuard` Drop; the tests prove them.
-- [ ] **Step 4: Run** `cargo test -p navori-mod-awake`. Expect: pass.
-- [ ] **Step 5: Commit** `feat(awake): give the lid back on quit and on drop`
+- [x] **Step 2: Run** `cargo test -p navori-mod-awake --test lid`. Expect: the quit test fails, because the marker stays.
+- [x] **Step 3: Implement** the quit release. Drop paths need no code beyond the `LidGuard` Drop; the tests prove them.
+- [x] **Step 4: Run** `cargo test -p navori-mod-awake`. Expect: pass.
+- [x] **Step 5: Commit** `feat(awake): give the lid back on quit and on drop`
 
 _Requirements: LID-1.10, LID-1.11, LID-8.4_
 
