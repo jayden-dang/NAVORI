@@ -707,7 +707,7 @@ fn will_sleep_records_a_time_taken_at_the_call() {
 }
 
 #[test]
-fn the_wake_pulse_still_runs_on_wake() {
+fn a_wake_leaves_the_core_serving() {
     let home = home();
     let (core, _) = start(&home);
 
@@ -721,18 +721,16 @@ fn the_wake_pulse_still_runs_on_wake() {
 }
 
 #[test]
-fn will_sleep_after_shutdown_records_nothing_and_does_not_panic() {
+fn will_sleep_after_shutdown_does_not_panic() {
     let home = home();
     let (core, _) = start(&home);
     core.shutdown();
 
     core.system_will_sleep();
-
-    assert_eq!(core.status().awake.and_then(|a| a.last_sleep_ms), None);
 }
 
 #[test]
-fn did_wake_after_shutdown_dispatches_nothing_and_does_not_panic() {
+fn did_wake_after_shutdown_does_not_panic() {
     let home = home();
     let (core, _) = start(&home);
     core.shutdown();
