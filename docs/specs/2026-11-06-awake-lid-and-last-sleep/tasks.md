@@ -241,7 +241,7 @@ _Requirements: LID-1.11_
 
 **Depends-on:** none
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
   - In `power_source.rs`:
     - `an_empty_watch_would_block`
     - `a_fired_watch_reads_tokens_then_would_block`
@@ -250,19 +250,19 @@ _Requirements: LID-1.11_
   - In `fakes.rs`:
     - `the_fake_counts_current_reads`
     - `a_failed_watch_returns_an_error`
-- [ ] **Step 2: Run** `cargo test -p navori-macos --features fake --test power_source`. Expect: unresolved names.
-- [ ] **Step 3: Add** `ps` to the `objc2-io-kit` features in `Cargo.toml`, plus any CF feature the build asks for. Implement `MacPowerSource::current` with `IOPSCopyPowerSourcesInfo` → `IOPSGetProvidingPowerSourceType`.
-- [ ] **Step 4: Implement `watch`:**
+- [x] **Step 2: Run** `cargo test -p navori-macos --features fake --test power_source`. Expect: unresolved names.
+- [x] **Step 3: Add** `ps` to the `objc2-io-kit` features in `Cargo.toml`, plus any CF feature the build asks for. Implement `MacPowerSource::current` with `IOPSCopyPowerSourcesInfo` → `IOPSGetProvidingPowerSourceType`.
+- [x] **Step 4: Implement `watch`:**
   - `notify_register_file_descriptor` and `notify_cancel` in the same crate-local `extern "C"` block that Task 2 starts
   - `fcntl(O_NONBLOCK)` on the fd
   - `read_tokens` reads 4-byte tokens until `EAGAIN`, returns `WouldBlock` when nothing was read, and returns `0` on EOF
   - every `unsafe` block carries `// SAFETY:`
-- [ ] **Step 5: Implement `FakePowerSource`** over `UnixStream::pair()`. `fire` writes 4 bytes; `kill` drops the writer.
+- [x] **Step 5: Implement `FakePowerSource`** over `UnixStream::pair()`. `fire` writes 4 bytes; `kill` drops the writer.
   - `PowerWatch::from_stream` calls `set_nonblocking(true)`.
   - With feature `fake`, `from_stream` takes an `Arc<AtomicUsize>` probe that counts `read_tokens` calls, exposed as `FakePowerSource::drain_count()`.
   - Every new public type derives or implements `Debug` (lint `missing_debug_implementations`).
-- [ ] **Step 6: Run** `cargo test -p navori-macos --features fake` and `cargo xtask check-deps`. Expect: pass.
-- [ ] **Step 7: Commit** `feat(macos): a power-source seam with a notify(3) watch`
+- [x] **Step 6: Run** `cargo test -p navori-macos --features fake` and `cargo xtask check-deps`. Expect: pass.
+- [x] **Step 7: Commit** `feat(macos): a power-source seam with a notify(3) watch`
 
 _Requirements: LID-2.3_
 
