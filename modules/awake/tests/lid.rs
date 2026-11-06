@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use common::ASSERTION_NAME;
-use navori_kernel::{ActionError, DispatchError};
+use navori_kernel::{ActionError, DispatchError, ModuleState, RestartPolicy};
 use navori_macos::fake::{FakeProcess, LidCall};
 use navori_macos::{AssertionKind, PowerKind};
 use serde_json::{Value, json};
@@ -682,4 +682,63 @@ async fn lease_events_keep_their_key_and_kind_payload() {
         [json!({ "key": "manual", "kind": "until_off" })]
     );
     rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_clean_shutdown_gives_the_lid_back_then_deletes_the_marker() {
+    let rig = adapter_rig();
+    lid_on_with_a_lease(&rig).await;
+    let calls = watch_marker(&rig);
+
+    rig.shutdown().await;
+
+    assert!(!rig.lid.is_set());
+    assert_eq!(log(&calls), [(LidCall::Clear, true)]);
+    assert_eq!(stored(&rig, "lid_held"), None);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_module_that_fails_permanently_gives_the_lid_back_and_keeps_the_marker() {
+    let rig = Rig::with_policy(RestartPolicy {
+        max_restarts: 0,
+        base_delay: Duration::from_millis(10),
+        max_delay: Duration::from_millis(10),
+    });
+    rig.power_source.set(navori_macos::PowerKind::Adapter);
+    lid_on_with_a_lease(&rig).await;
+    assert!(rig.lid.is_set());
+
+    rig.power.panic_on_hold(1);
+    let error = rig
+        .dispatch(json!({ "display": { "on": true } }))
+        .await
+        .unwrap_err();
+    assert_eq!(error, DispatchError::Unavailable("awake".into()));
+
+    for _ in 0..30 {
+        let failed = rig.kernel.modules().into_iter().any(|module| {
+            module.id == "awake" && matches!(module.state, ModuleState::Failed { .. })
+        });
+        if failed {
+            break;
+        }
+        rig.idle().await;
+    }
+
+    assert!(!rig.lid.is_set());
+    assert_eq!(stored(&rig, "lid_held"), Some(json!(true)));
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn dropping_the_kernel_while_holding_gives_the_lid_back() {
+    let rig = adapter_rig();
+    lid_on_with_a_lease(&rig).await;
+    assert!(rig.lid.is_set());
+    let lid = rig.lid.clone();
+
+    drop(rig);
+    tokio::task::yield_now().await;
+
+    assert!(!lid.is_set());
 }

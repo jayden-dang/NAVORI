@@ -146,6 +146,7 @@ impl Awake {
                 }
                 req = ctx.recv() => {
                     let Some(req) = req else {
+                        self.release_lid_on_quit(ctx);
                         return Ok(());
                     };
                     self.on_request(ctx, &wait, req).await;
@@ -830,6 +831,15 @@ impl Awake {
         }
         if want && self.lid.is_none() && !self.lid_marker {
             self.hold_lid(ctx);
+        }
+    }
+
+    fn release_lid_on_quit(&mut self, ctx: &ModuleCtx<Self>) {
+        if let Some(guard) = self.lid.take() {
+            match guard.release() {
+                Ok(()) => self.finish_lid_clear(&ctx.store),
+                Err(err) => tracing::warn!(error = %err, "the lid could not be given back on quit"),
+            }
         }
     }
 
