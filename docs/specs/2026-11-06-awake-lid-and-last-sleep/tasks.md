@@ -129,6 +129,29 @@ Compact delta every task inherits:
 | `apps/macos/Tests/NavoriPanelTests/{RunningStateTests,AwakeSubmenuStateTests,AwakeRowStateTests}.swift` | changed | rows, order, lid state |
 | `apps/macos/Tests/NavoriPanelTests/LastSleepTextTests.swift` | new | time buckets and spoken text |
 
+Files this plan names in shorthand above, or that the spec run and the review added, listed one per row:
+
+| Path | New/Changed | Responsibility |
+|---|---|---|
+| `modules/awake/src/domain/table.rs` | changed | `snapshot()` and `idle()` carry the new fields |
+| `modules/awake/src/lib.rs` | changed | exports `LID_CHANGED`, `SLEPT` |
+| `modules/awake/tests/display.rs` | changed | catalog list and exact state JSON |
+| `modules/awake/tests/duration.rs` | changed | exact state JSON |
+| `modules/awake/tests/idle.rs` | changed | catalog list and exact state JSON |
+| `modules/awake/tests/manual.rs` | changed | catalog list and exact state JSON |
+| `modules/awake/tests/session.rs` | changed | exact state JSON |
+| `modules/awake/tests/tray.rs` | changed | exact state JSON |
+| `apps/macos/NavoriPanel/AwakeRowState.swift` | changed | `AwakeCommand.lid(Bool)`, failure mapping |
+| `apps/macos/NavoriPanel/KeepAwakeChoice.swift` | changed | `AwakeCommand` carries the lid command |
+| `apps/macos/Tests/NavoriPanelTests/AwakeRowStateTests.swift` | changed | lid action failure |
+| `apps/macos/Tests/NavoriPanelTests/RunningStateTests.swift` | changed | row order, last sleep, problem slot |
+| `CONTEXT.md` | changed | glossary: Lid closed, Last sleep |
+| `docs/product/vision.md` | changed | the lid-closed non-goal is superseded (spec run, operator's choice) |
+| `docs/adr/0010-lid-closed-through-the-clamshell-selector.md` | new | the decision and its known limits |
+| `docs/specs/2026-11-02-awake-leases/requirements.md` | changed | AWAKE-11.7 amended (spec run) |
+| `docs/specs/2026-11-04-ports-panel-and-stop/requirements.md` | changed | PSTOP-4.11 amended (spec run) |
+| `README.md`, `docs/ARCHITECTURE.md`, `docs/codebase/modules.md` | changed | readers of the doctor rows and the changed crate surfaces (whole-branch review) |
+
 ---
 
 ### Task 1: The Store can delete a kv key
