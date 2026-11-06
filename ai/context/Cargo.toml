@@ -8,12 +8,14 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+navori-llm.workspace = true
 navori-redact.workspace = true
 navori-secrets.workspace = true
 tokio.workspace = true
 futures.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 navori-secrets = { workspace = true, features = ["fake"] }

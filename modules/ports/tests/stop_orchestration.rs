@@ -244,6 +244,8 @@ async fn ports_list_and_open_are_answered_while_a_stop_waits() {
     seat(&rig);
     docker_with(&rig, &[CONTAINER]);
     rig.containers.delay_stop(Duration::from_secs(20));
+    rig.advance(Duration::from_secs(5)).await;
+    rig.settle().await;
 
     let (reply, ()) = tokio::join!(rig.dispatch(kill(&[container(CONTAINER)])), async {
         until(&rig, "the container stop", || {
@@ -260,7 +262,7 @@ async fn ports_list_and_open_are_answered_while_a_stop_waits() {
         )
         .await
         .unwrap();
-        assert!(opened.is_err(), "{opened:?}");
+        assert!(opened.is_ok(), "{opened:?}");
     });
 
     assert_eq!(answers(&reply.unwrap()), vec![answer("stopped")]);

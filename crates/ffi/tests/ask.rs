@@ -83,6 +83,7 @@ impl Fixture {
                 Ok(store)
             }),
             make_sender: Arc::new(|| Arc::new(StubSender)),
+            ..AiDeps::production()
         }
     }
 
@@ -281,6 +282,7 @@ fn a_failed_open_is_retried_by_the_next_call() {
             })
         },
         make_sender: Arc::new(|| Arc::new(StubSender)),
+        ..AiDeps::production()
     };
     let home = home();
     let core = NavoriCore::start_with(config(&home, "dev"), Arc::new(Quiet), deps).unwrap();
@@ -710,9 +712,9 @@ fn a_provider_that_cannot_be_reached_logs_one_line_naming_only_the_kind() {
     drop(closed);
     let fixture = Fixture::new();
     let home = home();
-    let sender: Arc<dyn Sender> = Arc::new(navori_ffi::LlmSender::new(
+    let sender: Arc<dyn Sender> = Arc::new(navori_ffi::LlmSender::new(Arc::new(
         navori_llm::OpenAiCompat::new(url),
-    ));
+    )));
     let core = fixture.core_sending(&home, sender);
     futures::executor::block_on(core.save_provider_key("k1".into())).unwrap();
 
@@ -739,6 +741,7 @@ fn a_keychain_that_cannot_open_logs_a_content_free_line() {
     let deps = AiDeps {
         open_secrets: Arc::new(|_| Err(navori_secrets::OpenError)),
         make_sender: Arc::new(|| Arc::new(StubSender)),
+        ..AiDeps::production()
     };
     let home = home();
     captured_tracing();
@@ -764,6 +767,7 @@ fn a_keychain_open_that_panics_logs_that_it_did_not_finish() {
     let deps = AiDeps {
         open_secrets: Arc::new(|_| std::panic::panic_any("keychain open exploded")),
         make_sender: Arc::new(|| Arc::new(StubSender)),
+        ..AiDeps::production()
     };
     let home = home();
     captured_tracing();
@@ -831,9 +835,9 @@ fn the_wire_body_holds_the_marker_not_the_secret() {
     let (url, requests) = responder(r#"{"choices":[{"message":{"content":"wire reply"}}]}"#);
     let fixture = Fixture::new();
     let home = home();
-    let sender: Arc<dyn Sender> = Arc::new(navori_ffi::LlmSender::new(
+    let sender: Arc<dyn Sender> = Arc::new(navori_ffi::LlmSender::new(Arc::new(
         navori_llm::OpenAiCompat::new(url),
-    ));
+    )));
     let core = fixture.core_sending(&home, sender);
     futures::executor::block_on(core.save_provider_key("k1".into())).unwrap();
 
@@ -1155,6 +1159,7 @@ fn a_failed_build_is_retried_on_the_next_ask() {
                 Arc::new(StubSender)
             })
         },
+        ..AiDeps::production()
     };
     let home = home();
     let core = NavoriCore::start_with(config(&home, "dev"), Arc::new(Quiet), deps).unwrap();

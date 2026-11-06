@@ -191,8 +191,6 @@ async fn ports_list_and_open_still_reply_from_the_last_scan_without_scanning() {
         FakeProcess::new(100, 1, 501, 10_100, "/usr/local/bin/node").listen("127.0.0.1", 5173),
     );
     let before = rig.gate.attempts();
-    let listed = rig.dispatch(json!("list")).await.unwrap();
-    assert_eq!(listed["scanned_at_ms"], Value::Null);
     let message = invalid_message(rig.dispatch(json!({"open": {"port": 5173}})).await);
     assert!(message.contains("5173"), "{message}");
     assert_eq!(rig.gate.attempts(), before);

@@ -214,7 +214,7 @@ _Requirements: PORTS-1.2, PORTS-1.9, PORTS-10.5_
 
 - [x] **Step 1: Write the failing tests** in `modules/ports/tests/scan.rs` with `Rig` over `FakeProcesses`:
   - `listing_returns_one_entry_per_process_and_port_with_both_addresses`: `127.0.0.1:3000` and `::1:3000` give one entry with 2 addresses.
-  - `listing_before_any_scan_says_nothing_was_scanned_and_starts_no_scan`: `"list"` at t=0 gives `scanned_at_ms` null, and `list_calls()` is unchanged.
+  - ~~`listing_before_any_scan_says_nothing_was_scanned_and_starts_no_scan`~~ *(Replaced 2026-11-06 by LOOP: see Task 12.)*
   - `the_first_scan_comes_five_seconds_after_start`: `Rig::advance(Duration::from_secs(5)).await`.
   - `listing_counts_a_process_whose_sockets_could_not_be_read`: `.fds_err(ReadError::Denied)` gives `skipped` 1.
   - `a_process_whose_executable_cannot_be_read_is_named_by_the_os_short_name`: `.exe_err(..)` with `.name("node")` gives name `node`.
@@ -627,3 +627,15 @@ _Requirements: PORTS-9.3, PORTS-9.8, PORTS-10.2_
 - [x] **Step 5: Record** the results in the execute report. No commit unless a fix was needed.
 
 _Requirements: PORTS-3.9, PORTS-10.1_
+
+### Task 12: A list before the first scan waits for it (LOOP amendment, 2026-11-06)
+
+- [x] **Step 1: Write the failing tests** in `modules/ports/tests/scan.rs`:
+  - `listing_before_any_scan_starts_the_first_scan_and_answers_once_it_lands`: `"list"` at t=0 gives `scanned_at_ms` set and one scan's reads.
+  - `two_listings_before_any_scan_share_one_scan`: both replies equal, one scan's reads.
+  - `a_listing_before_any_scan_is_answered_with_the_problem_when_that_scan_fails` and `..._when_the_source_cannot_open`: `problem` set, `scanned_at_ms` null.
+  - `a_listing_after_a_scan_replies_at_once_and_starts_no_scan`.
+  - `modules/ports/tests/timing.rs`: `a_list_during_the_first_scan_waits_for_it_and_starts_no_second_scan`; `list_answers_from_the_last_scan_while_a_later_scan_is_running` replaces the first-scan variant.
+- [x] **Step 2: Implement** in `actor.rs` (park in `run_loop`, answer after the select once `published`) and update the `list` description in `action.rs`.
+
+_Requirements: PORTS-1.3, PORTS-1.12, PORTS-7.5, PORTS-7.6_

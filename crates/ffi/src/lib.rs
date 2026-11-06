@@ -32,8 +32,14 @@ use tokio_util::sync::CancellationToken;
 use crate::ai::AiRuntime;
 use crate::app::{Inner, IpcBridge};
 
-pub use ai::{AiDeps, LlmSender, StoreAudit, ask_error_to_rpc, service_for};
+pub use ai::{
+    AiDeps, LlmChatSender, LlmSender, StoreAudit, StoreConversations, ask_error_to_rpc, service_for,
+};
 pub use app::{awake_check, awake_view, config_notice, ports_check, running_view};
+pub use navori_agent::{
+    ConversationId, ConversationStore, Origin, TurnEnd, TurnErrorKind, TurnOutcome, TurnRequest,
+    TurnStartError,
+};
 
 uniffi::setup_scaffolding!();
 
@@ -258,6 +264,22 @@ impl NavoriCore {
         rx.await.map_err(|_| CoreError::ShutDown)?
     }
 
+    /// Runs one Navori AI Turn. Plain Rust: the UniFFI surface does not carry it.
+    pub async fn run_agent_turn(
+        &self,
+        request: TurnRequest,
+        cancel: CancellationToken,
+    ) -> Result<TurnOutcome, TurnStartError> {
+        self.on_runtime(|inner| async move {
+            Ok(match inner.ai.agent().await {
+                Ok(agent) => agent.run_turn(&inner.kernel, request, cancel).await,
+                Err(error) => Err(error),
+            })
+        })
+        .await
+        .map_err(|_| TurnStartError::ShutDown)?
+    }
+
     /// [`NavoriCore::start`] with the AI factories given, so tests can inject fakes.
     pub fn start_with(
         config: CoreConfig,
@@ -316,6 +338,7 @@ impl NavoriCore {
 
         // The socket doubles as the single-instance lock: bind before touching the session marker.
         let pid = std::process::id();
+        let bus = kernel.bus().clone();
         let inner = Arc::new(Inner {
             kernel,
             store: store.clone(),
@@ -326,7 +349,7 @@ impl NavoriCore {
             config_notice,
             integrations,
             last_unclean_exit: OnceLock::new(),
-            ai: AiRuntime::new(profile, deps, store),
+            ai: AiRuntime::new(profile, deps, store, bus),
         });
         let server = match handle.block_on(Server::bind(
             &paths.socket,

@@ -13,6 +13,7 @@ members = [
     "crates/ffi",
     "ai/llm",
     "ai/context",
+    "ai/agent",
     "apps/cli",
     "xtask",
     "modules/awake",
@@ -39,6 +40,7 @@ navori-procs = { path = "crates/procs" }
 navori-secrets = { path = "crates/secrets" }
 navori-llm = { path = "ai/llm" }
 navori-context = { path = "ai/context" }
+navori-agent = { path = "ai/agent" }
 navori-mod-awake = { path = "modules/awake" }
 navori-mod-integrations = { path = "modules/integrations" }
 navori-mod-ports = { path = "modules/ports" }

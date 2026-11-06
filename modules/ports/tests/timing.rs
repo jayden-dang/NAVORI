@@ -85,30 +85,45 @@ async fn a_scan_that_comes_due_during_a_slow_scan_is_skipped() {
 
 #[allow(clippy::await_holding_lock)]
 #[tokio::test(start_paused = true)]
-async fn list_answers_while_a_scan_is_running() {
+async fn list_answers_from_the_last_scan_while_a_later_scan_is_running() {
     let rig = Rig::new();
     with_one_listener(&rig);
-    let hold = rig.gate.block();
     rig.advance(Duration::from_secs(5)).await;
+    rig.settle_at(ORIGIN_MS + 5_000).await;
+    let hold = rig.gate.block();
+    rig.advance(Duration::from_secs(30)).await;
     let listed = tokio::time::timeout(Duration::from_secs(1), rig.dispatch(json!("list")))
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(listed["scanned_at_ms"], Value::Null);
+    assert_eq!(listed["scanned_at_ms"], ORIGIN_MS + 5_000);
     let opened = tokio::time::timeout(
         Duration::from_secs(1),
         rig.dispatch(json!({"open": {"port": 3000}})),
     )
     .await
     .unwrap();
-    assert!(opened.is_err());
+    assert!(opened.is_ok());
     drop(hold);
-    rig.settle().await;
-    let listed = rig.dispatch(json!("list")).await.unwrap();
-    assert_eq!(
-        listed["groups"][0]["worktrees"][0]["processes"][0]["entries"][0]["port"],
-        3000
-    );
+    rig.settle_at(ORIGIN_MS + 35_000).await;
+}
+
+#[allow(clippy::await_holding_lock)]
+#[tokio::test(start_paused = true)]
+async fn a_list_during_the_first_scan_waits_for_it_and_starts_no_second_scan() {
+    let rig = Rig::new();
+    with_one_listener(&rig);
+    let hold = rig.gate.block();
+    rig.advance(Duration::from_secs(5)).await;
+    let (listed, ()) = tokio::join!(rig.dispatch(json!("list")), async {
+        rig.idle().await;
+        drop(hold);
+    });
+    assert_eq!(listed.unwrap()["scanned_at_ms"], ORIGIN_MS + 5_000);
+    let control = Rig::new();
+    control.advance(Duration::from_secs(5)).await;
+    control.settle().await;
+    assert_eq!(rig.gate.attempts(), control.gate.attempts());
 }
 
 #[tokio::test(start_paused = true)]

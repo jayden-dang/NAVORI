@@ -68,7 +68,8 @@ small chunked body, so this design writes that read on `tokio::net::UnixStream` 
     in flight the deadline is `None`, so a due timer cannot fire again and nothing spins. When the scan finishes, Ok or
     Err, the next deadline is now + 3 s while the panel is visible and now + 30 s while it is not. On a `PanelChanged`
     to visible with no scan in flight, the deadline becomes at most now + 3 s. A scan runs as a spawned task, so the
-    actor keeps answering.
+    actor keeps answering. *(Amended 2026-11-06 by LOOP: a `list` that arrives before any scan has finished is parked and
+    starts the first scan at once if none is in flight; the 5 s deadline stays for callers that never list, PORTS-1.12.)*
 11. A new perf metric `port_scan_ms` (budget 50 ms, floor 5 ms, `agent-decided`) follows `snapshot_ms`
     end to end (xtask/src/perf/mod.rs:35,55,608-630; judge.rs:98-103; performance.md:21,30,34).
 12. Identity: a scan ends with one more `list()` and drops every listener process whose start time or real UID
@@ -311,7 +312,10 @@ wake = wait.wait_until(deadline) }`.
 - `done`: on `Ok`, group the entries and publish them with `scanned_at_ms` once, clearing `problem` (PORTS-1.7,
   PORTS-1.8). On `Err`, keep the groups and `scanned_at_ms` and set `problem` to the outcome text (PORTS-8.2). In both
   cases the next deadline is now + 3 s if visible, else now + 30 s (PORTS-7.1, PORTS-7.2, PORTS-7.3).
-- `List` replies with the published state. It never scans (PORTS-1.3, PORTS-7.6).
+- `List` replies with the published state. Once a scan has finished it never scans (PORTS-1.3, PORTS-7.6). *(Amended
+  2026-11-06 by LOOP, PORTS-1.12: before any scan has finished, `run_loop` parks the request, starts the first scan
+  now if none is in flight (`begin_scan`), and the loop answers every parked request with the published state once
+  `scanned_at_ms` or `problem` is set. `on_request` never awaits the scan.)*
 - `Open` finds the port in the published state and builds its URL (PORTS-6.1, PORTS-6.3, PORTS-6.4). It opens
   nothing and connects to nothing (PORTS-6.2).
 
@@ -325,7 +329,7 @@ line carries the error text, a path or a reply. An in-flight scan is aborted whe
 handle aborts its task on drop). The blocking thread itself cannot be cancelled, so it runs on until its read returns and
 its result is discarded.
 
-The first deadline is start + 5 s (PORTS-7.5). Both Actions are in `catalog()` with `Risk::Read`, a schema and a
+The first deadline is start + 5 s (PORTS-7.5), unless a `list` starts the first scan sooner (PORTS-1.12). Both Actions are in `catalog()` with `Risk::Read`, a schema and a
 description (PORTS-1.11, PORTS-6.5).
 
 `tray` asks for `TrayGlyph::Problem` only while `problem` is `Some`, with the tooltip `Can't scan ports. <outcome>`. A Docker failure lives in `docker`, not in

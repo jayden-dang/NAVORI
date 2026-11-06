@@ -1,0 +1,136 @@
+use std::time::Duration;
+
+use navori_context::ToolCall;
+use navori_kernel::{DispatchError, Kernel};
+use navori_protocol::{Envelope, Risk};
+use serde_json::{Value, json};
+
+use crate::Toolset;
+
+const MAX_RESULT_BYTES: usize = 64 * 1024;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolOutcome {
+    pub text: String,
+    pub is_error: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct Dispatcher {
+    action_timeout: Duration,
+}
+
+impl Dispatcher {
+    pub fn new(action_timeout: Duration) -> Dispatcher {
+        Dispatcher { action_timeout }
+    }
+
+    pub async fn call(&self, kernel: &Kernel, toolset: &Toolset, call: &ToolCall) -> ToolOutcome {
+        let Some(tool) = toolset.lookup(&call.name) else {
+            tracing::warn!(reason = "unknown_tool", "tool call refused");
+            return failure(format!("no Action named {}.", call.name));
+        };
+        if tool.risk != Risk::Read {
+            return refused(
+                &call.name,
+                "not_read_only",
+                format!(
+                    "Navori AI cannot run {} yet: it changes things and needs your approval, which is not available.",
+                    call.name
+                ),
+            );
+        }
+        let arguments: Value = if tool.unit && call.arguments.trim().is_empty() {
+            Value::Null
+        } else {
+            match serde_json::from_str(&call.arguments) {
+                Ok(arguments) => arguments,
+                Err(e) => {
+                    return refused(
+                        &call.name,
+                        "not_json",
+                        format!("the arguments are not valid JSON: {e}."),
+                    );
+                }
+            }
+        };
+        let no_arguments =
+            arguments.is_null() || arguments.as_object().is_some_and(|o| o.is_empty());
+        if tool.unit && !no_arguments {
+            return refused(
+                &call.name,
+                "takes_no_arguments",
+                format!(
+                    "the arguments do not fit {}: it takes no arguments.",
+                    call.name
+                ),
+            );
+        }
+        let action = if tool.unit {
+            Value::String(tool.action.clone())
+        } else {
+            json!({ tool.action.clone(): arguments })
+        };
+        let envelope = Envelope {
+            module: tool.module.clone(),
+            action,
+        };
+        let reply = tokio::time::timeout(self.action_timeout, kernel.dispatch(envelope)).await;
+        match reply {
+            Ok(Ok(value)) => ToolOutcome {
+                text: value.to_string(),
+                is_error: false,
+            },
+            Ok(Err(DispatchError::InvalidAction { message, .. })) => refused(
+                &call.name,
+                "arguments_do_not_fit",
+                format!("the arguments do not fit {}: {message}.", call.name),
+            ),
+            Ok(Err(e)) => refused(&call.name, "dispatch_failed", format!("{e}.")),
+            Err(_) => refused(
+                &call.name,
+                "timed_out",
+                format!(
+                    "{} did not answer within {} s.",
+                    call.name,
+                    self.action_timeout.as_secs_f64()
+                ),
+            ),
+        }
+    }
+}
+
+fn refused(tool: &str, reason: &'static str, message: String) -> ToolOutcome {
+    tracing::warn!(tool, reason, "tool call refused");
+    failure(message)
+}
+
+fn failure(message: String) -> ToolOutcome {
+    ToolOutcome {
+        text: format!("Error: {message}"),
+        is_error: true,
+    }
+}
+
+/// Backs `cut` up to the start of a `[REDACTED:` marker that the cut would leave unclosed.
+pub(crate) fn before_open_marker(text: &str, cut: usize) -> usize {
+    match text[..cut].rfind("[REDACTED:") {
+        Some(open) if !text[open..cut].contains(']') => open,
+        _ => cut,
+    }
+}
+
+pub(crate) fn cap_result(mut text: String) -> String {
+    if text.len() <= MAX_RESULT_BYTES {
+        return text;
+    }
+    let total = text.len();
+    let mut keep = MAX_RESULT_BYTES;
+    while !text.is_char_boundary(keep) {
+        keep -= 1;
+    }
+    keep = before_open_marker(&text, keep);
+    text.truncate(keep);
+    text.push_str(&format!("\n[truncated: {} bytes cut]", total - keep));
+    text
+}

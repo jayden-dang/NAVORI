@@ -19,14 +19,15 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | `navori-store` | `navori-protocol`, `navori-redact` | allowed — the Journal redacts on write |
 | `navori-kernel` | `navori-protocol`, `navori-redact`, `navori-store` | allowed |
 | `navori-ipc` | `navori-protocol` | allowed |
-| `navori-ffi` | every foundation crate (`config`, `ipc`, `kernel`, `protocol`, `redact`, `secrets`, `store`), `navori-mod-awake`, `navori-mod-integrations`, `navori-mod-ports`, `navori-llm` and `navori-context` | allowed — the composition root; later also other `modules/*`, `ai/*` |
+| `navori-ffi` | every foundation crate (`config`, `ipc`, `kernel`, `protocol`, `redact`, `secrets`, `store`), `navori-mod-awake`, `navori-mod-integrations`, `navori-mod-ports`, `navori-llm`, `navori-context` and `navori-agent`; third-party `rusqlite` for the `ai_session` tables | allowed — the composition root; later also other `modules/*`, `ai/*` |
 | `navori` CLI (`navori-cli`) | `navori-config`, `navori-ipc`, `navori-protocol` | allowed — thin client; dev-dependencies for end-to-end tests only: `navori-ffi`, `navori-context`, `navori-secrets` (`fake` feature), `navori-store`, `futures` and `tokio` |
 | `xtask` | — | allowed: none (tooling only) |
 | `navori-macos` | — | allowed: none — leaf |
 | `navori-procs` | `navori-macos` | allowed — through the safe traits |
 | `navori-secrets` | — | allowed: none — leaf; consumed by `modules/*` and `ai/*` (rows below) and may be opened by the composition root `navori-ffi` (it may depend on any foundation crate) |
 | `navori-llm` | `navori-secrets` | allowed — provider-neutral LLM client; takes only the `Secret` type from `navori-secrets`; no edge to `navori-context` or any Module |
-| `navori-context` | `navori-redact`, `navori-secrets` | allowed — Context Gateway; `redact` is required (nothing reaches an LLM unredacted, ARCH-6); no edge to `navori-llm` (the `Sender` trait is wired in `navori-ffi`) |
+| `navori-context` | `navori-llm`, `navori-redact`, `navori-secrets` | allowed — Context Gateway; `redact` is required (nothing reaches an LLM unredacted, ARCH-6); `navori-llm` is for its chat types only, never `LlmProvider` (the `Sender` and `ChatSender` traits are wired in `navori-ffi`) |
+| `navori-agent` | `navori-context`, `navori-kernel`, `navori-protocol` | allowed — Agent loop; reaches the model only through the Context Gateway's `ChatSender`, never `navori-llm` (`cargo xtask check-deps` enforces); uses `navori-kernel` for dispatch and the Event bus, and takes its chat types through `navori-context` |
 | `navori-mod-awake` | `navori-kernel`, `navori-macos`, `navori-procs`, `navori-store` | allowed — feature Module; depends on no other Module |
 | `navori-mod-ports` | `navori-kernel`, `navori-macos`, `navori-procs` | allowed — feature Module; depends on no other Module |
 | `navori-mod-integrations` | `navori-kernel` | allowed — feature Module; depends on no other Module, and not on `navori-macos`, `navori-procs` or `navori-store` (the last only as a dev-dependency) |
@@ -39,7 +40,7 @@ Which crate may depend on which inside the workspace, which edges are forbidden 
 | From | To | Rule |
 |---|---|---|
 | `modules/*` | `kernel`, `protocol`, `store`, `config`, `redact`, `procs`, `secrets` | allowed |
-| `ai/agent` | `ai/llm`, `ai/models`, `ai/context`, `ai/memory`, `ai/mcp`, `kernel`, `protocol` | allowed |
+| `ai/agent` (more edges) | `ai/models`, `ai/memory`, `ai/mcp` | allowed when they land — never `ai/llm` (`check-deps` enforces; the model is reached through the Context Gateway) |
 | `ai/memory` | `navori-redact` | required — nothing reaches memory unredacted (ARCH-6) |
 | `ai/*` | `navori-secrets` | allowed — provider keys from the Keychain |
 

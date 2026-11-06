@@ -1129,6 +1129,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "743fb55ba31b18fb1ecef6bdc9aa2743314978ac084044301a7eee33fb99a20d"
 
 [[package]]
+name = "navori-agent"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "navori-context",
+ "navori-kernel",
+ "navori-protocol",
+ "navori-redact",
+ "navori-secrets",
+ "navori-store",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "ulid",
+]
+
+[[package]]
 name = "navori-cli"
 version = "0.1.0"
 dependencies = [
@@ -1165,8 +1189,10 @@ name = "navori-context"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "navori-llm",
  "navori-redact",
  "navori-secrets",
+ "serde_json",
  "thiserror",
  "tokio",
  "tracing",
@@ -1179,6 +1205,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "futures",
+ "navori-agent",
  "navori-config",
  "navori-context",
  "navori-ipc",
@@ -1192,6 +1219,7 @@ dependencies = [
  "navori-redact",
  "navori-secrets",
  "navori-store",
+ "rusqlite",
  "serde",
  "serde_json",
  "tempfile",

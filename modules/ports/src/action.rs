@@ -128,7 +128,7 @@ impl ModuleAction for PortsAction {
         vec![
             ActionDoc {
                 name: "list",
-                description: "List the TCP ports the user's own processes listen on, grouped by project, worktree and process. It replies with the last scan, says when that scan was taken, and starts no scan of its own.",
+                description: "List the TCP ports the user's own processes listen on, grouped by project, worktree and process. It replies with the last scan and says when that scan was taken, and starts no scan of its own. Only before the first scan after Core starts, when nothing has been scanned yet, it starts that first scan now and answers once it finishes, with the problem set if that scan failed.",
                 risk: Risk::Read,
             },
             ActionDoc {

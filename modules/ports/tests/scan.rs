@@ -22,6 +22,13 @@ async fn scanned(rig: &Rig) -> Value {
     rig.dispatch(json!("list")).await.unwrap()
 }
 
+/// How many process-list reads one scan makes.
+async fn one_scan() -> usize {
+    let rig = Rig::new();
+    scanned(&rig).await;
+    rig.gate.attempts()
+}
+
 fn entry(pid: i32, port: u16, project: Option<&str>, worktree: Option<&str>) -> PortEntry {
     PortEntry {
         port,
@@ -77,14 +84,58 @@ async fn listing_returns_one_entry_per_process_and_port_with_both_addresses() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn listing_before_any_scan_says_nothing_was_scanned_and_starts_no_scan() {
+async fn listing_before_any_scan_starts_the_first_scan_and_answers_once_it_lands() {
     let rig = Rig::new();
     rig.processes
         .add(listener(100, "/bin/node").listen("127.0.0.1", 3000));
     let state = rig.dispatch(json!("list")).await.unwrap();
+    assert_eq!(state["scanned_at_ms"], ORIGIN_MS);
+    assert_eq!(
+        state["groups"][0]["worktrees"][0]["processes"][0]["entries"][0]["port"],
+        3000
+    );
+    assert_eq!(rig.gate.attempts(), one_scan().await);
+}
+
+#[tokio::test(start_paused = true)]
+async fn two_listings_before_any_scan_share_one_scan() {
+    let rig = Rig::new();
+    rig.processes
+        .add(listener(100, "/bin/node").listen("127.0.0.1", 3000));
+    let (first, second) = tokio::join!(rig.dispatch(json!("list")), rig.dispatch(json!("list")));
+    let (first, second) = (first.unwrap(), second.unwrap());
+    assert_eq!(first["scanned_at_ms"], ORIGIN_MS);
+    assert_eq!(first, second);
+    assert_eq!(rig.gate.attempts(), one_scan().await);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_listing_before_any_scan_is_answered_with_the_problem_when_that_scan_fails() {
+    let rig = Rig::new();
+    rig.gate.deny(true);
+    let state = rig.dispatch(json!("list")).await.unwrap();
     assert_eq!(state["scanned_at_ms"], Value::Null);
-    assert_eq!(state["groups"], json!([]));
-    assert_eq!(rig.processes.list_calls(), 0);
+    assert!(state["problem"].is_string(), "{state}");
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_listing_before_any_scan_is_answered_with_the_problem_when_the_source_cannot_open() {
+    let rig = Rig::unopenable();
+    let state = rig.dispatch(json!("list")).await.unwrap();
+    assert_eq!(state["scanned_at_ms"], Value::Null);
+    assert!(state["problem"].is_string(), "{state}");
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_listing_after_a_scan_replies_at_once_and_starts_no_scan() {
+    let rig = Rig::new();
+    rig.processes
+        .add(listener(100, "/bin/node").listen("127.0.0.1", 3000));
+    scanned(&rig).await;
+    let calls = rig.processes.list_calls();
+    let state = rig.dispatch(json!("list")).await.unwrap();
+    assert_eq!(state["scanned_at_ms"], ORIGIN_MS + 5_000);
+    assert_eq!(rig.processes.list_calls(), calls);
 }
 
 #[tokio::test(start_paused = true)]

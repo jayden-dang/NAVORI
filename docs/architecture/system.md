@@ -66,10 +66,10 @@ Status: **Built** = in the tree at R0 · **Built (Rn)** = in the tree since that
 | GitHub module | Planned (R4) | PR inbox, checks, approve/merge; OAuth device flow (ADR 0002). | `modules/github` |
 | Needs you inbox | Planned (R2) | Decisions, To-dos and Updates between the user and Navori AI; approvals for Destructive Actions. | proposed `modules/inbox` |
 | PlatformServices | Planned (R2) | Swift-implemented services the Core calls: notifications, frontmost app/AX, screen capture + OCR + blur, permissions. | `apps/macos/Navori/Platform/` |
-| LLM providers | Partial (R2) — text-only `openai_compat` for DeepSeek exists; no tools, streaming or other adapters yet | Canonical chat/tool/stream format; adapters `anthropic`, `openai`, `openai_compat`, `gemini`. | `ai/llm` |
+| LLM providers | Partial (R2) — `openai_compat` for DeepSeek with tool calls, reasoning text and usage exists; no streaming or other adapters yet | Canonical chat/tool/stream format; adapters `anthropic`, `openai`, `openai_compat`, `gemini`. | `ai/llm` |
 | Model router | Planned (R2) | Model catalog, roles (`chat`, `fast`, `vision`, `embedding`), fallback, usage and budget. | `ai/models` |
-| Context Engine + Gateway | Partial (R2) — the Context Gateway exists (key read, Shield pass, audit row, send); the Context Engine does not | Assembles the current situation; the only path to an LLM, redacted and audited (ARCH-7). | `ai/context` |
-| Agent runtime | Planned (R2) | Agent loop; tool registry built from every module's ActionSpecs; Risk policy and approvals. | `ai/agent` |
+| Context Engine + Gateway | Partial (R2) — the Context Gateway exists (key read, Shield pass over text and structured chat requests, one audit row per model call, send); the Context Engine does not | Assembles the current situation; the only path to an LLM, redacted and audited (ARCH-7). | `ai/context` |
+| Agent runtime | Partial (R2) — a Turn runs as an Agent loop over Read Actions only (`NavoriCore::run_agent_turn`); each Turn is kept in a Conversation after the Shield and ends with one `ai.turn_ended` Event. Limits: 8 Steps and 200 000 tokens per Turn, 10 s per Action; the token check is made when a Step ends, so the Step that reaches the limit still runs its tool calls. Approvals and non-Read Actions are not built | Agent loop; tool registry built from every module's ActionSpecs; Risk policy and approvals. | `ai/agent` |
 | Memory | Planned (R2) | Facts, episodic summaries, embeddings. | `ai/memory` |
 | Triggers | Planned (R5) | Proactive rules on the Event bus, within a token budget and quiet hours. | `ai/triggers` |
 | MCP | Planned (R6) | MCP client (external tools) and server (`navori mcp`). | `ai/mcp` |

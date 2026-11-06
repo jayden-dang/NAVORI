@@ -55,6 +55,17 @@ fn every_default_test_uses_fakes() {
     sources.extend(context_sources);
     sources.push(ask);
 
+    let agent_tests = llm.join("../agent/tests");
+    if agent_tests.is_dir() {
+        sources.extend(rust_files_in(&agent_tests));
+    }
+    let ffi_agent = llm.join("../../crates/ffi/tests/agent.rs");
+    if ffi_agent.is_file() {
+        sources.push(ffi_agent);
+    }
+    let live_agent = llm.join("../../crates/ffi/tests/live_agent.rs");
+    sources.retain(|path| *path != live_agent);
+
     let forbidden = [
         concat!("Keychain", "Store::open"),
         concat!("Command::new(", "\"pass"),

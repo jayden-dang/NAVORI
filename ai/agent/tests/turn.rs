@@ -1,0 +1,934 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
+mod common;
+
+use navori_agent::{
+    ConversationId, Entry, Limits, Origin, RecordError, RecordedMessage, TurnEnd, TurnErrorKind,
+    TurnRequest, TurnStartError,
+};
+use navori_context::{ChatReply, Finish, Message, ToolCall, Usage};
+
+fn request(input: &str) -> TurnRequest {
+    TurnRequest {
+        conversation: None,
+        origin: Origin::User,
+        model: "deepseek-chat".to_owned(),
+        input: input.to_owned(),
+    }
+}
+
+#[tokio::test]
+async fn a_turn_calls_a_read_action_and_answers_from_its_result() {
+    let rig = common::agent_with(
+        vec![
+            common::call_reply("c1", "probe_look", "{}"),
+            common::text_reply("3 things"),
+        ],
+        Limits::default(),
+    );
+
+    let outcome = rig
+        .agent
+        .run_turn(&rig.kernel, request("what is around?"), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.end, TurnEnd::Completed);
+    assert_eq!(outcome.answer.as_deref(), Some("3 things"));
+    assert_eq!(outcome.steps, 2);
+    let requests = rig.chat.requests();
+    assert_eq!(requests.len(), 2);
+    assert_eq!(
+        requests[1].messages.last(),
+        Some(&Message::Tool {
+            call_id: "c1".to_owned(),
+            text: r#"{"seen":"room"}"#.to_owned()
+        })
+    );
+}
+
+#[tokio::test]
+async fn the_record_holds_origin_input_reply_raw_arguments_result_and_usage() {
+    let mut first = common::call_reply("c1", "probe_look", "{}");
+    first.usage = Some(common::usage(120, 30));
+    let rig = common::agent_with(vec![first, common::text_reply("done")], Limits::default());
+
+    rig.agent
+        .run_turn(&rig.kernel, request("look"), Default::default())
+        .await
+        .unwrap();
+
+    let entries = rig.store.entries();
+    assert!(entries.iter().any(|e| matches!(
+        e,
+        Entry::TurnStarted { origin: Origin::User, model, seq: 1, .. } if model == "deepseek-chat"
+    )));
+    let bodies: Vec<RecordedMessage> = entries
+        .iter()
+        .filter_map(|e| match e {
+            Entry::Message { body, .. } => Some(body.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        bodies,
+        vec![
+            RecordedMessage::Input {
+                text: "look".to_owned()
+            },
+            RecordedMessage::Assistant {
+                text: None,
+                reasoning: None,
+                tool_calls: vec![ToolCall {
+                    id: "c1".to_owned(),
+                    name: "probe_look".to_owned(),
+                    arguments: "{}".to_owned()
+                }]
+            },
+            RecordedMessage::ToolResult {
+                call_id: "c1".to_owned(),
+                text: r#"{"seen":"room"}"#.to_owned(),
+                is_error: false,
+                synthetic: false
+            },
+            RecordedMessage::Assistant {
+                text: Some("done".to_owned()),
+                reasoning: None,
+                tool_calls: vec![]
+            },
+        ]
+    );
+    let usages: Vec<Option<Usage>> = entries
+        .iter()
+        .filter_map(|e| match e {
+            Entry::Usage { usage, .. } => Some(usage.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(usages, vec![Some(common::usage(120, 30)), None]);
+}
+
+fn reply_with(
+    text: Option<&str>,
+    reasoning: Option<&str>,
+    id: &str,
+    name: &str,
+    arguments: &str,
+) -> ChatReply {
+    let mut reply = common::call_reply(id, name, arguments);
+    reply.text = text.map(str::to_owned);
+    reply.reasoning = reasoning.map(str::to_owned);
+    reply
+}
+
+#[tokio::test]
+async fn everything_recorded_is_shielded() {
+    let token = common::PLANTED;
+    let rig = common::agent_with(
+        vec![
+            reply_with(Some(token), None, "c1", "probe_leak", "{}"),
+            reply_with(None, Some(token), "c2", "probe_look", "{}"),
+            reply_with(
+                None,
+                None,
+                "c3",
+                "probe_look_at",
+                &format!(r#"{{"n":1,"note":"{token}"}}"#),
+            ),
+            common::text_reply("ok"),
+        ],
+        Limits::default(),
+    );
+
+    rig.agent
+        .run_turn(&rig.kernel, request(token), Default::default())
+        .await
+        .unwrap();
+
+    let mut counted = Vec::new();
+    for entry in rig.store.entries() {
+        if let Entry::Message {
+            body, redactions, ..
+        } = entry
+        {
+            let stored = body.to_body();
+            assert!(!stored.contains(token), "{stored}");
+            if stored.contains("[REDACTED:github_token]") {
+                counted.push(redactions);
+            }
+        }
+    }
+    assert_eq!(counted, vec![1, 1, 1, 1, 1]);
+}
+
+#[tokio::test]
+async fn the_first_request_carries_the_inputs_redaction_count() {
+    let rig = common::agent_with(vec![common::text_reply("ok")], Limits::default());
+
+    rig.agent
+        .run_turn(&rig.kernel, request(common::PLANTED), Default::default())
+        .await
+        .unwrap();
+
+    let rows = rig.audit.rows();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].redacted_count, 1);
+}
+
+#[tokio::test]
+async fn the_model_id_comes_from_the_request() {
+    let rig = common::agent_with(vec![common::text_reply("ok")], Limits::default());
+
+    rig.agent
+        .run_turn(&rig.kernel, request("hi"), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(rig.chat.requests()[0].model, "deepseek-chat");
+}
+
+#[tokio::test]
+async fn a_follow_up_turn_sends_the_earlier_messages_first() {
+    let rig = common::agent_with(
+        vec![
+            common::text_reply("first answer"),
+            common::text_reply("second"),
+        ],
+        Limits::default(),
+    );
+    let first = rig
+        .agent
+        .run_turn(&rig.kernel, request("one"), Default::default())
+        .await
+        .unwrap();
+
+    let mut follow_up = request("two");
+    follow_up.conversation = Some(first.conversation);
+    let second = rig
+        .agent
+        .run_turn(&rig.kernel, follow_up, Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(second.conversation, first.conversation);
+    assert_eq!(
+        rig.chat.requests()[1].messages,
+        vec![
+            Message::User {
+                text: "one".to_owned()
+            },
+            Message::Assistant {
+                text: Some("first answer".to_owned()),
+                reasoning: None,
+                tool_calls: vec![]
+            },
+            Message::User {
+                text: "two".to_owned()
+            },
+        ]
+    );
+}
+
+async fn until_requests(rig: &common::Rig, count: usize) {
+    while rig.chat.requests().len() < count {
+        tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+    }
+}
+
+fn refuse(_: &str) -> navori_redact::Redacted {
+    std::panic::panic_any(())
+}
+
+fn end_reasons(rig: &common::Rig) -> Vec<String> {
+    rig.store
+        .entries()
+        .into_iter()
+        .filter_map(|e| match e {
+            Entry::TurnEnded { end, .. } => Some(end),
+            _ => None,
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_failed_record_write_ends_the_turn_and_sends_nothing_more() {
+    let rig = common::agent_with(
+        vec![
+            common::call_reply("c1", "probe_look", "{}"),
+            common::text_reply("never sent"),
+        ],
+        Limits::default(),
+    );
+    let release = rig.chat.hold_next();
+
+    let (outcome, ()) = tokio::join!(
+        rig.agent
+            .run_turn(&rig.kernel, request("look"), Default::default()),
+        async {
+            until_requests(&rig, 1).await;
+            rig.store.fail_next_append();
+            release.send(()).unwrap();
+        }
+    );
+
+    assert_eq!(outcome.unwrap().end, TurnEnd::Error(TurnErrorKind::Record));
+    assert_eq!(rig.chat.requests().len(), 1);
+    assert_eq!(end_reasons(&rig), ["error:record"]);
+}
+
+#[tokio::test]
+async fn a_missing_key_ends_the_turn_as_no_key_after_recording_it() {
+    let rig = common::build_rig(vec![], Limits::default(), false, navori_redact::redact_text);
+
+    let outcome = rig
+        .agent
+        .run_turn(&rig.kernel, request("hi"), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.end, TurnEnd::Error(TurnErrorKind::NoKey));
+    assert_eq!(end_reasons(&rig), ["error:no_key"]);
+    assert!(rig.chat.requests().is_empty());
+}
+
+#[tokio::test]
+async fn a_shield_refusal_ends_the_turn() {
+    let rig = common::build_rig(vec![], Limits::default(), true, refuse);
+
+    let outcome = rig
+        .agent
+        .run_turn(&rig.kernel, request("hi"), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.end, TurnEnd::Error(TurnErrorKind::Shield));
+    assert_eq!(end_reasons(&rig), ["error:shield"]);
+    assert!(rig.chat.requests().is_empty());
+}
+
+#[tokio::test]
+async fn an_unknown_conversation_is_refused_before_any_row() {
+    let rig = common::agent_with(vec![], Limits::default());
+    let mut unknown = request("hi");
+    unknown.conversation = Some(ConversationId::new());
+
+    let refused = rig
+        .agent
+        .run_turn(&rig.kernel, unknown, Default::default())
+        .await;
+
+    assert_eq!(refused.unwrap_err(), TurnStartError::UnknownConversation);
+    assert!(rig.store.entries().is_empty());
+}
+
+#[tokio::test]
+async fn a_reply_cut_at_the_output_limit_with_no_tool_call_completes_with_its_text() {
+    let mut cut = common::text_reply("half an ans");
+    cut.finish = Finish::Length;
+    let rig = common::agent_with(vec![cut], Limits::default());
+
+    let outcome = rig
+        .agent
+        .run_turn(&rig.kernel, request("tell me"), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.end, TurnEnd::Completed);
+    assert_eq!(outcome.answer.as_deref(), Some("half an ans"));
+}
+
+#[tokio::test]
+async fn one_turn_ended_event_carries_ids_origin_end_and_steps() {
+    let mut rig = common::agent_with(
+        vec![
+            common::call_reply("c1", "probe_look", "{}"),
+            common::text_reply("done"),
+        ],
+        Limits::default(),
+    );
+
+    let outcome = rig
+        .agent
+        .run_turn(
+            &rig.kernel,
+            request("a private question"),
+            Default::default(),
+        )
+        .await
+        .unwrap();
+
+    let event = rig.events.try_recv().unwrap();
+    assert_eq!(event.module, "ai");
+    assert_eq!(event.kind, "ai.turn_ended");
+    assert_eq!(
+        event.summary,
+        "Navori AI finished a Turn: completed after 2 Steps"
+    );
+    let payload = event.payload.as_object().unwrap();
+    let mut keys: Vec<&str> = payload.keys().map(String::as_str).collect();
+    keys.sort_unstable();
+    assert_eq!(keys, ["conversation", "end", "origin", "steps", "turn"]);
+    assert_eq!(payload["conversation"], outcome.conversation.to_string());
+    assert_eq!(payload["turn"], outcome.turn.to_string());
+    assert_eq!(payload["origin"], "user");
+    assert_eq!(payload["end"], "completed");
+    assert_eq!(payload["steps"], 2);
+    assert!(rig.events.try_recv().is_err());
+}
+
+async fn abandon_after_first_request(rig: &common::Rig, input: &str) -> ConversationId {
+    let _held = rig.chat.hold_next();
+    tokio::select! {
+        _ = rig.agent.run_turn(&rig.kernel, request(input), Default::default()) => {
+            panic!("the held turn cannot finish")
+        }
+        () = until_requests(rig, 1) => {}
+    }
+    rig.store
+        .entries()
+        .into_iter()
+        .find_map(|e| match e {
+            Entry::TurnStarted { conversation, .. } => Some(conversation),
+            _ => None,
+        })
+        .unwrap()
+}
+
+#[tokio::test]
+async fn continuing_an_unended_conversation_repairs_it_and_emits_interrupted() {
+    let mut rig = common::agent_with(vec![common::text_reply("fresh")], Limits::default());
+    let conversation = abandon_after_first_request(&rig, "left hanging").await;
+
+    let mut next = request("again");
+    next.conversation = Some(conversation);
+    let outcome = rig
+        .agent
+        .run_turn(&rig.kernel, next, Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.end, TurnEnd::Completed);
+    assert_eq!(end_reasons(&rig), ["interrupted", "completed"]);
+    let interrupted = rig.events.try_recv().unwrap();
+    assert_eq!(interrupted.kind, "ai.turn_ended");
+    assert_eq!(interrupted.payload["end"], "interrupted");
+    assert_eq!(
+        interrupted.payload["conversation"],
+        conversation.to_string()
+    );
+    let completed = rig.events.try_recv().unwrap();
+    assert_eq!(completed.payload["end"], "completed");
+    assert!(rig.events.try_recv().is_err());
+}
+
+#[tokio::test]
+async fn a_second_turn_started_at_once_on_one_conversation_is_refused() {
+    let rig = common::agent_with(
+        vec![common::text_reply("first"), common::text_reply("second")],
+        Limits::default(),
+    );
+    let conversation = rig
+        .agent
+        .run_turn(&rig.kernel, request("one"), Default::default())
+        .await
+        .unwrap()
+        .conversation;
+    let release = rig.chat.hold_next();
+    let mut held = request("two");
+    held.conversation = Some(conversation);
+    let mut rival = request("three");
+    rival.conversation = Some(conversation);
+
+    let (held, rival) = tokio::join!(
+        rig.agent.run_turn(&rig.kernel, held, Default::default()),
+        async {
+            until_requests(&rig, 2).await;
+            let refused = rig
+                .agent
+                .run_turn(&rig.kernel, rival, Default::default())
+                .await;
+            release.send(()).unwrap();
+            refused
+        }
+    );
+
+    assert_eq!(held.unwrap().end, TurnEnd::Completed);
+    assert_eq!(
+        rival.unwrap_err(),
+        TurnStartError::Record(RecordError::Duplicate)
+    );
+    assert_eq!(rig.chat.requests().len(), 2);
+}
+
+#[tokio::test]
+async fn no_message_text_reaches_the_logs() {
+    common::keep_callsites_interested();
+    let capture = common::Capture::default();
+    let _guard = tracing::subscriber::set_default(
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .with_writer(capture.clone())
+            .with_ansi(false)
+            .finish(),
+    );
+    let rig = common::agent_with(
+        vec![
+            reply_with(
+                Some("musing aloud"),
+                Some("quiet thoughts"),
+                "c1",
+                "probe_leak",
+                "{}",
+            ),
+            common::text_reply("the final answer"),
+        ],
+        Limits::default(),
+    );
+
+    rig.agent
+        .run_turn(
+            &rig.kernel,
+            request("my private question"),
+            Default::default(),
+        )
+        .await
+        .unwrap();
+
+    let logs = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
+    assert!(logs.contains("turn ended"), "{logs}");
+    for text in [
+        "my private question",
+        "musing aloud",
+        "quiet thoughts",
+        "the final answer",
+        "probe_leak",
+        common::PLANTED,
+        "REDACTED",
+    ] {
+        assert!(!logs.contains(text), "{text} in {logs}");
+    }
+}
+
+#[tokio::test]
+async fn a_repeated_call_gets_the_reminder_with_its_result_and_each_turn_starts_fresh() {
+    let call = |id: &str| common::call_reply(id, "probe_look", "{}");
+    let script = vec![
+        call("c1"),
+        call("c2"),
+        call("c3"),
+        common::text_reply("stuck"),
+        call("c4"),
+        call("c5"),
+        common::text_reply("fine"),
+    ];
+    let rig = common::agent_with(script, Limits::default());
+
+    let first = rig
+        .agent
+        .run_turn(&rig.kernel, request("loop"), Default::default())
+        .await
+        .unwrap();
+    let mut second = request("again");
+    second.conversation = Some(first.conversation);
+    rig.agent
+        .run_turn(&rig.kernel, second, Default::default())
+        .await
+        .unwrap();
+
+    let requests = rig.chat.requests();
+    let tool_texts = |request: &navori_context::ChatRequest| -> Vec<String> {
+        request
+            .messages
+            .iter()
+            .filter_map(|m| match m {
+                Message::Tool { text, .. } => Some(text.clone()),
+                _ => None,
+            })
+            .collect()
+    };
+    let third = tool_texts(&requests[3]);
+    assert_eq!(third[0], r#"{"seen":"room"}"#);
+    assert_eq!(third[1], r#"{"seen":"room"}"#);
+    assert!(third[2].starts_with(r#"{"seen":"room"}"#));
+    assert!(third[2].contains("You are repeating the exact same tool call"));
+    let last = tool_texts(&requests[6]);
+    assert!(
+        last.iter().skip(3).all(|t| t == r#"{"seen":"room"}"#),
+        "{last:?}"
+    );
+}
+
+#[tokio::test]
+async fn turns_in_a_conversation_are_numbered_from_one() {
+    let rig = common::agent_with(
+        vec![common::text_reply("one"), common::text_reply("two")],
+        Limits::default(),
+    );
+
+    let first = rig
+        .agent
+        .run_turn(&rig.kernel, request("first"), Default::default())
+        .await
+        .unwrap();
+    let mut next = request("second");
+    next.conversation = Some(first.conversation);
+    rig.agent
+        .run_turn(&rig.kernel, next, Default::default())
+        .await
+        .unwrap();
+
+    let seqs: Vec<u32> = rig
+        .store
+        .entries()
+        .into_iter()
+        .filter_map(|e| match e {
+            Entry::TurnStarted { seq, .. } => Some(seq),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(seqs, vec![1, 2]);
+}
+
+#[tokio::test]
+async fn a_module_gets_the_arguments_as_written_while_the_record_and_the_model_get_the_shielded_copy()
+ {
+    let arguments = format!(r#"{{"text":"{}"}}"#, common::PLANTED);
+    let rig = common::agent_with(
+        vec![
+            common::call_reply("c1", "probe_note", &arguments),
+            common::text_reply("noted"),
+        ],
+        Limits::default(),
+    );
+
+    rig.agent
+        .run_turn(&rig.kernel, request("note it"), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(*rig.notes.lock().unwrap(), vec![common::PLANTED.to_owned()]);
+    let shielded = r#"{"text":"[REDACTED:github_token]"}"#;
+    let recorded: Vec<String> = rig
+        .store
+        .entries()
+        .into_iter()
+        .filter_map(|e| match e {
+            Entry::Message {
+                body: RecordedMessage::Assistant { tool_calls, .. },
+                ..
+            } => Some(tool_calls),
+            _ => None,
+        })
+        .flatten()
+        .map(|c| c.arguments)
+        .collect();
+    assert_eq!(recorded, vec![shielded.to_owned()]);
+    let requests = rig.chat.requests();
+    let sent = requests[1]
+        .messages
+        .iter()
+        .find_map(|m| match m {
+            Message::Assistant { tool_calls, .. } => {
+                tool_calls.first().map(|c| c.arguments.clone())
+            }
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(sent, shielded);
+}
+
+#[tokio::test]
+async fn a_call_id_the_model_reuses_is_made_unique_within_the_turn() {
+    let rig = common::agent_with(
+        vec![
+            common::call_reply("call_0", "probe_look", "{}"),
+            common::call_reply("call_0", "probe_look_at", r#"{"n":2}"#),
+            common::text_reply("done"),
+        ],
+        Limits::default(),
+    );
+
+    let outcome = rig
+        .agent
+        .run_turn(&rig.kernel, request("look twice"), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.end, TurnEnd::Completed);
+    let results: Vec<String> = rig
+        .store
+        .entries()
+        .into_iter()
+        .filter_map(|e| match e {
+            Entry::Message {
+                body: RecordedMessage::ToolResult { call_id, text, .. },
+                ..
+            } => Some(format!("{call_id} {text}")),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(results.len(), 2, "{results:?}");
+    let ids: std::collections::HashSet<&str> =
+        results.iter().filter_map(|r| r.split(' ').next()).collect();
+    assert_eq!(ids.len(), 2, "{results:?}");
+    let last = rig.chat.requests().pop().unwrap();
+    let announced: Vec<String> = last
+        .messages
+        .iter()
+        .filter_map(|m| match m {
+            Message::Assistant { tool_calls, .. } => Some(tool_calls.clone()),
+            _ => None,
+        })
+        .flatten()
+        .map(|c| c.id)
+        .collect();
+    assert_eq!(announced.len(), 2);
+    assert_ne!(announced[0], announced[1]);
+    let answered: Vec<String> = last
+        .messages
+        .iter()
+        .filter_map(|m| match m {
+            Message::Tool { call_id, .. } => Some(call_id.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(answered, announced);
+}
+
+#[tokio::test]
+async fn two_calls_with_one_id_in_one_reply_each_get_their_own_result() {
+    let call = |name: &str, arguments: &str| ToolCall {
+        id: "dup".to_owned(),
+        name: name.to_owned(),
+        arguments: arguments.to_owned(),
+    };
+    let reply = ChatReply {
+        text: None,
+        reasoning: None,
+        tool_calls: vec![
+            call("probe_look", "{}"),
+            call("probe_look_at", r#"{"n":5}"#),
+        ],
+        usage: None,
+        finish: Finish::ToolCalls,
+    };
+    let rig = common::agent_with(vec![reply, common::text_reply("ok")], Limits::default());
+
+    let outcome = rig
+        .agent
+        .run_turn(&rig.kernel, request("both"), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.end, TurnEnd::Completed);
+    let last = rig.chat.requests().pop().unwrap();
+    let tool_texts: Vec<(String, String)> = last
+        .messages
+        .iter()
+        .filter_map(|m| match m {
+            Message::Tool { call_id, text } => Some((call_id.clone(), text.clone())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(tool_texts.len(), 2);
+    assert_ne!(tool_texts[0].0, tool_texts[1].0);
+    assert_eq!(tool_texts[1].1, r#"{"seen":5}"#);
+}
+
+#[tokio::test]
+async fn a_failed_record_write_leaves_a_log_line_without_message_text() {
+    common::keep_callsites_interested();
+    let capture = common::Capture::default();
+    let _guard = tracing::subscriber::set_default(
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .with_writer(capture.clone())
+            .with_ansi(false)
+            .finish(),
+    );
+    let rig = common::agent_with(
+        vec![common::text_reply("a private answer")],
+        Limits::default(),
+    );
+    let release = rig.chat.hold_next();
+
+    let (outcome, ()) = tokio::join!(
+        rig.agent.run_turn(
+            &rig.kernel,
+            request("a private question"),
+            Default::default()
+        ),
+        async {
+            until_requests(&rig, 1).await;
+            rig.store.fail_next_append();
+            release.send(()).unwrap();
+        }
+    );
+
+    assert_eq!(outcome.unwrap().end, TurnEnd::Error(TurnErrorKind::Record));
+    let logs = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
+    assert!(logs.contains("conversation record failed"), "{logs}");
+    assert!(logs.contains("WARN"), "{logs}");
+    for text in ["a private question", "a private answer"] {
+        assert!(!logs.contains(text), "{text} in {logs}");
+    }
+}
+
+#[tokio::test]
+async fn a_secret_straddling_the_repeat_reminder_cut_never_reaches_the_record_or_the_model() {
+    let arguments = format!(
+        r#"{{"n":1,"note":"{} {}"}}"#,
+        "x".repeat(479),
+        common::PLANTED
+    );
+    let mut script: Vec<ChatReply> = (1..=5)
+        .map(|n| common::call_reply(&format!("c{n}"), "probe_look_at", &arguments))
+        .collect();
+    script.push(common::text_reply("done"));
+    let rig = common::agent_with(script, Limits::default());
+
+    let outcome = rig
+        .agent
+        .run_turn(&rig.kernel, request("look"), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.end, TurnEnd::Completed);
+    let last = rig.chat.requests().pop().unwrap();
+    let reminder = last
+        .messages
+        .iter()
+        .filter_map(|m| match m {
+            Message::Tool { text, .. } if text.contains("Repeated tool call detected") => {
+                Some(text.clone())
+            }
+            _ => None,
+        })
+        .next_back()
+        .expect("the fifth call carries the detailed reminder");
+    assert!(!reminder.contains("ghp_"), "{reminder}");
+    for request in rig.chat.requests() {
+        assert!(!format!("{:?}", request.messages).contains("ghp_"));
+    }
+    for entry in rig.store.entries() {
+        if let Entry::Message { body, .. } = entry {
+            assert!(!body.to_body().contains("ghp_"));
+        }
+    }
+}
+
+fn tool_results(rig: &common::Rig) -> Vec<String> {
+    rig.store
+        .entries()
+        .into_iter()
+        .filter_map(|e| match e {
+            Entry::Message {
+                body: RecordedMessage::ToolResult { text, .. },
+                ..
+            } => Some(text),
+            _ => None,
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_secret_straddling_the_result_cap_is_shielded_before_the_cut() {
+    let rig = common::agent_with(
+        vec![
+            common::call_reply("c1", "probe_edge", "{}"),
+            common::text_reply("done"),
+        ],
+        Limits::default(),
+    );
+
+    rig.agent
+        .run_turn(&rig.kernel, request("edge"), Default::default())
+        .await
+        .unwrap();
+
+    let shielded = format!("\"{} [REDACTED:github_token] end\"", "x".repeat(65_514));
+    let kept = 65_516;
+    let expected = format!(
+        "{}\n[truncated: {} bytes cut]",
+        &shielded[..kept],
+        shielded.len() - kept
+    );
+    assert_eq!(tool_results(&rig), vec![expected.clone()]);
+    let last = rig.chat.requests().pop().unwrap();
+    assert!(
+        last.messages
+            .iter()
+            .any(|m| matches!(m, Message::Tool { text, .. } if *text == expected))
+    );
+}
+
+#[tokio::test]
+async fn a_huge_result_is_cut_at_a_character_boundary_with_a_visible_marker() {
+    let rig = common::agent_with(
+        vec![
+            common::call_reply("c1", "probe_big", "{}"),
+            common::text_reply("done"),
+        ],
+        Limits::default(),
+    );
+
+    rig.agent
+        .run_turn(&rig.kernel, request("big"), Default::default())
+        .await
+        .unwrap();
+
+    let whole = serde_json::to_string(&"é".repeat(40_000)).unwrap();
+    let kept = 65_535;
+    assert_eq!(
+        tool_results(&rig),
+        vec![format!(
+            "{}\n[truncated: {} bytes cut]",
+            &whole[..kept],
+            whole.len() - kept
+        )]
+    );
+}
+
+#[tokio::test]
+async fn a_follow_up_turn_replays_each_rewritten_call_id_with_exactly_one_result() {
+    let rig = common::agent_with(
+        vec![
+            common::call_reply("call_0", "probe_look", "{}"),
+            common::call_reply("call_0", "probe_look_at", r#"{"n":2}"#),
+            common::text_reply("done"),
+            common::text_reply("again"),
+        ],
+        Limits::default(),
+    );
+    let first = rig
+        .agent
+        .run_turn(&rig.kernel, request("look twice"), Default::default())
+        .await
+        .unwrap();
+
+    let mut follow_up = request("and now");
+    follow_up.conversation = Some(first.conversation);
+    rig.agent
+        .run_turn(&rig.kernel, follow_up, Default::default())
+        .await
+        .unwrap();
+
+    let replayed = rig.chat.requests().pop().unwrap().messages;
+    let announced: Vec<String> = replayed
+        .iter()
+        .filter_map(|m| match m {
+            Message::Assistant { tool_calls, .. } => Some(tool_calls),
+            _ => None,
+        })
+        .flatten()
+        .map(|c| c.id.clone())
+        .collect();
+    assert_eq!(announced.len(), 2, "{announced:?}");
+    for id in &announced {
+        let answers = replayed
+            .iter()
+            .filter(|m| matches!(m, Message::Tool { call_id, .. } if call_id == id))
+            .count();
+        assert_eq!(answers, 1, "{id} in {replayed:?}");
+    }
+}

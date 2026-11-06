@@ -4,7 +4,8 @@ mod common;
 
 use common::{Responder, refused_url};
 use navori_llm::{
-    ChatRequest, DEEPSEEK_BASE_URL, LlmError, LlmProvider, Message, OpenAiCompat, Role,
+    ChatRequest, DEEPSEEK_BASE_URL, Finish, LlmError, LlmProvider, Message, OpenAiCompat, ToolCall,
+    ToolDef, Usage,
 };
 use navori_secrets::Secret;
 
@@ -13,21 +14,154 @@ const KEY: &str = "test-key-ZZ9";
 fn hello() -> ChatRequest {
     ChatRequest {
         model: "m".to_owned(),
-        messages: vec![Message {
-            role: Role::User,
+        messages: vec![Message::User {
             text: "hello".to_owned(),
         }],
+        tools: vec![],
     }
 }
 
+fn sent_body(server: &Responder) -> serde_json::Value {
+    let requests = server.requests();
+    serde_json::from_str(requests[0].split("\r\n\r\n").nth(1).unwrap()).unwrap()
+}
+
+const TOOL_CALL_NULL_CONTENT: &str = r#"{"choices":[{"message":{"content":null,"reasoning_content":"r","tool_calls":[{"id":"c1","type":"function","function":{"name":"ports_list","arguments":"{}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":120,"completion_tokens":30,"total_tokens":150,"prompt_cache_hit_tokens":100,"prompt_cache_miss_tokens":20}}"#;
+const TOOL_CALL_EMPTY_CONTENT: &str = r#"{"choices":[{"message":{"content":"","reasoning_content":"r","tool_calls":[{"id":"c1","type":"function","function":{"name":"ports_list","arguments":"{}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":120,"completion_tokens":30,"total_tokens":150,"prompt_cache_hit_tokens":100,"prompt_cache_miss_tokens":20}}"#;
+
 #[tokio::test]
-async fn the_adapter_posts_one_user_message_without_streaming() {
+async fn tools_are_sent_as_functions_and_omitted_when_empty() {
+    let server = Responder::start(200, r#"{"choices":[{"message":{"content":"ok"}}]}"#).await;
+    let adapter = OpenAiCompat::new(server.base_url.clone());
+    let mut request = hello();
+    request.tools = vec![ToolDef {
+        name: "ports_list".to_owned(),
+        description: "List ports".to_owned(),
+        parameters: serde_json::json!({"type": "object", "properties": {}}),
+    }];
+
+    adapter.complete(request, &Secret::new(KEY)).await.unwrap();
+
+    assert_eq!(
+        sent_body(&server)["tools"],
+        serde_json::json!([{"type": "function", "function": {
+            "name": "ports_list",
+            "description": "List ports",
+            "parameters": {"type": "object", "properties": {}}
+        }}])
+    );
+}
+
+#[tokio::test]
+async fn an_assistant_message_is_replayed_with_reasoning_and_tool_calls() {
+    let server = Responder::start(200, r#"{"choices":[{"message":{"content":"ok"}}]}"#).await;
+    let adapter = OpenAiCompat::new(server.base_url.clone());
+    let mut request = hello();
+    request.messages.push(Message::Assistant {
+        text: None,
+        reasoning: Some("think".to_owned()),
+        tool_calls: vec![ToolCall {
+            id: "c1".to_owned(),
+            name: "ports_list".to_owned(),
+            arguments: "{}".to_owned(),
+        }],
+    });
+    request.messages.push(Message::Tool {
+        call_id: "c1".to_owned(),
+        text: "[]".to_owned(),
+    });
+
+    adapter.complete(request, &Secret::new(KEY)).await.unwrap();
+
+    assert_eq!(
+        sent_body(&server)["messages"],
+        serde_json::json!([
+            {"role": "user", "content": "hello"},
+            {"role": "assistant", "content": null, "reasoning_content": "think",
+             "tool_calls": [{"id": "c1", "type": "function",
+                             "function": {"name": "ports_list", "arguments": "{}"}}]},
+            {"role": "tool", "tool_call_id": "c1", "content": "[]"}
+        ])
+    );
+}
+
+#[tokio::test]
+async fn a_tool_call_reply_with_null_content_is_accepted() {
+    let server = Responder::start(200, TOOL_CALL_NULL_CONTENT).await;
+    let adapter = OpenAiCompat::new(server.base_url.clone());
+
+    let reply = adapter.complete(hello(), &Secret::new(KEY)).await.unwrap();
+
+    assert_eq!(reply.text, None);
+    assert_eq!(
+        reply.tool_calls,
+        vec![ToolCall {
+            id: "c1".to_owned(),
+            name: "ports_list".to_owned(),
+            arguments: "{}".to_owned()
+        }]
+    );
+    assert_eq!(reply.reasoning.as_deref(), Some("r"));
+    assert_eq!(reply.finish, Finish::ToolCalls);
+    assert_eq!(
+        reply.usage,
+        Some(Usage {
+            input: 120,
+            output: 30,
+            cache_hit: Some(100),
+            cache_miss: Some(20)
+        })
+    );
+}
+
+#[tokio::test]
+async fn a_tool_call_reply_with_empty_content_is_accepted() {
+    let server = Responder::start(200, TOOL_CALL_EMPTY_CONTENT).await;
+    let adapter = OpenAiCompat::new(server.base_url.clone());
+
+    let reply = adapter.complete(hello(), &Secret::new(KEY)).await.unwrap();
+
+    assert_eq!(reply.text, None);
+    assert_eq!(reply.tool_calls.len(), 1);
+    assert_eq!(reply.finish, Finish::ToolCalls);
+}
+
+#[tokio::test]
+async fn a_reply_without_usage_has_none() {
+    let server = Responder::start(200, r#"{"choices":[{"message":{"content":"hi"}}]}"#).await;
+    let adapter = OpenAiCompat::new(server.base_url.clone());
+
+    let reply = adapter.complete(hello(), &Secret::new(KEY)).await.unwrap();
+
+    assert_eq!(reply.usage, None);
+    assert_eq!(reply.text.as_deref(), Some("hi"));
+}
+
+#[tokio::test]
+async fn a_reply_with_neither_text_nor_tool_calls_is_malformed() {
+    let server = Responder::start(
+        200,
+        r#"{"choices":[{"message":{"content":null,"reasoning_content":"r"}}]}"#,
+    )
+    .await;
+    let adapter = OpenAiCompat::new(server.base_url.clone());
+
+    let error = adapter
+        .complete(hello(), &Secret::new(KEY))
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, LlmError::Malformed), "{error}");
+}
+
+#[tokio::test]
+async fn a_plain_request_still_sends_only_model_messages_and_stream() {
     let server = Responder::start(200, r#"{"choices":[{"message":{"content":"hi there"}}]}"#).await;
     let adapter = OpenAiCompat::new(server.base_url.clone());
 
     let reply = adapter.complete(hello(), &Secret::new(KEY)).await.unwrap();
 
-    assert_eq!(reply.text, "hi there");
+    assert_eq!(reply.text.as_deref(), Some("hi there"));
     let requests = server.requests();
     assert_eq!(requests.len(), 1);
     let raw = &requests[0];

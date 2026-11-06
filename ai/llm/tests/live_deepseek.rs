@@ -2,7 +2,7 @@
 
 use std::process::{Command, Stdio};
 
-use navori_llm::{ChatRequest, DEEPSEEK_BASE_URL, LlmProvider, Message, OpenAiCompat, Role};
+use navori_llm::{ChatRequest, DEEPSEEK_BASE_URL, LlmProvider, Message, OpenAiCompat};
 use navori_secrets::Secret;
 
 fn required(name: &str) -> String {
@@ -38,16 +38,19 @@ async fn a_live_deepseek_call_returns_text() {
 
     let request = ChatRequest {
         model,
-        messages: vec![Message {
-            role: Role::User,
+        messages: vec![Message::User {
             text: "Say hello in one short sentence.".to_owned(),
         }],
+        tools: vec![],
     };
     let result = OpenAiCompat::new(DEEPSEEK_BASE_URL)
         .complete(request, &key)
         .await;
     match result {
-        Ok(reply) => assert!(!reply.text.trim().is_empty(), "the reply had no text"),
+        Ok(reply) => assert!(
+            reply.text.is_some_and(|text| !text.trim().is_empty()),
+            "the reply had no text"
+        ),
         Err(error) => panic!("the live call failed: {error}"),
     }
 }
