@@ -221,7 +221,6 @@ pub(crate) fn save_lid(store: &Store, on: bool) -> navori_store::Result<()> {
     store.kv_set(SETTINGS_NS, LID_KEY, &serde_json::Value::Bool(on))
 }
 
-#[expect(dead_code, reason = "used by the lid restore / last sleep tasks")]
 pub(crate) fn load_lid_held(store: &Store) -> navori_store::Result<bool> {
     Ok(store.kv_get(SETTINGS_NS, LID_HELD_KEY)?.is_some())
 }

@@ -27,6 +27,8 @@ const EXITS_PROBLEM: &str =
 const LID_READ_PROBLEM: &str = "Awake could not read the Lid closed setting, so it reads as off.";
 const POWER_PROBLEM: &str = "Awake could not watch the power source, so it reads as on battery. Navori retries in 60 seconds.";
 const LID_MARKER_PROBLEM: &str = "Awake could not save its lid marker, so it did not hold the lid. Navori retries in 60 seconds.";
+const LID_MARKER_READ_PROBLEM: &str =
+    "Awake could not read its lid marker, so it did not give the lid back.";
 const LID_REFUSED_PROBLEM: &str = "macOS refused to keep the lid awake, so Lid closed is off.";
 const LID_CLEAR_PROBLEM: &str =
     "Awake could not give the lid setting back. Navori retries in 60 seconds.";
@@ -98,7 +100,7 @@ impl Awake {
             on_adapter: None,
             lid: None,
             lid_marker: false,
-            lid_restored: true,
+            lid_restored: false,
             watcher: None,
             problems: Problems::default(),
             retry_at: None,
@@ -115,6 +117,7 @@ impl Awake {
         if self.lid_on {
             self.arm_power(wait.now());
         }
+        self.restore_lid_once(ctx, wait.now());
         self.restore_if_needed(ctx, wait.now()).await;
         loop {
             let now = wait.now();
@@ -124,6 +127,9 @@ impl Awake {
             }
             if due && self.lid_on && self.power.is_none() {
                 self.rebuild_power_now(now);
+            }
+            if due {
+                self.restore_lid_once(ctx, now);
             }
             if due && !self.restored {
                 self.restore_if_needed(ctx, now).await;
@@ -834,6 +840,35 @@ impl Awake {
         }
     }
 
+    /// Runs until it succeeds or the marker proves unreadable, so a restart never repeats it.
+    fn restore_lid_once(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime) {
+        if self.lid_restored {
+            return;
+        }
+        if !self.lid_marker {
+            match stored::load_lid_held(&ctx.store) {
+                Ok(true) => self.lid_marker = true,
+                Ok(false) => {
+                    self.lid_restored = true;
+                    return;
+                }
+                Err(err) => {
+                    tracing::warn!(error = %err, "the lid marker could not be read");
+                    self.lid_problem = Some(LID_MARKER_READ_PROBLEM.to_owned());
+                    self.lid_restored = true;
+                    return;
+                }
+            }
+        }
+        match self.platform.give_back_lid() {
+            Ok(()) => {
+                self.lid_restored = true;
+                self.finish_lid_clear(&ctx.store);
+            }
+            Err(err) => self.note_lid_clear_failed(&err, now),
+        }
+    }
+
     fn release_lid_on_quit(&mut self, ctx: &ModuleCtx<Self>) {
         if let Some(guard) = self.lid.take() {
             match guard.release() {
@@ -934,6 +969,7 @@ impl Awake {
             || self.problems.platform.is_some()
             || self.problems.exits.is_some()
             || (self.lid_on && self.power.is_none())
+            || !self.lid_restored
             || self.pending_lid_clear()
             || (self.lid_wanted() && self.lid.is_none())
             || !self.restored
