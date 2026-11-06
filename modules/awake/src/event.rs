@@ -1,6 +1,8 @@
 pub const LEASE_STARTED: &str = "awake.lease_started";
 pub const LEASE_ENDED: &str = "awake.lease_ended";
 pub const TRACKING_CHANGED: &str = "awake.tracking_changed";
+pub const LID_CHANGED: &str = "awake.lid_changed";
+pub const SLEPT: &str = "awake.slept";
 
 const MINUTE: u64 = 60;
 const HOUR: u64 = 3600;
@@ -15,6 +17,14 @@ pub(crate) fn tracking_changed(on: bool) -> &'static str {
         "Tracking agents is on: agent sessions keep this Mac awake."
     } else {
         "Tracking agents is off: agent sessions no longer keep this Mac awake."
+    }
+}
+
+pub(crate) fn lid_changed(on: bool) -> &'static str {
+    if on {
+        "Lid closed is on: the lid may close without sleep while a Lease holds on the adapter."
+    } else {
+        "Lid closed is off: closing the lid sleeps this Mac."
     }
 }
 

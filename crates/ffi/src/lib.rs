@@ -121,6 +121,12 @@ pub struct AwakeView {
     pub since_ms: Option<i64>,
     pub problem: Option<String>,
     pub tracking: bool,
+    pub lid: bool,
+    pub lid_held: bool,
+    pub on_adapter: Option<bool>,
+    pub lid_marker: bool,
+    pub last_sleep_ms: Option<i64>,
+    pub lid_problem: Option<String>,
 }
 
 /// Which mark the status icon shows. Mirrors `navori_protocol::TrayGlyph`.

@@ -11,7 +11,7 @@ use crate::domain::{
     self, DisplayChange, EndReason, Ended, Held, Lease, LeaseKey, LeaseSource, LeaseTable,
     Reconciler, Timing,
 };
-use crate::event::{self, LEASE_ENDED, LEASE_STARTED, TRACKING_CHANGED};
+use crate::event::{self, LEASE_ENDED, LEASE_STARTED, LID_CHANGED, TRACKING_CHANGED};
 use crate::infra::stored::{self, StoredKind, StoredLease};
 use crate::infra::{ExecutableName, Platform, ProcessClass, Rejected};
 use crate::state::AwakeState;
@@ -23,6 +23,7 @@ const DISPLAY_PROBLEM: &str = "macOS refused to keep the display on. Navori keep
 const RELEASE_PROBLEM: &str = "Releasing a power assertion failed.";
 const EXITS_PROBLEM: &str =
     "Exit watches stopped, so a command lease has no end signal. Navori retries in 60 seconds.";
+const LID_READ_PROBLEM: &str = "Awake could not read the Lid closed setting, so it reads as off.";
 const STORE_PROBLEM: &str = "Awake could not save a lease. Navori retries in 60 seconds.";
 const PLATFORM_PROBLEM: &str = "Awake could not watch a process, so a stored lease stays on disk. Navori retries in 60 seconds.";
 
@@ -53,6 +54,8 @@ pub struct Awake {
     table: LeaseTable,
     reconciler: Reconciler,
     published: AwakeState,
+    lid_on: bool,
+    lid_problem: Option<String>,
     watcher: Option<ProcWatcher>,
     problems: Problems,
     retry_at: Option<SystemTime>,
@@ -78,6 +81,8 @@ impl Awake {
             table: LeaseTable::new(timing),
             reconciler,
             published: AwakeState::idle(),
+            lid_on: false,
+            lid_problem: None,
             watcher: None,
             problems: Problems::default(),
             retry_at: None,
@@ -90,6 +95,7 @@ impl Awake {
         let mut wait = ctx.wait_handle();
         stored::migrate(&ctx.store)?;
         self.load_tracking(ctx);
+        self.load_lid(ctx);
         self.restore_if_needed(ctx, wait.now()).await;
         loop {
             let now = wait.now();
@@ -133,6 +139,20 @@ impl Awake {
             Ok(Some(on)) => self.table.set_tracking(on),
             Ok(None) => {}
             Err(err) => tracing::warn!(error = %err, "the tracking setting could not be read"),
+        }
+    }
+
+    fn load_lid(&mut self, ctx: &ModuleCtx<Self>) {
+        match stored::load_lid(&ctx.store) {
+            Ok(value) => {
+                self.lid_on = value.unwrap_or(false);
+                self.lid_problem = None;
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "the Lid closed setting could not be read");
+                self.lid_on = false;
+                self.lid_problem = Some(LID_READ_PROBLEM.to_owned());
+            }
         }
     }
 
@@ -201,6 +221,10 @@ impl Awake {
                 Ok(None)
             }
             AwakeAction::Tracking { on } => self.set_tracking(ctx, *on),
+            AwakeAction::Lid { on } => self.set_lid(ctx, *on),
+            AwakeAction::Slept { .. } | AwakeAction::Woke => Err(ActionError::Failed(
+                "this action is not available yet".to_owned(),
+            )),
             AwakeAction::SubagentStart {
                 session_id,
                 agent_id,
@@ -269,6 +293,28 @@ impl Awake {
             TRACKING_CHANGED,
             Severity::Info,
             event::tracking_changed(on).to_owned(),
+            json!({ "on": on }),
+        );
+        Ok(None)
+    }
+
+    /// Stores first, so a failure changes nothing, as Tracking agents does.
+    fn set_lid(&mut self, ctx: &ModuleCtx<Self>, on: bool) -> Result<Option<Started>, ActionError> {
+        if self.lid_on == on {
+            return Ok(None);
+        }
+        if let Err(err) = stored::save_lid(&ctx.store, on) {
+            tracing::warn!(error = %err, "the Lid closed setting could not be stored");
+            return Err(ActionError::Failed(
+                "the Lid closed setting could not be saved, so it did not change".to_owned(),
+            ));
+        }
+        self.lid_on = on;
+        self.lid_problem = None;
+        ctx.emit(
+            LID_CHANGED,
+            Severity::Info,
+            event::lid_changed(on).to_owned(),
             json!({ "on": on }),
         );
         Ok(None)
@@ -688,6 +734,8 @@ impl Awake {
     fn publish(&mut self, ctx: &ModuleCtx<Self>, held: &Held) -> AwakeState {
         let mut state = self.table.snapshot(held.system, held.display);
         state.problem = self.problems.first();
+        state.lid = self.lid_on;
+        state.lid_problem.clone_from(&self.lid_problem);
         if state != self.published {
             self.published = state.clone();
             let next = state.clone();

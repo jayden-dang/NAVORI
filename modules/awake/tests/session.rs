@@ -174,7 +174,13 @@ async fn a_session_lease_watches_the_harness_not_the_hook() {
             "display_held": false,
             "since_ms": ORIGIN_MS as i64,
             "problem": null,
-            "tracking": true
+            "tracking": true,
+            "lid": false,
+            "lid_held": false,
+            "on_adapter": null,
+            "lid_marker": false,
+            "last_sleep_ms": null,
+            "lid_problem": null
         })
     );
     assert!(

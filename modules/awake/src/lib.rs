@@ -13,7 +13,7 @@ pub use domain::{
     EndReason, Ended, Held, Lease, LeaseKey, LeaseSource, LeaseTable, Reconciler, Settled, Timing,
     Wants,
 };
-pub use event::{LEASE_ENDED, LEASE_STARTED, TRACKING_CHANGED};
+pub use event::{LEASE_ENDED, LEASE_STARTED, LID_CHANGED, SLEPT, TRACKING_CHANGED};
 pub use infra::{ExitsFactory, Platform, ProcessFactory};
 pub use state::{AwakeState, LeaseState};
 

@@ -45,6 +45,9 @@ fn sample(name: &str) -> Value {
         "keep_indefinitely" => json!("keep_indefinitely"),
         "keep_off" => json!("keep_off"),
         "tracking" => json!({ "tracking": { "on": true } }),
+        "lid" => json!({ "lid": { "on": true } }),
+        "slept" => json!({ "slept": { "at_ms": 1 } }),
+        "woke" => json!("woke"),
         "subagent_start" => {
             json!({ "subagent_start": { "session_id": "s", "agent_id": "a", "pid": 1, "ppid": 1 } })
         }
@@ -318,6 +321,9 @@ async fn every_action_has_a_description_a_schema_and_a_risk() {
             "keep_indefinitely",
             "keep_off",
             "tracking",
+            "lid",
+            "slept",
+            "woke",
             "subagent_start",
             "subagent_stop",
         ]

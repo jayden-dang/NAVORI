@@ -48,6 +48,12 @@ pub enum AwakeAction {
     KeepOff,
     /// Turn Tracking agents on or off.
     Tracking { on: bool },
+    /// Turn Lid closed on or off.
+    Lid { on: bool },
+    /// The Mac went to sleep at `at_ms`.
+    Slept { at_ms: i64 },
+    /// The Mac woke.
+    Woke,
     /// A subagent of the harness session `session_id` started.
     SubagentStart {
         session_id: String,
@@ -80,6 +86,9 @@ impl ModuleAction for AwakeAction {
             | Self::KeepIndefinitely
             | Self::KeepOff
             | Self::Tracking { .. }
+            | Self::Lid { .. }
+            | Self::Slept { .. }
+            | Self::Woke
             | Self::SubagentStart { .. }
             | Self::SubagentStop { .. } => Risk::Write,
         }
@@ -150,6 +159,21 @@ impl ModuleAction for AwakeAction {
             ActionDoc {
                 name: "tracking",
                 description: "Turn Tracking agents on or off, and store the setting. While it is off, sessions are still followed but keep nothing awake, and they are left out of the published leases. Turning it on counts them again at once.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "lid",
+                description: "Turn Lid closed on or off, and store the setting. While it is on and a Lease holds on the adapter, the lid may close without sleep. Turning it off lets closing the lid sleep this Mac again.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "slept",
+                description: "Record that this Mac went to sleep at `at_ms`, in milliseconds since the epoch, so the menu can show when it last slept.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "woke",
+                description: "Record that this Mac woke from sleep.",
                 risk: Risk::Write,
             },
             ActionDoc {

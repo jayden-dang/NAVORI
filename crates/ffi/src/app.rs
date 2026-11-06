@@ -307,6 +307,12 @@ impl From<AwakeState> for crate::AwakeView {
             since_ms,
             problem,
             tracking,
+            lid,
+            lid_held,
+            on_adapter,
+            lid_marker,
+            last_sleep_ms,
+            lid_problem,
         } = state;
         Self {
             leases: leases.into_iter().map(crate::LeaseView::from).collect(),
@@ -315,6 +321,12 @@ impl From<AwakeState> for crate::AwakeView {
             since_ms,
             problem,
             tracking,
+            lid,
+            lid_held,
+            on_adapter,
+            lid_marker,
+            last_sleep_ms,
+            lid_problem,
         }
     }
 }
@@ -332,6 +344,8 @@ pub fn awake_view(kernel: &Kernel) -> Option<crate::AwakeView> {
     if module_is_down(kernel, Awake::ID) {
         view.system_held = false;
         view.display_held = false;
+        view.lid_held = false;
+        view.on_adapter = None;
         view.problem = Some(crate::running::AWAKE_STOPPED.to_owned());
     }
     Some(view)

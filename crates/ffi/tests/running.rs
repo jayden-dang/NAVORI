@@ -41,6 +41,12 @@ fn awake(leases: Vec<LeaseView>) -> AwakeView {
         since_ms: None,
         problem: None,
         tracking: true,
+        lid: false,
+        lid_held: false,
+        on_adapter: None,
+        lid_marker: false,
+        last_sleep_ms: None,
+        lid_problem: None,
     }
 }
 

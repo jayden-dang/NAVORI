@@ -3,8 +3,9 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use navori_macos::{
-    ExitSink, ExitSource, KqueueExits, MacPower, MacProcesses, PlatformError, PowerAssertions,
-    ProcEntry, ProcessSource, ReadError, StartTime,
+    ExitSink, ExitSource, KqueueExits, LidError, LidGuard, LidSetting, MacLid, MacPower,
+    MacPowerSource, MacProcesses, PlatformError, PowerAssertions, PowerKind, PowerSource,
+    PowerSourceError, PowerWatch, ProcEntry, ProcessSource, ReadError, StartTime,
 };
 use navori_procs::{
     Branch, Harness, HarnessLookup, Location, ProcId, ProcWatcher, ProcsError, Snapshot,
@@ -44,8 +45,40 @@ pub enum Rejected {
     Platform(PlatformError),
 }
 
+#[derive(Debug)]
+struct UnsupportedLid;
+
+impl LidSetting for UnsupportedLid {
+    fn hold(&self) -> Result<LidGuard, LidError> {
+        Err(LidError::Unavailable)
+    }
+
+    fn give_back(&self) -> Result<(), LidError> {
+        Err(LidError::Unavailable)
+    }
+
+    fn sleep_reason(&self) -> Option<String> {
+        None
+    }
+}
+
+#[derive(Debug)]
+struct UnsupportedPowerSource;
+
+impl PowerSource for UnsupportedPowerSource {
+    fn current(&self) -> Result<PowerKind, PowerSourceError> {
+        Ok(PowerKind::Battery)
+    }
+
+    fn watch(&self) -> Result<PowerWatch, PowerSourceError> {
+        Err(PowerSourceError::Unavailable)
+    }
+}
+
 pub struct Platform {
     power: Arc<dyn PowerAssertions>,
+    lid: Arc<dyn LidSetting>,
+    power_source: Arc<dyn PowerSource>,
     processes: ProcessFactory,
     exits: ExitsFactory,
     open: Option<Arc<dyn ProcessSource>>,
@@ -55,6 +88,8 @@ impl std::fmt::Debug for Platform {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Platform")
             .field("power", &Arc::strong_count(&self.power))
+            .field("lid", &Arc::strong_count(&self.lid))
+            .field("power_source", &Arc::strong_count(&self.power_source))
             .finish_non_exhaustive()
     }
 }
@@ -67,6 +102,8 @@ impl Platform {
     ) -> Self {
         Self {
             power,
+            lid: Arc::new(UnsupportedLid),
+            power_source: Arc::new(UnsupportedPowerSource),
             processes,
             exits,
             open: None,
@@ -79,6 +116,20 @@ impl Platform {
             Box::new(|| Ok(Arc::new(MacProcesses::new()?) as Arc<dyn ProcessSource>)),
             Box::new(|sink| Ok(Box::new(KqueueExits::start(sink)?) as Box<dyn ExitSource>)),
         )
+        .with_lid(Arc::new(MacLid))
+        .with_power_source(Arc::new(MacPowerSource))
+    }
+
+    #[must_use]
+    pub fn with_lid(mut self, lid: Arc<dyn LidSetting>) -> Self {
+        self.lid = lid;
+        self
+    }
+
+    #[must_use]
+    pub fn with_power_source(mut self, power_source: Arc<dyn PowerSource>) -> Self {
+        self.power_source = power_source;
+        self
     }
 
     pub(crate) fn power(&self) -> Arc<dyn PowerAssertions> {

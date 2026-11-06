@@ -155,7 +155,13 @@ async fn display_on_with_no_other_lease_holds_system_too() {
             "display_held": true,
             "since_ms": ORIGIN_MS as i64,
             "problem": null,
-            "tracking": true
+            "tracking": true,
+            "lid": false,
+            "lid_held": false,
+            "on_adapter": null,
+            "lid_marker": false,
+            "last_sleep_ms": null,
+            "lid_problem": null
         })
     );
     let events = rig.kernel.recent_events(10).unwrap();
@@ -287,6 +293,9 @@ fn only_display_release_all_and_the_keep_actions_end_a_display_lease() {
         "stop_session",
         "end_session",
         "tracking",
+        "lid",
+        "slept",
+        "woke",
         "subagent_start",
         "subagent_stop",
     ];
