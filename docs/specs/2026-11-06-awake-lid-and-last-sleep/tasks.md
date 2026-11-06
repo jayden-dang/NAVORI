@@ -303,7 +303,7 @@ _Requirements: LID-2.3_
 
 **Depends-on:** Task 2, Task 3
 
-- [ ] **Step 1: Write failing tests in `lid.rs`:**
+- [x] **Step 1: Write failing tests in `lid.rs`:**
   - `lid_closed_is_off_on_a_fresh_store`
   - `a_stored_non_boolean_reads_as_off`
   - `turning_lid_closed_on_stores_it_and_journals_the_change`, where the event payload is `{"on": true}` and the summary is `Lid closed is on: the lid may close without sleep while a Lease holds on the adapter.` (`Lid closed is off: closing the lid sleeps this Mac.` when off). Wording is agent-decided, in the style of `event.rs` line 15
@@ -314,12 +314,12 @@ _Requirements: LID-2.3_
   - `setting_tracking_still_stores_first_and_journals_tracking_changed`
 
   Add `lid`, `slept` and `woke` to `actions.rs`: `sample()`, the ordered names list and `every_catalog_name_decodes_as_an_action`. Add them to the not-ending lists in `manual.rs` and `display.rs`. In `actions_risk.rs`, set `SAMPLED = 27`, with samples asserting `Write` for all three. In `crates/ffi/tests/agent.rs` `no_new_action_appears` (line 606), insert `"awake lid write"`, `"awake slept write"` and `"awake woke write"` after `"awake tracking write"` (line 634); LOOP-10.5 allows additions.
-- [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test lid --test actions`. Expect: unknown variant `lid`.
-- [ ] **Step 3: Implement** the Platform builders and defaults, the stored helpers (kv namespace `awake`), the `AwakeState` fields (set in `LeaseTable::snapshot` and `AwakeState::idle`, filled by the actor in `publish`), the three Action variants (`lid`, `slept`, `woke`) with risk and catalog, and the event constants and summaries.
-- [ ] **Step 4: Implement `set_lid`** by copying `set_tracking`: unchanged → `Ok(None)`; save first; set `lid_on`; emit `LID_CHANGED`. Load `lid` on the first `run_loop` entry.
-- [ ] **Step 5: Mirror the six fields** on `AwakeView`, its `From` and the `awake_view` module-down blanking (`lid_held = false`, `on_adapter = None`). Update the exact-JSON expectations and literals in the seven Awake test files and `crates/ffi/tests/running.rs`.
-- [ ] **Step 6: Run** `cargo test -p navori-mod-awake && cargo test -p navori-ffi`. Expect: pass, with every pre-existing test unchanged apart from the added fields.
-- [ ] **Step 7: Commit** `feat(awake): a Lid closed switch with its stored value and state`
+- [x] **Step 2: Run** `cargo test -p navori-mod-awake --test lid --test actions`. Expect: unknown variant `lid`.
+- [x] **Step 3: Implement** the Platform builders and defaults, the stored helpers (kv namespace `awake`), the `AwakeState` fields (set in `LeaseTable::snapshot` and `AwakeState::idle`, filled by the actor in `publish`), the three Action variants (`lid`, `slept`, `woke`) with risk and catalog, and the event constants and summaries.
+- [x] **Step 4: Implement `set_lid`** by copying `set_tracking`: unchanged → `Ok(None)`; save first; set `lid_on`; emit `LID_CHANGED`. Load `lid` on the first `run_loop` entry.
+- [x] **Step 5: Mirror the six fields** on `AwakeView`, its `From` and the `awake_view` module-down blanking (`lid_held = false`, `on_adapter = None`). Update the exact-JSON expectations and literals in the seven Awake test files and `crates/ffi/tests/running.rs`.
+- [x] **Step 6: Run** `cargo test -p navori-mod-awake && cargo test -p navori-ffi`. Expect: pass, with every pre-existing test unchanged apart from the added fields.
+- [x] **Step 7: Commit** `feat(awake): a Lid closed switch with its stored value and state`
 
 _Requirements: LID-3.1, LID-3.2, LID-3.3, LID-3.4, LID-3.5, LID-3.6, LID-3.12, LID-3.13, LID-7.2, LID-7.8, LID-8.3_
 
