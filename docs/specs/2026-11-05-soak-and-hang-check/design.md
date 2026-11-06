@@ -307,4 +307,4 @@ Every requirement ID in requirements.md appears in exactly one `Satisfies:` line
 
 Known consequence, carried from requirements Out of Scope: while issue #21 is open, the short
 gate's store holds are expected to produce `soak hang core` and fail release-check. A passing gate
-on `main` is first demonstrable once #21 is fixed.
+on `main` is first demonstrable once #21 is fixed. *(Realigned 2026-11-06: #21 was fixed by PR #32, merged at `a33135d`. Two full `cargo xtask soak` runs on `main` at `a33135d`, 2026-11-06 09:05 and 10:01, recorded no `soak hang core` and printed `soak verdict pass`.)*
