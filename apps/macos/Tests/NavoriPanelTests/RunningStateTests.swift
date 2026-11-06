@@ -214,6 +214,61 @@ struct RunningSubmenuStateTests {
         ])
     }
 
+    @Test func a_recorded_sleep_leads_the_submenu_with_a_separator() {
+        let sleep = LastSleepText(value: "09:20", spoken: "today at 09:20")
+        let state = RunningSubmenuState(running: running([]), lastSleep: sleep)
+        #expect(Array(state.items.prefix(3)) == [.lastSleep(sleep), .separator, .keepAwake])
+    }
+
+    @Test func no_recorded_sleep_shows_no_row_and_no_separator() {
+        let state = RunningSubmenuState(running: running([]))
+        #expect(state.items.first == .keepAwake)
+    }
+
+    @Test func the_full_order_runs_from_last_sleep_to_stop_all() {
+        let sleep = LastSleepText(value: "09:20", spoken: "today at 09:20")
+        let idle = project("api", state: .idle, ports: [port(1, stop: "a")], stoppable: 1, childStop: "r")
+        let commands = AwakeSubmenuState(
+            status: .on(sources: []),
+            leases: [AwakeLeaseInput(kind: .command, harness: nil, label: "make test", pid: 77, stopped: false, until: nil)],
+            displayHeld: false,
+            tracking: true
+        ).commandRows
+        let state = RunningSubmenuState(
+            running: running([idle], stopAll: ["r"], stopAllPorts: 1),
+            problem: "Awake cannot hold",
+            commands: commands,
+            lastSleep: sleep
+        )
+        #expect(state.items.map(Self.kind) == [
+            "lastSleep", "separator", "keepAwake", "trackingAgents", "lidClosed", "problem", "separator",
+            "project", "separator", "commands", "separator", "stopAll",
+        ])
+    }
+
+    @Test func the_last_sleep_item_has_no_action_id() {
+        let sleep = LastSleepText(value: "09:20", spoken: "today at 09:20")
+        #expect(RunningSubmenuItem.lastSleep(sleep).actionId == nil)
+        #expect(RunningSubmenuItem.lidClosed.actionId == "awake.lid")
+        #expect(RunningSubmenuItem.trackingAgents.actionId == "awake.tracking")
+    }
+
+    private static func kind(_ item: RunningSubmenuItem) -> String {
+        switch item {
+        case .lastSleep: "lastSleep"
+        case .keepAwake: "keepAwake"
+        case .trackingAgents: "trackingAgents"
+        case .lidClosed: "lidClosed"
+        case .note: "note"
+        case .problem: "problem"
+        case .separator: "separator"
+        case .nothingRunning: "nothingRunning"
+        case .project: "project"
+        case .commands: "commands"
+        case .stopAll: "stopAll"
+        }
+    }
+
     @Test func no_note_means_no_problem_line_and_no_stop_all_means_no_closing_separator() {
         let state = RunningSubmenuState(running: running([project("klynt", state: .working, sessions: [live])]))
         #expect(state.items == [

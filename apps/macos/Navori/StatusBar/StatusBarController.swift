@@ -299,15 +299,13 @@ final class StatusBarController: NSObject {
     }
 
     private var runningCommands: [CascadeNode] {
-        [
+        (store.runningSubmenu?.items ?? []).compactMap(\.actionId).map { id in
             CascadeNode(
-                id: "awake.keep",
+                id: id,
                 isActionable: true,
-                children: KeepAwakeChoice.all.map { CascadeNode(id: $0.id, isActionable: true) }
-            ),
-            CascadeNode(id: "awake.tracking", isActionable: true),
-            CascadeNode(id: "awake.lid", isActionable: true),
-        ]
+                children: id == "awake.keep" ? KeepAwakeChoice.all.map { CascadeNode(id: $0.id, isActionable: true) } : []
+            )
+        }
     }
 
     private func activate(_ id: String) {

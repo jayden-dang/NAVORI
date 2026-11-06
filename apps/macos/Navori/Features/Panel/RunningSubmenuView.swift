@@ -28,6 +28,8 @@ struct RunningSubmenuView: View {
     private func row(_ item: RunningSubmenuItem, state: RunningSubmenuState) -> some View {
         let awake = store.awakeSubmenu
         switch item {
+        case let .lastSleep(text):
+            LastSleepRowView(text: text)
         case .keepAwake:
             MenuRowView(
                 row: MenuRow(
@@ -144,6 +146,33 @@ private struct AwakeProblemView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(problem.title)
         .accessibilityValue(problem.detail ?? "")
+    }
+}
+
+private struct LastSleepRowView: View {
+    let text: LastSleepText
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "moon")
+                .font(.system(size: 12))
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .frame(width: 14, height: 20)
+            Text("Last sleep")
+                .font(.system(size: 14))
+                .foregroundStyle(Color(nsColor: .labelColor))
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Text(text.value)
+                .font(.system(size: 12))
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .lineLimit(1)
+                .fixedSize()
+        }
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Last sleep, \(text.spoken)")
     }
 }
 
