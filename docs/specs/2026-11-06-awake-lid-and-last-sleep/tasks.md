@@ -563,16 +563,16 @@ _Requirements: LID-6.1, LID-6.2, LID-6.3, LID-7.7_
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Write failing tests in `cli.rs`.** Every lid test runs against a stub `UnixListener` server that records the request JSON and answers a fixture state. Copy the stubs at `apps/cli/tests/cli.rs` lines 535, 1072 and 1419. **Never** use the real in-process `NavoriCore` (`cli.rs` line 55, `Platform::mac()`), because a `lid {on: true}` there would set the real lid (charter hard stop).
+- [x] **Step 1: Write failing tests in `cli.rs`.** Every lid test runs against a stub `UnixListener` server that records the request JSON and answers a fixture state. Copy the stubs at `apps/cli/tests/cli.rs` lines 535, 1072 and 1419. **Never** use the real in-process `NavoriCore` (`cli.rs` line 55, `Platform::mac()`), because a `lid {on: true}` there would set the real lid (charter hard stop).
   - `awake_lid_on_dispatches_the_lid_action`
   - `awake_lid_off_dispatches_the_lid_action`
   - `status_prints_lid_closed_after_tracking_agents`, covering `off`, `on`, `on (held)` and `on (needs adapter)` from fixture states (`lid`, `lid_held`, `on_adapter`)
   - `status_reads_a_missing_lid_field_as_off`
   - `status_json_carries_the_lid_fields`
-- [ ] **Step 2: Run** `cargo test -p navori-cli --test cli`. Expect: unknown subcommand `lid`.
-- [ ] **Step 3: Implement** the verb and the status line with plain `serde_json::Value` (no new dependency). In `docs/features/awake.md`, update the CLI paragraph (line 20), the doctor line (line 22), the menu rows (line 30) and the "does not do" list (line 36), where the lid becomes adapter-only support. In `docs/agents/verify.md`, update the awake commands (lines 66, 100 and 151-156).
-- [ ] **Step 4: Run** `cargo test -p navori-cli && cargo xtask check-deps`. Expect: pass.
-- [ ] **Step 5: Commit** `feat(cli): navori awake lid on|off`
+- [x] **Step 2: Run** `cargo test -p navori-cli --test cli`. Expect: unknown subcommand `lid`.
+- [x] **Step 3: Implement** the verb and the status line with plain `serde_json::Value` (no new dependency). In `docs/features/awake.md`, update the CLI paragraph (line 20), the doctor line (line 22), the menu rows (line 30) and the "does not do" list (line 36), where the lid becomes adapter-only support. In `docs/agents/verify.md`, update the awake commands (lines 66, 100 and 151-156).
+- [x] **Step 4: Run** `cargo test -p navori-cli && cargo xtask check-deps`. Expect: pass.
+- [x] **Step 5: Commit** `feat(cli): navori awake lid on|off`
 
 _Requirements: LID-3.10, LID-3.11, LID-7.9, LID-7.12_
 
