@@ -68,6 +68,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 - **ROAD-28** soak-and-hang-check — After: ROAD-5 — Surfaces: `xtask/`, `apps/macos/Navori/`
 - **ROAD-34** menubar-visual-foundation — After: none — Surfaces: `apps/macos/Navori/StatusBar/`, `apps/macos/Navori/Features/Panel/`, `apps/macos/Navori/Features/Settings/`, `apps/macos/NavoriPanel/`, `apps/macos/Package.swift`, `.cargo/config.toml`, `xtask/`
 - **ROAD-35** status-icon-states — After: ROAD-7, ROAD-8, ROAD-34 — Surfaces: `modules/awake/`, `crates/kernel/`, `crates/protocol/`, `crates/ffi/`, `apps/cli/`, `apps/macos/Navori/Core/`, `apps/macos/Navori/StatusBar/`, `apps/macos/NavoriPanel/`, `xtask/assets/`
+- **ROAD-41** awake-lid-and-last-sleep — After: ROAD-8, ROAD-18 — Surfaces: `modules/awake/`, `crates/macos/`, `crates/ffi/`, `apps/macos/Navori/`, `apps/macos/NavoriPanel/`, `apps/cli/` — Card: [ROAD-41](roads/ROAD-41.md)
 **Depends-on:** MILE-1
 **Commitment:** Planned
 **Closed:** None
