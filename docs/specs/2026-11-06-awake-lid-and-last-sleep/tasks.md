@@ -185,7 +185,7 @@ _Requirements: LID-7.6_
 
 **Depends-on:** none
 
-- [ ] **Step 1: Write failing tests in `fakes.rs`:**
+- [x] **Step 1: Write failing tests in `fakes.rs`:**
   - `a_held_lid_is_set_until_released`
   - `releasing_a_lid_guard_clears_the_setting`
   - `dropping_a_lid_guard_clears_the_setting`, where the log ends in `Clear`
@@ -194,15 +194,15 @@ _Requirements: LID-7.6_
   - `give_back_clears_without_a_guard`
   - `the_probe_sees_every_call_in_order`
   - `the_scripted_sleep_reason_is_returned`
-- [ ] **Step 2: Run** `cargo test -p navori-macos --features fake --test fakes`. Expect: unresolved `FakeLid`.
-- [ ] **Step 3: Implement `MacLid`:**
+- [x] **Step 2: Run** `cargo test -p navori-macos --features fake --test fakes`. Expect: unresolved `FakeLid`.
+- [x] **Step 3: Implement `MacLid`:**
   - each call: `IOServiceMatching("IOPMrootDomain")` → `IOServiceGetMatchingService` → `IOServiceOpen(task, 0)`, where `task` is read from `mach_task_self_`, declared in the crate's own `extern "C"` block. `libc`'s `mach_task_self()` and `mach_task_self_` are both `#[deprecated]` in 0.2.191 (`unix/bsd/apple/mod.rs` lines 5326 and 5451), so using them fails `clippy -D warnings` → `IOConnectCallScalarMethod(conn, 12, [1 or 0])` → `IOServiceClose` and `IOObjectRelease`
   - `sleep_reason`: `IORegistryEntryCreateCFProperty("Last Sleep Reason")`
   - each `unsafe` block carries `// SAFETY:`
   - **no test calls `MacLid`**
-- [ ] **Step 4: Implement `FakeLid`** on `Arc<Mutex<State>>`, with a lock that recovers from a poisoned mutex (copy `fake/power.rs`). A guard's closure shares the state. Add the module and `pub use` lines.
-- [ ] **Step 5: Run** `cargo test -p navori-macos --features fake` and `cargo xtask check-deps`. Expect: pass.
-- [ ] **Step 6: Commit** `feat(macos): a lid-setting seam with a guard and a fake`
+- [x] **Step 4: Implement `FakeLid`** on `Arc<Mutex<State>>`, with a lock that recovers from a poisoned mutex (copy `fake/power.rs`). A guard's closure shares the state. Add the module and `pub use` lines.
+- [x] **Step 5: Run** `cargo test -p navori-macos --features fake` and `cargo xtask check-deps`. Expect: pass.
+- [x] **Step 6: Commit** `feat(macos): a lid-setting seam with a guard and a fake`
 
 _Requirements: LID-1.11_
 
