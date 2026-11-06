@@ -153,7 +153,7 @@ _Avoid_: pause, sleep mode
 
 **Lid closed**:
 The on/off setting that lets held **Leases** keep the Mac awake with its lid closed, only while it is on the power
-adapter. Off by default; on battery it stays on but holds nothing.
+adapter. On battery it stays on but holds nothing.
 _Avoid_: clamshell mode, closed-display mode, lid hold
 
 **Integration**:

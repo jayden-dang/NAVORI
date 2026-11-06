@@ -37,7 +37,7 @@ The second constraint is the GOAL-11 budget and ARCH-16: no timers and no pollin
 5. **The start-up restore runs once per process**, guarded by a `lid_restored` flag on the actor struct. The struct survives supervised restarts (`actor.rs:51`). It runs before `restore_if_needed`, which itself calls `turn` (`actor.rs:926`). No hold is wanted until `lid_restored` is true, so a refused restore is retried and never clears a live hold (LID-4.4; design review F3).
 6. **The power watch is armed only while `Lid closed` is on** (LID-2.5, LID-2.7; changed in design). A Mac that never uses the feature pays nothing, and a broken watch cannot fail doctor when the switch is off. While the switch is on, a dead or failed watch reads as not on the adapter, raises a lid problem and is retried like the exits watcher (LID-2.6).
 7. **The watch is a notify(3) fd driven by tokio `AsyncFd`** in the actor (close package A3).
-   - `navori-macos` registers the key and returns a `PowerWatch` that owns the fd and token and cancels both on Drop.
+   - `navori-macos` registers the key and returns a `PowerWatch` that owns the fd and the token. Its Drop calls `notify_cancel(token)` **only**, which also closes the fd (`notify.h:255-258`); it never calls `close()`, so there is no double close (design r1 finding 3).
    - `PowerWatch` exposes a safe `read_tokens()`, which returns `Err(WouldBlock)` once the fd is empty. The actor calls it inside `AsyncFd::readable()` → `guard.try_io(..)`, so tokio clears readiness on `WouldBlock` and the arm cannot spin (design review F2).
    - Arming registers the watch **first**, then reads `current()`, so a change between the two is never lost (design review F1).
    - No thread is added. tokio `net` is already a workspace feature (`Cargo.toml:68`).
@@ -107,7 +107,7 @@ Interface:
   - `fn current(&self) -> Result<PowerKind, PowerSourceError>`
   - `fn watch(&self) -> Result<PowerWatch, PowerSourceError>`
 - `enum PowerKind { Adapter, Battery }`. `AC Power` maps to Adapter. `Battery Power` and `UPS Power` map to Battery (LID-2.3).
-- `PowerWatch` implements `AsRawFd`. `read_tokens(&self) -> io::Result<usize>` reads every pending 4-byte token. It returns `Ok(n > 0)` when there was a change, `Ok(0)` on EOF (the watch is closed), and `Err(WouldBlock)` when the fd is empty. Callers must go through `AsyncFd::try_io`, so readiness is cleared.
+- `PowerWatch` implements `AsRawFd` and has two variants: `Notify { fd, token }` (Mac; Drop = `notify_cancel(token)` only) and `Stream(UnixStream)` (fake, from `PowerWatch::from_stream`; Drop drops the stream). `read_tokens(&self) -> io::Result<usize>` reads every pending 4-byte token. It returns `Ok(n > 0)` when there was a change, `Ok(0)` on EOF (the watch is closed), and `Err(WouldBlock)` when the fd is empty. Callers must go through `AsyncFd::try_io`, so readiness is cleared.
 Depth: callers still need to know only "what powers the Mac now" and "an fd that turns readable on a change". The notify registration, the non-blocking flag, the token and cancel, IOPS lookup and CF release stay inside.
 Locality: new files in `crates/macos`; nothing existing changes except the feature list.
 
@@ -216,10 +216,10 @@ Locality: extend the same five files.
 4. Arm or disarm the power watch.
 5. Emit `LID_CHANGED {on}` with a one-sentence summary (LID-3.4).
 
-Read failures at start (`Corrupt` or `Sqlite` from `kv_get`):
-- Treat `lid` as off and skip the restore.
-- Leave `last_sleep_ms` as None.
-- Raise a lid problem (LID-3.13).
+Read failures at start (`Corrupt` or `Sqlite` from `kv_get`), each raising a lid problem (LID-3.13):
+- An unreadable `lid` reads as off.
+- An unreadable `last_sleep` leaves `last_sleep_ms` as None, so there is no row.
+- Only an unreadable `lid_held` marker skips the start-up restore (§4 Start-up, step 1).
 
 ### 6. Last sleep (`modules/awake` handling, `crates/ffi/src/lib.rs` forwarder)
 
@@ -387,10 +387,6 @@ Charter hard stop: no test may call the real lid setting.
 |---|---|---|
 | Awake Module through the kernel (`modules/awake/tests/common` rig: `dispatch` + `FakeClock` + `FakePower` + `FakeLid` + `FakePowerSource` + in-memory Store) — existing seam, extended | integration | LID-1.1–1.10, 1.12, LID-2.1, 2.2, 2.5–2.7, LID-3.1–3.6, 3.12, 3.13, LID-4.1–4.4, LID-5.2, 5.3, 5.8, 5.9, LID-7.1–7.4, 7.11, LID-8.1, 8.3, 8.4 |
 | Awake actor drop (rig: drop the kernel or module while holding) — existing rig | integration | LID-1.11, LID-8.4 |
-
-How LID-8.4 is tested (design review F6):
-- `FakeLid` takes an `on_call` probe. The test passes a closure that reads `kv_get("awake","lid_held")`, so every `Set` and `Clear` records whether the marker was stored at that instant.
-- Per-key store failures come from an SQLite trigger installed through `Store::with_conn` on the in-memory store, for example `BEFORE INSERT ON kv WHEN NEW.key='lid_held' … RAISE(ABORT)`.
 | `FakeLid` / `FakePowerSource` / `LidGuard` / `PowerWatch::from_stream` (`crates/macos/tests/fakes.rs`) — existing file | unit | LID-1.11, LID-2.3 |
 | `Store` (`crates/store` tests) — existing | unit | LID-7.6 |
 | `NavoriCore::start_with` on a temp profile (`crates/ffi/tests/core.rs` pattern; real `Platform::mac()` with `Lid closed` off and no marker, so the lid setting is never called. `system_will_sleep()` reads only `Last Sleep Reason`) — existing | integration | LID-5.1, LID-7.5, 7.7, 7.8 |
@@ -399,6 +395,10 @@ How LID-8.4 is tested (design review F6):
 | NavoriPanel pure state (`RunningStateTests`, `AwakeSubmenuStateTests`, new `LastSleepTextTests`) — existing target | unit | LID-2.4, LID-3.7–3.9, LID-5.4–5.7, LID-6.3 (string), LID-7.13, 7.15–7.17, LID-8.5 |
 | Menu-open path (`CoreStore` builds `RunningSubmenuState` from the last pushed `CoreSnapshot` only). Verified by a NavoriPanel test that builds every row from a snapshot value, and by the import rule: NavoriPanel and `Features/Panel` import no IOKit; `check-deps` / grep) — existing | unit + integration | LID-8.2 |
 | `cargo xtask check-deps` and the Swift import rule — existing | integration | LID-7.9, LID-7.10, LID-7.14 |
+
+How LID-8.4 is tested (design review F6):
+- `FakeLid` takes an `on_call` probe. The test passes a closure that reads `kv_get("awake","lid_held")`, so every `Set` and `Clear` records whether the marker was stored at that instant.
+- Per-key store failures come from an SQLite trigger installed through `Store::with_conn` on the in-memory store, for example `BEFORE INSERT ON kv WHEN NEW.key='lid_held' … RAISE(ABORT)`.
 
 There are no new seams: every row extends an existing test rig or target.
 

@@ -206,3 +206,4 @@ Owned unknowns. Each can be settled only by the operator's real lid run; tests h
 - That giving lid sleep back while the lid is closed sleeps the Mac within seconds. The 5 s test bound is agent-decided, from one control run of 4 s (LID-1.2, LID-2.1) — operator (lid run) — before merge — forbid-guess.
 - That a reboot gives lid sleep back. Inferred from xnu, where the init code sets the mask to 0 — operator — before merge — forbid-guess.
 - Whether powerd uses the same lid bit and could clash with Navori — operator — before merge — forbid-guess.
+- That a change of power source during sleep reaches Navori after wake. Test: hold the lid on the adapter, sleep from the Apple menu, unplug, wake, close the lid; the Mac sleeps. If it fails, the fix is one `current()` re-read on the first `turn` after a wake (agent-decided; design r1 finding 1) — operator (lid run) — before merge — forbid-guess.
