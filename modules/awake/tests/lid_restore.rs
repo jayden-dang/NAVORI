@@ -202,3 +202,27 @@ async fn an_unreadable_last_sleep_does_not_skip_the_restore() {
     assert_eq!(stored(&rig, "lid_held"), None);
     rig.shutdown().await;
 }
+
+#[tokio::test(start_paused = true)]
+async fn an_unreadable_last_sleep_raises_a_lid_problem_and_still_restores() {
+    let mut rig = Rig::new();
+    rig.shutdown().await;
+    plant_marker(&rig);
+    rig.store.with_conn(|conn| {
+        conn.execute(
+            "INSERT INTO kv (ns, key, value) VALUES ('awake', 'last_sleep', '{broken')",
+            [],
+        )
+        .unwrap();
+    });
+
+    rig.reopen().await;
+
+    assert_eq!(rig.lid.calls(), [LidCall::Clear]);
+    assert_eq!(stored(&rig, "lid_held"), None);
+    assert_eq!(
+        state(&rig)["lid_problem"],
+        "Awake could not read when the Mac last slept, so the Last sleep row is hidden. Navori keeps working."
+    );
+    rig.shutdown().await;
+}

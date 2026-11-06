@@ -98,3 +98,26 @@ async fn a_failed_store_still_publishes_the_sleep_and_raises_a_lid_problem() {
     assert_eq!(sleeps(&rig).len(), 1);
     rig.shutdown().await;
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_later_successful_save_clears_the_failed_save_problem() {
+    let rig = Rig::new();
+    rig.store.with_conn(|conn| {
+        conn.execute_batch(
+            "CREATE TRIGGER refuse_last_sleep BEFORE INSERT ON kv WHEN NEW.key = 'last_sleep' \
+             BEGIN SELECT RAISE(ABORT, 'refused'); END;",
+        )
+        .unwrap();
+    });
+    rig.dispatch(slept(SLEEP_AT_MS)).await.unwrap();
+    assert_ne!(state(&rig)["lid_problem"], Value::Null);
+
+    rig.store.with_conn(|conn| {
+        conn.execute_batch("DROP TRIGGER refuse_last_sleep;")
+            .unwrap();
+    });
+    rig.dispatch(slept(SLEEP_AT_MS + 1)).await.unwrap();
+
+    assert_eq!(state(&rig)["lid_problem"], Value::Null);
+    rig.shutdown().await;
+}

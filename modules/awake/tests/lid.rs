@@ -789,3 +789,61 @@ async fn a_wake_while_lid_closed_is_off_reads_nothing() {
     assert_eq!(state(&rig)["on_adapter"], Value::Null);
     rig.shutdown().await;
 }
+
+const CLEAR_PROBLEM: &str =
+    "Awake could not give the lid setting back. Navori retries in 60 seconds.";
+
+#[tokio::test(start_paused = true)]
+async fn a_failed_last_sleep_save_does_not_hide_a_pending_clear_failure() {
+    let rig = adapter_rig();
+    lid_on_with_a_lease(&rig).await;
+    rig.lid.refuse_clear(5);
+    rig.dispatch(json!("release_all")).await.unwrap();
+    fail_writes_of(&rig, "last_sleep");
+
+    rig.dispatch(json!({ "slept": { "at_ms": 1_793_931_600_000_i64 } }))
+        .await
+        .unwrap();
+
+    assert!(rig.lid.is_set());
+    assert_eq!(state(&rig)["lid_problem"], CLEAR_PROBLEM);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_power_watch_that_arms_again_does_not_clear_a_pending_clear_failure() {
+    let rig = adapter_rig();
+    lid_on_with_a_lease(&rig).await;
+    rig.lid.refuse_clear(5);
+    rig.dispatch(json!("release_all")).await.unwrap();
+    rig.power_source.kill();
+    rig.idle().await;
+    assert_eq!(state(&rig)["lid_problem"], CLEAR_PROBLEM);
+
+    rig.advance(Duration::from_secs(60)).await;
+    rig.idle().await;
+
+    assert_eq!(rig.power_source.watch_count(), 2);
+    assert!(rig.lid.is_set());
+    assert_eq!(state(&rig)["lid_problem"], CLEAR_PROBLEM);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_refused_set_whose_off_value_cannot_be_saved_raises_a_problem_and_deletes_the_marker() {
+    let rig = adapter_rig();
+    rig.lid.refuse_set(5);
+    rig.dispatch(lid(true)).await.unwrap();
+    fail_writes_of(&rig, "lid");
+
+    rig.dispatch(hold(600)).await.unwrap();
+
+    let now = state(&rig);
+    assert_eq!(now["lid"], false);
+    assert_eq!(
+        now["lid_problem"],
+        "Awake could not save the Lid closed setting as off, so it may come back on after a restart."
+    );
+    assert_eq!(stored(&rig, "lid_held"), None);
+    rig.shutdown().await;
+}

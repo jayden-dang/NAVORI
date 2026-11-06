@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use navori_kernel::{ActionError, ModuleCtx, Request, Severity, WaitHandle, Wake};
@@ -33,6 +33,9 @@ const LID_REFUSED_PROBLEM: &str = "macOS refused to keep the lid awake, so Lid c
 const LID_CLEAR_PROBLEM: &str =
     "Awake could not give the lid setting back. Navori retries in 60 seconds.";
 const LAST_SLEEP_PROBLEM: &str = "Awake could not save when the Mac last slept.";
+const LAST_SLEEP_READ_PROBLEM: &str = "Awake could not read when the Mac last slept, so the Last sleep row is hidden. Navori keeps working.";
+const LID_SAVE_OFF_PROBLEM: &str =
+    "Awake could not save the Lid closed setting as off, so it may come back on after a restart.";
 const STORE_PROBLEM: &str = "Awake could not save a lease. Navori retries in 60 seconds.";
 const PLATFORM_PROBLEM: &str = "Awake could not watch a process, so a stored lease stays on disk. Navori retries in 60 seconds.";
 
@@ -58,13 +61,48 @@ impl Problems {
     }
 }
 
+/// Declaration order is severity: the first kind that is set is the one published.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum LidProblemKind {
+    Clear,
+    MarkerRead,
+    Marker,
+    SaveOff,
+    Refused,
+    Power,
+    LidRead,
+    LastSleepRead,
+    LastSleep,
+}
+
+#[derive(Debug, Default)]
+struct LidProblems(BTreeMap<LidProblemKind, &'static str>);
+
+impl LidProblems {
+    fn raise(&mut self, kind: LidProblemKind, text: &'static str) {
+        self.0.insert(kind, text);
+    }
+
+    fn clear(&mut self, kind: LidProblemKind) {
+        self.0.remove(&kind);
+    }
+
+    fn clear_all_but_clear(&mut self) {
+        self.0.retain(|kind, _| *kind == LidProblemKind::Clear);
+    }
+
+    fn first(&self) -> Option<String> {
+        self.0.values().next().map(|text| (*text).to_owned())
+    }
+}
+
 pub struct Awake {
     platform: Platform,
     table: LeaseTable,
     reconciler: Reconciler,
     published: AwakeState,
     lid_on: bool,
-    lid_problem: Option<String>,
+    lid_problems: LidProblems,
     power: Option<AsyncFd<PowerWatch>>,
     on_adapter: Option<bool>,
     lid: Option<LidGuard>,
@@ -97,7 +135,7 @@ impl Awake {
             reconciler,
             published: AwakeState::idle(),
             lid_on: false,
-            lid_problem: None,
+            lid_problems: LidProblems::default(),
             power: None,
             on_adapter: None,
             lid: None,
@@ -184,7 +222,11 @@ impl Awake {
     fn load_last_sleep(&mut self, ctx: &ModuleCtx<Self>) {
         match stored::load_last_sleep(&ctx.store) {
             Ok(value) => self.last_sleep_ms = value,
-            Err(err) => tracing::warn!(error = %err, "the last sleep could not be read"),
+            Err(err) => {
+                tracing::warn!(error = %err, "the last sleep could not be read");
+                self.lid_problems
+                    .raise(LidProblemKind::LastSleepRead, LAST_SLEEP_READ_PROBLEM);
+            }
         }
     }
 
@@ -192,12 +234,13 @@ impl Awake {
         match stored::load_lid(&ctx.store) {
             Ok(value) => {
                 self.lid_on = value.unwrap_or(false);
-                self.lid_problem = None;
+                self.lid_problems.clear(LidProblemKind::LidRead);
             }
             Err(err) => {
                 tracing::warn!(error = %err, "the Lid closed setting could not be read");
                 self.lid_on = false;
-                self.lid_problem = Some(LID_READ_PROBLEM.to_owned());
+                self.lid_problems
+                    .raise(LidProblemKind::LidRead, LID_READ_PROBLEM);
             }
         }
     }
@@ -229,7 +272,7 @@ impl Awake {
         }
         self.read_power(now);
         if self.power.is_some() {
-            self.lid_problem = None;
+            self.lid_problems.clear(LidProblemKind::Power);
         }
     }
 
@@ -255,7 +298,8 @@ impl Awake {
         }
         tracing::warn!("the power-source watch stopped; it reads as battery until the retry");
         self.on_adapter = Some(false);
-        self.lid_problem = Some(POWER_PROBLEM.to_owned());
+        self.lid_problems
+            .raise(LidProblemKind::Power, POWER_PROBLEM);
         self.schedule_retry(now);
     }
 
@@ -427,7 +471,7 @@ impl Awake {
             ));
         }
         self.lid_on = on;
-        self.lid_problem = None;
+        self.lid_problems.clear_all_but_clear();
         if on {
             self.arm_power(now);
         } else {
@@ -444,9 +488,16 @@ impl Awake {
 
     fn record_sleep(&mut self, ctx: &ModuleCtx<Self>, at_ms: i64) {
         let reason = self.platform.sleep_reason();
-        if let Err(err) = stored::save_last_sleep(&ctx.store, at_ms) {
-            tracing::warn!(error = %err, "the last sleep could not be stored");
-            self.lid_problem = Some(LAST_SLEEP_PROBLEM.to_owned());
+        match stored::save_last_sleep(&ctx.store, at_ms) {
+            Ok(()) => {
+                self.lid_problems.clear(LidProblemKind::LastSleep);
+                self.lid_problems.clear(LidProblemKind::LastSleepRead);
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "the last sleep could not be stored");
+                self.lid_problems
+                    .raise(LidProblemKind::LastSleep, LAST_SLEEP_PROBLEM);
+            }
         }
         self.last_sleep_ms = Some(at_ms);
         ctx.emit(
@@ -861,7 +912,10 @@ impl Awake {
                 self.lid = Some(guard);
             } else {
                 match guard.release() {
-                    Ok(()) => self.finish_lid_clear(&ctx.store),
+                    Ok(()) => {
+                        self.log_lid_given_back(self.give_back_reason());
+                        self.finish_lid_clear(&ctx.store);
+                    }
                     Err(err) => self.note_lid_clear_failed(&err, now),
                 }
             }
@@ -869,7 +923,10 @@ impl Awake {
         }
         if self.pending_lid_clear() && self.retry_at.is_none() {
             match self.platform.give_back_lid() {
-                Ok(()) => self.finish_lid_clear(&ctx.store),
+                Ok(()) => {
+                    self.log_lid_given_back(self.give_back_reason());
+                    self.finish_lid_clear(&ctx.store);
+                }
                 Err(err) => self.note_lid_clear_failed(&err, now),
             }
         }
@@ -892,7 +949,8 @@ impl Awake {
                 }
                 Err(err) => {
                     tracing::warn!(error = %err, "the lid marker could not be read");
-                    self.lid_problem = Some(LID_MARKER_READ_PROBLEM.to_owned());
+                    self.lid_problems
+                        .raise(LidProblemKind::MarkerRead, LID_MARKER_READ_PROBLEM);
                     self.lid_restored = true;
                     return;
                 }
@@ -901,6 +959,7 @@ impl Awake {
         match self.platform.give_back_lid() {
             Ok(()) => {
                 self.lid_restored = true;
+                self.log_lid_given_back("restore");
                 self.finish_lid_clear(&ctx.store);
             }
             Err(err) => self.note_lid_clear_failed(&err, now),
@@ -910,10 +969,32 @@ impl Awake {
     fn release_lid_on_quit(&mut self, ctx: &ModuleCtx<Self>) {
         if let Some(guard) = self.lid.take() {
             match guard.release() {
-                Ok(()) => self.finish_lid_clear(&ctx.store),
+                Ok(()) => {
+                    self.log_lid_given_back("quit");
+                    self.finish_lid_clear(&ctx.store);
+                }
                 Err(err) => tracing::warn!(error = %err, "the lid could not be given back on quit"),
             }
         }
+    }
+
+    fn give_back_reason(&self) -> &'static str {
+        if !self.lid_on {
+            "off"
+        } else if self.on_adapter != Some(true) {
+            "battery"
+        } else {
+            "lease"
+        }
+    }
+
+    fn log_lid_given_back(&self, reason: &'static str) {
+        tracing::info!(
+            reason,
+            lid_on = self.lid_on,
+            on_adapter = ?self.on_adapter,
+            "the lid setting was given back"
+        );
     }
 
     fn hold_lid(&mut self, ctx: &ModuleCtx<Self>) {
@@ -921,7 +1002,8 @@ impl Awake {
         // with nothing recording it.
         if let Err(err) = stored::save_lid_held(&ctx.store) {
             tracing::warn!(error = %err, "the lid marker could not be stored");
-            self.lid_problem = Some(LID_MARKER_PROBLEM.to_owned());
+            self.lid_problems
+                .raise(LidProblemKind::Marker, LID_MARKER_PROBLEM);
             return;
         }
         self.lid_marker = true;
@@ -930,6 +1012,7 @@ impl Awake {
             Ok(guard) => {
                 self.lid = Some(guard);
                 self.clear_lid_hold_problem();
+                tracing::info!(reason = "lease", on_adapter = ?self.on_adapter, "the lid is held");
             }
             Err(err) => {
                 tracing::warn!(error = %err, "the lid could not be held");
@@ -937,6 +1020,8 @@ impl Awake {
                 self.disarm_power();
                 if let Err(err) = stored::save_lid(&ctx.store, false) {
                     tracing::warn!(error = %err, "the Lid closed setting could not be stored");
+                    self.lid_problems
+                        .raise(LidProblemKind::SaveOff, LID_SAVE_OFF_PROBLEM);
                 }
                 ctx.emit(
                     LID_CHANGED,
@@ -945,7 +1030,8 @@ impl Awake {
                     json!({ "on": false }),
                 );
                 self.finish_lid_clear(&ctx.store);
-                self.lid_problem = Some(LID_REFUSED_PROBLEM.to_owned());
+                self.lid_problems
+                    .raise(LidProblemKind::Refused, LID_REFUSED_PROBLEM);
             }
         }
     }
@@ -963,17 +1049,15 @@ impl Awake {
 
     fn note_lid_clear_failed(&mut self, err: &navori_macos::LidError, now: SystemTime) {
         tracing::warn!(error = %err, "the lid setting could not be given back");
-        self.lid_problem = Some(LID_CLEAR_PROBLEM.to_owned());
+        self.lid_problems
+            .raise(LidProblemKind::Clear, LID_CLEAR_PROBLEM);
         self.schedule_retry(now);
     }
 
     fn clear_lid_hold_problem(&mut self) {
-        if matches!(
-            self.lid_problem.as_deref(),
-            Some(LID_MARKER_PROBLEM | LID_REFUSED_PROBLEM | LID_CLEAR_PROBLEM)
-        ) {
-            self.lid_problem = None;
-        }
+        self.lid_problems.clear(LidProblemKind::Marker);
+        self.lid_problems.clear(LidProblemKind::Refused);
+        self.lid_problems.clear(LidProblemKind::Clear);
     }
 
     fn note_assertions(&mut self, held: &Held) {
@@ -1021,7 +1105,7 @@ impl Awake {
         state.lid_held = self.lid.is_some();
         state.lid_marker = self.lid_marker;
         state.last_sleep_ms = self.last_sleep_ms;
-        state.lid_problem.clone_from(&self.lid_problem);
+        state.lid_problem = self.lid_problems.first();
         if state != self.published {
             self.published = state.clone();
             let next = state.clone();
