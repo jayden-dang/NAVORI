@@ -72,7 +72,7 @@ Compact delta every task inherits:
 - **Permanent names (Compat External).** These are not renamed after the first commit:
   - kv `awake/lid`, `awake/lid_held` and `awake/last_sleep`
   - Journal kinds `awake.lid_changed {on}` and `awake.slept {at_ms, reason}`
-  - Actions `lid {on}` and `slept {at_ms}`
+  - Actions `lid {on}`, `slept {at_ms}` and `woke`
 - **Shared files.** From load-subgraph on 2026-11-06 (advisory; `owns_coverage` 14/19, and `cluster(LID)` is empty until this file is indexed):
   - `crates/ffi/src/{lib,app}.rs` is shared with ASK, AWAKE, HOOKS, ICON, KCONTRACT, LOOP, PORTS and PSTOP.
   - `CoreStore.swift` and `StatusBarController.swift` are shared with AWAKE, ICON, MENU, PERF and PSTOP.
@@ -286,7 +286,7 @@ _Requirements: LID-2.3_
 - Produces:
   - `Platform::with_lid(self, Arc<dyn LidSetting>) -> Self` and `Platform::with_power_source(self, Arc<dyn PowerSource>) -> Self`. The defaults are an unsupported lid that refuses, and an unsupported power source that reads `Battery` and has no watch. `Platform::mac()` wires `MacLid` and `MacPowerSource`.
   - `AwakeAction::Lid { on: bool }`, `Risk::Write`, in the catalog after `tracking`.
-  - `AwakeAction::Slept { at_ms: i64 }`, `Risk::Write`, in the catalog after `lid`. Its handler lands in Task 9; until then the actor answers `ActionError::Failed`.
+  - `AwakeAction::Slept { at_ms: i64 }` and `AwakeAction::Woke`, both `Risk::Write`, in the catalog after `lid` in that order. Their handlers land in Task 9; until then the actor answers `ActionError::Failed`.
   - `AwakeState` fields, all `#[serde(default)]`:
     - `lid: bool`
     - `lid_held: bool`
@@ -311,7 +311,7 @@ _Requirements: LID-2.3_
   - `an_unreadable_lid_value_reads_as_off_and_raises_a_lid_problem`
   - `setting_tracking_still_stores_first_and_journals_tracking_changed`
 
-  Add `lid` and `slept` to `actions.rs`: `sample()`, the ordered names list and `every_catalog_name_decodes_as_an_action`. Add them to the not-ending lists in `manual.rs` and `display.rs`. In `actions_risk.rs`, set `SAMPLED = 26`, with samples asserting `Write` for both. In `crates/ffi/tests/agent.rs` `no_new_action_appears` (line 606), insert `"awake lid write"` and `"awake slept write"` after `"awake tracking write"` (line 634); LOOP-10.5 allows additions.
+  Add `lid`, `slept` and `woke` to `actions.rs`: `sample()`, the ordered names list and `every_catalog_name_decodes_as_an_action`. Add them to the not-ending lists in `manual.rs` and `display.rs`. In `actions_risk.rs`, set `SAMPLED = 27`, with samples asserting `Write` for all three. In `crates/ffi/tests/agent.rs` `no_new_action_appears` (line 606), insert `"awake lid write"`, `"awake slept write"` and `"awake woke write"` after `"awake tracking write"` (line 634); LOOP-10.5 allows additions.
 - [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test lid --test actions`. Expect: unknown variant `lid`.
 - [ ] **Step 3: Implement** the Platform builders and defaults, the stored helpers (kv namespace `awake`), the `AwakeState` fields (set in `LeaseTable::snapshot` and `AwakeState::idle`, filled by the actor in `publish`), the two Action variants with risk and catalog, and the event constants and summaries.
 - [ ] **Step 4: Implement `set_lid`** by copying `set_tracking`: unchanged → `Ok(None)`; save first; set `lid_on`; emit `LID_CHANGED`. Load `lid` on the first `run_loop` entry.
@@ -473,7 +473,7 @@ _Requirements: LID-3.13, LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.4_
 **Files:**
 - Modify: `modules/awake/src/actor.rs`, `crates/ffi/src/lib.rs`
 - Create: `modules/awake/tests/sleep.rs`
-- Test: `modules/awake/tests/sleep.rs`, `crates/ffi/tests/core.rs`
+- Test: `modules/awake/tests/sleep.rs`, `modules/awake/tests/lid.rs`, `crates/ffi/tests/core.rs`
 
 **Reuse:** rung 2 — `NavoriCore::system_did_wake` and the spawned-dispatch shape in `NavoriCore::dispatch` (`lib.rs:445-487`), the Swift `WakeObserver` token pattern
 
@@ -485,6 +485,8 @@ _Requirements: LID-3.13, LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.4_
     1. stamps `SystemTime::now()` in ms first
     2. returns if `shut_down`
     3. spawns a dispatch of `{"slept":{"at_ms":..}}` to `awake` and logs an error
+  - `system_did_wake` keeps its wake pulse and also spawns a dispatch of `"woke"` to `awake`
+  - private `on_woke(ctx)`: while the power watch is armed, one `current()` read through the change path
 
 **Depends-on:** Task 4, Task 8 (all of Tasks 5–9 edit `actor.rs`, so they run in order)
 
@@ -495,17 +497,21 @@ _Requirements: LID-3.13, LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.4_
     - `the_last_sleep_survives_a_relaunch`
     - `every_slept_call_counts`, where two calls give two events and the latest is published
     - `a_failed_store_still_publishes_the_sleep_and_raises_a_lid_problem`
+  - In `lid.rs`:
+    - `a_wake_rereads_the_power_source_while_lid_closed_is_on`, where `read_count` goes up by one
+    - `an_unplug_during_sleep_is_seen_at_wake_and_gives_the_lid_back`: hold the lid, `FakePowerSource::set(Battery)` with no `fire()`, dispatch `woke`; `FakeLid` logs `Clear`
+    - `a_wake_while_lid_closed_is_off_reads_nothing`
   - In `core.rs` (real platform; `Lid closed` stays off):
     - `will_sleep_records_a_time_taken_at_the_call`, where `last_sleep_ms` is between the before and after stamps
     - `the_wake_pulse_still_runs_on_wake`
     - `will_sleep_after_shutdown_records_nothing_and_does_not_panic`
 - [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test sleep`. Expect: the `slept` handler fails.
 - [ ] **Step 3: Implement `record_sleep`:** reason → save → set → emit `SLEPT` (one-sentence summary).
-- [ ] **Step 4: Implement `system_will_sleep`** next to `system_did_wake`, which stays unchanged.
+- [ ] **Step 4: Implement `system_will_sleep`** next to `system_did_wake`. Extend `system_did_wake` to dispatch `woke` after its unchanged wake pulse, and implement `on_woke` in the actor.
 - [ ] **Step 5: Run** `cargo test -p navori-mod-awake && cargo test -p navori-ffi`. Expect: pass.
 - [ ] **Step 6: Commit** `feat(awake): record when the Mac went to sleep`
 
-_Requirements: LID-5.1, LID-5.2, LID-5.3, LID-5.8, LID-5.9, LID-7.5_
+_Requirements: LID-2.8, LID-5.1, LID-5.2, LID-5.3, LID-5.8, LID-5.9, LID-7.5_
 
 ---
 
@@ -557,7 +563,7 @@ _Requirements: LID-6.1, LID-6.2, LID-6.3, LID-7.7_
 - [ ] **Step 1: Write failing tests in `cli.rs`.** Every lid test runs against a stub `UnixListener` server that records the request JSON and answers a fixture state. Copy the stubs at `apps/cli/tests/cli.rs` lines 535, 1072 and 1419. **Never** use the real in-process `NavoriCore` (`cli.rs` line 55, `Platform::mac()`), because a `lid {on: true}` there would set the real lid (charter hard stop).
   - `awake_lid_on_dispatches_the_lid_action`
   - `awake_lid_off_dispatches_the_lid_action`
-  - `status_prints_lid_closed_after_tracking_agents`, covering `on`, `off` and `on (needs adapter)` from the fixture states
+  - `status_prints_lid_closed_after_tracking_agents`, covering `off`, `on`, `on (holding the lid)` and `on (needs adapter)` from fixture states (`lid`, `lid_held`, `on_adapter`)
   - `status_reads_a_missing_lid_field_as_off`
   - `status_json_carries_the_lid_fields`
 - [ ] **Step 2: Run** `cargo test -p navori-cli --test cli`. Expect: unknown subcommand `lid`.
@@ -688,7 +694,7 @@ _Requirements: LID-3.7, LID-5.4, LID-5.5, LID-5.6, LID-5.7, LID-7.14, LID-8.2, L
 | Story | IDs → Task |
 |---|---|
 | 1 | 1.1–1.9, 1.12 → 6; 1.10 → 7; 1.11 → 2, 7 |
-| 2 | 2.1, 2.2 → 6; 2.3 → 3; 2.4 → 12; 2.5, 2.7 → 5; 2.6 → 5, 6 |
+| 2 | 2.1, 2.2 → 6; 2.3 → 3; 2.4 → 12; 2.5, 2.7 → 5; 2.6 → 5, 6; 2.8 → 9 |
 | 3 | 3.1–3.6, 3.12 → 4; 3.13 → 4, 8; 3.7 → 13; 3.8, 3.9 → 12; 3.10, 3.11 → 11 |
 | 4 | 4.1–4.4 → 8 |
 | 5 | 5.1–5.3, 5.8, 5.9 → 9; 5.4–5.7 → 13 |

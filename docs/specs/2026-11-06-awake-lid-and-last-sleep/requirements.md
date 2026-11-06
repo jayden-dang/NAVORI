@@ -52,6 +52,7 @@ Terms: **Lease**, **Tracking agents** and **Running** as in `CONTEXT.md`.
 - **LID-2.5** WHILE `Lid closed` is on THE SYSTEM SHALL learn the power source from one read when its watch is armed (when `Lid closed` turns on, or at start with it on) and from macOS power-source change notifications after that, with no timer and no polling (agent-decided: the `kIOPSNotifyPowerSource` notification; ARCH-16; arming only while on was changed in design).
 - **LID-2.6** WHILE `Lid closed` is on, IF the power source cannot be read, or its change notification cannot be registered or stops delivering, THEN THE SYSTEM SHALL treat the Mac as not on the adapter, give lid sleep back if Navori holds the lid setting, and record a lid problem, retrying the watch as the exits watcher does today (`modules/awake/src/actor.rs:110,588,599`) (agent-decided).
 - **LID-2.7** WHILE `Lid closed` is off THE SYSTEM SHALL neither read nor watch the power source (agent-decided in design).
+- **LID-2.8** WHEN the Mac wakes while `Lid closed` is on THE SYSTEM SHALL read the power source once and act on it as on a change notification, so an unplug during sleep is never missed. The Shell's existing wake call carries it to Awake as an Awake Action named `woke`, with no input and Risk `Write` (agent-decided; final review M1).
 
 ## 3. The `Lid closed` switch
 
@@ -77,7 +78,7 @@ Terms: **Lease**, **Tracking agents** and **Running** as in `CONTEXT.md`.
 - **LID-3.8** THE SYSTEM SHALL draw the `Lid closed` row with the icon `laptopcomputer` and the value `On` or `Off`, with a green dot while on, the same as `Tracking agents` (the brief's kit fallback, agent-decided).
 - **LID-3.9** WHEN the user picks the `Lid closed` row, by click or by keyboard as with `Tracking agents`, THE SYSTEM SHALL run the `lid` Action with the opposite of the current value.
 - **LID-3.10** WHEN the user runs `navori awake lid on` or `navori awake lid off` THE SYSTEM SHALL run the `lid` Action with that value (agent-decided verb).
-- **LID-3.11** WHEN the user runs `navori awake status` THE SYSTEM SHALL print a `Lid closed:` line reading `on`, `off` or `on (needs adapter)`, and its `--json` form SHALL carry the same state (agent-decided wording).
+- **LID-3.11** WHEN the user runs `navori awake status` THE SYSTEM SHALL print a `Lid closed:` line reading `off`, `on`, `on (holding the lid)` or `on (needs adapter)`, and its `--json` form SHALL carry the same state (agent-decided wording; `holding the lid` added in final review M2).
 - **LID-3.12** WHEN the `lid` Action asks for the value `Lid closed` already has THE SYSTEM SHALL change nothing, store nothing and write no event, as `tracking` does today (`actor.rs:258`) (agent-decided).
 - **LID-3.13** IF the stored `Lid closed` value, the `lid_held` marker or the last sleep cannot be read THEN THE SYSTEM SHALL still start the Awake module and record the read failure as a lid problem. An unreadable `Lid closed` value reads as off, an unreadable last sleep shows no `Last sleep` row, and only an unreadable `lid_held` marker skips the start-up restore (agent-decided; narrowed in design review).
 
@@ -173,10 +174,10 @@ Files this change touches. Each has its guard, or `no behavior to guard`:
 
 **Story:** As a stakeholder, I want measurable quality targets for this feature, so that how-well is not left implicit.
 
-- **Performance:** **LID-8.1** WHILE the menu is closed THE SYSTEM SHALL add no timer and no polling for the lid setting or the power source (ARCH-16). Verified by a module test with fakes that count power-source reads: none while `Lid closed` is off, exactly one when the watch is armed, then one per change notification.
+- **Performance:** **LID-8.1** WHILE the menu is closed THE SYSTEM SHALL add no timer and no polling for the lid setting or the power source (ARCH-16). Verified by a module test with fakes that count power-source reads: none while `Lid closed` is off, exactly one when the watch is armed, then one per change notification and one per wake.
   - **LID-8.2** WHEN the Running submenu opens THE SYSTEM SHALL make no IOKit, power-source or notify call. Verified by a test that builds the menu state from a snapshot with fakes that count calls.
   - The GOAL-11 budget (AWAKE-13.1) stays binding. Per `docs/standards/INDEX.md:27`, it is measured at the final milestone, not gated on this feature.
-- **Security:** **LID-8.3** THE SYSTEM SHALL add no socket, root step or helper process for the lid. The `lid` and `slept` Actions SHALL carry Risk `Write`, the same as `tracking`, and reach Navori only through the paths that already serve `tracking`: the in-process `NavoriCore.dispatch` for the menu and Navori AI, and the user-private IPC socket (mode 0600, peer-uid check) for the CLI (threat model TB-2, TB-3). Verified by the Action-doc test and `cargo xtask check-deps`.
+- **Security:** **LID-8.3** THE SYSTEM SHALL add no socket, root step or helper process for the lid. The `lid`, `slept` and `woke` Actions SHALL carry Risk `Write`, the same as `tracking`, and reach Navori only through the paths that already serve `tracking`: the in-process `NavoriCore.dispatch` for the menu and Navori AI, and the user-private IPC socket (mode 0600, peer-uid check) for the CLI (threat model TB-2, TB-3). Verified by the Action-doc test and `cargo xtask check-deps`.
 - **Reliability:** **LID-8.4** THE SYSTEM SHALL never reach a state where Navori holds the lid setting and no `lid_held` marker is stored.
   - Verified by fake-ordered tests that stop the module after each step: marker write, set, clear, marker delete.
   - Also verified by a drop test that records the clear when the module is dropped.
@@ -195,7 +196,7 @@ Files this change touches. Each has its guard, or `no behavior to guard`:
 - A sleep log, history view, duration or reason shown in the menu.
 - A watchdog, helper process, root step or privileged helper.
 - Reading `pmset -g log`, or any system log, when the menu opens.
-- Thermal release logic (agent-decided; macOS keeps its own thermal-emergency and low-battery sleep).
+- Thermal release logic (agent-decided; macOS keeps its own thermal-emergency and low-battery sleep). **Accepted risk, shown to the operator:** a closed Mac held awake on the adapter, for example in a bag, relies on macOS's own thermal-emergency sleep to stop it overheating (final review M3).
 - Telling apart, or protecting, another app's use of the same lid setting. Navori restores only when its own marker says it held, and a release or restore can clear another app's hold (residual limit of the operator's marker rule).
 - The brief's battery proposal (to 20%) and its "unconditional restore at launch". Both were superseded by the card.
 
@@ -206,4 +207,4 @@ Owned unknowns. Each can be settled only by the operator's real lid run; tests h
 - That giving lid sleep back while the lid is closed sleeps the Mac within seconds. The 5 s test bound is agent-decided, from one control run of 4 s (LID-1.2, LID-2.1) — operator (lid run) — before merge — forbid-guess.
 - That a reboot gives lid sleep back. Inferred from xnu, where the init code sets the mask to 0 — operator — before merge — forbid-guess.
 - Whether powerd uses the same lid bit and could clash with Navori — operator — before merge — forbid-guess.
-- That a change of power source during sleep reaches Navori after wake. Test: hold the lid on the adapter, sleep from the Apple menu, unplug, wake, close the lid; the Mac sleeps. If it fails, the fix is one `current()` re-read on the first `turn` after a wake (agent-decided; design r1 finding 1) — operator (lid run) — before merge — forbid-guess.
+- That the wake re-read (LID-2.8) sees an unplug made during sleep. Test: hold the lid on the adapter, sleep from the Apple menu, unplug, wake, close the lid; the Mac sleeps (final review M1) — operator (lid run) — before merge — forbid-guess.

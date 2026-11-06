@@ -41,6 +41,7 @@ The second constraint is the GOAL-11 budget and ARCH-16: no timers and no pollin
    - `PowerWatch` exposes a safe `read_tokens()`, which returns `Err(WouldBlock)` once the fd is empty. The actor calls it inside `AsyncFd::readable()` → `guard.try_io(..)`, so tokio clears readiness on `WouldBlock` and the arm cannot spin (design review F2).
    - Arming registers the watch **first**, then reads `current()`, so a change between the two is never lost (design review F1).
    - No thread is added. tokio `net` is already a workspace feature (`Cargo.toml:68`).
+8a. **A wake reaches Awake through a new `woke` Action** (LID-2.8; final review M1). `NavoriCore::system_did_wake()` keeps its wake pulse (LID-7.5) and also spawns a dispatch of `"woke"` to `awake`. While `Lid closed` is on, the actor reads `current()` once, as for a change notification. The Scheduler's wake pulse does not guarantee a module turn: `wait_until` returns `Due` only when a deadline has passed (`crates/kernel/src/scheduler.rs:118-133`).
 8. **The sleep reaches Awake through a new `slept {at_ms}` Action** (LID-5.9; added in design). `NavoriCore::system_will_sleep()` stamps `at_ms` synchronously, then spawns the dispatch, honouring `shut_down`. The Core reaches a Module only through dispatch (`crates/ffi/src/lib.rs:445-465`). The actor reads the `Last Sleep Reason` through the platform when it handles the Action. That value persists across wake (research Q2).
 9. **Storage** (A4, A5, A9):
    - All new values go in kv namespace `awake`. There is no new migration (LID-7.6).
@@ -133,7 +134,7 @@ Locality: extend; one method and its test. No migration and no schema version ch
 
 ### 4. Lid hold in the Awake actor (`modules/awake`)
 
-Satisfies: LID-1.1, LID-1.2, LID-1.3, LID-1.4, LID-1.5, LID-1.6, LID-1.7, LID-1.8, LID-1.9, LID-1.10, LID-1.12, LID-2.1, LID-2.2, LID-2.6, LID-2.7, LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.1, LID-7.3, LID-7.4, LID-7.11, LID-8.1, LID-8.4
+Satisfies: LID-1.1, LID-1.2, LID-1.3, LID-1.4, LID-1.5, LID-1.6, LID-1.7, LID-1.8, LID-1.9, LID-1.10, LID-1.12, LID-2.1, LID-2.2, LID-2.6, LID-2.7, LID-2.8, LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.1, LID-7.3, LID-7.4, LID-7.11, LID-8.1, LID-8.4
 Reuse: rung 2 — the actor's `turn` / `note_*` / `needs_retry` / `schedule_retry` loop, the exits-watcher dead-and-retry pattern (`actor.rs:588-614`), `Platform` injection (`infra/platform.rs:47-83`) and kv helpers in `infra/stored.rs`
 Respects: ARCH-3, ARCH-10, ARCH-16
 Surface:
@@ -178,6 +179,8 @@ This runs before `restore_if_needed` and the first `turn` (`actor.rs:93,926`). `
 
 The arm sits after the exits arm and before `ctx.recv()`. It is pending forever while not armed (LID-2.7).
 
+**On `woke`** (LID-2.8): while the watch is armed, read `current()` once, through the same path as a change. While `Lid closed` is off, do nothing.
+
 **On quit and on drop:**
 - Quit: when `ctx.recv()` returns `None`, release the lid and then delete the marker (LID-1.10).
 - Drop of the actor, after a permanent failure (`crates/kernel/src/runtime.rs:435-451`) or an abort: drops `LidGuard`, which clears the bit with the marker left (LID-1.11, LID-8.4).
@@ -191,7 +194,7 @@ Security: TB-2, TB-3
 Surface:
 | Reader | Disposition |
 |---|---|
-| `AwakeAction` catalog order and `risk()` match (`action.rs:63-85`) | replace — `lid` added after `tracking`, `slept` after `lid`, both `Risk::Write` |
+| `AwakeAction` catalog order and `risk()` match (`action.rs:63-85`) | replace — `lid` added after `tracking`, then `slept`, then `woke`, all `Risk::Write` |
 | `modules/awake/tests/actions.rs` `sample()` (`:28-52`), ordered names (`:301-319`), spec compare (`:325-337`), decode-all (`:344-352`) | replace — sample payloads and names added |
 | `modules/awake/tests/manual.rs:~255-275` and `display.rs:~289` "not ending manual" lists | replace — `lid`, `slept` added |
 | `crates/ffi/tests/actions_risk.rs:64` `SAMPLED = 24`, `sample()` `:66-98` | replace — 26, with two samples |
@@ -203,7 +206,7 @@ Surface:
 
 Interface:
 - `AwakeAction::Lid { on: bool }`, JSON `{"lid":{"on":true}}`.
-- `AwakeAction::Slept { at_ms: i64 }` (section 6).
+- `AwakeAction::Slept { at_ms: i64 }` and `AwakeAction::Woke` (section 6 and Decision 8a).
 - `AwakeState` gains `lid: bool`, `lid_held: bool`, `on_adapter: Option<bool>`, `lid_marker: bool`, `last_sleep_ms: Option<i64>` and `lid_problem: Option<String>`.
 - `pub const LID_CHANGED = "awake.lid_changed"` and `SLEPT = "awake.slept"`.
 Depth: n/a — extends the Awake Action and state.
@@ -229,10 +232,10 @@ Respects: ARCH-1, ARCH-2, ARCH-4
 Surface:
 | Reader | Disposition |
 |---|---|
-| UniFFI bindings (`NavoriCore` gains `system_will_sleep()`), imported only in `CoreStore` and `NavoriBanner` | replace — bindings regenerated; `system_did_wake` unchanged (LID-7.5) |
+| UniFFI bindings (`NavoriCore` gains `system_will_sleep()`), imported only in `CoreStore` and `NavoriBanner` | replace — bindings regenerated; `system_did_wake` keeps its wake pulse (LID-7.5) and also dispatches `woke` |
 
 Interface:
-- `NavoriCore::system_will_sleep(&self)` is synchronous and returns nothing.
+- `NavoriCore::system_will_sleep(&self)` is synchronous and returns nothing. `system_did_wake` also dispatches `woke` (Decision 8a).
 - The Action `slept {at_ms}`.
 - State field `last_sleep_ms`.
 Depth: n/a — extends the wake seam and the Awake Action set.
@@ -385,7 +388,7 @@ Charter hard stop: no test may call the real lid setting.
 
 | Seam | Kind | Covers |
 |---|---|---|
-| Awake Module through the kernel (`modules/awake/tests/common` rig: `dispatch` + `FakeClock` + `FakePower` + `FakeLid` + `FakePowerSource` + in-memory Store) — existing seam, extended | integration | LID-1.1–1.10, 1.12, LID-2.1, 2.2, 2.5–2.7, LID-3.1–3.6, 3.12, 3.13, LID-4.1–4.4, LID-5.2, 5.3, 5.8, 5.9, LID-7.1–7.4, 7.11, LID-8.1, 8.3, 8.4 |
+| Awake Module through the kernel (`modules/awake/tests/common` rig: `dispatch` + `FakeClock` + `FakePower` + `FakeLid` + `FakePowerSource` + in-memory Store) — existing seam, extended | integration | LID-1.1–1.10, 1.12, LID-2.1, 2.2, 2.5–2.8, LID-3.1–3.6, 3.12, 3.13, LID-4.1–4.4, LID-5.2, 5.3, 5.8, 5.9, LID-7.1–7.4, 7.11, LID-8.1, 8.3, 8.4 |
 | Awake actor drop (rig: drop the kernel or module while holding) — existing rig | integration | LID-1.11, LID-8.4 |
 | `FakeLid` / `FakePowerSource` / `LidGuard` / `PowerWatch::from_stream` (`crates/macos/tests/fakes.rs`) — existing file | unit | LID-1.11, LID-2.3 |
 | `Store` (`crates/store` tests) — existing | unit | LID-7.6 |
@@ -408,7 +411,7 @@ There are no new seams: every row extends an existing test rig or target.
   - §1: 1.11
   - §2: 2.3, 2.5
   - §3: 7.6
-  - §4: 1.1–1.10, 1.12, 2.1, 2.2, 2.6, 2.7, 4.1–4.4, 7.1, 7.3, 7.4, 7.11, 8.1, 8.4
+  - §4: 1.1–1.10, 1.12, 2.1, 2.2, 2.6, 2.7, 2.8, 4.1–4.4, 7.1, 7.3, 7.4, 7.11, 8.1, 8.4
   - §5: 3.1–3.6, 3.12, 3.13, 7.2, 8.3
   - §6: 5.1–5.3, 5.8, 5.9, 7.5
   - §7: 6.1, 6.2, 7.7, 7.8
