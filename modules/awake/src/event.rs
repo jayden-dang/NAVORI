@@ -28,6 +28,10 @@ pub(crate) fn lid_changed(on: bool) -> &'static str {
     }
 }
 
+pub(crate) fn slept() -> &'static str {
+    "The Mac went to sleep."
+}
+
 pub(crate) fn until_off_source() -> &'static str {
     "until off"
 }

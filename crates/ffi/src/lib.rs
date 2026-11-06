@@ -250,6 +250,20 @@ fn startup(context: &str, e: impl std::fmt::Display) -> CoreError {
 }
 
 impl NavoriCore {
+    /// Sends `action` to `module` without waiting for the answer; a failure is logged.
+    fn dispatch_in_background(&self, module: &'static str, action: serde_json::Value) {
+        let inner = self.inner.clone();
+        self.handle.spawn(async move {
+            let envelope = Envelope {
+                module: module.to_owned(),
+                action,
+            };
+            if let Err(err) = inner.kernel.dispatch(envelope).await {
+                tracing::error!(error = %err, module, "a system notice could not be delivered");
+            }
+        });
+    }
+
     /// Runs `work` on the core runtime, or fails with [`CoreError::ShutDown`] once the core has
     /// shut down. A UniFFI `async fn` is polled on Swift's executor, where tokio's blocking pool
     /// has no runtime, so the work hops over a oneshot like `dispatch`.
@@ -486,9 +500,30 @@ impl NavoriCore {
         self.inner.kernel.scheduler().set_panel_visible(visible);
     }
 
+    /// Records when macOS reports that the Mac is about to sleep.
+    pub fn system_will_sleep(&self) {
+        // Stamped before anything else: the dispatch below may run after the Mac is asleep.
+        let at_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|elapsed| i64::try_from(elapsed.as_millis()).ok());
+        if self.shut_down.load(Ordering::SeqCst) {
+            return;
+        }
+        let Some(at_ms) = at_ms else {
+            tracing::error!("the clock reads before 1970, so this sleep was not recorded");
+            return;
+        };
+        self.dispatch_in_background("awake", serde_json::json!({ "slept": { "at_ms": at_ms } }));
+        tracing::info!("system will sleep");
+    }
+
     /// One wake pulse after macOS reports that the Mac woke.
     pub fn system_did_wake(&self) {
         self.inner.kernel.scheduler().wake_pulse();
+        if !self.shut_down.load(Ordering::SeqCst) {
+            self.dispatch_in_background("awake", serde_json::json!("woke"));
+        }
         tracing::info!("system did wake");
     }
 

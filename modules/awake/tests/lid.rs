@@ -742,3 +742,50 @@ async fn dropping_the_kernel_while_holding_gives_the_lid_back() {
 
     assert!(!lid.is_set());
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_wake_rereads_the_power_source_while_lid_closed_is_on() {
+    let rig = adapter_rig();
+    rig.dispatch(lid(true)).await.unwrap();
+    let before = rig.power_source.read_count();
+
+    rig.dispatch(json!("woke")).await.unwrap();
+
+    assert_eq!(rig.power_source.read_count(), before + 1);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_unplug_during_sleep_is_seen_at_wake_and_gives_the_lid_back() {
+    let rig = adapter_rig();
+    rig.processes.add(FakeProcess::new(
+        100,
+        1,
+        501,
+        100_000,
+        "/usr/local/bin/claude",
+    ));
+    rig.dispatch(lid(true)).await.unwrap();
+    rig.dispatch(json!({ "hold_session": { "session_id": "sess-1", "pid": 100, "ppid": 1 } }))
+        .await
+        .unwrap();
+    assert_eq!(rig.lid.calls(), [LidCall::Set]);
+
+    rig.power_source.set(PowerKind::Battery);
+    rig.dispatch(json!("woke")).await.unwrap();
+
+    assert_eq!(rig.lid.calls(), [LidCall::Set, LidCall::Clear]);
+    assert_eq!(state(&rig)["on_adapter"], false);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_wake_while_lid_closed_is_off_reads_nothing() {
+    let rig = adapter_rig();
+
+    rig.dispatch(json!("woke")).await.unwrap();
+
+    assert_eq!(rig.power_source.read_count(), 0);
+    assert_eq!(state(&rig)["on_adapter"], Value::Null);
+    rig.shutdown().await;
+}

@@ -32,6 +32,7 @@ const LID_MARKER_READ_PROBLEM: &str =
 const LID_REFUSED_PROBLEM: &str = "macOS refused to keep the lid awake, so Lid closed is off.";
 const LID_CLEAR_PROBLEM: &str =
     "Awake could not give the lid setting back. Navori retries in 60 seconds.";
+const LAST_SLEEP_PROBLEM: &str = "Awake could not save when the Mac last slept.";
 const STORE_PROBLEM: &str = "Awake could not save a lease. Navori retries in 60 seconds.";
 const PLATFORM_PROBLEM: &str = "Awake could not watch a process, so a stored lease stays on disk. Navori retries in 60 seconds.";
 
@@ -69,6 +70,7 @@ pub struct Awake {
     lid: Option<LidGuard>,
     lid_marker: bool,
     lid_restored: bool,
+    last_sleep_ms: Option<i64>,
     watcher: Option<ProcWatcher>,
     problems: Problems,
     retry_at: Option<SystemTime>,
@@ -101,6 +103,7 @@ impl Awake {
             lid: None,
             lid_marker: false,
             lid_restored: false,
+            last_sleep_ms: None,
             watcher: None,
             problems: Problems::default(),
             retry_at: None,
@@ -114,6 +117,7 @@ impl Awake {
         stored::migrate(&ctx.store)?;
         self.load_tracking(ctx);
         self.load_lid(ctx);
+        self.load_last_sleep(ctx);
         if self.lid_on {
             self.arm_power(wait.now());
         }
@@ -174,6 +178,13 @@ impl Awake {
             Ok(Some(on)) => self.table.set_tracking(on),
             Ok(None) => {}
             Err(err) => tracing::warn!(error = %err, "the tracking setting could not be read"),
+        }
+    }
+
+    fn load_last_sleep(&mut self, ctx: &ModuleCtx<Self>) {
+        match stored::load_last_sleep(&ctx.store) {
+            Ok(value) => self.last_sleep_ms = value,
+            Err(err) => tracing::warn!(error = %err, "the last sleep could not be read"),
         }
     }
 
@@ -318,9 +329,14 @@ impl Awake {
             }
             AwakeAction::Tracking { on } => self.set_tracking(ctx, *on),
             AwakeAction::Lid { on } => self.set_lid(ctx, *on, now),
-            AwakeAction::Slept { .. } | AwakeAction::Woke => Err(ActionError::Failed(
-                "this action is not available yet".to_owned(),
-            )),
+            AwakeAction::Slept { at_ms } => {
+                self.record_sleep(ctx, *at_ms);
+                Ok(None)
+            }
+            AwakeAction::Woke => {
+                self.on_woke(now);
+                Ok(None)
+            }
             AwakeAction::SubagentStart {
                 session_id,
                 agent_id,
@@ -424,6 +440,28 @@ impl Awake {
             json!({ "on": on }),
         );
         Ok(None)
+    }
+
+    fn record_sleep(&mut self, ctx: &ModuleCtx<Self>, at_ms: i64) {
+        let reason = self.platform.sleep_reason();
+        if let Err(err) = stored::save_last_sleep(&ctx.store, at_ms) {
+            tracing::warn!(error = %err, "the last sleep could not be stored");
+            self.lid_problem = Some(LAST_SLEEP_PROBLEM.to_owned());
+        }
+        self.last_sleep_ms = Some(at_ms);
+        ctx.emit(
+            event::SLEPT,
+            Severity::Info,
+            event::slept().to_owned(),
+            json!({ "at_ms": at_ms, "reason": reason }),
+        );
+    }
+
+    /// The change notification can be lost across a sleep, so the source is read again.
+    fn on_woke(&mut self, now: SystemTime) {
+        if self.power.is_some() {
+            self.read_power(now);
+        }
     }
 
     fn hold_until_off(&mut self, now: SystemTime) -> Option<Ended> {
@@ -982,6 +1020,7 @@ impl Awake {
         state.on_adapter = self.on_adapter;
         state.lid_held = self.lid.is_some();
         state.lid_marker = self.lid_marker;
+        state.last_sleep_ms = self.last_sleep_ms;
         state.lid_problem.clone_from(&self.lid_problem);
         if state != self.published {
             self.published = state.clone();

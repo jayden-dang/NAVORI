@@ -148,6 +148,10 @@ impl Platform {
         self.lid.give_back()
     }
 
+    pub(crate) fn sleep_reason(&self) -> Option<String> {
+        self.lid.sleep_reason()
+    }
+
     pub(crate) fn power(&self) -> Arc<dyn PowerAssertions> {
         Arc::clone(&self.power)
     }

@@ -233,14 +233,12 @@ pub(crate) fn delete_lid_held(store: &Store) -> navori_store::Result<()> {
     store.kv_delete(SETTINGS_NS, LID_HELD_KEY)
 }
 
-#[expect(dead_code, reason = "used by the lid restore / last sleep tasks")]
 pub(crate) fn load_last_sleep(store: &Store) -> navori_store::Result<Option<i64>> {
     Ok(store
         .kv_get(SETTINGS_NS, LAST_SLEEP_KEY)?
         .and_then(|value| value.as_i64()))
 }
 
-#[expect(dead_code, reason = "used by the lid restore / last sleep tasks")]
 pub(crate) fn save_last_sleep(store: &Store, at_ms: i64) -> navori_store::Result<()> {
     store.kv_set(SETTINGS_NS, LAST_SLEEP_KEY, &serde_json::json!(at_ms))
 }
