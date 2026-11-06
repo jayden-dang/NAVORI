@@ -5,3 +5,8 @@ Status: Accepted · 2026-11-06 (LID, ROAD-41; accepted with the LID spec under t
 Navori's `PreventUserIdleSystemSleep` assertion never stops lid-close sleep, and the usual fixes need root: `pmset disablesleep`, or a privileged helper as Amphetamine's Closed-Display Mode installs. Lid tests on 2026-11-06 showed that selector 12 on the `IOPMrootDomain` user client works as uid 501 (`kPMSetClamshellSleepState`, `IOPMLibDefs.h:43`), and that the setting outlives the process.
 So `navori-macos` sets that one global bit only while `Lid closed` is on, a Lease is held and the Mac is on its adapter, and the Awake actor owns it as a guard that gives it back on release, quit and drop. The actor writes a `lid_held` marker to the store before setting the bit and deletes it after clearing it, and at the next launch it gives lid sleep back only when that marker is present. Navori does not restore at every launch, because that would clobber another app's setting.
 This is an undocumented use of a public selector, so a macOS update may refuse it or ignore it silently. The bit is shared, so Navori's release can also clear another client's hold. The kv keys (`awake/lid`, `awake/lid_held`, `awake/last_sleep`) and the Journal kinds (`awake.lid_changed`, `awake.slept`) are permanent once shipped. `caffeinate` was rejected because it works only with the lid open.
+
+## Known limits
+
+- A downgrade after a crash with `lid_held` set leaves the global bit set, because the older build does not know the marker. To clear it, turn Lid closed off and quit Navori, or reopen the new build once.
+- Two Navori profiles share the machine-global bit. One profile can clear what the other holds.

@@ -133,6 +133,7 @@ impl NavoriCore {
 
     fn set_panel_visible(&self, visible: bool);                          // throttles polling / coalescing
     fn system_did_wake(&self);                                           // one wake pulse after the Mac wakes
+    fn system_will_sleep(&self);                                         // records when the Mac is about to sleep
     async fn shutdown(&self);
 }
 ```

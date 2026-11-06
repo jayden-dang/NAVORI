@@ -45,10 +45,10 @@ One read-only check: is this instance worth driving?
 ```
 
 Pass: exit 0, every line ✓ (app reachable at the dev socket, config, database, IPC,
-modules, logs, awake, integrations, ports). The `integrations` row fails, and doctor exits 1, when a
+modules, logs, awake, integrations, ports, lid). The `integrations` row fails, and doctor exits 1, when a
 Harness hook needs repair or its file is unreadable. A dev build run from another worktree can
 cause this, because the hook entry names that build's path; that is not a defect of this
-instance. Exit 3 = app not running → Launch first. Any other failure: do not Drive;
+instance. A failing `lid` row also makes doctor exit 1; it shows the lid problem. Exit 3 = app not running → Launch first. Any other failure: do not Drive;
 fix Launch or record the blocker.
 
 ## Drive
