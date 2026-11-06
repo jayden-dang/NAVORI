@@ -532,7 +532,7 @@ _Requirements: LID-2.8, LID-5.1, LID-5.2, LID-5.3, LID-5.8, LID-5.9, LID-7.5_
 
 **Depends-on:** Task 4, Task 9 (both edit `crates/ffi/tests/core.rs`)
 
-- [ ] **Step 1: Write failing tests in `awake.rs`:**
+- [x] **Step 1: Write failing tests in `awake.rs`:**
   - `the_lid_check_passes_with_lid_closed_off`, detail `Lid closed off · not held · not watched · no marker`
   - `the_lid_check_reports_held_adapter_and_marker`, detail `Lid closed on · held · adapter · marker`
   - `the_lid_check_reports_battery_while_on_and_unplugged`, detail `Lid closed on · not held · battery · no marker`
@@ -540,10 +540,10 @@ _Requirements: LID-2.8, LID-5.1, LID-5.2, LID-5.3, LID-5.8, LID-5.9, LID-7.5_
   - `the_lid_check_fails_when_awake_cannot_be_read`
 
   Add `lid` last in the ordered doctor lists in `integrations.rs` (lines 64-119) and `core.rs` (lines 772-790). Keep `doctor_reports_a_healthy_core` (`core.rs` line 423) as is.
-- [ ] **Step 2: Run** `cargo test -p navori-ffi --test awake`. Expect: no `lid_check`.
-- [ ] **Step 3: Implement** `lid_check` and append it after `ports`. In `SettingsView.swift`, change the doctor sentence to "…, logs, ports and lid."
-- [ ] **Step 4: Run** `cargo test -p navori-ffi`. Expect: pass; existing check names and order unchanged. Acceptance for LID-6.3: `grep -n 'logs, ports and lid' apps/macos/Navori/Features/Settings/SettingsView.swift` matches.
-- [ ] **Step 5: Commit** `feat(ffi): a lid row in navori doctor`
+- [x] **Step 2: Run** `cargo test -p navori-ffi --test awake`. Expect: no `lid_check`.
+- [x] **Step 3: Implement** `lid_check` and append it after `ports`. In `SettingsView.swift`, change the doctor sentence to "…, logs, ports and lid."
+- [x] **Step 4: Run** `cargo test -p navori-ffi`. Expect: pass; existing check names and order unchanged. Acceptance for LID-6.3: `grep -n 'logs, ports and lid' apps/macos/Navori/Features/Settings/SettingsView.swift` matches.
+- [x] **Step 5: Commit** `feat(ffi): a lid row in navori doctor`
 
 _Requirements: LID-6.1, LID-6.2, LID-6.3, LID-7.7_
 
