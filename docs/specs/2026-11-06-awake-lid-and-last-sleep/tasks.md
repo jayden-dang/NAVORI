@@ -11,7 +11,7 @@ Status: Approved
 Approved by the operator's command `/shape #34 --auto --go` (relayed by the conductor navori-e7 in .skills/_pending-awake-lid/auto/operator-reply.md, 2026-11-06 11:47 +07).
 Approval: the operator's /shape --go, before reading the spec
 Date: 2026-11-06
-Execution-mode: unset
+Execution-mode: continuous
 Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
