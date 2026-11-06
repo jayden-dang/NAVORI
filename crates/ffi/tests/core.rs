@@ -844,7 +844,8 @@ fn an_idle_core_reports_a_passing_awake_row_and_keeps_the_other_rows() {
             "awake",
             "integrations",
             "logs",
-            "ports"
+            "ports",
+            "lid"
         ]
     );
     let awake = checks.iter().find(|check| check.name == "awake").unwrap();
