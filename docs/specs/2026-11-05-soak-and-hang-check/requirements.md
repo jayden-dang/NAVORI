@@ -1,7 +1,7 @@
 # Requirements: Soak and hang check
 
 Feature code: SOAK
-Status: In-progress
+Status: Implemented
 Approval: the operator's /shape --go, before reading the spec (operator command: `/shape #27 --auto --go --video --work=opus --interpret=opus --build=sonnet`, relayed by the conductor on 2026-11-05)
 Date: 2026-11-05
 
@@ -128,7 +128,7 @@ Files this change touches:
 
 ## Out of Scope
 
-- Fixing anything the soak finds, issue #21 included. While #21 is open, the short gate is expected to record `soak hang core` during store write holds and fail `cargo xtask release-check` until #21 is fixed. This is the case the card's Example 3 names; the stall length is unmeasured.
+- Fixing anything the soak finds, issue #21 included. While #21 is open, the short gate is expected to record `soak hang core` during store write holds and fail `cargo xtask release-check` until #21 is fixed. This is the case the card's Example 3 names; the stall length is unmeasured. *(Realigned 2026-11-06: #21 was fixed by PR #32, merged at `a33135d`. Two full `cargo xtask soak` runs on `main` at `a33135d`, 2026-11-06 09:05 and 10:01, recorded no `soak hang core` and printed `soak verdict pass`.)*
 - Absolute budgets for the baseline-only metrics (a GOAL-11 amendment), and any change to GOAL-11.
 - Recording the perf baseline (#24).
 - Any change to what `cargo xtask perf` measures, judges, prints or how long it takes, and any edit to `xtask/assets/perf-probe.swift`.
@@ -142,6 +142,16 @@ Files this change touches:
 
 ## Open Questions
 
-- ~~Whether releases stay blocked while issue #21 is open.~~ **Resolved by the operator, 2026-11-05 (Lock):** "Keep it, fix #21 first". Build as specified, with no skip and no override; releases wait until #21 is fixed under its own ticket. Under this spec's Locks, the short gate's store holds are expected to record `soak hang core` and fail `cargo xtask release-check` until then.
+- ~~Whether releases stay blocked while issue #21 is open.~~ **Resolved by the operator, 2026-11-05 (Lock):** "Keep it, fix #21 first". Build as specified, with no skip and no override; releases wait until #21 is fixed under its own ticket. Under this spec's Locks, the short gate's store holds are expected to record `soak hang core` and fail `cargo xtask release-check` until then. *(Realigned 2026-11-06: #21 was fixed by PR #32, merged at `a33135d`. Two full `cargo xtask soak` runs on `main` at `a33135d`, 2026-11-06 09:05 and 10:01, recorded no `soak hang core` and printed `soak verdict pass`.)*
 
 - ~~Whether "the perf gate unchanged" covers source as well as behavior.~~ **Resolved by the operator, 2026-11-05 (Lock):** "OK, not a change". Behavior is what counts, so the 3-line `mod` → `pub(crate) mod` edit for `home`, `launch` and `logstream` in `xtask/src/perf/mod.rs:1-7` stays, with perf's output and tests unchanged.
+
+## Known gaps
+
+Nobody verified these end to end; none is claimed as working. Recorded on 2026-11-06 when the spec was marked Implemented.
+
+- Card Example 2, a real leak caught by a full run (SOAK-2.4): covered by the judge's unit tests only. Nothing can inject a leak into the app without editing product code.
+- Three soaks in a row agree (SOAK-9.4): two full runs on `a33135d` agreed (both `pass`, no LEAK, no hang). The third run was not made.
+- `cargo xtask release-check` end to end with the soak gate (SOAK-4.1, 4.2): not run, because preflight stops while the version's tag already exists.
+- A run is only judged fairly when nobody opens the soak app's menu. A first menu open adds about 7 MB that stays after the menu closes (issue #30, closed as not a leak). The leak rule also calls a late rise `ok` when the middle third dips (the 2026-11-06 09:05 run rose 7.2 MiB and was judged `ok`).
+- A run that cannot finish (locked screen, or a probe slower than 10 s under load) prints nothing it measured (issue #33).
