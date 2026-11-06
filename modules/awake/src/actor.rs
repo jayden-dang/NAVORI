@@ -638,7 +638,7 @@ impl Awake {
                 ));
             }
         };
-        let (harness, process, label) = found;
+        let (harness, process, place) = found;
         let Some(deadline) = arrived.checked_add(self.table.timing().session_ttl) else {
             return Err(ActionError::Invalid(
                 "session ttl does not fit on the clock; retry the hold".to_owned(),
@@ -655,7 +655,7 @@ impl Awake {
             process,
             arrived,
             deadline,
-            label,
+            place,
         );
         if let Some(old) = previous.filter(|old| *old != process) {
             self.unwatch_if_idle(old);
@@ -1392,29 +1392,23 @@ impl Awake {
         let mut command_at = 0;
         let mut session_at = 0;
         for (row, id) in &rows {
-            let label = match row.kind {
+            match row.kind {
                 StoredKind::Command => {
-                    let label = label_at(
+                    let label = at(
                         labels.as_ref().map(|pair| pair.commands.as_slice()),
                         command_at,
                     );
                     command_at += 1;
-                    label
+                    self.table.set_command_label(*id, label);
                 }
                 StoredKind::Session => {
-                    let label = label_at(
+                    let place = at(
                         labels.as_ref().map(|pair| pair.sessions.as_slice()),
                         session_at,
                     );
                     session_at += 1;
-                    label
-                }
-            };
-            match row.kind {
-                StoredKind::Command => self.table.set_command_label(*id, label),
-                StoredKind::Session => {
                     if let Some(session_id) = row.session_id.as_deref() {
-                        self.table.set_session_label(session_id, label);
+                        self.table.set_session_place(session_id, place);
                     }
                 }
             }
@@ -1488,7 +1482,7 @@ impl Awake {
                     id,
                     first_hold,
                     deadline,
-                    label,
+                    None,
                 );
                 if let Some(mark) = row.stop_mark {
                     self.table.stop_session(&session_id, mark, false);
@@ -1600,11 +1594,11 @@ fn source_text(lease: &Lease) -> String {
 
 fn kind_of(lease: &Lease) -> &'static str {
     match lease.source {
-        LeaseSource::Duration { .. } => "duration",
-        LeaseSource::UntilOff => "until_off",
-        LeaseSource::Display => "display",
-        LeaseSource::Command { .. } => "command",
-        LeaseSource::Session { .. } => "session",
+        LeaseSource::Duration { .. } => crate::state::LeaseKind::Duration.as_str(),
+        LeaseSource::UntilOff => crate::state::LeaseKind::UntilOff.as_str(),
+        LeaseSource::Display => crate::state::LeaseKind::Display.as_str(),
+        LeaseSource::Command { .. } => crate::state::LeaseKind::Command.as_str(),
+        LeaseSource::Session { .. } => crate::state::LeaseKind::Session.as_str(),
     }
 }
 
@@ -1691,10 +1685,8 @@ fn stored_command(process: ProcId) -> StoredLease {
     }
 }
 
-fn label_at(labels: Option<&[Option<String>]>, index: usize) -> Option<String> {
-    labels
-        .and_then(|labels| labels.get(index).cloned())
-        .flatten()
+fn at<T: Clone>(items: Option<&[Option<T>]>, index: usize) -> Option<T> {
+    items.and_then(|items| items.get(index).cloned()).flatten()
 }
 
 fn truncate_us(time: SystemTime) -> SystemTime {

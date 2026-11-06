@@ -9,7 +9,20 @@ struct AwakeSubmenuStateTests {
         pid: Int32,
         stopped: Bool = false
     ) -> AwakeLeaseInput {
-        AwakeLeaseInput(kind: .session, harness: harness, label: label, pid: pid, stopped: stopped, until: nil)
+        let project: String?
+        let name: String?
+        if let label, let slash = label.firstIndex(of: "/"), label.startIndex != slash,
+           label.index(after: slash) != label.endIndex
+        {
+            project = String(label[..<slash])
+            name = String(label[label.index(after: slash)...])
+        } else {
+            project = label
+            name = label
+        }
+        return AwakeLeaseInput(
+            kind: .session, harness: harness, label: name, pid: pid, stopped: stopped, until: nil, project: project
+        )
     }
 
     private static func state(
@@ -111,9 +124,10 @@ struct AwakeSubmenuStateTests {
         ))
     }
 
-    private static func titled(_ title: String?, label: String = "klynt/dev", pid: Int32 = 51865) -> AwakeLeaseInput {
+    private static func titled(_ title: String?, label: String = "dev", pid: Int32 = 51865) -> AwakeLeaseInput {
         AwakeLeaseInput(
-            kind: .session, harness: "Claude Code", label: label, pid: pid, stopped: false, until: nil, title: title
+            kind: .session, harness: "Claude Code", label: label, pid: pid, stopped: false, until: nil, title: title,
+            project: "klynt"
         )
     }
 

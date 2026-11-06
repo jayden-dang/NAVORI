@@ -108,18 +108,17 @@ pub fn build(
 
     let mut drafts: BTreeMap<Key, Draft> = BTreeMap::new();
     for lease in awake.iter().flat_map(|awake| &awake.leases) {
-        if lease.kind != "session" {
+        if lease.kind != crate::LeaseKindView::Session {
             continue;
         }
-        let Some(label) = lease.label.as_deref().filter(|label| !label.is_empty()) else {
+        let Some(name) = lease.project.as_deref().filter(|name| !name.is_empty()) else {
             continue;
         };
-        let (name, branch) = split_label(label);
         drafts
             .entry(Key::Named(name.to_owned()))
             .or_default()
             .sessions
-            .push((lease, branch));
+            .push((lease, lease.label.as_deref()));
     }
     for entry in ports.iter().flat_map(|ports| ports.entries()) {
         let key = match &entry.place.project {
@@ -302,16 +301,6 @@ fn project_key(project: &RunningProject) -> (bool, bool, String, String) {
     )
 }
 
-/// The project a label joins and the branch after it, when both sides are non-empty.
-fn split_label(label: &str) -> (&str, Option<&str>) {
-    match label.split_once('/') {
-        Some((project, branch)) if !project.is_empty() && !branch.is_empty() => {
-            (project, Some(branch))
-        }
-        _ => (label, None),
-    }
-}
-
 fn unknown_reason(awake: Option<&AwakeView>) -> Option<String> {
     let Some(awake) = awake else {
         return Some(AWAKE_UNREADABLE.to_owned());
@@ -325,8 +314,8 @@ fn unknown_reason(awake: Option<&AwakeView>) -> Option<String> {
     awake
         .leases
         .iter()
-        .filter(|lease| lease.kind == "session")
-        .any(|lease| lease.label.as_deref().is_none_or(str::is_empty))
+        .filter(|lease| lease.kind == crate::LeaseKindView::Session)
+        .any(|lease| lease.project.as_deref().is_none_or(str::is_empty))
         .then(|| NO_LABEL.to_owned())
 }
 

@@ -15,7 +15,7 @@ pub use domain::{
 };
 pub use event::{LEASE_ENDED, LEASE_STARTED, LID_CHANGED, SLEPT, TRACKING_CHANGED};
 pub use infra::{ExitsFactory, Platform, ProcessFactory};
-pub use state::{AwakeState, LeaseState};
+pub use state::{AwakeState, LeaseKind, LeaseState};
 
 use navori_kernel::{Module, ModuleCtx, NoConfig, TrayContribution, TrayGlyph};
 

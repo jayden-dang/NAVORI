@@ -4,21 +4,9 @@ import Testing
 
 @Suite
 struct AwakeLeaseMapTests {
-    @Test func an_unknown_lease_kind_is_dropped() {
-        let lease = AwakeLeaseMap.lease(
-            kind: "not-a-lease",
-            harness: "Claude Code",
-            label: "1 hour",
-            pid: 12,
-            stopped: false,
-            endsAtMs: 1_700_000_000_000
-        )
-        #expect(lease == nil)
-    }
-
     @Test func a_session_row_uses_the_harness() {
         let source = AwakeLeaseMap.sourceName(
-            kind: "session",
+            kind: .session,
             harness: "claude",
             label: "NAVORI/main"
         )
@@ -35,7 +23,7 @@ struct AwakeLeaseMapTests {
         let zone = TimeZone(secondsFromGMT: 0)!
         let ms: Int64 = 1_700_000_000_000
         let lease = AwakeLeaseMap.lease(
-            kind: "duration",
+            kind: .duration,
             harness: nil,
             label: "1 hour",
             pid: nil,
@@ -45,11 +33,11 @@ struct AwakeLeaseMapTests {
         )
         let state = AwakeSubmenuState(
             status: .on(sources: ["1 hour"]),
-            leases: [lease].compactMap { $0 },
+            leases: [lease],
             displayHeld: false,
             tracking: true
         )
-        #expect(lease?.until == "22:13")
+        #expect(lease.until == "22:13")
         #expect(state.keepValue == "until 22:13")
         #expect(AwakeLeaseMap.clockText(ms, timeZone: zone) == "22:13")
     }

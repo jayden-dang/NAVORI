@@ -101,12 +101,22 @@ pub struct CheckView {
     pub detail: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, uniffi::Enum)]
+pub enum LeaseKindView {
+    Duration,
+    UntilOff,
+    Display,
+    Command,
+    Session,
+}
+
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct LeaseView {
     pub key: String,
-    pub kind: String,
+    pub kind: LeaseKindView,
     pub harness: Option<String>,
     pub label: Option<String>,
+    pub project: Option<String>,
     pub pid: Option<i32>,
     pub stopped: bool,
     pub ends_at_ms: Option<i64>,

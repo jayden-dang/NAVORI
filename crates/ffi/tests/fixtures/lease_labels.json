@@ -1,9 +1,6 @@
 [
-  {"label": "klynt/main", "project": "klynt"},
-  {"label": "klynt", "project": "klynt"},
-  {"label": "/main", "project": "/main"},
-  {"label": "klynt/", "project": "klynt/"},
-  {"label": null, "project": null},
-  {"label": "", "project": null},
-  {"label": "a/b/c", "project": "a"}
+  {"project": "klynt", "name": "main"},
+  {"project": "klynt", "name": null},
+  {"project": null, "name": null},
+  {"project": "a", "name": "b/c"}
 ]

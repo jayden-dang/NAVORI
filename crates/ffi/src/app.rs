@@ -13,7 +13,7 @@ use navori_config::{
 };
 use navori_ipc::Handler;
 use navori_kernel::{DispatchError, Kernel, Module, ModuleState};
-use navori_mod_awake::{Awake, AwakeState, LeaseState, Platform, Timing};
+use navori_mod_awake::{Awake, AwakeState, LeaseKind, LeaseState, Platform, Timing};
 use navori_mod_integrations::{
     Harness, Integrations, IntegrationsEnv, IntegrationsState, State, inspect,
 };
@@ -274,6 +274,18 @@ pub fn build_kernel(
         .start()
 }
 
+impl From<LeaseKind> for crate::LeaseKindView {
+    fn from(kind: LeaseKind) -> Self {
+        match kind {
+            LeaseKind::Duration => Self::Duration,
+            LeaseKind::UntilOff => Self::UntilOff,
+            LeaseKind::Display => Self::Display,
+            LeaseKind::Command => Self::Command,
+            LeaseKind::Session => Self::Session,
+        }
+    }
+}
+
 impl From<LeaseState> for crate::LeaseView {
     fn from(lease: LeaseState) -> Self {
         let LeaseState {
@@ -281,6 +293,7 @@ impl From<LeaseState> for crate::LeaseView {
             kind,
             harness,
             label,
+            project,
             pid,
             stopped,
             ends_at_ms,
@@ -288,9 +301,10 @@ impl From<LeaseState> for crate::LeaseView {
         } = lease;
         Self {
             key,
-            kind,
+            kind: kind.into(),
             harness,
             label,
+            project,
             pid,
             stopped,
             ends_at_ms,

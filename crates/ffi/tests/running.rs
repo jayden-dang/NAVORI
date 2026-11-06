@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use navori_ffi::running::{Own, ProjectState, RunningProject, RunningView, StopTargetView, build};
-use navori_ffi::{AwakeView, LeaseView};
+use navori_ffi::{AwakeView, LeaseKindView, LeaseView};
 use navori_mod_ports::PortsState;
 use serde_json::{Value, json};
 
@@ -20,12 +20,22 @@ fn own() -> Own {
     }
 }
 
-fn session(label: Option<&str>, stopped: bool) -> LeaseView {
+fn session(place: Option<&str>, stopped: bool) -> LeaseView {
+    let (project, name) = match place {
+        Some(place) => match place.split_once('/') {
+            Some((project, name)) if !project.is_empty() && !name.is_empty() => {
+                (Some(project.to_owned()), Some(name.to_owned()))
+            }
+            _ => (Some(place.to_owned()), None),
+        },
+        None => (None, None),
+    };
     LeaseView {
-        key: format!("session-{}", label.unwrap_or("none")),
-        kind: "session".into(),
+        key: format!("session-{}", place.unwrap_or("none")),
+        kind: LeaseKindView::Session,
         harness: Some("claude".into()),
-        label: label.map(str::to_owned),
+        label: name,
+        project,
         pid: Some(900),
         stopped,
         ends_at_ms: None,
@@ -165,16 +175,23 @@ fn dev_servers() -> PortsState {
 }
 
 #[test]
-fn a_label_joins_the_project_before_its_first_slash() {
+fn a_session_joins_the_project_the_lease_publishes() {
     let cases: Vec<Value> =
         serde_json::from_str(include_str!("fixtures/lease_labels.json")).unwrap();
     for case in cases {
-        let label = case["label"].as_str();
-        let lease = session(label, false);
+        let project = case["project"].as_str();
+        let name = case["name"].as_str();
+        let mut lease = session(None, false);
+        lease.project = project.map(str::to_owned);
+        lease.label = name.map(str::to_owned);
         let view = view_of(Some(&awake(vec![lease])), Some(&PortsState::default()));
-        match case["project"].as_str() {
+        match project {
             Some(expected) => {
-                assert_eq!(names(&view), [expected], "label {label:?}");
+                assert_eq!(
+                    names(&view),
+                    [expected],
+                    "project {project:?} name {name:?}"
+                );
                 assert_eq!(view.projects[0].state, ProjectState::Working);
                 assert_eq!(view.unknown_reason, None);
             }
@@ -182,7 +199,7 @@ fn a_label_joins_the_project_before_its_first_slash() {
                 assert_eq!(
                     view.unknown_reason.as_deref(),
                     Some(NO_LABEL),
-                    "label {label:?}"
+                    "project {project:?} name {name:?}"
                 );
                 assert!(view.projects.is_empty());
             }

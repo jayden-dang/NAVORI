@@ -790,7 +790,7 @@ fn the_snapshot_carries_awake_after_a_hold() {
     assert_eq!(awake.leases.len(), 1);
     let lease = &awake.leases[0];
     assert_eq!(lease.key, "manual");
-    assert_eq!(lease.kind, "duration");
+    assert_eq!(lease.kind, navori_ffi::LeaseKindView::Duration);
     assert_eq!(lease.label.as_deref(), Some("1 hour"));
     assert_eq!(lease.harness, None);
     assert_eq!(lease.pid, None);

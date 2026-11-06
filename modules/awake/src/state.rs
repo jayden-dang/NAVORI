@@ -1,5 +1,27 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LeaseKind {
+    Duration,
+    UntilOff,
+    Display,
+    Command,
+    Session,
+}
+
+impl LeaseKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Duration => "duration",
+            Self::UntilOff => "until_off",
+            Self::Display => "display",
+            Self::Command => "command",
+            Self::Session => "session",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AwakeState {
     pub leases: Vec<LeaseState>,
@@ -44,9 +66,11 @@ impl AwakeState {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LeaseState {
     pub key: String,
-    pub kind: String,
+    pub kind: LeaseKind,
     pub harness: Option<String>,
     pub label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<String>,
     pub pid: Option<i32>,
     pub stopped: bool,
     pub ends_at_ms: Option<i64>,
