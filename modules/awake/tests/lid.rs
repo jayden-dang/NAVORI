@@ -3,10 +3,13 @@
 mod common;
 
 use common::Rig;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use common::ASSERTION_NAME;
 use navori_kernel::{ActionError, DispatchError};
-use navori_macos::PowerKind;
+use navori_macos::fake::{FakeProcess, LidCall};
+use navori_macos::{AssertionKind, PowerKind};
 use serde_json::{Value, json};
 
 fn lid(on: bool) -> Value {
@@ -315,5 +318,368 @@ async fn an_idle_watch_does_not_spin() {
     }
 
     assert!(rig.power_source.drain_count() <= 1);
+    rig.shutdown().await;
+}
+
+const POWER_PROBLEM: &str = "Awake could not watch the power source, so it reads as on battery. Navori retries in 60 seconds.";
+const SYSTEM_PROBLEM: &str = "macOS refused the request. Navori keeps trying.";
+
+fn hold(seconds: u64) -> Value {
+    json!({ "hold_for": { "seconds": seconds } })
+}
+
+fn session_rig() -> Rig {
+    let rig = adapter_rig();
+    rig.processes.add(FakeProcess::new(
+        100,
+        1,
+        501,
+        100_000,
+        "/usr/local/bin/claude",
+    ));
+    rig
+}
+
+fn hold_session() -> Value {
+    json!({ "hold_session": { "session_id": "sess-1", "pid": 100, "ppid": 1 } })
+}
+
+type Calls = Arc<Mutex<Vec<(LidCall, bool)>>>;
+
+fn watch_marker(rig: &Rig) -> Calls {
+    let calls = Calls::default();
+    let store = rig.store.clone();
+    let seen = Arc::clone(&calls);
+    rig.lid.on_call(Box::new(move |call| {
+        let marker = store.kv_get("awake", "lid_held").unwrap().is_some();
+        seen.lock().unwrap().push((call, marker));
+    }));
+    calls
+}
+
+fn log(calls: &Calls) -> Vec<(LidCall, bool)> {
+    calls.lock().unwrap().clone()
+}
+
+async fn lid_on_with_a_lease(rig: &Rig) {
+    rig.dispatch(lid(true)).await.unwrap();
+    rig.dispatch(hold(600)).await.unwrap();
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_held_lease_on_the_adapter_with_lid_closed_on_sets_the_lid() {
+    let rig = adapter_rig();
+
+    lid_on_with_a_lease(&rig).await;
+
+    assert!(rig.lid.is_set());
+    assert_eq!(state(&rig)["lid_held"], true);
+    assert_eq!(state(&rig)["lid_marker"], true);
+    assert_eq!(stored(&rig, "lid_held"), Some(json!(true)));
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_marker_is_stored_before_the_lid_is_set() {
+    let rig = adapter_rig();
+    let calls = watch_marker(&rig);
+
+    lid_on_with_a_lease(&rig).await;
+
+    assert_eq!(log(&calls), [(LidCall::Set, true)]);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_marker_is_deleted_only_after_the_lid_is_cleared() {
+    let rig = adapter_rig();
+    let calls = watch_marker(&rig);
+    lid_on_with_a_lease(&rig).await;
+
+    rig.dispatch(json!("release_all")).await.unwrap();
+
+    assert_eq!(log(&calls), [(LidCall::Set, true), (LidCall::Clear, true)]);
+    assert_eq!(stored(&rig, "lid_held"), None);
+    assert_eq!(state(&rig)["lid_marker"], false);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_last_lease_ending_gives_the_lid_back() {
+    let rig = adapter_rig();
+    rig.dispatch(lid(true)).await.unwrap();
+    rig.dispatch(hold(60)).await.unwrap();
+    assert!(rig.lid.is_set());
+
+    rig.advance(Duration::from_secs(61)).await;
+    rig.idle().await;
+
+    assert!(!rig.lid.is_set());
+    assert_eq!(state(&rig)["lid_held"], false);
+    assert_eq!(stored(&rig, "lid_held"), None);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn turning_lid_closed_off_gives_the_lid_back() {
+    let rig = adapter_rig();
+    lid_on_with_a_lease(&rig).await;
+
+    let answer = rig.dispatch(lid(false)).await.unwrap();
+
+    assert!(!rig.lid.is_set());
+    assert_eq!(answer["lid_held"], false);
+    assert_eq!(stored(&rig, "lid_held"), None);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn with_tracking_agents_off_a_session_lease_alone_does_not_hold_the_lid() {
+    let rig = session_rig();
+    rig.dispatch(json!({ "tracking": { "on": false } }))
+        .await
+        .unwrap();
+    rig.dispatch(lid(true)).await.unwrap();
+
+    rig.dispatch(hold_session()).await.unwrap();
+
+    assert!(!rig.lid.is_set());
+    assert_eq!(rig.lid.calls(), []);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_session_lease_holds_the_lid_with_tracking_agents_on() {
+    let rig = session_rig();
+    rig.dispatch(lid(true)).await.unwrap();
+
+    rig.dispatch(hold_session()).await.unwrap();
+
+    assert!(rig.lid.is_set());
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_manual_lease_holds_the_lid_with_tracking_agents_off() {
+    let rig = adapter_rig();
+    rig.dispatch(json!({ "tracking": { "on": false } }))
+        .await
+        .unwrap();
+
+    lid_on_with_a_lease(&rig).await;
+
+    assert!(rig.lid.is_set());
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn unplugging_gives_the_lid_back_and_plugging_in_holds_it_again() {
+    let rig = adapter_rig();
+    lid_on_with_a_lease(&rig).await;
+
+    rig.power_source.set(PowerKind::Battery);
+    rig.power_source.fire();
+    rig.idle().await;
+    assert!(!rig.lid.is_set());
+    assert_eq!(stored(&rig, "lid_held"), None);
+
+    rig.power_source.set(PowerKind::Adapter);
+    rig.power_source.fire();
+    rig.idle().await;
+    assert!(rig.lid.is_set());
+    assert_eq!(state(&rig)["lid_held"], true);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_failed_marker_store_sets_nothing_and_raises_a_lid_problem() {
+    let rig = adapter_rig();
+    fail_writes_of(&rig, "lid_held");
+
+    lid_on_with_a_lease(&rig).await;
+
+    assert_eq!(rig.lid.calls(), []);
+    assert_eq!(state(&rig)["lid_held"], false);
+    assert_ne!(state(&rig)["lid_problem"], Value::Null);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_refused_set_turns_lid_closed_off_stores_it_deletes_the_marker_and_does_not_retry() {
+    let rig = adapter_rig();
+    rig.lid.refuse_set(5);
+
+    lid_on_with_a_lease(&rig).await;
+
+    let now = state(&rig);
+    assert_eq!(now["lid"], false);
+    assert_eq!(now["lid_held"], false);
+    assert_ne!(now["lid_problem"], Value::Null);
+    assert_eq!(stored(&rig, "lid"), Some(json!(false)));
+    assert_eq!(stored(&rig, "lid_held"), None);
+    assert_eq!(
+        events(&rig, "awake.lid_changed")[0],
+        (
+            "Lid closed is off: closing the lid sleeps this Mac.".to_owned(),
+            json!({ "on": false })
+        )
+    );
+
+    rig.advance(Duration::from_secs(180)).await;
+    rig.idle().await;
+
+    assert_eq!(rig.lid.calls(), [LidCall::Set]);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_refused_clear_keeps_the_marker_raises_a_lid_problem_and_retries_until_cleared() {
+    let rig = adapter_rig();
+    lid_on_with_a_lease(&rig).await;
+    rig.lid.refuse_clear(5);
+
+    rig.dispatch(json!("release_all")).await.unwrap();
+
+    assert!(rig.lid.is_set());
+    assert_eq!(stored(&rig, "lid_held"), Some(json!(true)));
+    assert_eq!(state(&rig)["lid_marker"], true);
+    assert_eq!(state(&rig)["lid_held"], false);
+    assert_ne!(state(&rig)["lid_problem"], Value::Null);
+
+    rig.advance(Duration::from_secs(60)).await;
+    rig.idle().await;
+    assert_eq!(
+        rig.lid.calls(),
+        [LidCall::Set, LidCall::Clear, LidCall::Clear]
+    );
+
+    rig.lid.allow();
+    rig.advance(Duration::from_secs(60)).await;
+    rig.idle().await;
+
+    assert!(!rig.lid.is_set());
+    assert_eq!(stored(&rig, "lid_held"), None);
+    assert_eq!(state(&rig)["lid_marker"], false);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_lid_problem_clears_when_the_lid_call_succeeds() {
+    let rig = adapter_rig();
+    lid_on_with_a_lease(&rig).await;
+    rig.lid.refuse_clear(5);
+    rig.dispatch(json!("release_all")).await.unwrap();
+    assert_ne!(state(&rig)["lid_problem"], Value::Null);
+
+    rig.lid.allow();
+    rig.advance(Duration::from_secs(60)).await;
+    rig.idle().await;
+
+    assert_eq!(state(&rig)["lid_problem"], Value::Null);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_lid_problem_clears_when_the_marker_saves_again() {
+    let rig = adapter_rig();
+    fail_writes_of(&rig, "lid_held");
+    lid_on_with_a_lease(&rig).await;
+    assert_ne!(state(&rig)["lid_problem"], Value::Null);
+
+    rig.store.with_conn(|conn| {
+        conn.execute_batch("DROP TRIGGER refuse_lid_held;").unwrap();
+    });
+    rig.advance(Duration::from_secs(60)).await;
+    rig.idle().await;
+
+    assert_eq!(state(&rig)["lid_problem"], Value::Null);
+    assert!(rig.lid.is_set());
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_lid_problem_clears_when_the_user_sets_lid_closed() {
+    let rig = adapter_rig();
+    fail_writes_of(&rig, "lid_held");
+    lid_on_with_a_lease(&rig).await;
+    assert_ne!(state(&rig)["lid_problem"], Value::Null);
+
+    let answer = rig.dispatch(lid(false)).await.unwrap();
+
+    assert_eq!(answer["lid_problem"], Value::Null);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_dead_watch_while_holding_gives_the_lid_back_and_raises_a_lid_problem() {
+    let rig = adapter_rig();
+    let calls = watch_marker(&rig);
+    lid_on_with_a_lease(&rig).await;
+    assert!(rig.lid.is_set());
+
+    rig.power_source.kill();
+    rig.idle().await;
+
+    assert!(!rig.lid.is_set());
+    assert_eq!(log(&calls), [(LidCall::Set, true), (LidCall::Clear, true)]);
+    assert_eq!(stored(&rig, "lid_held"), None);
+    assert_eq!(state(&rig)["lid_problem"], POWER_PROBLEM);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_lid_problem_never_becomes_the_awake_problem() {
+    let rig = adapter_rig();
+    lid_on_with_a_lease(&rig).await;
+    rig.lid.refuse_clear(5);
+
+    rig.dispatch(json!("release_all")).await.unwrap();
+
+    assert_ne!(state(&rig)["lid_problem"], Value::Null);
+    assert_eq!(state(&rig)["problem"], Value::Null);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_system_assertion_is_held_whatever_the_lid() {
+    let rig = adapter_rig();
+    rig.lid.refuse_set(5);
+    lid_on_with_a_lease(&rig).await;
+
+    assert_eq!(
+        rig.power.held(),
+        vec![(AssertionKind::System, ASSERTION_NAME.to_owned())]
+    );
+    assert_eq!(state(&rig)["system_held"], true);
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_refused_system_assertion_still_refuses_every_kind() {
+    let rig = adapter_rig();
+    rig.power.refuse(4);
+
+    lid_on_with_a_lease(&rig).await;
+
+    assert_eq!(state(&rig)["system_held"], false);
+    assert_eq!(state(&rig)["problem"], SYSTEM_PROBLEM);
+    assert!(rig.power.held().is_empty());
+    rig.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn lease_events_keep_their_key_and_kind_payload() {
+    let rig = adapter_rig();
+    rig.dispatch(lid(true)).await.unwrap();
+
+    rig.dispatch(json!("hold_until_off")).await.unwrap();
+
+    assert_eq!(
+        events(&rig, "awake.lease_started")
+            .into_iter()
+            .map(|(_, payload)| payload)
+            .collect::<Vec<_>>(),
+        [json!({ "key": "manual", "kind": "until_off" })]
+    );
     rig.shutdown().await;
 }

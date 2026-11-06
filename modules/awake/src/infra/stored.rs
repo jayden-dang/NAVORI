@@ -226,12 +226,10 @@ pub(crate) fn load_lid_held(store: &Store) -> navori_store::Result<bool> {
     Ok(store.kv_get(SETTINGS_NS, LID_HELD_KEY)?.is_some())
 }
 
-#[expect(dead_code, reason = "used by the lid restore / last sleep tasks")]
 pub(crate) fn save_lid_held(store: &Store) -> navori_store::Result<()> {
     store.kv_set(SETTINGS_NS, LID_HELD_KEY, &serde_json::Value::Bool(true))
 }
 
-#[expect(dead_code, reason = "used by the lid restore / last sleep tasks")]
 pub(crate) fn delete_lid_held(store: &Store) -> navori_store::Result<()> {
     store.kv_delete(SETTINGS_NS, LID_HELD_KEY)
 }

@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use navori_kernel::{ActionError, ModuleCtx, Request, Severity, WaitHandle, Wake};
-use navori_macos::{PowerKind, PowerWatch, StartTime};
+use navori_macos::{LidGuard, PowerKind, PowerWatch, StartTime};
 use navori_procs::{Exited, ProcId, ProcWatcher, ProcsError};
 use serde_json::{Value, json};
 use tokio::io::unix::AsyncFd;
@@ -26,6 +26,10 @@ const EXITS_PROBLEM: &str =
     "Exit watches stopped, so a command lease has no end signal. Navori retries in 60 seconds.";
 const LID_READ_PROBLEM: &str = "Awake could not read the Lid closed setting, so it reads as off.";
 const POWER_PROBLEM: &str = "Awake could not watch the power source, so it reads as on battery. Navori retries in 60 seconds.";
+const LID_MARKER_PROBLEM: &str = "Awake could not save its lid marker, so it did not hold the lid. Navori retries in 60 seconds.";
+const LID_REFUSED_PROBLEM: &str = "macOS refused to keep the lid awake, so Lid closed is off.";
+const LID_CLEAR_PROBLEM: &str =
+    "Awake could not give the lid setting back. Navori retries in 60 seconds.";
 const STORE_PROBLEM: &str = "Awake could not save a lease. Navori retries in 60 seconds.";
 const PLATFORM_PROBLEM: &str = "Awake could not watch a process, so a stored lease stays on disk. Navori retries in 60 seconds.";
 
@@ -60,6 +64,9 @@ pub struct Awake {
     lid_problem: Option<String>,
     power: Option<AsyncFd<PowerWatch>>,
     on_adapter: Option<bool>,
+    lid: Option<LidGuard>,
+    lid_marker: bool,
+    lid_restored: bool,
     watcher: Option<ProcWatcher>,
     problems: Problems,
     retry_at: Option<SystemTime>,
@@ -89,6 +96,9 @@ impl Awake {
             lid_problem: None,
             power: None,
             on_adapter: None,
+            lid: None,
+            lid_marker: false,
+            lid_restored: true,
             watcher: None,
             problems: Problems::default(),
             retry_at: None,
@@ -782,9 +792,105 @@ impl Awake {
         }
         let held = self.reconciler.apply(self.table.wants());
         self.note_assertions(&held);
+        self.reconcile_lid(ctx, now);
         self.flush_dirty(ctx, now);
         self.sync_retry(now, &held);
         self.publish(ctx, &held)
+    }
+
+    fn lid_wanted(&self) -> bool {
+        self.lid_restored
+            && self.lid_on
+            && self.table.wants().system
+            && self.on_adapter == Some(true)
+    }
+
+    fn pending_lid_clear(&self) -> bool {
+        self.lid_restored && self.lid_marker && self.lid.is_none()
+    }
+
+    fn reconcile_lid(&mut self, ctx: &ModuleCtx<Self>, now: SystemTime) {
+        let want = self.lid_wanted();
+        if let Some(guard) = self.lid.take() {
+            if want {
+                self.lid = Some(guard);
+            } else {
+                match guard.release() {
+                    Ok(()) => self.finish_lid_clear(&ctx.store),
+                    Err(err) => self.note_lid_clear_failed(&err, now),
+                }
+            }
+            return;
+        }
+        if self.pending_lid_clear() && self.retry_at.is_none() {
+            match self.platform.give_back_lid() {
+                Ok(()) => self.finish_lid_clear(&ctx.store),
+                Err(err) => self.note_lid_clear_failed(&err, now),
+            }
+        }
+        if want && self.lid.is_none() && !self.lid_marker {
+            self.hold_lid(ctx);
+        }
+    }
+
+    fn hold_lid(&mut self, ctx: &ModuleCtx<Self>) {
+        // The marker goes to disk before the lid changes, so a crash cannot leave the lid set
+        // with nothing recording it.
+        if let Err(err) = stored::save_lid_held(&ctx.store) {
+            tracing::warn!(error = %err, "the lid marker could not be stored");
+            self.lid_problem = Some(LID_MARKER_PROBLEM.to_owned());
+            return;
+        }
+        self.lid_marker = true;
+        self.clear_lid_hold_problem();
+        match self.platform.hold_lid() {
+            Ok(guard) => {
+                self.lid = Some(guard);
+                self.clear_lid_hold_problem();
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "the lid could not be held");
+                self.lid_on = false;
+                self.disarm_power();
+                if let Err(err) = stored::save_lid(&ctx.store, false) {
+                    tracing::warn!(error = %err, "the Lid closed setting could not be stored");
+                }
+                ctx.emit(
+                    LID_CHANGED,
+                    Severity::Info,
+                    event::lid_changed(false).to_owned(),
+                    json!({ "on": false }),
+                );
+                self.finish_lid_clear(&ctx.store);
+                self.lid_problem = Some(LID_REFUSED_PROBLEM.to_owned());
+            }
+        }
+    }
+
+    /// The lid is clear, so the marker goes; a failed delete leaves the mirror set and retries.
+    fn finish_lid_clear(&mut self, store: &navori_store::Store) {
+        match stored::delete_lid_held(store) {
+            Ok(()) => {
+                self.lid_marker = false;
+                self.clear_lid_hold_problem();
+            }
+            Err(err) => tracing::warn!(error = %err, "the lid marker could not be deleted"),
+        }
+    }
+
+    fn note_lid_clear_failed(&mut self, err: &navori_macos::LidError, now: SystemTime) {
+        tracing::warn!(error = %err, "the lid setting could not be given back");
+        self.lid_problem = Some(LID_CLEAR_PROBLEM.to_owned());
+        self.schedule_retry(now);
+    }
+
+    fn clear_lid_hold_problem(&mut self) {
+        if matches!(
+            self.lid_problem.as_deref(),
+            Some(LID_MARKER_PROBLEM | LID_REFUSED_PROBLEM | LID_CLEAR_PROBLEM)
+        ) {
+            self.lid_problem = None;
+        }
     }
 
     fn note_assertions(&mut self, held: &Held) {
@@ -818,6 +924,8 @@ impl Awake {
             || self.problems.platform.is_some()
             || self.problems.exits.is_some()
             || (self.lid_on && self.power.is_none())
+            || self.pending_lid_clear()
+            || (self.lid_wanted() && self.lid.is_none())
             || !self.restored
     }
 
@@ -826,6 +934,8 @@ impl Awake {
         state.problem = self.problems.first();
         state.lid = self.lid_on;
         state.on_adapter = self.on_adapter;
+        state.lid_held = self.lid.is_some();
+        state.lid_marker = self.lid_marker;
         state.lid_problem.clone_from(&self.lid_problem);
         if state != self.published {
             self.published = state.clone();

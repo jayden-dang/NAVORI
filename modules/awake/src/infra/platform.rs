@@ -140,6 +140,14 @@ impl Platform {
         self.power_source.current()
     }
 
+    pub(crate) fn hold_lid(&self) -> Result<LidGuard, LidError> {
+        self.lid.hold()
+    }
+
+    pub(crate) fn give_back_lid(&self) -> Result<(), LidError> {
+        self.lid.give_back()
+    }
+
     pub(crate) fn power(&self) -> Arc<dyn PowerAssertions> {
         Arc::clone(&self.power)
     }
