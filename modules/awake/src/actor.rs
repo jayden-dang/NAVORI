@@ -168,7 +168,7 @@ impl Awake {
                 self.rebuild_exits_now(now);
             }
             if due && self.lid_on && self.power.is_none() {
-                self.rebuild_power_now(now);
+                self.arm_power(now);
             }
             if due {
                 self.restore_lid_once(ctx, now);
@@ -301,10 +301,6 @@ impl Awake {
         self.lid_problems
             .raise(LidProblemKind::Power, POWER_PROBLEM);
         self.schedule_retry(now);
-    }
-
-    fn rebuild_power_now(&mut self, now: SystemTime) {
-        self.arm_power(now);
     }
 
     fn deadline(&self) -> Option<SystemTime> {
@@ -477,13 +473,17 @@ impl Awake {
         } else {
             self.disarm_power();
         }
+        self.emit_lid_changed(ctx, on);
+        Ok(None)
+    }
+
+    fn emit_lid_changed(&self, ctx: &ModuleCtx<Self>, on: bool) {
         ctx.emit(
             LID_CHANGED,
             Severity::Info,
             event::lid_changed(on).to_owned(),
             json!({ "on": on }),
         );
-        Ok(None)
     }
 
     fn record_sleep(&mut self, ctx: &ModuleCtx<Self>, at_ms: i64) {
@@ -913,8 +913,7 @@ impl Awake {
             } else {
                 match guard.release() {
                     Ok(()) => {
-                        self.log_lid_given_back(self.give_back_reason());
-                        self.finish_lid_clear(&ctx.store);
+                        self.lid_given_back(&ctx.store, self.give_back_reason());
                     }
                     Err(err) => self.note_lid_clear_failed(&err, now),
                 }
@@ -924,8 +923,7 @@ impl Awake {
         if self.pending_lid_clear() && self.retry_at.is_none() {
             match self.platform.give_back_lid() {
                 Ok(()) => {
-                    self.log_lid_given_back(self.give_back_reason());
-                    self.finish_lid_clear(&ctx.store);
+                    self.lid_given_back(&ctx.store, self.give_back_reason());
                 }
                 Err(err) => self.note_lid_clear_failed(&err, now),
             }
@@ -959,8 +957,7 @@ impl Awake {
         match self.platform.give_back_lid() {
             Ok(()) => {
                 self.lid_restored = true;
-                self.log_lid_given_back("restore");
-                self.finish_lid_clear(&ctx.store);
+                self.lid_given_back(&ctx.store, "restore");
             }
             Err(err) => self.note_lid_clear_failed(&err, now),
         }
@@ -970,8 +967,7 @@ impl Awake {
         if let Some(guard) = self.lid.take() {
             match guard.release() {
                 Ok(()) => {
-                    self.log_lid_given_back("quit");
-                    self.finish_lid_clear(&ctx.store);
+                    self.lid_given_back(&ctx.store, "quit");
                 }
                 Err(err) => tracing::warn!(error = %err, "the lid could not be given back on quit"),
             }
@@ -995,6 +991,11 @@ impl Awake {
             on_adapter = ?self.on_adapter,
             "the lid setting was given back"
         );
+    }
+
+    fn lid_given_back(&mut self, store: &navori_store::Store, reason: &'static str) {
+        self.log_lid_given_back(reason);
+        self.finish_lid_clear(store);
     }
 
     fn hold_lid(&mut self, ctx: &ModuleCtx<Self>) {
@@ -1023,12 +1024,7 @@ impl Awake {
                     self.lid_problems
                         .raise(LidProblemKind::SaveOff, LID_SAVE_OFF_PROBLEM);
                 }
-                ctx.emit(
-                    LID_CHANGED,
-                    Severity::Info,
-                    event::lid_changed(false).to_owned(),
-                    json!({ "on": false }),
-                );
+                self.emit_lid_changed(ctx, false);
                 self.finish_lid_clear(&ctx.store);
                 self.lid_problems
                     .raise(LidProblemKind::Refused, LID_REFUSED_PROBLEM);
