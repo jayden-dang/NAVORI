@@ -24,6 +24,7 @@ The single source of engineering rules. Feature work, reviews and "done" claims 
 
 - **Before every push:** `cargo xtask ci` (not required per commit) — `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --workspace`, `cargo xtask check-deps`, Swift build.
 - **Before every release:** `cargo xtask perf` green, then the soak gate green (see [performance.md](performance.md)).
+- **Not per feature:** a feature's spec, plan and pull request do not run or gate on `cargo xtask perf`, and carry no base-to-head perf comparison. Perf is measured at the final milestone, before the release. ARCH-15 – ARCH-18 still bind every design. (Operator, 2026-11-06.)
 - Hosted CI is the release workflow (`.github/workflows/release.yml`, ADR 0007): on a `v*` tag it runs `cargo xtask ci`. `cargo xtask release-check` (ci + perf + soak gate) stays the local gate before tagging, and perf never runs on CI. Otherwise the local gates are authoritative.
 
 ## Commits
