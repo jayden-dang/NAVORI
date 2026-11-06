@@ -374,7 +374,7 @@ _Requirements: LID-2.5, LID-2.6, LID-2.7, LID-8.1_
 
 **Depends-on:** Task 1, Task 5
 
-- [ ] **Step 1: Write failing tests in `lid.rs`.** Every test uses `FakeLid` with an `on_call` probe that records `kv_get("awake","lid_held")` at each call.
+- [x] **Step 1: Write failing tests in `lid.rs`.** Every test uses `FakeLid` with an `on_call` probe that records `kv_get("awake","lid_held")` at each call.
   - `a_held_lease_on_the_adapter_with_lid_closed_on_sets_the_lid`
   - `the_marker_is_stored_before_the_lid_is_set`
   - `the_marker_is_deleted_only_after_the_lid_is_cleared`
@@ -394,16 +394,16 @@ _Requirements: LID-2.5, LID-2.6, LID-2.7, LID-8.1_
   - `the_system_assertion_is_held_whatever_the_lid`
   - `a_refused_system_assertion_still_refuses_every_kind`
   - `lease_events_keep_their_key_and_kind_payload`
-- [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test lid`. Expect: the new tests fail.
-- [ ] **Step 3: Implement `reconcile_lid`** to the design's §4 flow:
+- [x] **Step 2: Run** `cargo test -p navori-mod-awake --test lid`. Expect: the new tests fail.
+- [x] **Step 3: Implement `reconcile_lid`** to the design's §4 flow:
   - `want = lid_restored ∧ lid_on ∧ wants().system ∧ on_adapter == Some(true)`
   - hold: marker, then `hold()`
   - refused or unavailable: off, save, emit, delete the marker; no retry
   - release: `release()`, then delete the marker
   - pending clear (derived from the marker mirror with no guard): `give_back()`, then delete
-- [ ] **Step 4: Extend `needs_retry`** for a pending clear and for a failed marker save while a hold is wanted, never for a refusal. Publish `lid_held`, `lid_marker` and `lid_problem`. `Problems::first()` stays untouched.
-- [ ] **Step 5: Run** `cargo test -p navori-mod-awake`. Expect: pass.
-- [ ] **Step 6: Commit** `feat(awake): hold the lid while a Lease holds on the adapter`
+- [x] **Step 4: Extend `needs_retry`** for a pending clear and for a failed marker save while a hold is wanted, never for a refusal. Publish `lid_held`, `lid_marker` and `lid_problem`. `Problems::first()` stays untouched.
+- [x] **Step 5: Run** `cargo test -p navori-mod-awake`. Expect: pass.
+- [x] **Step 6: Commit** `feat(awake): hold the lid while a Lease holds on the adapter`
 
 _Requirements: LID-1.1, LID-1.2, LID-1.3, LID-1.4, LID-1.5, LID-1.6, LID-1.7, LID-1.8, LID-1.9, LID-1.12, LID-2.1, LID-2.2, LID-2.6, LID-7.1, LID-7.3, LID-7.11, LID-8.4_
 
