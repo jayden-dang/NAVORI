@@ -34,7 +34,7 @@ Guard walk (Step 3 of specify-behavior). Files the change touches:
 
 - **PORTS-1.1** WHEN a scan runs THE SYSTEM SHALL find listeners by listing the current UID's processes, then their socket file descriptors, then their TCP sockets in LISTEN state, without running `lsof` (L6) or any other subprocess (`agent-decided`: the wider rule).
 - **PORTS-1.2** THE SYSTEM SHALL read file descriptors and sockets only of processes the scan's listing showed under the current user's real UID, and SHALL drop any result from a process whose start time or real UID changed during the scan (`agent-decided`: the drop, since a pid can be reused between listing and reading).
-- **PORTS-1.3** WHEN `ports.list` is dispatched THE SYSTEM SHALL reply with the last published scan and SHALL NOT start a scan for that call (`agent-decided`).
+- **PORTS-1.3** WHEN `ports.list` is dispatched THE SYSTEM SHALL reply with the last published scan and SHALL NOT start a scan for that call (`agent-decided`). *(Amended 2026-11-06 by LOOP: this holds once a scan has finished; before the first one, PORTS-1.12 applies.)*
 - **PORTS-1.4** THE SYSTEM SHALL return one entry per (pid, port), holding every address that process has bound for that port, so a v4 and a v6 socket on one port are one entry (`agent-decided`). PORTS-4.5 keys Docker ports differently.
 - **PORTS-1.5** THE SYSTEM SHALL put these fields on each entry: port, bound addresses, pid, process start time, process name, exe path when read, project, worktree, branch, `missing_path` (the removed working directory or `working_dir` of PORTS-2.5 and PORTS-4.6, absent otherwise), harness, kind, and for a Docker port the container id and name (`agent-decided`: the field set, including what ROAD-18 needs to act on an entry).
   (Amended 2026-11-04 by PSTOP: entries gain `root` and a container's `image`; both additive.)
@@ -44,6 +44,7 @@ Guard walk (Step 3 of specify-behavior). Files the change touches:
 - **PORTS-1.9** IF a process exits, or its pid no longer has the start time seen at listing, while its sockets are being read THEN THE SYSTEM SHALL leave out that process's sockets from this scan (`agent-decided`, following crates/procs/src/snapshot.rs:48-85).
 - **PORTS-1.10** IF a same-UID process's sockets cannot be read for any other reason THEN THE SYSTEM SHALL state in the reply how many such processes the scan skipped (`agent-decided`).
 - **PORTS-1.11** THE SYSTEM SHALL expose `list` on Module `ports` as an Action with Risk `read`, a JSON schema and a description written for people and LLMs.
+- **PORTS-1.12** *(Added 2026-11-06 by LOOP.)* WHEN `ports.list` is dispatched before any scan has finished THE SYSTEM SHALL start the first scan now if none is running, hold the call without blocking the Module's other requests, and reply once that scan publishes, with `problem` set if it failed, and every `ports.list` held meanwhile SHALL get the same reply from that one scan (`agent-decided`: the failed-scan reply and the shared scan). THE SYSTEM SHALL CONTINUE TO reply at once from the last published scan, starting no scan, once any scan has finished (PORTS-1.3), and to schedule the first scheduled scan under PORTS-7.5.
 
 ## 2. See which project a port belongs to
 
@@ -113,7 +114,7 @@ Guard walk (Step 3 of specify-behavior). Files the change touches:
 - **PORTS-7.3** THE SYSTEM SHALL time scans only through the Scheduler's wait handle, with no timer of its own (ARCH-16).
 - **PORTS-7.4** WHEN the panel opens THE SYSTEM SHALL run the next scan no later than 3 seconds after, and SHALL NOT scan at the moment of opening (L9; `agent-decided`: the reading of the moment of opening).
 - **PORTS-7.5** WHEN the Module starts THE SYSTEM SHALL run its first scan after start-up has finished, within 30 seconds, and not on the start path (`agent-decided`).
-- **PORTS-7.6** WHILE a scan is running THE SYSTEM SHALL keep answering `ports.list` and `ports.open` from the last published scan (`agent-decided`).
+- **PORTS-7.6** WHILE a scan is running THE SYSTEM SHALL keep answering `ports.list` and `ports.open` from the last published scan (`agent-decided`). *(Amended 2026-11-06 by LOOP: this holds once a scan has been published; a `ports.list` before the first scan finishes waits for it, PORTS-1.12.)*
 - **PORTS-7.7** IF a scan comes due while one is running THEN THE SYSTEM SHALL skip it (`agent-decided`).
 
 ## 8. Know when the list cannot be trusted

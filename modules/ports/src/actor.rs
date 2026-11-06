@@ -70,6 +70,12 @@ fn cadence(panel_visible: bool) -> Duration {
     }
 }
 
+/// Whether any scan has finished, with a result or a problem, since the loop started.
+fn published(ctx: &ModuleCtx<Ports>) -> bool {
+    let state = ctx.state();
+    state.scanned_at_ms.is_some() || state.problem.is_some()
+}
+
 fn publish(
     ctx: &ModuleCtx<Ports>,
     started: SystemTime,
@@ -105,6 +111,7 @@ impl Ports {
         let mut docker_failing = false;
         let mut stops = Stops::default();
         let mut rescan_after = false;
+        let mut parked: Vec<Request<PortsAction>> = Vec::new();
         loop {
             tokio::select! {
                 biased;
@@ -161,7 +168,19 @@ impl Ports {
                     let Some(req) = req else {
                         return Ok(());
                     };
-                    if let Some(done) = self.on_request(ctx, req, &mut stops) {
+                    if matches!(req.action, PortsAction::List) && !published(ctx) {
+                        parked.push(req);
+                        if in_flight.is_none() {
+                            let now = wait.now();
+                            match self.begin_scan(ctx, now, &mut failing, wait.panel_visible()) {
+                                Ok(task) => {
+                                    in_flight = Some(task);
+                                    deadline = None;
+                                }
+                                Err(next) => deadline = Some(next),
+                            }
+                        }
+                    } else if let Some(done) = self.on_request(ctx, req, &mut stops) {
                         ctx.emit(STOPPED, done.severity(), done.summary(), done.payload());
                         self.rescan_after_stop(
                             ctx,
@@ -190,6 +209,12 @@ impl Ports {
                             }
                         }
                     }
+                }
+            }
+            if !parked.is_empty() && published(ctx) {
+                let state = ctx.state();
+                for req in parked.drain(..) {
+                    req.respond(Ok(state.clone()));
                 }
             }
         }
