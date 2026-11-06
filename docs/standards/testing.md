@@ -25,5 +25,5 @@ Date: 2026-11-01
 
 ## Gates
 
-- `cargo xtask ci` before every commit. Report the scope you ran: a crate's tests are not "the suite".
+- `cargo xtask ci` before every push; it is not required per commit. Report the scope you ran: a crate's tests are not "the suite".
 - AI behavior: each module ships at least one eval case (does Navori AI call the right action with the right arguments, and ask for approval on Destructive actions?), run across the configured models with `cargo xtask eval` (planned with R2).

@@ -1,6 +1,6 @@
 # Navori — Architecture overview
 
-Navori is an AI-first personal cockpit for macOS (Apple Silicon): one menubar app whose logic lives in a Rust **Core** (kernel, modules, AI runtime) and whose UI is a Swift **Shell** (AppKit + SwiftUI), connected through UniFFI. It is built for a single user, runs locally, works with any cloud model the user chooses, and keeps a hardcore performance budget. First capabilities: Awake, Ports and GitHub pull requests — which are also the AI's first tools.
+Navori is an AI-first personal cockpit for macOS (Apple Silicon): one menubar app whose logic lives in a Rust **Core** (kernel, modules, AI runtime) and whose UI is a Swift **Shell** (AppKit + SwiftUI), connected through UniFFI. It is built for its author, installable by other developers through Homebrew, runs locally, works with any cloud model the user chooses, and keeps a hardcore performance budget. First capabilities: Awake, Ports and GitHub pull requests — which are also the AI's first tools.
 
 This file is the **entry point**: it maps where each part of the architecture is documented, keeps the principles' rationale and the index of locked decisions, and holds the **design seeds** for features not yet specified. When this file disagrees with a document listed below, that document wins.
 
@@ -34,7 +34,7 @@ The binding rules are the ARCH-N invariants; this table records why they exist.
 |---|---|---|
 | P1 | **AI-first, not an AI add-on** | The AI runtime is a core layer on par with the kernel, present from the start. Every module is born "AI-readable" (state can be described) and "AI-operable" (actions have a schema). |
 | P2 | **Model-agnostic** | No dependence on a single provider. The internal message/tool/stream format is our own standard; providers are just adapters. The user picks a model per role and per conversation. |
-| P3 | **Rust owns logic, Swift owns experience** | Rust: kernel, modules, AI, store, IPC, low-level system FFI. Swift: UI and the Apple frameworks tied to the app bundle / permissions (Accessibility, ScreenCaptureKit, Notifications, Login item, Hotkey). Swift contains **no** business logic. |
+| P3 | **Rust owns logic, Swift owns experience** | Rust: kernel, modules, AI, store, IPC, low-level system FFI. Swift: UI and the Apple frameworks tied to the app bundle / permissions (Accessibility, ScreenCaptureKit, Notifications, Login item, Hotkey). Swift contains **no** business logic. Exception: computer use reads and drives other apps through Accessibility, ScreenCaptureKit and SkyLight from `navori-macos`; Swift still owns the permission prompts (ADR 0009). |
 | P4 | **Narrow FFI boundary** | Swift talks to Rust through ~6 functions + a few listeners. No chatty calls. Data crossing the boundary is snapshots/commands, not object graphs. |
 | P5 | **Everything is a Module** | A feature = an independent module actor registered with the kernel. Modules do not import each other; they communicate via the Event Bus / Commands. |
 | P6 | **Actions carry a schema + risk** | A single action surface serves UI, CLI, IPC, Navori AI, and MCP. `Read` / `Write` / `Destructive` decides whether the AI must ask permission. |

@@ -22,9 +22,9 @@ The single source of engineering rules. Feature work, reviews and "done" claims 
 
 ## Gates
 
-- **Before every commit:** `cargo xtask ci` — `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --workspace`, `cargo xtask check-deps`, Swift build.
-- **Before every release:** `cargo xtask perf` green (see [performance.md](performance.md)).
-- Hosted CI is the release workflow (`.github/workflows/release.yml`, ADR 0007): on a `v*` tag it runs `cargo xtask ci`. `cargo xtask release-check` (ci + perf) stays the local gate before tagging, and perf never runs on CI. Otherwise the local gates are authoritative.
+- **Before every push:** `cargo xtask ci` (not required per commit) — `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --workspace`, `cargo xtask check-deps`, Swift build.
+- **Before every release:** `cargo xtask perf` green, then the soak gate green (see [performance.md](performance.md)).
+- Hosted CI is the release workflow (`.github/workflows/release.yml`, ADR 0007): on a `v*` tag it runs `cargo xtask ci`. `cargo xtask release-check` (ci + perf + soak gate) stays the local gate before tagging, and perf never runs on CI. Otherwise the local gates are authoritative.
 
 ## Commits
 
@@ -42,15 +42,16 @@ The single source of engineering rules. Feature work, reviews and "done" claims 
 
 ## Definition of Done
 
-A release (one capability) is done only when all of these hold. Trimmed for a single user (vision: Users).
+A release (one capability) is done only when all of these hold. Trimmed for one author whose users are developers installing their own copy (vision: Users).
 
 1. **Complete** — the capability described in its spec works end to end; nothing deferred "to the next version".
 2. **Every failure is visible** — offline, quota, expired token, missing macOS permission: the UI says what is wrong and how to fix it; no endless spinner, no silent failure.
 3. **Settings** — every option of the feature is in Settings; no hand-editing files required.
-4. **Permissions** — first use walks through the macOS permissions the feature needs (the only onboarding a single user needs).
+4. **Permissions** — first use walks through the macOS permissions the feature needs (the only onboarding Navori has).
 5. **AI-ready** — actions with schema, LLM-readable description and Risk (ARCH-4); the module's context fragment; Events with a one-sentence summary; at least one eval case.
 6. **Tested** — per [testing.md](testing.md); `cargo xtask ci` green.
 7. **Observable** — enough `tracing` to debug from logs alone, and an entry in `navori doctor`.
 8. **Fast** — `cargo xtask perf` green against the GOAL-11 budget (measured, not assumed).
 9. **Documented** — `docs/features/<feature>.md`.
 10. **Dogfooded** — used daily for at least 3 days with no blocking defect (GOAL-8).
+11. **Upgrade-safe** — data, config keys, hook entries and Keychain names the feature adds or changes keep working for people who installed an earlier release: forward-only migrations with a backup (ARCH-12), and a rename is a migration (Compat obligation External, `docs/agents/project.md`).

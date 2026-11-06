@@ -1,7 +1,7 @@
 # Requirements: Public release
 
 Feature code: RELEASE
-Status: In-progress
+Status: Implemented
 Date: 2026-11-04
 
 <!--
@@ -62,7 +62,7 @@ Files this change touches, and what in them is guarded:
 
 **Story:** As the maintainer, I want `cargo xtask release-check` to tell me the exact tag to push once the gate and the perf budget pass, so that no release skips the GOAL-11 budget that CI cannot measure.
 
-- **RELEASE-2.1** WHEN `cargo xtask release-check` runs THE SYSTEM SHALL run `cargo xtask ci` and then `cargo xtask perf`, stopping at the first that fails.
+- **RELEASE-2.1** WHEN `cargo xtask release-check` runs THE SYSTEM SHALL run `cargo xtask ci` and then `cargo xtask perf`, stopping at the first that fails. *(Amended 2026-11-05 by SOAK-4.1/4.2: after perf, release-check runs the soak gate (SOAK-4.x), also stopping on failure; the tag prints only when it passes too.)*
 - **RELEASE-2.2** WHEN both pass THE SYSTEM SHALL print the release tag `v<workspace version>` and the `git tag` and `git push` commands that publish it.
 - **RELEASE-2.3** IF the workspace version is not a valid Semantic Versioning 2.0 version THEN THE SYSTEM SHALL fail before running the gate, naming the version.
 - **RELEASE-2.4** IF the tag `v<workspace version>` already exists locally or on `origin` THEN THE SYSTEM SHALL fail before running the gate, naming the tag.
@@ -127,7 +127,7 @@ Files this change touches, and what in them is guarded:
 
 **Story:** As a stakeholder, I want measurable quality targets for this feature, so that how-well is not left implicit.
 
-- **Performance:** **RELEASE-7.1** WHEN `cargo xtask release-check` passes THE SYSTEM SHALL have held the release `.app` to ≤ 25 MB and every other GOAL-11 budget — verified by `cargo xtask perf` inside the check (`docs/standards/performance.md`).
+- **Performance:** **RELEASE-7.1** WHEN `cargo xtask release-check` passes THE SYSTEM SHALL have held the release `.app` to ≤ 25 MB and every other GOAL-11 budget — verified by `cargo xtask perf` inside the check, which is followed by the soak gate (SOAK-4.x) (`docs/standards/performance.md`).
 - **Performance:** **RELEASE-7.2** WHEN a guarded hook command runs with the helper present THE SYSTEM SHALL finish within the hook's existing 2-second timeout (1 second for `SessionEnd`) — verified by a test that runs the guarded command through `/bin/sh -c`.
 - **Security:** **RELEASE-7.3** THE SYSTEM SHALL expose `SIGNING_P12`, `SIGNING_P12_PASSWORD` and `TAP_TOKEN` only to jobs of the release workflow started by a `v*` tag, and SHALL never print them or write them into the repository, an artifact or the Release — verified by the Environment's deployment rule and a review of the workflow.
 - **Security:** **RELEASE-7.4** THE SYSTEM SHALL pin every third-party action in the release workflow to a full commit SHA — verified by a check in `cargo xtask ci` that rejects a `uses:` line without a 40-character SHA.
