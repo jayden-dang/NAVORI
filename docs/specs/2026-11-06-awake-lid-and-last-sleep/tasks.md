@@ -145,14 +145,14 @@ Compact delta every task inherits:
 
 **Depends-on:** none
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
   - `a_deleted_key_reads_as_absent`
   - `deleting_a_missing_key_is_not_an_error`
   - `deleting_one_key_leaves_its_neighbours`, where `awake/tracking` survives a delete of `awake/lid_held`
-- [ ] **Step 2: Run** `cargo test -p navori-store --test kv_and_journal`. Expect: no method `kv_delete`.
-- [ ] **Step 3: Implement** `DELETE FROM kv WHERE ns = ?1 AND key = ?2` through `with_conn`. No migration and no schema version change.
-- [ ] **Step 4: Run** `cargo test -p navori-store`. Expect: pass, with `migrations.rs` unchanged.
-- [ ] **Step 5: Commit** `feat(store): delete a kv key`
+- [x] **Step 2: Run** `cargo test -p navori-store --test kv_and_journal`. Expect: no method `kv_delete`.
+- [x] **Step 3: Implement** `DELETE FROM kv WHERE ns = ?1 AND key = ?2` through `with_conn`. No migration and no schema version change.
+- [x] **Step 4: Run** `cargo test -p navori-store`. Expect: pass, with `migrations.rs` unchanged.
+- [x] **Step 5: Commit** `feat(store): delete a kv key`
 
 _Requirements: LID-7.6_
 
