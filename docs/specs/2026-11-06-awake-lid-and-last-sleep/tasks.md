@@ -13,6 +13,7 @@ Approval: the operator's /shape --go, before reading the spec
 Date: 2026-11-06
 Execution-mode: continuous
 Max-concurrency: auto
+Delivered-by: PR #36
 Requirements: ./requirements.md
 Design: ./design.md
 
