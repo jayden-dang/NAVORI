@@ -87,7 +87,7 @@ impl LidProblems {
         self.0.remove(&kind);
     }
 
-    fn clear_all_but_clear(&mut self) {
+    fn clear_all_but_give_back(&mut self) {
         self.0.retain(|kind, _| *kind == LidProblemKind::Clear);
     }
 
@@ -471,7 +471,7 @@ impl Awake {
             ));
         }
         self.lid_on = on;
-        self.lid_problems.clear_all_but_clear();
+        self.lid_problems.clear_all_but_give_back();
         if on {
             self.arm_power(now);
         } else {

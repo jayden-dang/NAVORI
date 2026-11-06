@@ -847,3 +847,25 @@ async fn a_refused_set_whose_off_value_cannot_be_saved_raises_a_problem_and_dele
     assert_eq!(stored(&rig, "lid_held"), None);
     rig.shutdown().await;
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_user_lid_set_keeps_a_pending_give_back_problem() {
+    let rig = adapter_rig();
+    lid_on_with_a_lease(&rig).await;
+    rig.lid.refuse_clear(5);
+    rig.dispatch(json!("release_all")).await.unwrap();
+    assert_eq!(state(&rig)["lid_problem"], CLEAR_PROBLEM);
+
+    let answer = rig.dispatch(lid(false)).await.unwrap();
+
+    assert_eq!(answer["lid_problem"], CLEAR_PROBLEM);
+    assert!(rig.lid.is_set());
+
+    rig.lid.allow();
+    rig.advance(Duration::from_secs(60)).await;
+    rig.idle().await;
+
+    assert!(!rig.lid.is_set());
+    assert_eq!(state(&rig)["lid_problem"], Value::Null);
+    rig.shutdown().await;
+}
