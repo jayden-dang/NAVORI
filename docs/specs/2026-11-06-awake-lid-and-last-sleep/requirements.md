@@ -36,7 +36,7 @@ Terms: **Lease**, **Tracking agents** and **Running** as in `CONTEXT.md`.
 - **LID-1.6** IF storing the `lid_held` marker fails THEN THE SYSTEM SHALL leave the lid setting as it is and show the problem line in the Running submenu (agent-decided failure handling).
 - **LID-1.7** WHEN Navori gives lid sleep back THE SYSTEM SHALL delete the `lid_held` marker only after macOS accepts the call.
 - **LID-1.8** IF macOS refuses the call that gives lid sleep back THEN THE SYSTEM SHALL keep the `lid_held` marker and show the problem line (agent-decided failure handling).
-- **LID-1.9** IF macOS refuses the call that turns the lid setting off THEN THE SYSTEM SHALL show the problem line, set `Lid closed` to off and store that value.
+- **LID-1.9** IF macOS refuses the call that turns the lid setting off THEN THE SYSTEM SHALL show the problem line, set `Lid closed` to off, store that value and delete the `lid_held` marker, because the setting never changed (marker delete added in design, agent-decided).
 - **LID-1.10** WHEN Navori quits normally while holding the lid setting THE SYSTEM SHALL give lid sleep back and then delete the `lid_held` marker (agent-decided).
 - **LID-1.11** WHEN the Awake module is dropped while holding the lid setting, after repeated crashes or on an aborted shutdown, THE SYSTEM SHALL give lid sleep back, with the `lid_held` marker left in place (agent-decided).
 
@@ -48,8 +48,9 @@ Terms: **Lease**, **Tracking agents** and **Running** as in `CONTEXT.md`.
 - **LID-2.2** WHEN the providing power source changes to the adapter while `Lid closed` is on and a Lease is held THE SYSTEM SHALL turn the lid setting off again.
 - **LID-2.3** THE SYSTEM SHALL count only `AC Power` as the adapter, and treat `Battery Power` and `UPS Power` as not the adapter (agent-decided).
 - **LID-2.4** WHILE `Lid closed` is on and the Mac is not on the adapter THE SYSTEM SHALL show the `Lid closed` row's value as `On`, with a grey `Needs adapter` beside it that never replaces `On`.
-- **LID-2.5** THE SYSTEM SHALL learn the power source from one read when the Awake module starts and from macOS power-source change notifications after that, with no timer and no polling (agent-decided: the `kIOPSNotifyPowerSource` notification; ARCH-16).
-- **LID-2.6** IF the power source cannot be read, or its change notification cannot be registered or stops delivering, THEN THE SYSTEM SHALL treat the Mac as not on the adapter, give lid sleep back if Navori holds the lid setting, and record a lid problem, retrying the watch as the exits watcher does today (`modules/awake/src/actor.rs:110,588`) (agent-decided).
+- **LID-2.5** WHILE `Lid closed` is on THE SYSTEM SHALL learn the power source from one read when its watch is armed (when `Lid closed` turns on, or at start with it on) and from macOS power-source change notifications after that, with no timer and no polling (agent-decided: the `kIOPSNotifyPowerSource` notification; ARCH-16; arming only while on was changed in design).
+- **LID-2.6** WHILE `Lid closed` is on, IF the power source cannot be read, or its change notification cannot be registered or stops delivering, THEN THE SYSTEM SHALL treat the Mac as not on the adapter, give lid sleep back if Navori holds the lid setting, and record a lid problem, retrying the watch as the exits watcher does today (`modules/awake/src/actor.rs:110,588`) (agent-decided).
+- **LID-2.7** WHILE `Lid closed` is off THE SYSTEM SHALL neither read nor watch the power source (agent-decided in design).
 
 ## 3. The `Lid closed` switch
 
@@ -94,6 +95,7 @@ Terms: **Lease**, **Tracking agents** and **Running** as in `CONTEXT.md`.
 
 - **LID-5.1** WHEN macOS posts the will-sleep notification THE SYSTEM SHALL record the sleep time, stamped synchronously in the call the Shell makes from the notification. The Shell observes it wherever it observes the wake notification today.
 - **LID-5.2** WHEN a sleep is recorded THE SYSTEM SHALL write a Journal event `awake.slept` with payload `{at_ms, reason}`. Here `reason` is the macOS `Last Sleep Reason` string, or null when it cannot be read (agent-decided name and payload).
+- **LID-5.9** THE SYSTEM SHALL carry a sleep from the Shell to Awake as an Awake Action named `slept` with input `{at_ms}` and Risk `Write`, served like every Action (ARCH-4). A forged call changes only the `Last sleep` row and adds one `awake.slept` event (agent-decided in design: the Core reaches a Module only through dispatch, `crates/ffi/src/lib.rs:445-465`).
 - **LID-5.3** WHEN a sleep is recorded THE SYSTEM SHALL store its time, so the last sleep survives a relaunch and the Journal's retention sweep (agent-decided).
 - **LID-5.4** WHILE a sleep is recorded THE SYSTEM SHALL show `Last sleep` with the icon `moon` and the time as its value, as the first row of the Running submenu, followed by a separator.
 - **LID-5.5** WHILE no sleep has been recorded THE SYSTEM SHALL show neither the `Last sleep` row nor its separator.
@@ -115,7 +117,7 @@ The whole doctor check, LID-6.1 to LID-6.3, is agent-decided.
 - **LID-6.1** WHEN `navori doctor` runs THE SYSTEM SHALL add a `lid` check, after `ports` as the last row (agent-decided placement), that reports four things:
   - whether `Lid closed` is on
   - whether Navori holds the lid setting
-  - whether the Mac is on the adapter
+  - whether the Mac is on the adapter, or `not watched` while `Lid closed` is off (LID-2.7)
   - whether the `lid_held` marker is stored
 - **LID-6.2** IF a lid problem is recorded THEN THE SYSTEM SHALL fail the `lid` check with that problem's text, even when the problem line in the menu shows the Core's note instead.
 - **LID-6.3** THE SYSTEM SHALL name the `lid` check in the Settings sentence that lists the checks, after `ports`.
@@ -170,10 +172,10 @@ Files this change touches. Each has its guard, or `no behavior to guard`:
 
 **Story:** As a stakeholder, I want measurable quality targets for this feature, so that how-well is not left implicit.
 
-- **Performance:** **LID-8.1** WHILE the menu is closed THE SYSTEM SHALL add no timer and no polling for the lid setting or the power source (ARCH-16). Verified by a module test with fakes that count power-source reads: exactly one at start, then one per change notification.
+- **Performance:** **LID-8.1** WHILE the menu is closed THE SYSTEM SHALL add no timer and no polling for the lid setting or the power source (ARCH-16). Verified by a module test with fakes that count power-source reads: none while `Lid closed` is off, exactly one when the watch is armed, then one per change notification.
   - **LID-8.2** WHEN the Running submenu opens THE SYSTEM SHALL make no IOKit, power-source or notify call. Verified by a test that builds the menu state from a snapshot with fakes that count calls.
   - The GOAL-11 budget (AWAKE-13.1) stays binding. Per `docs/standards/INDEX.md:27`, it is measured at the final milestone, not gated on this feature.
-- **Security:** **LID-8.3** THE SYSTEM SHALL add no socket, root step or helper process for the lid. The `lid` Action SHALL carry Risk `Write`, the same as `tracking`, and reach Navori only through the paths that already serve `tracking`: the in-process `NavoriCore.dispatch` for the menu and Navori AI, and the user-private IPC socket (mode 0600, peer-uid check) for the CLI (threat model TB-2, TB-3). Verified by the Action-doc test and `cargo xtask check-deps`.
+- **Security:** **LID-8.3** THE SYSTEM SHALL add no socket, root step or helper process for the lid. The `lid` and `slept` Actions SHALL carry Risk `Write`, the same as `tracking`, and reach Navori only through the paths that already serve `tracking`: the in-process `NavoriCore.dispatch` for the menu and Navori AI, and the user-private IPC socket (mode 0600, peer-uid check) for the CLI (threat model TB-2, TB-3). Verified by the Action-doc test and `cargo xtask check-deps`.
 - **Reliability:** **LID-8.4** THE SYSTEM SHALL never reach a state where Navori holds the lid setting and no `lid_held` marker is stored.
   - Verified by fake-ordered tests that stop the module after each step: marker write, set, clear, marker delete.
   - Also verified by a drop test that records the clear when the module is dropped.
