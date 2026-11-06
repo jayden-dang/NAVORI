@@ -1,10 +1,11 @@
 use std::sync::mpsc;
 
 use navori_macos::fake::{
-    FakeExitsHandle, FakeLid, FakePower, FakeProcess, FakeProcesses, LidCall,
+    FakeExitsHandle, FakeLid, FakePower, FakePowerSource, FakeProcess, FakeProcesses, LidCall,
 };
 use navori_macos::{
-    AssertionKind, LidError, LidSetting, PlatformError, PowerAssertions, PowerError, ProcessSource,
+    AssertionKind, LidError, LidSetting, PlatformError, PowerAssertions, PowerError, PowerKind,
+    PowerSource, PowerSourceError, ProcessSource,
 };
 
 #[test]
@@ -201,4 +202,27 @@ fn the_scripted_sleep_reason_is_returned() {
     assert_eq!(fake.sleep_reason(), None);
     fake.set_reason(Some("Clamshell Sleep"));
     assert_eq!(fake.sleep_reason().as_deref(), Some("Clamshell Sleep"));
+}
+
+#[test]
+fn the_fake_counts_current_reads() {
+    let fake = FakePowerSource::new(PowerKind::Adapter);
+    assert_eq!(fake.current().expect("adapter"), PowerKind::Adapter);
+    fake.set(PowerKind::Battery);
+    assert_eq!(fake.current().expect("battery"), PowerKind::Battery);
+    assert_eq!(fake.read_count(), 2);
+    assert_eq!(fake.watch_count(), 0);
+}
+
+#[test]
+fn a_failed_watch_returns_an_error() {
+    let fake = FakePowerSource::new(PowerKind::Battery);
+    fake.fail_watch();
+    let err = fake.watch().expect_err("watch fails");
+    assert!(matches!(err, PowerSourceError::Register { .. }));
+    assert_eq!(fake.watch_count(), 1);
+    assert_eq!(
+        fake.current().expect("current still works"),
+        PowerKind::Battery
+    );
 }

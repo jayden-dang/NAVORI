@@ -54,7 +54,7 @@ futures = "0.3.34"
 keyring-core = "1.0.1"
 libc = "0.2.191"
 objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFString"] }
-objc2-io-kit = { version = "0.3.2", default-features = false, features = ["std", "pwr_mgt", "libc"] }
+objc2-io-kit = { version = "0.3.2", default-features = false, features = ["std", "pwr_mgt", "ps", "libc"] }
 predicates = "3.1.4"
 regex = "1.13.1"
 reqwest = { version = "0.13.5", features = ["json"] }
