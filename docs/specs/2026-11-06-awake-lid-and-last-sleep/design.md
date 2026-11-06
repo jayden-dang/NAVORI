@@ -196,8 +196,8 @@ Surface:
 |---|---|
 | `AwakeAction` catalog order and `risk()` match (`action.rs:63-85`) | replace — `lid` added after `tracking`, then `slept`, then `woke`, all `Risk::Write` |
 | `modules/awake/tests/actions.rs` `sample()` (`:28-52`), ordered names (`:301-319`), spec compare (`:325-337`), decode-all (`:344-352`) | replace — sample payloads and names added |
-| `modules/awake/tests/manual.rs:~255-275` and `display.rs:~289` "not ending manual" lists | replace — `lid`, `slept` added |
-| `crates/ffi/tests/actions_risk.rs:64` `SAMPLED = 24`, `sample()` `:66-98` | replace — 26, with two samples |
+| `modules/awake/tests/manual.rs:~255-275` and `display.rs:~289` "not ending manual" lists | replace — `lid`, `slept`, `woke` added |
+| `crates/ffi/tests/actions_risk.rs:64` `SAMPLED = 24`, `sample()` `:66-98` | replace — 27, with three samples |
 | `AwakeState` JSON readers: exact-JSON tests in `modules/awake/tests/{duration,manual,session,idle,display}.rs`, literal in `tests/tray.rs:25` | replace — new fields added to the expected objects |
 | `AwakeState` deserialized by `awake_view` (`crates/ffi/src/app.rs:323`) and the CLI `--json` | replace — `#[serde(default)]` keeps older state readable |
 | `AwakeState {` literals: `LeaseTable::snapshot` (`domain/table.rs:692`), `AwakeState::idle` (`state.rs:13`) | replace — new fields set (table defaults; the actor fills them in `publish`) |

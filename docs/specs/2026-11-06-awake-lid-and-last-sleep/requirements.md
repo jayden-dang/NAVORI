@@ -78,7 +78,7 @@ Terms: **Lease**, **Tracking agents** and **Running** as in `CONTEXT.md`.
 - **LID-3.8** THE SYSTEM SHALL draw the `Lid closed` row with the icon `laptopcomputer` and the value `On` or `Off`, with a green dot while on, the same as `Tracking agents` (the brief's kit fallback, agent-decided).
 - **LID-3.9** WHEN the user picks the `Lid closed` row, by click or by keyboard as with `Tracking agents`, THE SYSTEM SHALL run the `lid` Action with the opposite of the current value.
 - **LID-3.10** WHEN the user runs `navori awake lid on` or `navori awake lid off` THE SYSTEM SHALL run the `lid` Action with that value (agent-decided verb).
-- **LID-3.11** WHEN the user runs `navori awake status` THE SYSTEM SHALL print a `Lid closed:` line reading `off`, `on`, `on (holding the lid)` or `on (needs adapter)`, and its `--json` form SHALL carry the same state (agent-decided wording; `holding the lid` added in final review M2).
+- **LID-3.11** WHEN the user runs `navori awake status` THE SYSTEM SHALL print a `Lid closed:` line reading `off`, `on`, `on (held)` or `on (needs adapter)`, and its `--json` form SHALL carry the same state (agent-decided wording; `held` added in final review M2, matching the doctor row).
 - **LID-3.12** WHEN the `lid` Action asks for the value `Lid closed` already has THE SYSTEM SHALL change nothing, store nothing and write no event, as `tracking` does today (`actor.rs:258`) (agent-decided).
 - **LID-3.13** IF the stored `Lid closed` value, the `lid_held` marker or the last sleep cannot be read THEN THE SYSTEM SHALL still start the Awake module and record the read failure as a lid problem. An unreadable `Lid closed` value reads as off, an unreadable last sleep shows no `Last sleep` row, and only an unreadable `lid_held` marker skips the start-up restore (agent-decided; narrowed in design review).
 
@@ -196,7 +196,7 @@ Files this change touches. Each has its guard, or `no behavior to guard`:
 - A sleep log, history view, duration or reason shown in the menu.
 - A watchdog, helper process, root step or privileged helper.
 - Reading `pmset -g log`, or any system log, when the menu opens.
-- Thermal release logic (agent-decided; macOS keeps its own thermal-emergency and low-battery sleep). **Accepted risk, shown to the operator:** a closed Mac held awake on the adapter, for example in a bag, relies on macOS's own thermal-emergency sleep to stop it overheating (final review M3).
+- Thermal release logic (agent-decided; macOS keeps its own thermal-emergency and low-battery sleep). **Residual risk, agent-decided, for the operator to accept or reject:** a closed Mac held awake on the adapter, for example in a bag, relies on macOS's own thermal-emergency sleep to stop it overheating (final review M3).
 - Telling apart, or protecting, another app's use of the same lid setting. Navori restores only when its own marker says it held, and a release or restore can clear another app's hold (residual limit of the operator's marker rule).
 - The brief's battery proposal (to 20%) and its "unconditional restore at launch". Both were superseded by the card.
 

@@ -313,7 +313,7 @@ _Requirements: LID-2.3_
 
   Add `lid`, `slept` and `woke` to `actions.rs`: `sample()`, the ordered names list and `every_catalog_name_decodes_as_an_action`. Add them to the not-ending lists in `manual.rs` and `display.rs`. In `actions_risk.rs`, set `SAMPLED = 27`, with samples asserting `Write` for all three. In `crates/ffi/tests/agent.rs` `no_new_action_appears` (line 606), insert `"awake lid write"`, `"awake slept write"` and `"awake woke write"` after `"awake tracking write"` (line 634); LOOP-10.5 allows additions.
 - [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test lid --test actions`. Expect: unknown variant `lid`.
-- [ ] **Step 3: Implement** the Platform builders and defaults, the stored helpers (kv namespace `awake`), the `AwakeState` fields (set in `LeaseTable::snapshot` and `AwakeState::idle`, filled by the actor in `publish`), the two Action variants with risk and catalog, and the event constants and summaries.
+- [ ] **Step 3: Implement** the Platform builders and defaults, the stored helpers (kv namespace `awake`), the `AwakeState` fields (set in `LeaseTable::snapshot` and `AwakeState::idle`, filled by the actor in `publish`), the three Action variants (`lid`, `slept`, `woke`) with risk and catalog, and the event constants and summaries.
 - [ ] **Step 4: Implement `set_lid`** by copying `set_tracking`: unchanged → `Ok(None)`; save first; set `lid_on`; emit `LID_CHANGED`. Load `lid` on the first `run_loop` entry.
 - [ ] **Step 5: Mirror the six fields** on `AwakeView`, its `From` and the `awake_view` module-down blanking (`lid_held = false`, `on_adapter = None`). Update the exact-JSON expectations and literals in the seven Awake test files and `crates/ffi/tests/running.rs`.
 - [ ] **Step 6: Run** `cargo test -p navori-mod-awake && cargo test -p navori-ffi`. Expect: pass, with every pre-existing test unchanged apart from the added fields.
@@ -485,7 +485,7 @@ _Requirements: LID-3.13, LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.4_
     1. stamps `SystemTime::now()` in ms first
     2. returns if `shut_down`
     3. spawns a dispatch of `{"slept":{"at_ms":..}}` to `awake` and logs an error
-  - `system_did_wake` keeps its wake pulse and also spawns a dispatch of `"woke"` to `awake`
+  - `system_did_wake` keeps its wake pulse and also spawns a dispatch of `"woke"` to `awake`, returning early when `shut_down` is set, as `system_will_sleep` does
   - private `on_woke(ctx)`: while the power watch is armed, one `current()` read through the change path
 
 **Depends-on:** Task 4, Task 8 (all of Tasks 5–9 edit `actor.rs`, so they run in order)
@@ -505,6 +505,7 @@ _Requirements: LID-3.13, LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.4_
     - `will_sleep_records_a_time_taken_at_the_call`, where `last_sleep_ms` is between the before and after stamps
     - `the_wake_pulse_still_runs_on_wake`
     - `will_sleep_after_shutdown_records_nothing_and_does_not_panic`
+    - `did_wake_after_shutdown_dispatches_nothing_and_does_not_panic`
 - [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test sleep`. Expect: the `slept` handler fails.
 - [ ] **Step 3: Implement `record_sleep`:** reason → save → set → emit `SLEPT` (one-sentence summary).
 - [ ] **Step 4: Implement `system_will_sleep`** next to `system_did_wake`. Extend `system_did_wake` to dispatch `woke` after its unchanged wake pulse, and implement `on_woke` in the actor.
@@ -563,7 +564,7 @@ _Requirements: LID-6.1, LID-6.2, LID-6.3, LID-7.7_
 - [ ] **Step 1: Write failing tests in `cli.rs`.** Every lid test runs against a stub `UnixListener` server that records the request JSON and answers a fixture state. Copy the stubs at `apps/cli/tests/cli.rs` lines 535, 1072 and 1419. **Never** use the real in-process `NavoriCore` (`cli.rs` line 55, `Platform::mac()`), because a `lid {on: true}` there would set the real lid (charter hard stop).
   - `awake_lid_on_dispatches_the_lid_action`
   - `awake_lid_off_dispatches_the_lid_action`
-  - `status_prints_lid_closed_after_tracking_agents`, covering `off`, `on`, `on (holding the lid)` and `on (needs adapter)` from fixture states (`lid`, `lid_held`, `on_adapter`)
+  - `status_prints_lid_closed_after_tracking_agents`, covering `off`, `on`, `on (held)` and `on (needs adapter)` from fixture states (`lid`, `lid_held`, `on_adapter`)
   - `status_reads_a_missing_lid_field_as_off`
   - `status_json_carries_the_lid_fields`
 - [ ] **Step 2: Run** `cargo test -p navori-cli --test cli`. Expect: unknown subcommand `lid`.
