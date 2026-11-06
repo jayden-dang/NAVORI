@@ -21,7 +21,7 @@ Terms: **Lease**, **Tracking agents** and **Running** as in `CONTEXT.md`.
 - **Lid sleep given back**: the lid setting is set back so closing the lid sleeps the Mac.
 - **Navori holds the lid setting**: Navori has turned the lid setting off and has not yet given lid sleep back.
 - **The adapter**: the providing power source reads `AC Power`.
-- **The problem line**: the Running submenu's one shared problem-or-note slot, as it works today: the Core's own note, when it has one, takes the slot ahead of the Awake problem (`RunningState.swift:307-309`). A lid problem joins the Awake problem and follows that rule; `navori doctor` always shows it (LID-6.2) (agent-decided: the slot rule is kept, because changing it would change the Running layout beyond the two new rows).
+- **The problem line**: the Running submenu's one shared problem-or-note slot, as it works today: the Core's own note, when it has one, takes the slot ahead of the Awake problem (`RunningState.swift:307-309`). A lid problem is published apart from the Awake problem and takes the slot only when neither the Core's note nor the Awake problem does, so it never marks projects Unknown or fails the `awake` doctor check; `navori doctor` always shows it (LID-6.2) (agent-decided: the slot rule is kept, because changing it would change the Running layout beyond the two new rows; kept apart from the Awake problem in design review).
 - **A Lease held**: the Awake reconciler's `system` want is true. That want counts session Leases only while Tracking agents is on.
 
 ## 1. Keep working with the lid closed
@@ -39,6 +39,7 @@ Terms: **Lease**, **Tracking agents** and **Running** as in `CONTEXT.md`.
 - **LID-1.9** IF macOS refuses the call that turns the lid setting off THEN THE SYSTEM SHALL show the problem line, set `Lid closed` to off, store that value and delete the `lid_held` marker, because the setting never changed (marker delete added in design, agent-decided).
 - **LID-1.10** WHEN Navori quits normally while holding the lid setting THE SYSTEM SHALL give lid sleep back and then delete the `lid_held` marker (agent-decided).
 - **LID-1.11** WHEN the Awake module is dropped while holding the lid setting, after repeated crashes or on an aborted shutdown, THE SYSTEM SHALL give lid sleep back, with the `lid_held` marker left in place (agent-decided).
+- **LID-1.12** WHEN the condition behind a lid problem ends THE SYSTEM SHALL clear that problem: a later lid call macOS accepts, a re-armed power-source watch, a stored marker or value that saves, or the user setting `Lid closed` (agent-decided in design review).
 
 ## 2. Adapter only
 
@@ -49,7 +50,7 @@ Terms: **Lease**, **Tracking agents** and **Running** as in `CONTEXT.md`.
 - **LID-2.3** THE SYSTEM SHALL count only `AC Power` as the adapter, and treat `Battery Power` and `UPS Power` as not the adapter (agent-decided).
 - **LID-2.4** WHILE `Lid closed` is on and the Mac is not on the adapter THE SYSTEM SHALL show the `Lid closed` row's value as `On`, with a grey `Needs adapter` beside it that never replaces `On`.
 - **LID-2.5** WHILE `Lid closed` is on THE SYSTEM SHALL learn the power source from one read when its watch is armed (when `Lid closed` turns on, or at start with it on) and from macOS power-source change notifications after that, with no timer and no polling (agent-decided: the `kIOPSNotifyPowerSource` notification; ARCH-16; arming only while on was changed in design).
-- **LID-2.6** WHILE `Lid closed` is on, IF the power source cannot be read, or its change notification cannot be registered or stops delivering, THEN THE SYSTEM SHALL treat the Mac as not on the adapter, give lid sleep back if Navori holds the lid setting, and record a lid problem, retrying the watch as the exits watcher does today (`modules/awake/src/actor.rs:110,588`) (agent-decided).
+- **LID-2.6** WHILE `Lid closed` is on, IF the power source cannot be read, or its change notification cannot be registered or stops delivering, THEN THE SYSTEM SHALL treat the Mac as not on the adapter, give lid sleep back if Navori holds the lid setting, and record a lid problem, retrying the watch as the exits watcher does today (`modules/awake/src/actor.rs:110,588,599`) (agent-decided).
 - **LID-2.7** WHILE `Lid closed` is off THE SYSTEM SHALL neither read nor watch the power source (agent-decided in design).
 
 ## 3. The `Lid closed` switch
@@ -78,7 +79,7 @@ Terms: **Lease**, **Tracking agents** and **Running** as in `CONTEXT.md`.
 - **LID-3.10** WHEN the user runs `navori awake lid on` or `navori awake lid off` THE SYSTEM SHALL run the `lid` Action with that value (agent-decided verb).
 - **LID-3.11** WHEN the user runs `navori awake status` THE SYSTEM SHALL print a `Lid closed:` line reading `on`, `off` or `on (needs adapter)`, and its `--json` form SHALL carry the same state (agent-decided wording).
 - **LID-3.12** WHEN the `lid` Action asks for the value `Lid closed` already has THE SYSTEM SHALL change nothing, store nothing and write no event, as `tracking` does today (`actor.rs:258`) (agent-decided).
-- **LID-3.13** IF the stored `Lid closed` value, the `lid_held` marker or the last sleep cannot be read THEN THE SYSTEM SHALL still start the Awake module, treat `Lid closed` as off, skip the start-up restore, show no `Last sleep` row and record the read failure as an Awake problem (agent-decided).
+- **LID-3.13** IF the stored `Lid closed` value, the `lid_held` marker or the last sleep cannot be read THEN THE SYSTEM SHALL still start the Awake module and record the read failure as a lid problem. An unreadable `Lid closed` value reads as off, an unreadable last sleep shows no `Last sleep` row, and only an unreadable `lid_held` marker skips the start-up restore (agent-decided; narrowed in design review).
 
 ## 4. Lid sleep given back after a crash
 
@@ -87,7 +88,7 @@ Terms: **Lease**, **Tracking agents** and **Running** as in `CONTEXT.md`.
 - **LID-4.1** WHEN the Awake module first starts in a process and the `lid_held` marker is stored THE SYSTEM SHALL give lid sleep back and then delete the marker, before Navori holds the lid setting again in that process.
 - **LID-4.2** WHEN the Awake module first starts in a process and no `lid_held` marker is stored THE SYSTEM SHALL NOT call the lid setting at start.
 - **LID-4.3** WHEN the Awake module restarts under supervision in the same process THE SYSTEM SHALL NOT run the start-up restore again (agent-decided).
-- **LID-4.4** IF the start-up restore call is refused THEN THE SYSTEM SHALL keep the `lid_held` marker and show the problem line.
+- **LID-4.4** IF the start-up restore call is refused THEN THE SYSTEM SHALL keep the `lid_held` marker, show the problem line, retry the restore, and hold the lid setting in that process only after a restore succeeds (no-hold-until-restored added in design review, agent-decided).
 
 ## 5. The last sleep
 

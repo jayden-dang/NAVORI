@@ -34,11 +34,12 @@ The second constraint is the GOAL-11 budget and ARCH-16: no timers and no pollin
    - Hold: store the `lid_held` marker, then set the bit. If the marker save fails, nothing is set.
    - Release: clear the bit, then delete the marker. If the clear fails, the marker stays and the clear is retried.
    - A refused set deletes the marker, because the bit never changed. It also turns the switch off (LID-1.9).
-5. **The start-up restore runs once per process**, guarded by a `lid_restored` flag on the actor struct. The struct survives supervised restarts (`actor.rs:51`).
+5. **The start-up restore runs once per process**, guarded by a `lid_restored` flag on the actor struct. The struct survives supervised restarts (`actor.rs:51`). It runs before `restore_if_needed`, which itself calls `turn` (`actor.rs:926`). No hold is wanted until `lid_restored` is true, so a refused restore is retried and never clears a live hold (LID-4.4; design review F3).
 6. **The power watch is armed only while `Lid closed` is on** (LID-2.5, LID-2.7; changed in design). A Mac that never uses the feature pays nothing, and a broken watch cannot fail doctor when the switch is off. While the switch is on, a dead or failed watch reads as not on the adapter, raises a lid problem and is retried like the exits watcher (LID-2.6).
 7. **The watch is a notify(3) fd driven by tokio `AsyncFd`** in the actor (close package A3).
    - `navori-macos` registers the key and returns a `PowerWatch` that owns the fd and token and cancels both on Drop.
-   - `PowerWatch` exposes a safe `drain()`.
+   - `PowerWatch` exposes a safe `read_tokens()`, which returns `Err(WouldBlock)` once the fd is empty. The actor calls it inside `AsyncFd::readable()` → `guard.try_io(..)`, so tokio clears readiness on `WouldBlock` and the arm cannot spin (design review F2).
+   - Arming registers the watch **first**, then reads `current()`, so a change between the two is never lost (design review F1).
    - No thread is added. tokio `net` is already a workspace feature (`Cargo.toml:68`).
 8. **The sleep reaches Awake through a new `slept {at_ms}` Action** (LID-5.9; added in design). `NavoriCore::system_will_sleep()` stamps `at_ms` synchronously, then spawns the dispatch, honouring `shut_down`. The Core reaches a Module only through dispatch (`crates/ffi/src/lib.rs:445-465`). The actor reads the `Last Sleep Reason` through the platform when it handles the Action. That value persists across wake (research Q2).
 9. **Storage** (A4, A5, A9):
@@ -48,7 +49,7 @@ The second constraint is the GOAL-11 budget and ARCH-16: no timers and no pollin
      - `last_sleep`: JSON integer ms.
    - `Store::kv_delete(ns, key)` is added.
    - Journal kinds `awake.lid_changed {on}` and `awake.slept {at_ms, reason}` are permanent (Compat External).
-10. **Problem rank.** `Problems` gets a `lid` slot, ranked after `display` and before `release` (agent-decided; reviewer ask). `AwakeState` also publishes `lid_problem` on its own, so doctor sees it when the menu slot shows the Core's note (LID-6.2).
+10. **A lid problem stays out of `Problems::first`** (design review F4). It is published only as `AwakeState.lid_problem`. Putting it in `AwakeState.problem` would mark every project Unknown and turn off Stop (`crates/ffi/src/running.rs:319`), fail the `awake` doctor row and change the level-0 row. `CoreStore` gives it the menu's problem slot only after the Core's note and the Awake problem. Doctor reads it in `lid_check` (LID-6.2). It clears when its condition ends (LID-1.12). This answers the reviewer's ask about rank: it has no rank in `first()`, by design.
 11. **`AwakeState` gains `#[serde(default)]` fields**: `lid`, `lid_held`, `on_adapter: Option<bool>` (None = not watched), `lid_marker`, `last_sleep_ms`, `lid_problem`. They are mirrored on `AwakeView` (add-only, AWAKE-12.3). The Swift fallback for `lid` is `?? false` (W1).
 12. **An ADR records the clamshell-selector choice**: 0010, written via `define-domain`. It is surprising, hard to reverse because of the permanent keys and the global bit, and a real trade-off against root helpers.
 
@@ -106,7 +107,7 @@ Interface:
   - `fn current(&self) -> Result<PowerKind, PowerSourceError>`
   - `fn watch(&self) -> Result<PowerWatch, PowerSourceError>`
 - `enum PowerKind { Adapter, Battery }`. `AC Power` maps to Adapter. `Battery Power` and `UPS Power` map to Battery (LID-2.3).
-- `PowerWatch` implements `AsRawFd`. `drain(&self) -> io::Result<Drained>` returns `Drained::Changed` or `Drained::Closed`.
+- `PowerWatch` implements `AsRawFd`. `read_tokens(&self) -> io::Result<usize>` reads every pending 4-byte token. It returns `Ok(n > 0)` when there was a change, `Ok(0)` on EOF (the watch is closed), and `Err(WouldBlock)` when the fd is empty. Callers must go through `AsyncFd::try_io`, so readiness is cleared.
 Depth: callers still need to know only "what powers the Mac now" and "an fd that turns readable on a change". The notify registration, the non-blocking flag, the token and cancel, IOPS lookup and CF release stay inside.
 Locality: new files in `crates/macos`; nothing existing changes except the feature list.
 
@@ -115,7 +116,7 @@ Locality: new files in `crates/macos`; nothing existing changes except the featu
 - **`watch`:**
   - Declares `notify_register_file_descriptor` and `notify_cancel` in a hand-written `extern "C"` block. They are not in `libc` (research Q3); this is the crate's first such block.
   - Sets `O_NONBLOCK` on the fd.
-  - `drain` reads the 4-byte tokens until `EAGAIN` and reports `Closed` on EOF or error.
+  - `read_tokens` reads the 4-byte tokens until `EAGAIN`. It surfaces `EAGAIN` as `WouldBlock` once nothing was read, and returns 0 on EOF.
 - **`FakePowerSource`:**
   - Scripted with `set(kind)`, `fail_current()`, `fail_watch()` and `read_count()`.
   - `fire()` writes to one end of a `UnixStream::pair` that `PowerWatch::from_stream` wraps.
@@ -132,7 +133,7 @@ Locality: extend; one method and its test. No migration and no schema version ch
 
 ### 4. Lid hold in the Awake actor (`modules/awake`)
 
-Satisfies: LID-1.1, LID-1.2, LID-1.3, LID-1.4, LID-1.5, LID-1.6, LID-1.7, LID-1.8, LID-1.9, LID-1.10, LID-2.1, LID-2.2, LID-2.6, LID-2.7, LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.1, LID-7.3, LID-7.4, LID-7.11, LID-8.1, LID-8.4
+Satisfies: LID-1.1, LID-1.2, LID-1.3, LID-1.4, LID-1.5, LID-1.6, LID-1.7, LID-1.8, LID-1.9, LID-1.10, LID-1.12, LID-2.1, LID-2.2, LID-2.6, LID-2.7, LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.1, LID-7.3, LID-7.4, LID-7.11, LID-8.1, LID-8.4
 Reuse: rung 2 — the actor's `turn` / `note_*` / `needs_retry` / `schedule_retry` loop, the exits-watcher dead-and-retry pattern (`actor.rs:588-614`), `Platform` injection (`infra/platform.rs:47-83`) and kv helpers in `infra/stored.rs`
 Respects: ARCH-3, ARCH-10, ARCH-16
 Surface:
@@ -140,35 +141,36 @@ Surface:
 |---|---|
 | `Platform::new(power, processes, exits)`: `crates/ffi/tests/awake.rs:31`, `hook_session.rs:25`, `modules/awake/tests/common/mod.rs:135,167` | replace (signature kept). Builders `.with_lid(Arc<dyn LidSetting>)` and `.with_power_source(Arc<dyn PowerSource>)` are added. Defaults fail safe: lid `Unsupported` (refuses) and power `Unsupported` (Battery, no watch). The existing call sites compile unchanged |
 | `Platform::mac()`: `crates/ffi/src/app.rs:270`, `modules/awake/tests/real_os.rs:16,76` | replace — wires `MacLid` and `MacPowerSource`. `real_os.rs` never turns `Lid closed` on (charter hard stop) |
-| `Problems::first()` rank (`actor.rs:40`) and its readers `AwakeState.problem` → menu, doctor `awake_check` | replace — `lid` inserted after `display`; an existing problem keeps its rank relative to the others |
-| `needs_retry` (`actor.rs:678`) | replace — also true for a failed clear, a pending start-up restore, or a dead watch while `Lid closed` is on; never for a refused set |
+| `Problems::first()` (`actor.rs:40`) and its readers: `AwakeState.problem` → `crates/ffi/src/running.rs:319` `unknown_reason`, doctor `awake_check`, level-0 `AwakeRowState` | frozen — untouched; workaround: the lid problem is published apart as `lid_problem` (Decision 10) |
+| `needs_retry` (`actor.rs:678`) | replace — also true for a pending clear, a pending start-up restore, a failed marker save while a hold is wanted, or a dead watch while `Lid closed` is on. Never true for a refused or unavailable set, or a failed save of `lid = false` after one |
 | `run_loop` quit path (`actor.rs:114`, `ctx.recv() == None`) | replace — releases the lid, then deletes the marker, before returning `Ok(())` |
 | `Wants` (`domain/table.rs:109`), `Reconciler`, `Held` | frozen — untouched; the lid is computed beside them so assertions behave as today (LID-7.1) |
 | `tray()` (`lib.rs:34-53`) | frozen — reads `leases` and `system_held` only (LID-7.16) |
 
 Interface: no new public API. New `AwakeState` fields (section 5) carry the result. The lid is reconciled inside `turn` between `apply` and `publish`.
 Depth: n/a — extends the Awake actor.
-Locality: extend `actor.rs` with roughly five private fns (`reconcile_lid`, `restore_lid_once`, `arm_power`, `note_power_dead`, `release_lid_on_quit`), a `power: Option<AsyncFd<PowerWatch>>` and `lid: Option<LidGuard>` field, and the `lid_restored` flag. Extend `stored.rs` with load/save/delete helpers. `Platform` gets two fields. `table.rs` and `reconciler.rs` are left alone.
+Locality: extend `actor.rs` with roughly five private fns (`reconcile_lid`, `restore_lid_once`, `arm_power`, `note_power_dead`, `release_lid_on_quit`), a `power: Option<AsyncFd<PowerWatch>>` and `lid: Option<LidGuard>` field, and the `lid_restored` flag. Extend `stored.rs` with load/save/delete helpers. `Platform` gets two fields. `reconciler.rs` and the `Wants` rule are left alone. `table.rs` changes only where `snapshot()` builds an `AwakeState` literal (section 5).
 
 **Flow, every `turn`:**
-1. `want = lid_on ∧ table.wants().system ∧ on_adapter == Some(true)`.
-2. If `want` and no guard:
-   - Save the marker (failure → lid problem, stop, LID-1.6).
-   - Call `lid.hold()`. Ok → keep the guard.
-   - On `Refused`: lid problem; save `lid = false`; emit `lid_changed {on: false}`; delete the marker (LID-1.9).
+1. `want = lid_restored ∧ lid_on ∧ table.wants().system ∧ on_adapter == Some(true)`.
+2. If `want` and no guard and no pending clear:
+   - Save the marker. On failure: lid problem, retry, stop (LID-1.6).
+   - Call `lid.hold()`. Ok → keep the guard and clear the lid problem (LID-1.12).
+   - On `Refused` or `Unavailable`: lid problem; set `lid_on = false` in memory; save `lid = false`; emit `lid_changed {on: false}`; delete the marker (LID-1.9). A failed save here is only logged, and nothing is retried, so nothing spins.
 3. If not `want` and holding: `guard.release()`.
    - Ok → delete the marker.
-   - Err → keep the marker, set `clear_pending` and the lid problem, and retry with `give_back()` (LID-1.7, LID-1.8).
+   - Err → keep the marker and raise the lid problem (LID-1.7, LID-1.8).
+4. A **pending clear** is derived, not stored as a flag: the in-memory marker mirror is set and there is no guard (after `lid_restored`). It retries `give_back()` and then deletes the marker. Because nothing extra is kept, a panic and restart cannot orphan it (design review F7).
 
 **Start-up, in `run_loop` after `load_tracking`, once per process:**
-1. Load `lid` (LID-3.5, 3.6). If the marker is present, call `give_back()`, then delete the marker (LID-4.1 to 4.4).
-2. If `lid` is on, arm the power watch: one `current()` read, then `watch()`.
+1. Load `lid` (LID-3.5, 3.6). If the marker is present, call `give_back()`, then delete the marker, and set `lid_restored`. If `give_back()` is refused, keep the marker, raise the lid problem and retry (LID-4.1 to 4.4). If the marker read fails, skip the restore (LID-3.13) but set `lid_restored`.
+2. If `lid` is on, arm the power watch: `watch()` **first**, then one `current()` read (design review F1).
 
-The restore always runs before the first `turn`, so a hold in this process comes after it.
+This runs before `restore_if_needed` and the first `turn` (`actor.rs:93,926`). `want` stays false until `lid_restored` (design review F3).
 
 **The `select!` gets a fourth arm** that awaits `power.readable()`:
-- `Changed` → read `current()` once and set `on_adapter`. `publish` pushes only if the value changed (LID-8.1).
-- `Closed` or an error → `note_power_dead`:
+- `Ok(n > 0)` → read `current()` once and set `on_adapter`. `publish` pushes only if the value changed (LID-8.1).
+- `Ok(0)`, a read error, or a failed `current()` → `note_power_dead`:
   - drop the watch;
   - set `on_adapter = Some(false)`, which releases the lid in the same `turn` (LID-2.1, LID-2.6);
   - raise the lid problem;
@@ -195,6 +197,7 @@ Surface:
 | `crates/ffi/tests/actions_risk.rs:64` `SAMPLED = 24`, `sample()` `:66-98` | replace — 26, with two samples |
 | `AwakeState` JSON readers: exact-JSON tests in `modules/awake/tests/{duration,manual,session,idle,display}.rs`, literal in `tests/tray.rs:25` | replace — new fields added to the expected objects |
 | `AwakeState` deserialized by `awake_view` (`crates/ffi/src/app.rs:323`) and the CLI `--json` | replace — `#[serde(default)]` keeps older state readable |
+| `AwakeState {` literals: `LeaseTable::snapshot` (`domain/table.rs:692`), `AwakeState::idle` (`state.rs:13`) | replace — new fields set (table defaults; the actor fills them in `publish`) |
 | Journal kinds `awake.lease_started`, `awake.lease_ended`, `awake.tracking_changed` | frozen — untouched; two new kinds added beside them (permanent, Compat External) |
 | kv `awake/tracking` | frozen — untouched; new keys `lid`, `lid_held`, `last_sleep` |
 
@@ -248,7 +251,7 @@ The Mac may sleep before the task runs. The stamp is already taken, so the recor
 3. Set `last_sleep_ms`.
 4. Emit `SLEPT {at_ms, reason}` (LID-5.2, 5.3).
 
-Every `slept` call counts (LID-5.8); there is no reason filter.
+Every `slept` call counts (LID-5.8); there is no reason filter. If the dispatch lands only after wake and a dark wake slept again in between, `reason` may describe that later sleep while `at_ms` stays right. This is accepted: the reason is never shown, and appears only in the Journal (design review F10). `sleep_reason` lives on `LidSetting` because both read `IOPMrootDomain`; a third trait would add a seam for one getter.
 
 ### 7. Core view and doctor (`crates/ffi/src/{lib,app}.rs`)
 
@@ -260,7 +263,7 @@ Surface:
 |---|---|
 | `AwakeView` (`lib.rs:117-124`) → Swift `CoreStore`, `crates/ffi/tests/running.rs:37` literal, `tests/awake.rs` | replace — six fields appended; the test literal is updated; existing fields unchanged (LID-7.8) |
 | `awake_view` module-down blanking (`app.rs:323-338`) | replace — also blanks `lid_held` and `on_adapter` |
-| Doctor order: `Inner::doctor` (`app.rs:72-152`), `ffi/tests/integrations.rs:64-119` ordered list, `tests/core.rs:423` all-ok | replace — `lid` appended after `ports`; the ordered list in the test gains `lid`; it passes on a fresh start with `Lid closed` off |
+| Doctor order: `Inner::doctor` (`app.rs:72-152`), `ffi/tests/integrations.rs:64-119` and `tests/core.rs:772-790` ordered lists, `tests/core.rs:423` all-ok | replace — `lid` appended after `ports`; both ordered lists gain `lid`; it passes on a fresh start with `Lid closed` off |
 | `SettingsView.swift:135` doctor sentence | replace — see section 9 (LID-6.3) |
 
 Interface: `pub fn lid_check(view: Option<&AwakeView>) -> Check`, next to `awake_check`.
@@ -278,7 +281,7 @@ Surface:
 | Reader | Disposition |
 |---|---|
 | `print_awake_status` output, read by people and `apps/cli/tests/cli.rs` | replace — a `Lid closed:` line appended after `Tracking agents:`, which stays (LID-7.12); missing fields read as off for an older core |
-| `docs/features/awake.md:20`, `docs/agents/verify.md:156` (they say there is no lid verb) | replace — add `navori awake lid on|off` |
+| `docs/features/awake.md:22` (Action catalog), `docs/features/awake.md:36` (lists the lid as unsupported), `docs/agents/verify.md:48` (awake commands) | replace — add the `lid` and `slept` Actions, `navori awake lid on\|off`, and adapter-only lid support |
 
 Interface:
 - `navori awake lid on|off`: clap `ValueEnum` `OnOff`, sending `{"lid":{"on":bool}}`.
@@ -309,6 +312,8 @@ Surface:
 | `AwakeCommand` (`KeepAwakeChoice.swift:41-52`) and `AwakeActionFailure.achieved` (`AwakeRowState.swift:~55-64`) exhaustive switches | replace — `.lid(Bool)` added, emitting `{"lid":{"on":…}}` |
 | `StatusBarController.runningCommands` and `activate` (`:301-327`) | replace — `CascadeNode(id:"awake.lid", isActionable:true)` after tracking, and `case "awake.lid"`. `Last sleep` gets no node, so it is not keyboard-reachable or actionable (LID-5.7) |
 | `MenuRow` (`MenuRowView.swift`) | replace — optional `valueNote: String?` drawn in secondary colour after `value`; nil for every existing row |
+| `AwakeHeldMarks` (`CoreStore.swift:178`, `AwakeRowStateTests.swift:114`) | frozen — untouched; workaround: the lid is not a held mark, it lives on `AwakeSubmenuState` |
+| `CoreStore.runningSubmenu` problem slot (`CoreStore.swift:224-228`) | replace — passes `awake.problem ?? awake.lidProblem`; the Core's note still wins inside `RunningSubmenuState` (Decision 10, LID-7.17) |
 | `SettingsView.swift:135` sentence | replace — "…, logs, ports and lid." (LID-6.3) |
 | Running row dot (`RunningRowState`) and status icon (`tray`) | frozen — untouched (LID-7.16) |
 | Note-versus-problem slot (`RunningState.swift:307-309`) | frozen — the Core's note still wins (LID-7.17) |
@@ -360,7 +365,7 @@ States:
 - `Lid closed` off: `Off`, no dot.
 - `Lid closed` on, adapter: `On` + green dot.
 - `Lid closed` on, battery or not yet known: `On` + green dot + grey `Needs adapter`.
-- `Lid closed` refused: the problem line (when the Core's note does not take the slot), and the switch flips to `Off`.
+- `Lid closed` refused: the problem line, when neither the Core's note nor the Awake problem takes the slot, and the switch flips to `Off`.
 - `Lid closed` hover or keyboard selection: the standard row pill, as `Tracking agents`.
 
 Type & color: as Surface 1 of the 2026-11-01 brief.
@@ -380,13 +385,19 @@ Charter hard stop: no test may call the real lid setting.
 
 | Seam | Kind | Covers |
 |---|---|---|
-| Awake Module through the kernel (`modules/awake/tests/common` rig: `dispatch` + `FakeClock` + `FakePower` + `FakeLid` + `FakePowerSource` + in-memory Store) — existing seam, extended | integration | LID-1.1–1.10, LID-2.1, 2.2, 2.5–2.7, LID-3.1–3.6, 3.12, 3.13, LID-4.1–4.4, LID-5.2, 5.3, 5.8, 5.9, LID-7.1–7.4, 7.11, LID-8.1, 8.3, 8.4 |
+| Awake Module through the kernel (`modules/awake/tests/common` rig: `dispatch` + `FakeClock` + `FakePower` + `FakeLid` + `FakePowerSource` + in-memory Store) — existing seam, extended | integration | LID-1.1–1.10, 1.12, LID-2.1, 2.2, 2.5–2.7, LID-3.1–3.6, 3.12, 3.13, LID-4.1–4.4, LID-5.2, 5.3, 5.8, 5.9, LID-7.1–7.4, 7.11, LID-8.1, 8.3, 8.4 |
 | Awake actor drop (rig: drop the kernel or module while holding) — existing rig | integration | LID-1.11, LID-8.4 |
+
+How LID-8.4 is tested (design review F6):
+- `FakeLid` takes an `on_call` probe. The test passes a closure that reads `kv_get("awake","lid_held")`, so every `Set` and `Clear` records whether the marker was stored at that instant.
+- Per-key store failures come from an SQLite trigger installed through `Store::with_conn` on the in-memory store, for example `BEFORE INSERT ON kv WHEN NEW.key='lid_held' … RAISE(ABORT)`.
 | `FakeLid` / `FakePowerSource` / `LidGuard` / `PowerWatch::from_stream` (`crates/macos/tests/fakes.rs`) — existing file | unit | LID-1.11, LID-2.3 |
 | `Store` (`crates/store` tests) — existing | unit | LID-7.6 |
-| `NavoriCore` with an injected Awake platform (`crates/ffi/tests/awake.rs` pattern with fakes; `core.rs` for doctor all-ok with the switch off) — existing | integration | LID-5.1, LID-6.1, 6.2, LID-7.5, 7.7, 7.8 |
+| `NavoriCore::start_with` on a temp profile (`crates/ffi/tests/core.rs` pattern; real `Platform::mac()` with `Lid closed` off and no marker, so the lid setting is never called. `system_will_sleep()` reads only `Last Sleep Reason`) — existing | integration | LID-5.1, LID-7.5, 7.7, 7.8 |
+| `lid_check` / `awake_view` pure functions (`crates/ffi/tests/awake.rs` pattern, as `awake_check`) — existing | unit | LID-6.1, 6.2 |
 | CLI binary against a test socket (`apps/cli/tests/cli.rs`) — existing | integration | LID-3.10, 3.11, LID-7.9, 7.12 |
-| NavoriPanel pure state (`RunningStateTests`, `AwakeSubmenuStateTests`, new `LastSleepTextTests`) — existing target | unit | LID-2.4, LID-3.7–3.9, LID-5.4–5.7, LID-6.3 (string), LID-7.13, 7.15–7.17, LID-8.2, 8.5 |
+| NavoriPanel pure state (`RunningStateTests`, `AwakeSubmenuStateTests`, new `LastSleepTextTests`) — existing target | unit | LID-2.4, LID-3.7–3.9, LID-5.4–5.7, LID-6.3 (string), LID-7.13, 7.15–7.17, LID-8.5 |
+| Menu-open path (`CoreStore` builds `RunningSubmenuState` from the last pushed `CoreSnapshot` only). Verified by a NavoriPanel test that builds every row from a snapshot value, and by the import rule: NavoriPanel and `Features/Panel` import no IOKit; `check-deps` / grep) — existing | unit + integration | LID-8.2 |
 | `cargo xtask check-deps` and the Swift import rule — existing | integration | LID-7.9, LID-7.10, LID-7.14 |
 
 There are no new seams: every row extends an existing test rig or target.
@@ -397,7 +408,7 @@ There are no new seams: every row extends an existing test rig or target.
   - §1: 1.11
   - §2: 2.3, 2.5
   - §3: 7.6
-  - §4: 1.1–1.10, 2.1, 2.2, 2.6, 2.7, 4.1–4.4, 7.1, 7.3, 7.4, 7.11, 8.1, 8.4
+  - §4: 1.1–1.10, 1.12, 2.1, 2.2, 2.6, 2.7, 4.1–4.4, 7.1, 7.3, 7.4, 7.11, 8.1, 8.4
   - §5: 3.1–3.6, 3.12, 3.13, 7.2, 8.3
   - §6: 5.1–5.3, 5.8, 5.9, 7.5
   - §7: 6.1, 6.2, 7.7, 7.8
@@ -413,3 +424,8 @@ There are no new seams: every row extends an existing test rig or target.
   - LID-6.1: `not watched`.
   - LID-8.1: reads counted from arming.
   - LID-8.3: covers `slept`.
+  - After the independent design review (`RUN/design-review.md`):
+    - LID-1.12: new; when a lid problem clears.
+    - LID-4.4: no hold until a restore succeeds.
+    - LID-3.13: only an unreadable marker skips the restore.
+    - The "problem line" term: the lid problem is published apart from the Awake problem.
