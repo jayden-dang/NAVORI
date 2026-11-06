@@ -665,7 +665,7 @@ _Requirements: LID-2.4, LID-3.8, LID-3.9, LID-7.10, LID-7.13, LID-7.15, LID-7.16
 
 **Depends-on:** Task 9, Task 12
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
   - In the new `@Suite struct LastSleepTextTests`, one table-driven test, `the_last_sleep_reads_by_calendar_day`. Its rows use a fixed `now` of 2026-11-06 10:00 in `Asia/Ho_Chi_Minh`:
 
     | Sleep time | `value` | `spoken` |
@@ -681,12 +681,12 @@ _Requirements: LID-2.4, LID-3.8, LID-3.9, LID-7.10, LID-7.13, LID-7.15, LID-7.16
     - `no_recorded_sleep_shows_no_row_and_no_separator`
     - `the_full_order_runs_from_last_sleep_to_stop_all`, with exactly the order in design §9
     - `the_last_sleep_item_has_no_action_id`, testing a new `RunningSubmenuItem.actionId: String?` (`.lastSleep` → `nil`, `.lidClosed` → `"awake.lid"`, `.trackingAgents` → `"awake.tracking"`); `StatusBarController.runningCommands` builds its nodes only for non-nil ids (LID-5.7)
-- [ ] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter "LastSleepTextTests|RunningSubmenuStateTests"`. Expect: compile errors.
-- [ ] **Step 3: Implement** `lastSleepText` and the `.lastSleep` item. Draw it as a static row on the `CommandRowView` pattern: icon `moon`, value in secondary label colour, no Button, no hover, no cascade node, `.accessibilityElement(children: .ignore)` and `accessibilityLabel` `Last sleep, <spoken>`.
-- [ ] **Step 4: Wire the forwarder.** Add an `onSleep` token for `NSWorkspace.willSleepNotification` in `WakeObserver`, wired in `AppDelegate`'s existing `!perfFlagWithoutHome` block to `store.systemWillSleep()`, which calls `core?.systemWillSleep()`. `CoreStore` passes `lastSleep` from `awake?.lastSleepMs` with `Date()` and `.current`.
-- [ ] **Step 5: Run** the Swift suites above, then `cargo xtask ci`. Expect: pass.
-- [ ] **Step 6: Acceptance check for the menu-open path (LID-8.2, LID-7.14).** Run `grep -rnE 'import IOKit|IOPS|notify_register|IORegistry' apps/macos/NavoriPanel apps/macos/Navori/Features/Panel`. Expect: no match. `CoreStore` builds both submenus only from the last pushed `CoreSnapshot`.
-- [ ] **Step 7: Commit** `feat(menu): show when the Mac last slept`
+- [x] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter "LastSleepTextTests|RunningSubmenuStateTests"`. Expect: compile errors.
+- [x] **Step 3: Implement** `lastSleepText` and the `.lastSleep` item. Draw it as a static row on the `CommandRowView` pattern: icon `moon`, value in secondary label colour, no Button, no hover, no cascade node, `.accessibilityElement(children: .ignore)` and `accessibilityLabel` `Last sleep, <spoken>`.
+- [x] **Step 4: Wire the forwarder.** Add an `onSleep` token for `NSWorkspace.willSleepNotification` in `WakeObserver`, wired in `AppDelegate`'s existing `!perfFlagWithoutHome` block to `store.systemWillSleep()`, which calls `core?.systemWillSleep()`. `CoreStore` passes `lastSleep` from `awake?.lastSleepMs` with `Date()` and `.current`.
+- [x] **Step 5: Run** the Swift suites above, then `cargo xtask ci`. Expect: pass.
+- [x] **Step 6: Acceptance check for the menu-open path (LID-8.2, LID-7.14).** Run `grep -rnE 'import IOKit|IOPS|notify_register|IORegistry' apps/macos/NavoriPanel apps/macos/Navori/Features/Panel`. Expect: no match. `CoreStore` builds both submenus only from the last pushed `CoreSnapshot`.
+- [x] **Step 7: Commit** `feat(menu): show when the Mac last slept`
 
 _Requirements: LID-3.7, LID-5.4, LID-5.5, LID-5.6, LID-5.7, LID-7.14, LID-8.2, LID-8.5_
 
