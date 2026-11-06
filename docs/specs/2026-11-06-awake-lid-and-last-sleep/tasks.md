@@ -608,7 +608,7 @@ _Requirements: LID-3.10, LID-3.11, LID-7.9, LID-7.12_
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Run** `cargo xtask ci` once to build the core and the bindings. Write failing tests:
+- [x] **Step 1: Run** `cargo xtask ci` once to build the core and the bindings. Write failing tests:
   - In `AwakeSubmenuStateTests`:
     - `lid_closed_reads_off_by_default`
     - `lid_closed_on_shows_on_and_a_green_dot`
@@ -622,11 +622,11 @@ _Requirements: LID-3.10, LID-3.11, LID-7.9, LID-7.12_
   - In `AwakeRowStateTests`:
     - `a_lid_action_failure_is_reported`
   - In `AwakeSubmenuStateTests`, also add `the_lid_row_toggles_to_the_opposite_value`, which tests a pure `AwakeSubmenuState.lidToggle: AwakeCommand` that `StatusBarController.activate` calls (LID-3.9)
-- [ ] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter AwakeSubmenuStateTests`. Expect: compile errors.
-- [ ] **Step 3: Implement** the state, the item, the command, the `AwakeActionFailure.achieved` case and `MenuRow.valueNote`, drawn in secondary colour after `value`. Draw `.lidClosed` with `MenuRowView`: `id "awake.lid"`, icon `laptopcomputer`.
-- [ ] **Step 4: Wire `StatusBarController`:** the node after `awake.tracking`, and `case "awake.lid": store.awakeSubmenu.lidToggle`. In `CoreStore`, pass `awake?.lid ?? false` and `awake?.onAdapter`, and set the problem slot to `awake.problem ?? awake.lidProblem`. Leave `AwakeHeldMarks`, the Running row dot and `tray` untouched.
-- [ ] **Step 5: Run** `swift test --arch arm64 --package-path apps/macos --filter "AwakeSubmenuStateTests|RunningSubmenuStateTests|RunningCommandRowsTests|AwakeRowStateTests"`, then `cargo xtask ci`. Expect: pass.
-- [ ] **Step 6: Commit** `feat(menu): a Lid closed row in the Running submenu`
+- [x] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter AwakeSubmenuStateTests`. Expect: compile errors.
+- [x] **Step 3: Implement** the state, the item, the command, the `AwakeActionFailure.achieved` case and `MenuRow.valueNote`, drawn in secondary colour after `value`. Draw `.lidClosed` with `MenuRowView`: `id "awake.lid"`, icon `laptopcomputer`.
+- [x] **Step 4: Wire `StatusBarController`:** the node after `awake.tracking`, and `case "awake.lid": store.awakeSubmenu.lidToggle`. In `CoreStore`, pass `awake?.lid ?? false` and `awake?.onAdapter`, and set the problem slot to `awake.problem ?? awake.lidProblem`. Leave `AwakeHeldMarks`, the Running row dot and `tray` untouched.
+- [x] **Step 5: Run** `swift test --arch arm64 --package-path apps/macos --filter "AwakeSubmenuStateTests|RunningSubmenuStateTests|RunningCommandRowsTests|AwakeRowStateTests"`, then `cargo xtask ci`. Expect: pass.
+- [x] **Step 6: Commit** `feat(menu): a Lid closed row in the Running submenu`
 
 _Requirements: LID-2.4, LID-3.8, LID-3.9, LID-7.10, LID-7.13, LID-7.15, LID-7.16, LID-7.17, LID-8.5_
 
