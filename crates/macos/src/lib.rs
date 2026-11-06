@@ -2,6 +2,7 @@
 
 mod error;
 mod exits;
+mod lid;
 mod power;
 mod procargs;
 mod process;
@@ -10,6 +11,7 @@ mod sockets;
 
 pub use error::*;
 pub use exits::*;
+pub use lid::*;
 pub use power::*;
 pub use procargs::*;
 pub use process::*;
