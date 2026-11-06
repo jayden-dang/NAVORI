@@ -451,7 +451,7 @@ _Requirements: LID-1.10, LID-1.11, LID-8.4_
 
 **Depends-on:** Task 6
 
-- [ ] **Step 1: Write failing tests in `lid_restore.rs`:**
+- [x] **Step 1: Write failing tests in `lid_restore.rs`:**
   - `a_stored_marker_at_start_gives_the_lid_back_then_deletes_it`
   - `no_marker_at_start_makes_no_lid_call`
   - `the_restore_runs_before_any_hold_in_that_process`, with a marker, a Lease, the adapter and the switch on; the call order is `Clear` then `Set`
@@ -461,10 +461,10 @@ _Requirements: LID-1.10, LID-1.11, LID-8.4_
   - `an_unreadable_last_sleep_does_not_skip_the_restore`
 
   LID-7.4's guard is already covered by the existing restart test (`modules/awake/tests/restart.rs` line 89); keep it green.
-- [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test lid_restore`. Expect: fail.
-- [ ] **Step 3: Implement `restore_lid_once`.** Set `lid_restored` on success or on an unreadable marker. On refusal, keep the marker, raise the problem and retry; `want` stays false. Change the initial value of `lid_restored` to `false`. With an empty store (no marker), the restore succeeds at once and sets it to `true`, so Task 6's tests still pass unchanged.
-- [ ] **Step 4: Run** `cargo test -p navori-mod-awake`. Expect: pass.
-- [ ] **Step 5: Commit** `feat(awake): give lid sleep back at start when Navori held it`
+- [x] **Step 2: Run** `cargo test -p navori-mod-awake --test lid_restore`. Expect: fail.
+- [x] **Step 3: Implement `restore_lid_once`.** Set `lid_restored` on success or on an unreadable marker. On refusal, keep the marker, raise the problem and retry; `want` stays false. Change the initial value of `lid_restored` to `false`. With an empty store (no marker), the restore succeeds at once and sets it to `true`, so Task 6's tests still pass unchanged.
+- [x] **Step 4: Run** `cargo test -p navori-mod-awake`. Expect: pass.
+- [x] **Step 5: Commit** `feat(awake): give lid sleep back at start when Navori held it`
 
 _Requirements: LID-3.13, LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.4_
 
