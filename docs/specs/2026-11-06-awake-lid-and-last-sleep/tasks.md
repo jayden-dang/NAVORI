@@ -339,7 +339,7 @@ _Requirements: LID-3.1, LID-3.2, LID-3.3, LID-3.4, LID-3.5, LID-3.6, LID-3.12, L
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Write failing tests in `lid.rs`:**
+- [x] **Step 1: Write failing tests in `lid.rs`:**
   - `nothing_reads_the_power_source_while_lid_closed_is_off`, where `read_count` is 0 and `watch_count` is 0
   - `turning_lid_closed_on_watches_first_then_reads_once`
   - `a_power_change_reads_the_source_once_and_publishes_only_a_real_change`
@@ -348,11 +348,11 @@ _Requirements: LID-3.1, LID-3.2, LID-3.3, LID-3.4, LID-3.5, LID-3.6, LID-3.12, L
   - `a_failed_watch_at_arming_reads_as_battery_and_retries`
   - `turning_lid_closed_off_drops_the_watch`
   - `an_idle_watch_does_not_spin`: after arming and `rig.idle()` ten times on a paused clock, `drain_count()` is at most 1
-- [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test lid`. Expect: the new tests fail.
-- [ ] **Step 3: Implement** arming on turn-on and at start with `lid` on: `watch()` **first**, then one `current()`. On turn-off, disarm and set `on_adapter = None`.
-- [ ] **Step 4: Implement the arm.** It loops on `readable().await`, then `guard.try_io(|w| w.get_ref().read_tokens())`. `Ok(n > 0)` → `current()` once. `Ok(0)`, an error, or a failed `current()` → `note_power_dead`: drop the watch, set `on_adapter = Some(false)`, raise the lid problem, `schedule_retry`. `needs_retry` is true while the watch is dead and `lid` is on.
-- [ ] **Step 5: Run** `cargo test -p navori-mod-awake`. Expect: pass.
-- [ ] **Step 6: Commit** `feat(awake): watch the power source while Lid closed is on`
+- [x] **Step 2: Run** `cargo test -p navori-mod-awake --test lid`. Expect: the new tests fail.
+- [x] **Step 3: Implement** arming on turn-on and at start with `lid` on: `watch()` **first**, then one `current()`. On turn-off, disarm and set `on_adapter = None`.
+- [x] **Step 4: Implement the arm.** It loops on `readable().await`, then `guard.try_io(|w| w.get_ref().read_tokens())`. `Ok(n > 0)` → `current()` once. `Ok(0)`, an error, or a failed `current()` → `note_power_dead`: drop the watch, set `on_adapter = Some(false)`, raise the lid problem, `schedule_retry`. `needs_retry` is true while the watch is dead and `lid` is on.
+- [x] **Step 5: Run** `cargo test -p navori-mod-awake`. Expect: pass.
+- [x] **Step 6: Commit** `feat(awake): watch the power source while Lid closed is on`
 
 _Requirements: LID-2.5, LID-2.6, LID-2.7, LID-8.1_
 
