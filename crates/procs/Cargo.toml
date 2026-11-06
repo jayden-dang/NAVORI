@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 navori-macos.workspace = true
+navori-protocol.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 tokio.workspace = true

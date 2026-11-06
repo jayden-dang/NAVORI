@@ -87,7 +87,7 @@ fn session_row(label: &str, ends_at_ms: i64) -> Value {
     json!({
         "key": format!("session:{SESSION}"),
         "kind": "session",
-        "harness": "Claude Code",
+        "harness": "claude",
         "label": label,
         "pid": CLAUDE,
         "stopped": false,
@@ -463,7 +463,7 @@ async fn a_session_id_outside_the_allowed_characters_is_invalid() {
         .unwrap();
     assert_eq!(lease_count(&held), 1);
     assert_eq!(held["leases"][0]["key"], format!("session:{accepted}"));
-    assert_eq!(held["leases"][0]["harness"], "Claude Code");
+    assert_eq!(held["leases"][0]["harness"], "claude");
     assert_eq!(held["leases"][0]["label"], Value::Null);
     assert_eq!(held["leases"][0]["pid"], CLAUDE);
     rig.shutdown().await;
@@ -622,7 +622,7 @@ async fn a_codex_session_is_labelled_by_the_directory_it_reports_not_its_daemons
         .await
         .unwrap();
 
-    assert_eq!(state["leases"][0]["harness"], "Codex");
+    assert_eq!(state["leases"][0]["harness"], "codex");
     assert_eq!(state["leases"][0]["label"], json!(project.label()));
     assert_eq!(state["leases"][0]["pid"], CODEX_DAEMON);
 }

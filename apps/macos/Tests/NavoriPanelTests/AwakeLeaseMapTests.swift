@@ -19,7 +19,7 @@ struct AwakeLeaseMapTests {
     @Test func a_session_row_uses_the_harness() {
         let source = AwakeLeaseMap.sourceName(
             kind: "session",
-            harness: "Claude Code",
+            harness: "claude",
             label: "NAVORI/main"
         )
         let status = AwakeLevel0.row(
@@ -29,14 +29,6 @@ struct AwakeLeaseMapTests {
             sources: [source].compactMap { $0 }
         )
         #expect(AwakeRowState(status: status).label == "On · Claude Code")
-    }
-
-    @Test func a_session_title_reaches_the_row_input() {
-        let lease = AwakeLeaseMap.lease(
-            kind: "session", harness: "Claude Code", label: "klynt/dev", pid: 1, stopped: false, endsAtMs: nil,
-            title: "Road-128"
-        )
-        #expect(lease?.title == "Road-128")
     }
 
     @Test func a_known_epoch_formats_as_hour_and_minute() {

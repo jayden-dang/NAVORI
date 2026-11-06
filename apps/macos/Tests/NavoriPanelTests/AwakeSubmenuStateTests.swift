@@ -293,8 +293,10 @@ struct AwakeSubmenuStateTests {
     }
 
     @Test(arguments: [
+        ("claude", HoldingMark.claude),
         ("Claude Code", HoldingMark.claude),
-        ("Codex", HoldingMark.codex),
+        ("codex", HoldingMark.codex),
+        ("grok", HoldingMark.grok),
         ("Grok", HoldingMark.grok),
         ("Somebody Else", HoldingMark.terminal),
     ])

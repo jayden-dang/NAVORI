@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use navori_mod_ports::{
-    HarnessName, PortEntry, PortKind, PortsState, Selector, StopClass, Target, stop_class,
+    Harness, PortEntry, PortKind, PortsState, Selector, StopClass, Target, stop_class,
 };
 use serde_json::json;
 
@@ -330,12 +330,8 @@ fn unknown_reason(awake: Option<&AwakeView>) -> Option<String> {
         .then(|| NO_LABEL.to_owned())
 }
 
-fn harness_name(harness: HarnessName) -> &'static str {
-    match harness {
-        HarnessName::ClaudeCode => "claude_code",
-        HarnessName::Codex => "codex",
-        HarnessName::Grok => "grok",
-    }
+fn harness_name(harness: Harness) -> &'static str {
+    harness.id()
 }
 
 fn kind_name(kind: PortKind) -> &'static str {

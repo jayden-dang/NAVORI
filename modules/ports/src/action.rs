@@ -30,15 +30,16 @@ pub enum PortsAction {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Selector {
-    /// One process, named by its pid.
     Pid(i32),
     /// Everything in one worktree of one project.
-    Worktree { project: String, worktree: String },
+    Worktree {
+        project: String,
+        worktree: String,
+    },
     /// Everything in one project; no name means the group of ports with no project.
     Project(Option<String>),
 }
 
-/// One thing to stop.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Target {
@@ -48,7 +49,6 @@ pub enum Target {
     Container { id: String },
 }
 
-/// What happened to one target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Outcome {

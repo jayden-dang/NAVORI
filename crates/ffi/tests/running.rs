@@ -24,7 +24,7 @@ fn session(label: Option<&str>, stopped: bool) -> LeaseView {
     LeaseView {
         key: format!("session-{}", label.unwrap_or("none")),
         kind: "session".into(),
-        harness: Some("claude_code".into()),
+        harness: Some("claude".into()),
         label: label.map(str::to_owned),
         pid: Some(900),
         stopped,
@@ -200,7 +200,7 @@ fn a_session_lease_with_a_working_flag_makes_its_project_working() {
     let klynt = project(&view, "klynt");
     assert_eq!(klynt.state, ProjectState::Working);
     assert_eq!(klynt.sessions.len(), 1);
-    assert_eq!(klynt.sessions[0].harness.as_deref(), Some("claude_code"));
+    assert_eq!(klynt.sessions[0].harness.as_deref(), Some("claude"));
     assert_eq!(klynt.sessions[0].title.as_deref(), Some("Fix the build"));
     assert_eq!(klynt.sessions[0].branch.as_deref(), Some("feature/x"));
     assert!(!klynt.sessions[0].stopped);
@@ -533,7 +533,7 @@ fn a_port_row_carries_its_worktree_and_harness_and_a_docker_port_carries_no_harn
     let dev = with(
         with(port(3000, 10), "worktree", json!("klynt-feature")),
         "harness",
-        json!("claude_code"),
+        json!("claude"),
     );
     let docker = with(
         container(port(8080, 50), "ab12", "node"),
@@ -545,7 +545,7 @@ fn a_port_row_carries_its_worktree_and_harness_and_a_docker_port_carries_no_harn
     let klynt = project(&view, "klynt");
     let dev = klynt.ports.iter().find(|p| p.port == 3000).unwrap();
     assert_eq!(dev.worktree.as_deref(), Some("klynt-feature"));
-    assert_eq!(dev.harness.as_deref(), Some("claude_code"));
+    assert_eq!(dev.harness.as_deref(), Some("claude"));
     let docker = klynt.ports.iter().find(|p| p.port == 8080).unwrap();
     assert_eq!(docker.harness, None);
     assert_eq!(docker.name, "c-ab12");

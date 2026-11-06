@@ -666,7 +666,7 @@ impl Awake {
         }
         Ok(Some(Started::Session {
             key: LeaseKey::Session { session_id }.text(),
-            name: domain::harness_name(harness).to_owned(),
+            name: harness.display().to_owned(),
         }))
     }
 
@@ -1594,7 +1594,7 @@ fn source_text(lease: &Lease) -> String {
         LeaseSource::UntilOff => event::until_off_source().to_owned(),
         LeaseSource::Display => event::display_source().to_owned(),
         LeaseSource::Command { .. } => lease.label.clone().unwrap_or_else(|| "command".to_owned()),
-        LeaseSource::Session { harness, .. } => domain::harness_name(*harness).to_owned(),
+        LeaseSource::Session { harness, .. } => harness.display().to_owned(),
     }
 }
 

@@ -1314,6 +1314,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "navori-kernel",
+ "navori-protocol",
  "navori-store",
  "schemars",
  "serde",
@@ -1349,6 +1350,7 @@ name = "navori-procs"
 version = "0.1.0"
 dependencies = [
  "navori-macos",
+ "navori-protocol",
  "tempfile",
  "thiserror",
  "tokio",
@@ -1360,6 +1362,7 @@ dependencies = [
 name = "navori-protocol"
 version = "0.1.0"
 dependencies = [
+ "schemars",
  "serde",
  "serde_json",
 ]

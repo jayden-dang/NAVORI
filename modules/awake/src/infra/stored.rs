@@ -154,12 +154,7 @@ fn to_lease(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredLease> {
 }
 
 fn parse_harness(text: String) -> Option<Harness> {
-    match text.as_str() {
-        "Claude Code" => Some(Harness::ClaudeCode),
-        "Codex" => Some(Harness::Codex),
-        "Grok" => Some(Harness::Grok),
-        _ => None,
-    }
+    Harness::parse(&text)
 }
 
 fn optional_time(us: Option<i64>) -> rusqlite::Result<Option<SystemTime>> {

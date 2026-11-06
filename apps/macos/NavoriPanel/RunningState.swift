@@ -373,17 +373,18 @@ public struct SessionRowState: Equatable, Sendable {
     public let spoken: String
 
     init(_ session: RunningSessionInput) {
-        let title = Self.text(session.title) ?? Self.text(session.harness) ?? "Session"
+        let shown = session.harness.flatMap(HarnessCopy.display)
+        let title = Self.text(session.title) ?? shown ?? "Session"
         let word = session.stopped ? "stopped" : "working"
         let branch = Self.text(session.branch)
         self.title = title
-        mark = AwakeSubmenuState.harnessMark(session.harness)
+        mark = HarnessCopy.mark(session.harness)
         self.branch = branch
         state = word
         dimmed = session.stopped
         showsDot = session.stopped == false
         var parts = [title]
-        if let harness = Self.text(session.harness), harness != title { parts.append(harness) }
+        if let harness = shown, harness != title { parts.append(harness) }
         if let branch { parts.append("branch \(branch)") }
         parts.append(word)
         spoken = parts.joined(separator: ", ")
@@ -476,7 +477,7 @@ public struct PortRowState: Equatable, Sendable {
         }
         var origin: [String] = []
         if let worktree = port.worktree, worktree.isEmpty == false { origin.append("worktree \(worktree)") }
-        if port.container == false, let harness = port.harness.flatMap(Self.harnessName) {
+        if port.container == false, let harness = port.harness.flatMap(HarnessCopy.display) {
             origin.append("started by \(harness)")
         }
         tooltip = origin.isEmpty ? nil : origin.joined(separator: " \u{00B7} ")
@@ -495,15 +496,6 @@ public struct PortRowState: Equatable, Sendable {
         }
     }
 
-    private static func harnessName(_ harness: String) -> String? {
-        switch harness {
-        case "claude_code": "Claude Code"
-        case "codex": "Codex"
-        case "grok": "Grok"
-        case "": nil
-        default: harness
-        }
-    }
 }
 
 public struct ProjectChildState: Equatable, Sendable {

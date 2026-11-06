@@ -10,6 +10,7 @@ publish.workspace = true
 [dependencies]
 anyhow.workspace = true
 navori-kernel.workspace = true
+navori-protocol.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true

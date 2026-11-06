@@ -391,11 +391,7 @@ pub fn integrations_check(state: &IntegrationsState) -> Check {
 }
 
 fn harness_word(harness: Harness) -> &'static str {
-    match harness {
-        Harness::Claude => "claude",
-        Harness::Codex => "codex",
-        Harness::Grok => "grok",
-    }
+    harness.id()
 }
 
 fn state_word(state: State) -> &'static str {

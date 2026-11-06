@@ -226,7 +226,7 @@ async fn a_session_lease_row_stores_pid_start_first_hold_stop_mark_and_deadline(
     assert_eq!(row.key, format!("session:{SESSION}"));
     assert_eq!(row.kind, "session");
     assert_eq!(row.session_id.as_deref(), Some(SESSION));
-    assert_eq!(row.harness.as_deref(), Some("Claude Code"));
+    assert_eq!(row.harness.as_deref(), Some("claude"));
     assert_eq!(row.pid, i64::from(CLAUDE));
     assert_eq!(row.process_start_us, i64::try_from(CLAUDE_START).unwrap());
     assert_eq!(row.first_hold_us, Some(FIRST_HOLD_US));
@@ -306,7 +306,7 @@ async fn a_live_process_is_restored_and_the_assertion_returns() {
     assert_eq!(state["system_held"], true);
     assert_eq!(state["leases"][0]["key"], format!("session:{SESSION}"));
     assert_eq!(state["leases"][0]["kind"], "session");
-    assert_eq!(state["leases"][0]["harness"], "Claude Code");
+    assert_eq!(state["leases"][0]["harness"], "claude");
     assert_eq!(state["leases"][0]["pid"], CLAUDE);
     assert_eq!(state["leases"][0]["stopped"], false);
     assert_eq!(state["leases"][0]["ends_at_ms"], ENDS_AT_MS);

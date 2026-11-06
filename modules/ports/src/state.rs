@@ -2,27 +2,10 @@ use std::cmp::Ordering;
 use std::net::IpAddr;
 use std::path::PathBuf;
 
-use navori_procs::{Branch, Harness};
+use navori_procs::Branch;
 use serde::{Deserialize, Serialize};
 
-/// Which Harness started a process.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum HarnessName {
-    ClaudeCode,
-    Codex,
-    Grok,
-}
-
-impl From<Harness> for HarnessName {
-    fn from(harness: Harness) -> Self {
-        match harness {
-            Harness::ClaudeCode => Self::ClaudeCode,
-            Harness::Codex => Self::Codex,
-            Harness::Grok => Self::Grok,
-        }
-    }
-}
+pub use navori_procs::Harness;
 
 /// The branch checked out where a process runs, or the commit when none is.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,7 +24,6 @@ impl From<Branch> for BranchName {
     }
 }
 
-/// What kind of thing holds a port.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PortKind {
@@ -53,7 +35,6 @@ pub enum PortKind {
     Other,
 }
 
-/// The container that holds a Docker port.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContainerRef {
     pub id: String,
@@ -81,7 +62,6 @@ pub struct Placement {
     pub root: Option<PathBuf>,
 }
 
-/// One port held by one process, with every address it bound.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PortEntry {
     pub port: u16,
@@ -92,30 +72,27 @@ pub struct PortEntry {
     pub exe: Option<PathBuf>,
     #[serde(flatten)]
     pub place: Placement,
-    pub harness: Option<HarnessName>,
+    pub harness: Option<Harness>,
     pub kind: PortKind,
     pub container: Option<ContainerRef>,
 }
 
-/// One process and the ports it holds.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessGroup {
     pub pid: i32,
     pub start_us: u64,
     pub name: String,
     pub exe: Option<PathBuf>,
-    pub harness: Option<HarnessName>,
+    pub harness: Option<Harness>,
     pub entries: Vec<PortEntry>,
 }
 
-/// The processes that run in one worktree of a project.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorktreeGroup {
     pub worktree: Option<String>,
     pub processes: Vec<ProcessGroup>,
 }
 
-/// The worktrees of one project.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProjectGroup {
     pub project: Option<String>,

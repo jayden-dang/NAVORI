@@ -1,6 +1,7 @@
+import NavoriPanel
 import SwiftUI
 
-/// One confirmation, on one 26 pt row: a lead, the question, a flat `Cancel` and a flat `Stop`.
+/// One confirmation on a menu row: a lead, the question, a flat `Cancel` and a flat `Stop`.
 /// Shared by a single port's Stop, `Stop N ports` and `Stop all ports…`.
 struct InlineConfirmRow<Lead: View>: View {
     private enum Field { case cancel }
@@ -34,7 +35,7 @@ struct InlineConfirmRow<Lead: View>: View {
                 .layoutPriority(2)
         }
         .padding(.horizontal, 8)
-        .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: MenuMetrics.rowHeight, maxHeight: MenuMetrics.rowHeight, alignment: .leading)
         .background {
             if selected {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)

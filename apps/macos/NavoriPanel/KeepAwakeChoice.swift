@@ -28,7 +28,6 @@ public struct KeepAwakeChoice: Equatable, Sendable {
         self = found
     }
 
-    /// The cascade row id.
     public var id: String {
         "awake.keep.\(seconds.map(String.init) ?? "indefinitely")"
     }

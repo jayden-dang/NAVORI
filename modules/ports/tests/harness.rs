@@ -8,7 +8,7 @@ use std::time::Duration;
 use common::{Gate, LogCapture, Rig};
 use navori_macos::ProcessSource;
 use navori_macos::fake::{FakeProcess, FakeProcesses};
-use navori_mod_ports::{HarnessMemo, HarnessName, Scanner};
+use navori_mod_ports::{Harness, HarnessMemo, Scanner};
 use serde_json::{Value, json};
 
 const TOKEN_ENTRY: &str = concat!("CLAUDE_CODE_MESSAGING_TOKEN=", "tok_", "abcdefghijklmnop");
@@ -30,7 +30,7 @@ fn gated() -> (Arc<FakeProcesses>, Arc<Gate>, Scanner) {
     (fake, gate, scanner)
 }
 
-fn harness(scan: &navori_mod_ports::Scan) -> Vec<Option<HarnessName>> {
+fn harness(scan: &navori_mod_ports::Scan) -> Vec<Option<Harness>> {
     scan.entries.iter().map(|entry| entry.harness).collect()
 }
 
@@ -48,11 +48,11 @@ async fn a_listener_started_by_claude_code_shows_it_and_leaks_nothing_else() {
 
     assert_eq!(
         listed["groups"][0]["worktrees"][0]["processes"][0]["entries"][0]["harness"],
-        json!("claude_code")
+        json!("claude")
     );
     assert_eq!(
         listed["groups"][0]["worktrees"][0]["processes"][0]["harness"],
-        json!("claude_code")
+        json!("claude")
     );
     let state = rig.state().to_string();
     let log = logs.text();
@@ -78,7 +78,7 @@ fn a_denied_environment_read_leaves_no_harness_and_the_next_scan_reads_again() {
     assert!(memo.is_empty());
 
     let (second, memo) = scanner.scan(memo);
-    assert_eq!(harness(&second.unwrap()), vec![Some(HarnessName::Codex)]);
+    assert_eq!(harness(&second.unwrap()), vec![Some(Harness::Codex)]);
     assert_eq!(memo.len(), 1);
 }
 
@@ -98,14 +98,8 @@ fn a_completed_read_is_not_repeated_whatever_it_found() {
         .map(|(pid, _)| pid)
         .collect();
     assert_eq!(env_reads, vec![100, 101]);
-    assert_eq!(
-        harness(&first.unwrap()),
-        vec![Some(HarnessName::Grok), None]
-    );
-    assert_eq!(
-        harness(&second.unwrap()),
-        vec![Some(HarnessName::Grok), None]
-    );
+    assert_eq!(harness(&first.unwrap()), vec![Some(Harness::Grok), None]);
+    assert_eq!(harness(&second.unwrap()), vec![Some(Harness::Grok), None]);
     assert_eq!(memo.len(), 2);
 }
 
@@ -168,6 +162,6 @@ fn a_listener_under_a_claude_ancestor_gets_claude_code_without_an_environment_re
 
     let (scan, _) = scanner.scan(HarnessMemo::new());
 
-    assert_eq!(harness(&scan.unwrap()), vec![Some(HarnessName::ClaudeCode)]);
+    assert_eq!(harness(&scan.unwrap()), vec![Some(Harness::ClaudeCode)]);
     assert!(fake.reads().iter().all(|(_, kind)| *kind != "env"));
 }

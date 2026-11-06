@@ -4,7 +4,7 @@ import Foundation
 public enum AwakeLeaseMap {
     /// Level-0 source. A session names the harness; other leases use the published label.
     public static func sourceName(kind: String, harness: String?, label: String?) -> String? {
-        let name = kind == "session" ? harness : label
+        let name = kind == "session" ? harness.flatMap(HarnessCopy.display) : label
         guard let name, name.isEmpty == false else { return nil }
         return name
     }
@@ -32,7 +32,7 @@ public enum AwakeLeaseMap {
         let until = mapped == .duration ? endsAtMs.map { clockText($0, timeZone: timeZone) } : nil
         return AwakeLeaseInput(
             kind: mapped,
-            harness: nonempty(harness),
+            harness: nonempty(harness).flatMap(HarnessCopy.display),
             label: nonempty(label),
             pid: pid,
             stopped: stopped,

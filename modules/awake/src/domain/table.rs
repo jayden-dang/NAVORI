@@ -750,11 +750,7 @@ fn saved_session(lease: &SessionLease) -> SessionSaved {
 }
 
 pub(crate) fn harness_name(harness: Harness) -> &'static str {
-    match harness {
-        Harness::ClaudeCode => "Claude Code",
-        Harness::Codex => "Codex",
-        Harness::Grok => "Grok",
-    }
+    harness.id()
 }
 
 fn manual_label(lease: &Manual) -> Option<String> {

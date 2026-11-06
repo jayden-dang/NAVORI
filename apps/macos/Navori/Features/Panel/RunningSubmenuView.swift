@@ -3,8 +3,6 @@ import NavoriPanel
 import SwiftUI
 
 struct RunningSubmenuView: View {
-    private static let rowHeight: CGFloat = 26
-
     let store: CoreStore
     @Environment(CascadeController.self) private var cascade
 
@@ -18,7 +16,7 @@ struct RunningSubmenuView: View {
                 }
             }
         }
-        .padding(5)
+        .padding(MenuMetrics.pad)
         .frame(width: 272, alignment: .topLeading)
         .fixedSize(horizontal: true, vertical: true)
         .onDisappear { store.dismissAskingStops() }
@@ -84,7 +82,7 @@ struct RunningSubmenuView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                 .padding(.horizontal, 8)
-                .frame(maxWidth: .infinity, minHeight: Self.rowHeight, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: MenuMetrics.rowHeight, alignment: .leading)
                 .accessibilityAddTraits(.isStaticText)
         case let .project(project):
             ProjectRowView(state: project, cascade: cascade)
@@ -170,7 +168,7 @@ private struct LastSleepRowView: View {
                 .fixedSize()
         }
         .padding(.horizontal, 8)
-        .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: MenuMetrics.rowHeight, maxHeight: MenuMetrics.rowHeight, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Last sleep, \(text.spoken)")
     }
@@ -198,7 +196,7 @@ private struct CommandRowView: View {
                 .fixedSize()
         }
         .padding(.horizontal, 8)
-        .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: MenuMetrics.rowHeight, maxHeight: MenuMetrics.rowHeight, alignment: .leading)
         .help(row.help ?? "")
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(row.accessibilitySentence)

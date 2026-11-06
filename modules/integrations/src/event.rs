@@ -7,11 +7,7 @@ pub const HOOK_REMOVED: &str = "integrations.hook_removed";
 pub const HOOK_FAILED: &str = "integrations.hook_failed";
 
 pub(crate) fn name(harness: Harness) -> &'static str {
-    match harness {
-        Harness::Claude => "Claude Code",
-        Harness::Codex => "Codex",
-        Harness::Grok => "Grok Build",
-    }
+    harness.display()
 }
 
 pub(crate) fn not_found(harness: Harness) -> String {

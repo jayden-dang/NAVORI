@@ -14,8 +14,8 @@ struct CoreSubmenuView: View {
             ModulesSection(modules: store.moduleRows)
             ActivitySection(events: store.eventRows)
         }
-        .padding(5)
-        .frame(width: 360, alignment: .topLeading)
+        .padding(MenuMetrics.pad)
+        .frame(width: MenuMetrics.level0Width, alignment: .topLeading)
         .fixedSize(horizontal: true, vertical: true)
     }
 }

@@ -1,6 +1,6 @@
 //! Wire types shared by the kernel, IPC, CLI and the FFI layer.
 //!
-//! Everything here is plain data (serde). No behavior lives in this crate.
+//! Everything here is plain data (serde) plus the identity names those types carry.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -98,7 +98,6 @@ pub enum TrayGlyph {
     Problem,
 }
 
-/// The composed status icon state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TrayState {
     pub glyph: TrayGlyph,
@@ -119,7 +118,6 @@ pub struct CoreStatus {
     pub data_dir: String,
     pub socket_path: String,
     pub modules: Vec<ModuleInfo>,
-    /// The composed status icon state.
     pub tray: TrayState,
 }
 
@@ -131,14 +129,58 @@ pub struct Check {
     pub detail: String,
 }
 
-/// Params of `core.ask`.
+/// A coding-agent Harness. One id on the wire; one name in copy.
+///
+/// The Shell repeats `display` for menu marks. Change both, or the menu and the events disagree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
+pub enum Harness {
+    #[serde(rename = "claude")]
+    ClaudeCode,
+    #[serde(rename = "codex")]
+    Codex,
+    #[serde(rename = "grok")]
+    Grok,
+}
+
+impl Harness {
+    /// The order every reply lists them in.
+    pub const ALL: [Harness; 3] = [Harness::ClaudeCode, Harness::Codex, Harness::Grok];
+
+    /// The id Actions, Ports state and the Running view use.
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::ClaudeCode => "claude",
+            Self::Codex => "codex",
+            Self::Grok => "grok",
+        }
+    }
+
+    /// The name events, doctor rows and the menu show.
+    pub fn display(self) -> &'static str {
+        match self {
+            Self::ClaudeCode => "Claude Code",
+            Self::Codex => "Codex",
+            Self::Grok => "Grok Build",
+        }
+    }
+
+    /// Accepts the id, the display name, and the spellings that used to be stored.
+    pub fn parse(text: &str) -> Option<Self> {
+        match text {
+            "claude" | "claude_code" | "Claude Code" | "ClaudeCode" => Some(Self::ClaudeCode),
+            "codex" | "Codex" => Some(Self::Codex),
+            "grok" | "Grok" | "Grok Build" => Some(Self::Grok),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AskRequest {
     pub model: String,
     pub text: String,
 }
 
-/// Result of `core.ask`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AskReply {
     pub reply: String,

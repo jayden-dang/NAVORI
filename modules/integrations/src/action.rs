@@ -1,18 +1,7 @@
 use navori_kernel::{ActionDoc, ModuleAction, Risk};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Harness {
-    Claude,
-    Codex,
-    Grok,
-}
-
-impl Harness {
-    /// The order every reply lists them in.
-    pub const ALL: [Harness; 3] = [Harness::Claude, Harness::Codex, Harness::Grok];
-}
+pub use navori_protocol::Harness;
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]

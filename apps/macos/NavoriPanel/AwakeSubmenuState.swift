@@ -205,7 +205,7 @@ public struct AwakeSubmenuState: Equatable, Sendable {
     /// `project/branch`. The branch keeps any further slashes.
     private static func place(_ lease: AwakeLeaseInput) -> (project: String, name: String) {
         guard let label = text(lease.label) else {
-            return ("Other", text(lease.harness) ?? "Session")
+            return ("Other", lease.harness.flatMap(HarnessCopy.display) ?? "Session")
         }
         guard let slash = label.firstIndex(of: "/") else { return (label, label) }
         let project = String(label[..<slash])
@@ -223,7 +223,7 @@ public struct AwakeSubmenuState: Equatable, Sendable {
         let source = [text(lease.title), text(lease.harness), text(lease.label)].compactMap { $0 }
         let pid = lease.pid.map { "pid \($0)" }
         return HoldingRow(
-            mark: harnessMark(lease.harness),
+            mark: HarnessCopy.mark(lease.harness),
             name: shownName(lease),
             word: word,
             showsDot: lease.stopped == false,
@@ -272,15 +272,6 @@ public struct AwakeSubmenuState: Equatable, Sendable {
             help: nil,
             accessibilitySentence: word.isEmpty ? name : "\(name), \(word)"
         )
-    }
-
-    static func harnessMark(_ harness: String?) -> HoldingMark {
-        switch harness {
-        case "Claude Code": .claude
-        case "Codex": .codex
-        case "Grok": .grok
-        default: .terminal
-        }
     }
 
     private static func text(_ value: String?) -> String? {
