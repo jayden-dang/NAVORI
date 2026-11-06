@@ -269,7 +269,7 @@ Surface:
 Interface: `pub fn lid_check(view: Option<&AwakeView>) -> Check`, next to `awake_check`.
 - No view → fail, "Awake's state could not be read."
 - `lid_problem` present → fail with its text (LID-6.2).
-- Otherwise → pass, with detail `Lid closed off` or `Lid closed on · held|not held · adapter|battery|not watched · marker|no marker` (LID-6.1).
+- Otherwise → pass, with the four things always in the detail: `Lid closed on|off · held|not held · adapter|battery|not watched · marker|no marker` (LID-6.1). With the switch off it reads `Lid closed off · not held · not watched · no marker` (plan review F5).
 Depth: n/a — extends the doctor.
 Locality: extend two files.
 

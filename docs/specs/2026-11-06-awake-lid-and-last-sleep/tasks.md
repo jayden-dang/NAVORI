@@ -116,6 +116,7 @@ Compact delta every task inherits:
 | `crates/ffi/tests/{awake,core,integrations,running,actions_risk}.rs` | changed | view literal, doctor order, `lid_check`, will-sleep, `SAMPLED` |
 | `apps/cli/src/main.rs`, `apps/cli/tests/cli.rs` | changed | `navori awake lid on\|off`, `Lid closed:` status line |
 | `docs/features/awake.md`, `docs/agents/verify.md` | changed | lid Action, CLI verb, adapter-only support |
+| `modules/awake/tests/restart.rs` | read only | `restart.rs` line 89 already covers in-memory Leases kept on restart (LID-7.4) |
 | `apps/macos/NavoriPanel/LastSleepText.swift` | new | pure `lastSleepText(ms:now:calendar:)` |
 | `apps/macos/NavoriPanel/{RunningState,AwakeSubmenuState,KeepAwakeChoice,AwakeRowState}.swift` | changed | `.lastSleep`, `.lidClosed`, lid state, `.lid(Bool)` |
 | `apps/macos/Navori/Features/Panel/{RunningSubmenuView,MenuRowView}.swift` | changed | the two rows; `MenuRow.valueNote` |
@@ -193,7 +194,7 @@ _Requirements: LID-7.6_
   - `the_scripted_sleep_reason_is_returned`
 - [ ] **Step 2: Run** `cargo test -p navori-macos --features fake --test fakes`. Expect: unresolved `FakeLid`.
 - [ ] **Step 3: Implement `MacLid`:**
-  - each call: `IOServiceMatching("IOPMrootDomain")` → `IOServiceGetMatchingService` → `IOServiceOpen(mach_task_self, 0)` → `IOConnectCallScalarMethod(conn, 12, [1 or 0])` → `IOServiceClose` and `IOObjectRelease`
+  - each call: `IOServiceMatching("IOPMrootDomain")` → `IOServiceGetMatchingService` → `IOServiceOpen(task, 0)`, where `task` is read from `mach_task_self_`, declared in the crate's own `extern "C"` block. `libc`'s `mach_task_self()` and `mach_task_self_` are both `#[deprecated]` in 0.2.191 (`unix/bsd/apple/mod.rs` lines 5326 and 5451), so using them fails `clippy -D warnings` → `IOConnectCallScalarMethod(conn, 12, [1 or 0])` → `IOServiceClose` and `IOObjectRelease`
   - `sleep_reason`: `IORegistryEntryCreateCFProperty("Last Sleep Reason")`
   - each `unsafe` block carries `// SAFETY:`
   - **no test calls `MacLid`**
@@ -234,7 +235,7 @@ _Requirements: LID-1.11_
     - `new(PowerKind)`, `set(PowerKind)`
     - `fail_current()`, `fail_watch()`
     - `fire()`, `kill()`
-    - `read_count() -> usize`, `watch_count() -> usize`
+    - `read_count() -> usize`, `watch_count() -> usize`, `drain_count() -> usize`
 
 **Depends-on:** none
 
@@ -250,11 +251,14 @@ _Requirements: LID-1.11_
 - [ ] **Step 2: Run** `cargo test -p navori-macos --features fake --test power_source`. Expect: unresolved names.
 - [ ] **Step 3: Add** `ps` to the `objc2-io-kit` features in `Cargo.toml`, plus any CF feature the build asks for. Implement `MacPowerSource::current` with `IOPSCopyPowerSourcesInfo` → `IOPSGetProvidingPowerSourceType`.
 - [ ] **Step 4: Implement `watch`:**
-  - an `extern "C"` block for `notify_register_file_descriptor` and `notify_cancel` (the crate's first)
+  - `notify_register_file_descriptor` and `notify_cancel` in the same crate-local `extern "C"` block that Task 2 starts
   - `fcntl(O_NONBLOCK)` on the fd
   - `read_tokens` reads 4-byte tokens until `EAGAIN`, returns `WouldBlock` when nothing was read, and returns `0` on EOF
   - every `unsafe` block carries `// SAFETY:`
 - [ ] **Step 5: Implement `FakePowerSource`** over `UnixStream::pair()`. `fire` writes 4 bytes; `kill` drops the writer.
+  - `PowerWatch::from_stream` calls `set_nonblocking(true)`.
+  - With feature `fake`, `from_stream` takes an `Arc<AtomicUsize>` probe that counts `read_tokens` calls, exposed as `FakePowerSource::drain_count()`.
+  - Every new public type derives or implements `Debug` (lint `missing_debug_implementations`).
 - [ ] **Step 6: Run** `cargo test -p navori-macos --features fake` and `cargo xtask check-deps`. Expect: pass.
 - [ ] **Step 7: Commit** `feat(macos): a power-source seam with a notify(3) watch`
 
@@ -300,7 +304,7 @@ _Requirements: LID-2.3_
 - [ ] **Step 1: Write failing tests in `lid.rs`:**
   - `lid_closed_is_off_on_a_fresh_store`
   - `a_stored_non_boolean_reads_as_off`
-  - `turning_lid_closed_on_stores_it_and_journals_the_change`, where the event payload is `{"on": true}` and the summary is one sentence
+  - `turning_lid_closed_on_stores_it_and_journals_the_change`, where the event payload is `{"on": true}` and the summary is `Lid closed is on: the lid may close without sleep while a Lease holds on the adapter.` (`Lid closed is off: closing the lid sleeps this Mac.` when off). Wording is agent-decided, in the style of `event.rs` line 15
   - `asking_for_the_current_value_changes_nothing`, with no event and no store write
   - `a_failed_store_leaves_lid_closed_unchanged_and_fails_the_action`, using an SQLite trigger on `kv` for key `lid` through `Store::with_conn`
   - `the_stored_value_is_applied_after_a_relaunch`
@@ -341,7 +345,7 @@ _Requirements: LID-3.1, LID-3.2, LID-3.3, LID-3.4, LID-3.5, LID-3.6, LID-3.12, L
   - `a_dead_watch_reads_as_battery_raises_a_lid_problem_and_retries`, where the watch is re-armed after the 60 s retry on `FakeClock` and the problem clears
   - `a_failed_watch_at_arming_reads_as_battery_and_retries`
   - `turning_lid_closed_off_drops_the_watch`
-  - `an_idle_watch_does_not_wake_the_actor`, where the arm stays pending with no turns counted (no busy loop)
+  - `an_idle_watch_does_not_spin`: after arming and `rig.idle()` ten times on a paused clock, `drain_count()` is at most 1
 - [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test lid`. Expect: the new tests fail.
 - [ ] **Step 3: Implement** arming on turn-on and at start with `lid` on: `watch()` **first**, then one `current()`. On turn-off, disarm and set `on_adapter = None`.
 - [ ] **Step 4: Implement the arm.** It loops on `readable().await`, then `guard.try_io(|w| w.get_ref().read_tokens())`. `Ok(n > 0)` → `current()` once. `Ok(0)`, an error, or a failed `current()` → `note_power_dead`: drop the watch, set `on_adapter = Some(false)`, raise the lid problem, `schedule_retry`. `needs_retry` is true while the watch is dead and `lid` is on.
@@ -381,6 +385,9 @@ _Requirements: LID-2.5, LID-2.6, LID-2.7, LID-8.1_
   - `a_refused_set_turns_lid_closed_off_stores_it_deletes_the_marker_and_does_not_retry`
   - `a_refused_clear_keeps_the_marker_raises_a_lid_problem_and_retries_until_cleared`
   - `the_lid_problem_clears_when_the_lid_call_succeeds`
+  - `the_lid_problem_clears_when_the_marker_saves_again`, after the trigger is dropped
+  - `the_lid_problem_clears_when_the_user_sets_lid_closed`
+  - `a_dead_watch_while_holding_gives_the_lid_back_and_raises_a_lid_problem`, using `FakePowerSource::kill()` while `FakeLid::is_set()`; the probe shows the marker present at `Clear` and deleted after
   - `the_lid_problem_never_becomes_the_awake_problem`, where `AwakeState.problem` stays `None`
   - `the_system_assertion_is_held_whatever_the_lid`
   - `a_refused_system_assertion_still_refuses_every_kind`
@@ -396,7 +403,7 @@ _Requirements: LID-2.5, LID-2.6, LID-2.7, LID-8.1_
 - [ ] **Step 5: Run** `cargo test -p navori-mod-awake`. Expect: pass.
 - [ ] **Step 6: Commit** `feat(awake): hold the lid while a Lease holds on the adapter`
 
-_Requirements: LID-1.1, LID-1.2, LID-1.3, LID-1.4, LID-1.5, LID-1.6, LID-1.7, LID-1.8, LID-1.9, LID-1.12, LID-2.1, LID-2.2, LID-7.1, LID-7.3, LID-7.11, LID-8.4_
+_Requirements: LID-1.1, LID-1.2, LID-1.3, LID-1.4, LID-1.5, LID-1.6, LID-1.7, LID-1.8, LID-1.9, LID-1.12, LID-2.1, LID-2.2, LID-2.6, LID-7.1, LID-7.3, LID-7.11, LID-8.4_
 
 ---
 
@@ -416,7 +423,7 @@ _Requirements: LID-1.1, LID-1.2, LID-1.3, LID-1.4, LID-1.5, LID-1.6, LID-1.7, LI
 
 - [ ] **Step 1: Write failing tests:**
   - `a_clean_shutdown_gives_the_lid_back_then_deletes_the_marker`, through kernel shutdown
-  - `a_module_that_fails_permanently_gives_the_lid_back_and_keeps_the_marker`, using a restart policy of 0 and a panic injected through `FakePower::panic_on_hold`
+  - `a_module_that_fails_permanently_gives_the_lid_back_and_keeps_the_marker`. Copy `permanent_failure_releases_every_assertion` (`modules/awake/tests/restart.rs` lines 243-262): `Rig::with_policy(restarts(0))`, hold the lid (Lease + adapter + switch on), then `rig.power.panic_on_hold(1)` and dispatch `display_on()`; wait for `awake_failed`
   - `dropping_the_kernel_while_holding_gives_the_lid_back`
 - [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test lid`. Expect: the quit test fails, because the marker stays.
 - [ ] **Step 3: Implement** the quit release. Drop paths need no code beyond the `LidGuard` Drop; the tests prove them.
@@ -432,7 +439,7 @@ _Requirements: LID-1.10, LID-1.11, LID-8.4_
 **Files:**
 - Modify: `modules/awake/src/actor.rs`
 - Create: `modules/awake/tests/lid_restore.rs`
-- Test: `modules/awake/tests/lid_restore.rs`, `modules/awake/tests/restart.rs`
+- Test: `modules/awake/tests/lid_restore.rs` (and the existing `modules/awake/tests/restart.rs`, run unchanged)
 
 **Reuse:** rung 2 — the actor's `turn` / `note_*` / `needs_retry` / `schedule_retry` loop, the exits-watcher dead-and-retry pattern (`actor.rs:588-614`), `Platform` injection (`infra/platform.rs:47-83`) and kv helpers in `infra/stored.rs`
 
@@ -451,13 +458,13 @@ _Requirements: LID-1.10, LID-1.11, LID-8.4_
   - `an_unreadable_marker_skips_the_restore_and_raises_a_lid_problem`
   - `an_unreadable_last_sleep_does_not_skip_the_restore`
 
-  In `restart.rs`, add `a_restart_keeps_in_memory_leases_without_rereading_them` if no such test exists; read the file first.
+  LID-7.4's guard is already covered by the existing restart test (`modules/awake/tests/restart.rs` line 89); keep it green.
 - [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test lid_restore`. Expect: fail.
 - [ ] **Step 3: Implement `restore_lid_once`.** Set `lid_restored` on success or on an unreadable marker. On refusal, keep the marker, raise the problem and retry; `want` stays false. Change the initial value of `lid_restored` to `false`. With an empty store (no marker), the restore succeeds at once and sets it to `true`, so Task 6's tests still pass unchanged.
 - [ ] **Step 4: Run** `cargo test -p navori-mod-awake`. Expect: pass.
 - [ ] **Step 5: Commit** `feat(awake): give lid sleep back at start when Navori held it`
 
-_Requirements: LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.4_
+_Requirements: LID-3.13, LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.4_
 
 ---
 
@@ -479,11 +486,11 @@ _Requirements: LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.4_
     2. returns if `shut_down`
     3. spawns a dispatch of `{"slept":{"at_ms":..}}` to `awake` and logs an error
 
-**Depends-on:** Task 4
+**Depends-on:** Task 4, Task 8 (all of Tasks 5–9 edit `actor.rs`, so they run in order)
 
 - [ ] **Step 1: Write failing tests:**
   - In `sleep.rs`:
-    - `a_recorded_sleep_is_published_and_journaled_with_its_reason`, where the payload is `{"at_ms": 1762395600000, "reason": "Clamshell Sleep"}`
+    - `a_recorded_sleep_is_published_and_journaled_with_its_reason`, where the payload is `{"at_ms": 1793931600000, "reason": "Clamshell Sleep"}` (2026-11-06 09:20 +07), with the summary `The Mac went to sleep.`
     - `an_unreadable_reason_is_journaled_as_null`
     - `the_last_sleep_survives_a_relaunch`
     - `every_slept_call_counts`, where two calls give two events and the latest is published
@@ -491,6 +498,7 @@ _Requirements: LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.4_
   - In `core.rs` (real platform; `Lid closed` stays off):
     - `will_sleep_records_a_time_taken_at_the_call`, where `last_sleep_ms` is between the before and after stamps
     - `the_wake_pulse_still_runs_on_wake`
+    - `will_sleep_after_shutdown_records_nothing_and_does_not_panic`
 - [ ] **Step 2: Run** `cargo test -p navori-mod-awake --test sleep`. Expect: the `slept` handler fails.
 - [ ] **Step 3: Implement `record_sleep`:** reason → save → set → emit `SLEPT` (one-sentence summary).
 - [ ] **Step 4: Implement `system_will_sleep`** next to `system_did_wake`, which stays unchanged.
@@ -513,19 +521,19 @@ _Requirements: LID-5.1, LID-5.2, LID-5.3, LID-5.8, LID-5.9, LID-7.5_
 - Consumes: the `AwakeView` lid fields (Task 4)
 - Produces: `pub fn lid_check(view: Option<&AwakeView>) -> Check`, appended after `ports_check` in `Inner::doctor`
 
-**Depends-on:** Task 4
+**Depends-on:** Task 4, Task 9 (both edit `crates/ffi/tests/core.rs`)
 
 - [ ] **Step 1: Write failing tests in `awake.rs`:**
-  - `the_lid_check_passes_with_lid_closed_off`, detail `Lid closed off`
+  - `the_lid_check_passes_with_lid_closed_off`, detail `Lid closed off · not held · not watched · no marker`
   - `the_lid_check_reports_held_adapter_and_marker`, detail `Lid closed on · held · adapter · marker`
-  - `the_lid_check_reports_not_watched_while_off`
+  - `the_lid_check_reports_battery_while_on_and_unplugged`, detail `Lid closed on · not held · battery · no marker`
   - `the_lid_check_fails_with_the_lid_problem_text`
   - `the_lid_check_fails_when_awake_cannot_be_read`
 
   Add `lid` last in the ordered doctor lists in `integrations.rs` (lines 64-119) and `core.rs` (lines 772-790). Keep `doctor_reports_a_healthy_core` (`core.rs` line 423) as is.
 - [ ] **Step 2: Run** `cargo test -p navori-ffi --test awake`. Expect: no `lid_check`.
 - [ ] **Step 3: Implement** `lid_check` and append it after `ports`. In `SettingsView.swift`, change the doctor sentence to "…, logs, ports and lid."
-- [ ] **Step 4: Run** `cargo test -p navori-ffi`. Expect: pass; existing check names and order unchanged.
+- [ ] **Step 4: Run** `cargo test -p navori-ffi`. Expect: pass; existing check names and order unchanged. Acceptance for LID-6.3: `grep -n 'logs, ports and lid' apps/macos/Navori/Features/Settings/SettingsView.swift` matches.
 - [ ] **Step 5: Commit** `feat(ffi): a lid row in navori doctor`
 
 _Requirements: LID-6.1, LID-6.2, LID-6.3, LID-7.7_
@@ -546,15 +554,14 @@ _Requirements: LID-6.1, LID-6.2, LID-6.3, LID-7.7_
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Write failing tests in `cli.rs`:**
+- [ ] **Step 1: Write failing tests in `cli.rs`.** Every lid test runs against a stub `UnixListener` server that records the request JSON and answers a fixture state. Copy the stubs at `apps/cli/tests/cli.rs` lines 535, 1072 and 1419. **Never** use the real in-process `NavoriCore` (`cli.rs` line 55, `Platform::mac()`), because a `lid {on: true}` there would set the real lid (charter hard stop).
   - `awake_lid_on_dispatches_the_lid_action`
   - `awake_lid_off_dispatches_the_lid_action`
   - `status_prints_lid_closed_after_tracking_agents`, covering `on`, `off` and `on (needs adapter)` from the fixture states
   - `status_reads_a_missing_lid_field_as_off`
   - `status_json_carries_the_lid_fields`
-  - `existing_awake_verbs_are_unchanged`
 - [ ] **Step 2: Run** `cargo test -p navori-cli --test cli`. Expect: unknown subcommand `lid`.
-- [ ] **Step 3: Implement** the verb and the status line with plain `serde_json::Value` (no new dependency). Update the action catalog line in `docs/features/awake.md` (line 22), its unsupported list (line 36), and the awake commands in `docs/agents/verify.md` (line 48).
+- [ ] **Step 3: Implement** the verb and the status line with plain `serde_json::Value` (no new dependency). In `docs/features/awake.md`, update the CLI paragraph (line 20), the doctor line (line 22), the menu rows (line 30) and the "does not do" list (line 36), where the lid becomes adapter-only support. In `docs/agents/verify.md`, update the awake commands (lines 66, 100 and 151-156).
 - [ ] **Step 4: Run** `cargo test -p navori-cli && cargo xtask check-deps`. Expect: pass.
 - [ ] **Step 5: Commit** `feat(cli): navori awake lid on|off`
 
@@ -584,7 +591,7 @@ _Requirements: LID-3.10, LID-3.11, LID-7.9, LID-7.12_
 **Interfaces:**
 - Consumes: `AwakeView.lid`, `onAdapter`, `lidProblem` (Task 4, through the regenerated bindings in `CoreStore` only)
 - Produces:
-  - `AwakeSubmenuState`: `init(..., lid: Bool = false, onAdapter: Bool? = nil)`, plus `lidOn`, `lidValue` (`On`/`Off`), `lidDot` (`.green` when on), `lidNote` (`"Needs adapter"` when on and `onAdapter != true`) and `lidSpoken` (`Lid closed, stay awake, on`, plus `, needs adapter`)
+  - `AwakeSubmenuState`: `init(..., lid: Bool = false, onAdapter: Bool? = nil)`, plus `lidOn`, `lidValue` (`On`/`Off`), `lidDot` (`.green` when on), `lidNote` (`"Needs adapter"` when on and `onAdapter != true`) `lidSpoken` (`Lid closed, stay awake, on`, plus `, needs adapter`) and `lidToggle: AwakeCommand` (`.lid(!lidOn)`)
   - `RunningSubmenuItem.lidClosed`
   - `AwakeCommand.lid(Bool)`, which sends `{"lid":{"on":…}}`
   - `MenuRow.valueNote: String?`, defaulting to `nil`
@@ -599,16 +606,17 @@ _Requirements: LID-3.10, LID-3.11, LID-7.9, LID-7.12_
     - `lid_closed_on_without_the_adapter_keeps_on_and_adds_needs_adapter`
     - `the_spoken_label_reads_the_switch_state`
     - `the_lid_action_json_carries_on`
-  - In `RunningStateTests`, the order tests at lines 195-235 and 633-650 gain `.lidClosed` after `.trackingAgents`. Also add:
+  - In `RunningStateTests.swift`, the order tests in `RunningSubmenuStateTests` (lines 195-235) and `RunningCommandRowsTests` (lines 633-650) gain `.lidClosed` after `.trackingAgents`. The `kinds` mapping at line 658 gains a case for the new item. Also add to `RunningSubmenuStateTests`:
     - `the_core_note_still_takes_the_slot_before_any_problem`
     - `a_lid_problem_shows_only_when_no_note_or_awake_problem_does`
     - `project_rows_and_stop_all_are_unchanged`
   - In `AwakeRowStateTests`:
     - `a_lid_action_failure_is_reported`
+  - In `AwakeSubmenuStateTests`, also add `the_lid_row_toggles_to_the_opposite_value`, which tests a pure `AwakeSubmenuState.lidToggle: AwakeCommand` that `StatusBarController.activate` calls (LID-3.9)
 - [ ] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter AwakeSubmenuStateTests`. Expect: compile errors.
 - [ ] **Step 3: Implement** the state, the item, the command, the `AwakeActionFailure.achieved` case and `MenuRow.valueNote`, drawn in secondary colour after `value`. Draw `.lidClosed` with `MenuRowView`: `id "awake.lid"`, icon `laptopcomputer`.
-- [ ] **Step 4: Wire `StatusBarController`:** the node after `awake.tracking`, and `case "awake.lid": .lid(store.awakeSubmenu.lidOn == false)`. In `CoreStore`, pass `awake?.lid ?? false` and `awake?.onAdapter`, and set the problem slot to `awake.problem ?? awake.lidProblem`. Leave `AwakeHeldMarks`, the Running row dot and `tray` untouched.
-- [ ] **Step 5: Run** `swift test --arch arm64 --package-path apps/macos --filter "AwakeSubmenuStateTests|RunningStateTests|AwakeRowStateTests"`, then `cargo xtask ci`. Expect: pass.
+- [ ] **Step 4: Wire `StatusBarController`:** the node after `awake.tracking`, and `case "awake.lid": store.awakeSubmenu.lidToggle`. In `CoreStore`, pass `awake?.lid ?? false` and `awake?.onAdapter`, and set the problem slot to `awake.problem ?? awake.lidProblem`. Leave `AwakeHeldMarks`, the Running row dot and `tray` untouched.
+- [ ] **Step 5: Run** `swift test --arch arm64 --package-path apps/macos --filter "AwakeSubmenuStateTests|RunningSubmenuStateTests|RunningCommandRowsTests|AwakeRowStateTests"`, then `cargo xtask ci`. Expect: pass.
 - [ ] **Step 6: Commit** `feat(menu): a Lid closed row in the Running submenu`
 
 _Requirements: LID-2.4, LID-3.8, LID-3.9, LID-7.10, LID-7.13, LID-7.15, LID-7.16, LID-7.17, LID-8.5_
@@ -641,7 +649,7 @@ _Requirements: LID-2.4, LID-3.8, LID-3.9, LID-7.10, LID-7.13, LID-7.15, LID-7.16
 - Produces:
   - `public struct LastSleepText: Equatable, Sendable { value: String; spoken: String }`
   - `public func lastSleepText(ms: Int64, now: Date, calendar: Calendar) -> LastSleepText`, using static cached `DateFormatter`s (`en_US_POSIX`, gregorian, the calendar's time zone)
-  - `RunningSubmenuItem.lastSleep(LastSleepText)`
+  - `RunningSubmenuItem.lastSleep(LastSleepText)` and `RunningSubmenuItem.actionId: String?`
   - `RunningSubmenuState.init(..., lastSleep: LastSleepText? = nil)`
   - `WakeObserver(onWake:onSleep:)`
   - `CoreStore.systemWillSleep()`
@@ -649,7 +657,7 @@ _Requirements: LID-2.4, LID-3.8, LID-3.9, LID-7.10, LID-7.13, LID-7.15, LID-7.16
 **Depends-on:** Task 9, Task 12
 
 - [ ] **Step 1: Write failing tests:**
-  - In `LastSleepTextTests`, one table-driven test, `the_last_sleep_reads_by_calendar_day`. Its rows use a fixed `now` of 2026-11-06 10:00 in `Asia/Ho_Chi_Minh`:
+  - In the new `@Suite struct LastSleepTextTests`, one table-driven test, `the_last_sleep_reads_by_calendar_day`. Its rows use a fixed `now` of 2026-11-06 10:00 in `Asia/Ho_Chi_Minh`:
 
     | Sleep time | `value` | `spoken` |
     |---|---|---|
@@ -659,16 +667,17 @@ _Requirements: LID-2.4, LID-3.8, LID-3.9, LID-7.10, LID-7.13, LID-7.15, LID-7.16
     | 2026-10-30 08:00 | `30 Oct` | — |
     | 2025-10-30 08:00 | `30 Oct 2025` | — |
 
-  - In `RunningStateTests`:
+  - In `RunningSubmenuStateTests` (`RunningStateTests.swift`):
     - `a_recorded_sleep_leads_the_submenu_with_a_separator`
     - `no_recorded_sleep_shows_no_row_and_no_separator`
     - `the_full_order_runs_from_last_sleep_to_stop_all`, with exactly the order in design §9
-    - `the_menu_rows_come_from_the_snapshot_alone`, where every row is built from values passed in, with no other input
-- [ ] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter "LastSleepTextTests|RunningStateTests"`. Expect: compile errors.
+    - `the_last_sleep_item_has_no_action_id`, testing a new `RunningSubmenuItem.actionId: String?` (`.lastSleep` → `nil`, `.lidClosed` → `"awake.lid"`, `.trackingAgents` → `"awake.tracking"`); `StatusBarController.runningCommands` builds its nodes only for non-nil ids (LID-5.7)
+- [ ] **Step 2: Run** `swift test --arch arm64 --package-path apps/macos --filter "LastSleepTextTests|RunningSubmenuStateTests"`. Expect: compile errors.
 - [ ] **Step 3: Implement** `lastSleepText` and the `.lastSleep` item. Draw it as a static row on the `CommandRowView` pattern: icon `moon`, value in secondary label colour, no Button, no hover, no cascade node, `.accessibilityElement(children: .ignore)` and `accessibilityLabel` `Last sleep, <spoken>`.
 - [ ] **Step 4: Wire the forwarder.** Add an `onSleep` token for `NSWorkspace.willSleepNotification` in `WakeObserver`, wired in `AppDelegate`'s existing `!perfFlagWithoutHome` block to `store.systemWillSleep()`, which calls `core?.systemWillSleep()`. `CoreStore` passes `lastSleep` from `awake?.lastSleepMs` with `Date()` and `.current`.
 - [ ] **Step 5: Run** the Swift suites above, then `cargo xtask ci`. Expect: pass.
-- [ ] **Step 6: Commit** `feat(menu): show when the Mac last slept`
+- [ ] **Step 6: Acceptance check for the menu-open path (LID-8.2, LID-7.14).** Run `grep -rnE 'import IOKit|IOPS|notify_register|IORegistry' apps/macos/NavoriPanel apps/macos/Navori/Features/Panel`. Expect: no match. `CoreStore` builds both submenus only from the last pushed `CoreSnapshot`.
+- [ ] **Step 7: Commit** `feat(menu): show when the Mac last slept`
 
 _Requirements: LID-3.7, LID-5.4, LID-5.5, LID-5.6, LID-5.7, LID-7.14, LID-8.2, LID-8.5_
 
@@ -679,8 +688,8 @@ _Requirements: LID-3.7, LID-5.4, LID-5.5, LID-5.6, LID-5.7, LID-7.14, LID-8.2, L
 | Story | IDs → Task |
 |---|---|
 | 1 | 1.1–1.9, 1.12 → 6; 1.10 → 7; 1.11 → 2, 7 |
-| 2 | 2.1, 2.2 → 6; 2.3 → 3; 2.4 → 12; 2.5–2.7 → 5 |
-| 3 | 3.1–3.6, 3.12, 3.13 → 4; 3.7 → 13; 3.8, 3.9 → 12; 3.10, 3.11 → 11 |
+| 2 | 2.1, 2.2 → 6; 2.3 → 3; 2.4 → 12; 2.5, 2.7 → 5; 2.6 → 5, 6 |
+| 3 | 3.1–3.6, 3.12 → 4; 3.13 → 4, 8; 3.7 → 13; 3.8, 3.9 → 12; 3.10, 3.11 → 11 |
 | 4 | 4.1–4.4 → 8 |
 | 5 | 5.1–5.3, 5.8, 5.9 → 9; 5.4–5.7 → 13 |
 | 6 | 6.1–6.3 → 10 |
