@@ -78,6 +78,8 @@ public struct AwakeSubmenuState: Equatable, Sendable {
     /// `until <time>`, `Indefinitely`, or nil while no Keep awake lease exists.
     public let keepValue: String?
     public let trackingOn: Bool
+    public let lidOn: Bool
+    private let onAdapter: Bool?
     public let holdingGroups: [HoldingGroup]
     private let checkedTitles: [String]
 
@@ -86,6 +88,9 @@ public struct AwakeSubmenuState: Equatable, Sendable {
         leases: [AwakeLeaseInput],
         displayHeld: Bool,
         tracking: Bool,
+        lid: Bool = false,
+        onAdapter: Bool? = nil,
+        lidProblem: String? = nil,
         actionFailure: String? = nil
     ) {
         let duration = leases.first { $0.kind == .duration }
@@ -96,9 +101,12 @@ public struct AwakeSubmenuState: Equatable, Sendable {
             displayRefused: hasDisplay && displayHeld == false,
             leaseCount: leases.count
         )
-        problem = Self.withFailure(base, actionFailure)
+        let lidIssue = lidProblem.flatMap { $0.isEmpty ? nil : AwakeProblem(title: $0, detail: nil) }
+        problem = Self.withFailure(base ?? lidIssue, actionFailure)
         keepValue = duration?.until.map { "until \($0)" } ?? (indefinite ? KeepAwakeChoice.indefinitely.title : nil)
         trackingOn = tracking
+        lidOn = lid
+        self.onAdapter = onAdapter
         checkedTitles = [duration?.label, indefinite ? KeepAwakeChoice.indefinitely.title : nil].compactMap { $0 }
         holdingGroups = Self.groups(leases, systemHeld: status != .notHeld)
     }
@@ -110,6 +118,14 @@ public struct AwakeSubmenuState: Equatable, Sendable {
 
     public var trackingValue: String { trackingOn ? "On" : "Off" }
     public var trackingDot: StatusDot? { trackingOn ? .green : nil }
+
+    public var lidValue: String { lidOn ? "On" : "Off" }
+    public var lidDot: StatusDot? { lidOn ? .green : nil }
+    public var lidNote: String? { lidOn && onAdapter != true ? "Needs adapter" : nil }
+    public var lidSpoken: String {
+        "Lid closed, stay awake, \(lidValue.lowercased())" + (lidNote == nil ? "" : ", needs adapter")
+    }
+    public var lidToggle: AwakeCommand { .lid(lidOn == false) }
 
     public func isChecked(_ choice: KeepAwakeChoice) -> Bool {
         checkedTitles.contains(choice.title)

@@ -205,6 +205,9 @@ final class CoreStore {
             leases: awakeLeases,
             displayHeld: snapshot?.awake?.displayHeld ?? false,
             tracking: snapshot?.awake?.tracking ?? true,
+            lid: snapshot?.awake?.lid ?? false,
+            onAdapter: snapshot?.awake?.onAdapter,
+            lidProblem: snapshot?.awake?.lidProblem,
             actionFailure: awakeActionMessage
         )
     }

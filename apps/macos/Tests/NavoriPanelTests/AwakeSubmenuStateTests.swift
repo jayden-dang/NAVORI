@@ -17,6 +17,9 @@ struct AwakeSubmenuStateTests {
         leases: [AwakeLeaseInput] = [],
         displayHeld: Bool = false,
         tracking: Bool = true,
+        lid: Bool = false,
+        onAdapter: Bool? = nil,
+        lidProblem: String? = nil,
         actionFailure: String? = nil
     ) -> AwakeSubmenuState {
         AwakeSubmenuState(
@@ -24,6 +27,9 @@ struct AwakeSubmenuStateTests {
             leases: leases,
             displayHeld: displayHeld,
             tracking: tracking,
+            lid: lid,
+            onAdapter: onAdapter,
+            lidProblem: lidProblem,
             actionFailure: actionFailure
         )
     }
@@ -195,6 +201,58 @@ struct AwakeSubmenuStateTests {
         #expect(off.trackingOn == false)
         #expect(off.trackingValue == "Off")
         #expect(off.trackingDot == nil)
+    }
+
+    @Test func lid_closed_reads_off_by_default() {
+        let state = Self.state(status: .off)
+        #expect(state.lidOn == false)
+        #expect(state.lidValue == "Off")
+        #expect(state.lidDot == nil)
+        #expect(state.lidNote == nil)
+        #expect(state.lidSpoken == "Lid closed, stay awake, off")
+    }
+
+    @Test func lid_closed_on_shows_on_and_a_green_dot() {
+        let state = Self.state(status: .off, lid: true, onAdapter: true)
+        #expect(state.lidOn)
+        #expect(state.lidValue == "On")
+        #expect(state.lidDot == .green)
+        #expect(state.lidNote == nil)
+    }
+
+    @Test func lid_closed_on_without_the_adapter_keeps_on_and_adds_needs_adapter() {
+        for onAdapter in [false, nil] as [Bool?] {
+            let state = Self.state(status: .off, lid: true, onAdapter: onAdapter)
+            #expect(state.lidValue == "On")
+            #expect(state.lidDot == .green)
+            #expect(state.lidNote == "Needs adapter")
+        }
+        #expect(Self.state(status: .off, lid: false, onAdapter: false).lidNote == nil)
+    }
+
+    @Test func the_spoken_label_reads_the_switch_state() {
+        #expect(Self.state(status: .off, lid: true, onAdapter: true).lidSpoken == "Lid closed, stay awake, on")
+        #expect(
+            Self.state(status: .off, lid: true, onAdapter: false).lidSpoken
+                == "Lid closed, stay awake, on, needs adapter"
+        )
+    }
+
+    @Test func the_lid_action_json_carries_on() {
+        #expect(AwakeCommand.lid(true).actionJSON == "{\"lid\":{\"on\":true}}")
+        #expect(AwakeCommand.lid(false).actionJSON == "{\"lid\":{\"on\":false}}")
+    }
+
+    @Test func the_lid_row_toggles_to_the_opposite_value() {
+        #expect(Self.state(status: .off, lid: false).lidToggle == .lid(true))
+        #expect(Self.state(status: .off, lid: true, onAdapter: true).lidToggle == .lid(false))
+    }
+
+    @Test func a_lid_problem_fills_the_problem_slot_only_when_the_awake_problem_is_absent() {
+        let alone = Self.state(status: .on(sources: []), lidProblem: "macOS refused the lid setting")
+        #expect(alone.problem == AwakeProblem(title: "macOS refused the lid setting", detail: nil))
+        let both = Self.state(status: .unavailable, lidProblem: "macOS refused the lid setting")
+        #expect(both.problem == AwakeProblem(title: "Unavailable", detail: nil))
     }
 
     @Test func commands_become_the_actions_the_module_reads() {

@@ -205,6 +205,7 @@ struct RunningSubmenuStateTests {
         #expect(state.items == [
             .keepAwake,
             .trackingAgents,
+            .lidClosed,
             .note("Awake cannot be read, so Stop is off."),
             .separator,
             .project(state.rows[0]),
@@ -216,7 +217,7 @@ struct RunningSubmenuStateTests {
     @Test func no_note_means_no_problem_line_and_no_stop_all_means_no_closing_separator() {
         let state = RunningSubmenuState(running: running([project("klynt", state: .working, sessions: [live])]))
         #expect(state.items == [
-            .keepAwake, .trackingAgents, .separator, .project(state.rows[0]),
+            .keepAwake, .trackingAgents, .lidClosed, .separator, .project(state.rows[0]),
         ])
     }
 
@@ -243,6 +244,57 @@ struct RunningSubmenuStateTests {
         )
         #expect(fromAwake.items.contains(.problem(text)))
         #expect(fromAwake.items.contains(.note(text)) == false)
+    }
+
+    @Test func the_core_note_still_takes_the_slot_before_any_problem() {
+        let state = RunningSubmenuState(
+            running: running(
+                [project("klynt", state: .unknown, ports: [port(1)])],
+                unknownReason: "Awake cannot be read, so Stop is off."
+            ),
+            problem: "macOS refused the lid setting"
+        )
+        #expect(state.items.contains(.note("Awake cannot be read, so Stop is off.")))
+        #expect(state.items.contains(.problem("macOS refused the lid setting")) == false)
+    }
+
+    @Test func a_lid_problem_shows_only_when_no_note_or_awake_problem_does() {
+        let awake = AwakeSubmenuState(
+            status: .on(sources: []),
+            leases: [],
+            displayHeld: false,
+            tracking: true,
+            lid: true,
+            onAdapter: true,
+            lidProblem: "macOS refused the lid setting"
+        )
+        let shown = RunningSubmenuState(
+            running: running([project("klynt", state: .working, sessions: [live])]),
+            problem: awake.problem?.title
+        )
+        #expect(shown.items == [
+            .keepAwake, .trackingAgents, .lidClosed, .problem("macOS refused the lid setting"),
+            .separator, .project(shown.rows[0]),
+        ])
+        let broken = AwakeSubmenuState(
+            status: .unavailable,
+            leases: [],
+            displayHeld: false,
+            tracking: true,
+            lidProblem: "macOS refused the lid setting"
+        )
+        #expect(broken.problem?.title == "Unavailable")
+    }
+
+    @Test func project_rows_and_stop_all_are_unchanged() {
+        let idle = project("api", state: .idle, ports: [port(1, stop: "a")], stoppable: 1, childStop: "r")
+        let state = RunningSubmenuState(running: running([idle], stopAll: ["r"], stopAllPorts: 1))
+        #expect(state.items.dropFirst(3) == [
+            .separator,
+            .project(state.rows[0]),
+            .separator,
+            .stopAll(StopAllOffer(requests: ["r"], ports: 1, projects: 1, inUse: 0, otherLeft: 0, systemHidden: 0)),
+        ])
     }
 
     @Test func stop_all_is_absent_when_no_named_project_is_idle() {
@@ -656,7 +708,7 @@ struct RunningCommandRowsTests {
             default: "other"
             }
         }
-        #expect(kinds == ["other", "other", "separator", "project", "separator", "commands", "separator", "stopAll"])
+        #expect(kinds == ["other", "other", "other", "separator", "project", "separator", "commands", "separator", "stopAll"])
     }
 
     @Test func no_commands_leave_the_list_as_it_was() {

@@ -281,6 +281,7 @@ extension StopAllOffer {
 public enum RunningSubmenuItem: Equatable, Sendable {
     case keepAwake
     case trackingAgents
+    case lidClosed
     case note(String)
     case problem(String)
     case separator
@@ -318,7 +319,7 @@ public struct RunningSubmenuState: Equatable, Sendable {
     }
 
     public var items: [RunningSubmenuItem] {
-        var items: [RunningSubmenuItem] = [.keepAwake, .trackingAgents]
+        var items: [RunningSubmenuItem] = [.keepAwake, .trackingAgents, .lidClosed]
         if let note { items.append(noteIsProblem ? .problem(note) : .note(note)) }
         items.append(.separator)
         items += nothingRunning ? [.nothingRunning] : rows.map(RunningSubmenuItem.project)

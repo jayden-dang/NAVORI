@@ -306,6 +306,7 @@ final class StatusBarController: NSObject {
                 children: KeepAwakeChoice.all.map { CascadeNode(id: $0.id, isActionable: true) }
             ),
             CascadeNode(id: "awake.tracking", isActionable: true),
+            CascadeNode(id: "awake.lid", isActionable: true),
         ]
     }
 
@@ -319,6 +320,9 @@ final class StatusBarController: NSObject {
         case "quit": NSApp.terminate(nil)
         case "awake.tracking":
             let command = AwakeCommand.tracking(store.awakeSubmenu.trackingOn == false)
+            Task { [store] in await store.perform(command) }
+        case "awake.lid":
+            let command = store.awakeSubmenu.lidToggle
             Task { [store] in await store.perform(command) }
         default:
             guard let choice = KeepAwakeChoice(id: id) else { return }

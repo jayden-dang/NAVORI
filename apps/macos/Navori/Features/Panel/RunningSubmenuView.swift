@@ -54,6 +54,21 @@ struct RunningSubmenuView: View {
                 ),
                 cascade: cascade
             )
+        case .lidClosed:
+            MenuRowView(
+                row: MenuRow(
+                    id: "awake.lid",
+                    icon: "laptopcomputer",
+                    title: "Lid closed",
+                    value: awake.lidValue,
+                    dot: awake.lidDot,
+                    opensSubmenu: false,
+                    shortcut: nil,
+                    spokenLabel: awake.lidSpoken,
+                    valueNote: awake.lidNote
+                ),
+                cascade: cascade
+            )
         case let .note(text):
             note(text)
         case .problem:

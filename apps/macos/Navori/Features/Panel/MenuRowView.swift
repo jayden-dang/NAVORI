@@ -14,6 +14,7 @@ struct MenuRow {
     var isChecked: Bool = false
     /// Read by VoiceOver in place of `title`, for a row that shows its state without text.
     var spokenLabel: String?
+    var valueNote: String?
 }
 
 struct MenuRowView: View {
@@ -51,6 +52,13 @@ struct MenuRowView: View {
                 }
                 if let value = row.value {
                     Text(value)
+                        .font(.system(size: 13))
+                        .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
+                        .opacity(row.isDimmed ? 0.45 : 1)
+                        .lineLimit(1)
+                }
+                if let note = row.valueNote {
+                    Text(note)
                         .font(.system(size: 13))
                         .foregroundStyle(selected ? Color.white : Color(nsColor: .secondaryLabelColor))
                         .opacity(row.isDimmed ? 0.45 : 1)
@@ -102,7 +110,7 @@ struct MenuRowView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(row.spokenLabel ?? row.title)
-        .accessibilityValue(row.value ?? "")
+        .accessibilityValue(row.spokenLabel == nil ? row.value ?? "" : "")
         .accessibilityHint(row.opensSubmenu ? "Opens a submenu" : "")
         .accessibilityAddTraits(row.isChecked ? [.isButton, .isSelected] : .isButton)
     }
