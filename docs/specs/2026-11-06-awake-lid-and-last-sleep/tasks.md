@@ -485,7 +485,7 @@ _Requirements: LID-3.13, LID-4.1, LID-4.2, LID-4.3, LID-4.4, LID-7.4_
     1. stamps `SystemTime::now()` in ms first
     2. returns if `shut_down`
     3. spawns a dispatch of `{"slept":{"at_ms":..}}` to `awake` and logs an error
-  - `system_did_wake` keeps its wake pulse and also spawns a dispatch of `"woke"` to `awake`, returning early when `shut_down` is set, as `system_will_sleep` does
+  - `system_did_wake` always sends its wake pulse as today. After that it spawns a dispatch of `"woke"` to `awake`, unless `shut_down` is set; only that dispatch is skipped, never the pulse.
   - private `on_woke(ctx)`: while the power watch is armed, one `current()` read through the change path
 
 **Depends-on:** Task 4, Task 8 (all of Tasks 5–9 edit `actor.rs`, so they run in order)
