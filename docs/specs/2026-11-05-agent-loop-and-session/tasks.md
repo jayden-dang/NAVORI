@@ -417,6 +417,7 @@ _Requirements: LOOP-2.6_
 **Depends-on:** Task 10
 
 - [x] **Step 1: Write** `a_live_turn_answers_from_a_real_read_action`, marked `#[ignore = "calls DeepSeek with a key from pass; run by hand with NAVORI_LIVE_LLM=1 and --ignored"]`. It returns early unless `NAVORI_LIVE_LLM=1`, and reads `NAVORI_LIVE_PASS_ENTRY` and `NAVORI_LIVE_MODEL`. It reads the key with `pass show <entry>` inside the test, saves it into a `FakeKeychain`, and starts a core with production providers. It runs the input `Which TCP ports are open on this Mac? Use the tools.` and prints the answer, the end and the Actions called. It asserts only `end` is `Completed` or `StepLimit`. Run `cargo test -p navori-ffi --test live_agent` — expect: 1 ignored. No agent sets the variables.
+  _Run by the operator by hand 2026-11-06 with model `deepseek-flash` (recorded on PR #31):_ it passed twice. The second run, at `2cd6cae`, ended `Completed` after 2 Steps with one `ports_list` call, and its answer listed the real ports. This covers LOOP-9.1.
 - [x] **Step 2: Gate and commit:** `git commit -m "test(ffi): add the operator-run live Agent loop Turn"`.
 
 _Requirements: LOOP-9.1_
@@ -445,6 +446,7 @@ _Requirements: LOOP-9.1_
 - [x] **Step 2: Unchanged behavior:** `git diff --stat $(git merge-base main HEAD) -- crates/kernel crates/store modules` shows no change. `cargo test -p navori-kernel -p navori-store -p navori-mod-awake -p navori-mod-ports -p navori-mod-integrations` passes.
 - [x] **Step 3: Whole gate:** `cargo xtask ci` — expect: pass.
 - [x] **Step 4: Perf, on an idle machine:** run `cargo xtask perf` at the merge base and at the head, without `--record`. Compare each metric's head median with the base median + max(10%, the metric's floor) (performance.md:35-36), and write both tables into the task report. A failing metric blocks the merge, not this plan.
+  _Waived by the operator 2026-11-06 (perf at the final milestone), not measured._ Ruling recorded on PR #31. `cargo xtask perf` was not run at the merge base or the head, so LOOP-11.1's per-feature measurement moves to the final milestone; the GOAL-11 budget still binds the release gate and LOOP-11.1 is not retired.
 - [x] **Step 5: Commit:** `git commit -m "docs(loop): record the built Agent loop, Conversation tables and dependency edges"`.
 
 _Requirements: LOOP-10.5, LOOP-10.6, LOOP-11.1_
