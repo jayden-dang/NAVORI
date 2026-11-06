@@ -94,7 +94,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Closed:** None
 **Deferred:**
 - ROAD-39 shield-screen-layers → unscheduled (2026-11-05, app denylist, path blocks, OCR and screenshots wait until Navori AI sees the screen; split from ROAD-12)
-- ROAD-40 computer-use → unscheduled (2026-11-05, Navori AI controlling other apps comes after the Agent loop; dsh has no usable base for it, ADR 0008)
+- ROAD-40 computer-use → unscheduled (2026-11-05, built in `navori-macos` by porting cua-driver, cheapest Control path first, ADR 0009; waits for ROAD-14, ROAD-37, ROAD-25 and ROAD-39) — Notes: [ROAD-40](roads/ROAD-40.notes.md)
 **Blockers:** None
 
 ## MILE-4 — Ports (R3)
@@ -171,7 +171,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Outcome:** Anyone on an Apple Silicon Mac with macOS 26 installs Navori with `brew install --cask` from the Navori tap, and every later release reaches them through `brew upgrade` with their config, database, hooks and Keychain access intact.
 **Goals:** GOAL-8, GOAL-11
 **Members:**
-- **ROAD-27** open-source-distribution — After: none — Surfaces: `xtask/`, `.github/workflows/`, `modules/integrations/`, `docs/adr/`, `docs/agents/project.md`, external repo `jayden-dang/homebrew-navori` — A self-signed release built and published by GitHub Actions on a `v*` tag that matches the workspace version, a zip and sha256 on the NAVORI GitHub Release, and a cask in the personal tap; a local `cargo xtask release-check` (ci, perf, version) before tagging; a hook command that does nothing once the app is gone. Un-deferred from MILE-1 on 2026-11-04.
+- **ROAD-27** open-source-distribution — After: none — Surfaces: `xtask/`, `.github/workflows/`, `modules/integrations/`, `docs/adr/`, `docs/agents/project.md`, external repo `jayden-dang/homebrew-navori` — A self-signed release built and published by GitHub Actions on a `v*` tag that matches the workspace version, a zip and sha256 on the NAVORI GitHub Release, and a cask in the personal tap; a local `cargo xtask release-check` (ci, perf, the soak gate, version) before tagging; a hook command that does nothing once the app is gone. Un-deferred from MILE-1 on 2026-11-04.
 **Depends-on:** MILE-2, MILE-4
 **Commitment:** Planned
 **Closed:** None

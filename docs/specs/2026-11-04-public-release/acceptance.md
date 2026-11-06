@@ -37,6 +37,30 @@ The operator reported each group below as passing; no log or screenshot was atta
 
 Not exercised: a deliberately broken tap step (wrong token) followed by a rerun (7.7); `docs/agents/project.md` still has no `Compat obligation: External` line, which `release-check` requires for a final tag.
 
+## Release decision for `v0.1.0` (2026-11-05)
+
+`cargo xtask release-check` was run in an isolated worktree at commit `7bfb34a`: the preflight and `cargo xtask ci` passed (Rust and Swift tests included). The performance gate then failed one of twelve metrics: `menu_open_after_launch_ms` 85.9 ms against a budget of 80 ms; the other eleven were within budget (cold start 111.9 ms, `snapshot_ms` 6.7 ms, app size 16.5 MB, idle footprint 24.3 MB, and the rest). The Mac was busy with builds from another project (load average 6.7 to 10.5), and the same metric measured 58.9 ms in a standalone `cargo xtask perf` run on an idle Mac earlier the same day and 82.9 ms and 98 ms on busy ones.
+
+The operator decided on 2026-11-05 to skip the rest of `release-check` and release `v0.1.0` with the measurements taken. This is a recorded exception to RELEASE-2.1 and RELEASE-7.1 for this release only: the gate did not pass on a quiet Mac for the tagged commit. Re-measure on an idle Mac and run `cargo xtask perf --record` when convenient.
+
+## v0.1.0 published (2026-11-05)
+
+Tag `v0.1.0` on commit `cf846cd` (a descendant of `7bfb34a`, the commit `cargo xtask ci` passed on). Run 41992621783 on a GitHub-hosted runner, attempt 2, every step passed; attempt 1 had built and uploaded the draft Release and stopped at the tap checkout.
+
+| Check | Result |
+|---|---|
+| Release `v0.1.0` is public, not a pre-release, and is the repository's "Latest" | pass (API `releases/latest` returned `v0.1.0`) |
+| The tap `jayden-dang/homebrew-navori` holds `Casks/navori.rb` (commit `navori 0.1.0`) and no `navori-rc.rb` | pass |
+| `brew tap jayden-dang/navori`, `brew trust --cask`, `brew info`, `brew fetch --cask` fetch the zip and verify its sha256, with no sign-in | pass (maintainer's Mac; not installed there) |
+| Guards that ran for the first time on a final tag: hosted runner, tag on `main` pushed by the owner, tap token present, final release needs a tap, write access to the tap proven by a dry run, public asset checked against its hash | pass |
+
+What went wrong on the way, and what it taught:
+
+- The first attempt failed at the tap checkout with `Bad credentials`. The secret `TAP_TOKEN` had been set from the clipboard after the clipboard had been overwritten, so it held a command line instead of a token. The guard that the secret is non-empty could not catch it. A fresh token was handed over through a private file instead of the clipboard, and the job passed. A future guard could call the GitHub API with the token before the build.
+- The release-candidate Releases (`v0.1.0-rc.4`, `rc.5`, `rc.8`, `rc.9`, `rc.10`) and the tags `v0.1.0-rc.1` to `v0.1.0-rc.10` were deleted from origin and locally after the release.
+
+Still open: the performance gate has not been re-measured on a quiet Mac (see the release decision above); the throwaway tap `jayden-dang/homebrew-navori-test` and the two tokens `navori-release-tap-test` and `navori-release-tap` (its value was lost) need deleting by hand; an install on a clean macOS account from the public tap (`brew install --cask navori`) has not been done yet.
+
 ## Before `v0.1.0`
 
 - Add the line `- **Compat obligation:** External` to Project posture in `docs/agents/project.md`.

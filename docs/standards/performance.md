@@ -39,6 +39,19 @@ R0 baseline (debug build, 2026-11-01): 0.0% CPU, 0 wake-ups/s, 21 MB footprint, 
 - Perf runs use the same `dev.navori.app.debug` preferences domain as `cargo xtask run`.
 - Perf runs link the user's Docker socket into each run home and print `docker=<status>` from `ports.list` (`unavailable` when the app has no Ports module). With the socket linked, an `unreadable` or `unavailable` status warns and refuses `--record`; `not_seen` prints a note and records. A baseline needs the same Docker state as the runs it is compared with.
 
+## Soak
+
+`cargo xtask soak` drives an isolated release-flavor dev-identity Navori (perf mode, its own home under `/tmp/navori-soak-<uid>/`) under load and judges leaks and hangs. Every value below is agent-decided (specs `2026-11-05-soak-and-hang-check`, `requirements.md` and `design.md`); none was set by the operator.
+
+- **Tiers:** the short soak is a 1 minute settle plus 20 minutes of load (SOAK-1.2, D7; inside the operator's ~30 minute bound on `release-check`, about 23 minutes with teardown, SOAK-9.1). `cargo xtask soak --long` runs the same schedule at one fifth of its rate for 2 hours (SOAK-5.1, D8, D9), `--for <duration>` overrides the 2 hours, and it always exits 0 whatever the verdict. `release-check` never runs the long tier (SOAK-5.5).
+- **Load rates:** the SOAK-1.3 schedule (D9), including a 4 s write-lock hold on `navori.db` every 2 minutes. Samples of footprint, threads and fds every 10 s in the short tier and 60 s in the long tier (SOAK-1.5, SOAK-5.3, D10).
+- **Hang threshold:** a Core `status` probe unanswered after 2 s, or a menu SIGUSR1 with no `menuOpened` mark after 2 s (SOAK-3.2, SOAK-3.4, D11). Four times Apple's 500 ms "proper hang" (WWDC23 session 10248) and below the store's 5 s `busy_timeout`.
+- **Leak rule:** a signal is LEAK when median(last third) minus median(first third) of the post-settle samples exceeds max(10% of median(first third), floor) and median(middle third) is at least median(first third) (SOAK-2.1, D12). The rule is the perf regression rule from Method.
+- **Floors:** 1 MiB footprint, 2 threads, 4 fds (SOAK-2.2, D12). Footprint and threads reuse the perf floors; fds has no precedent. Fewer than 9 post-settle samples fail the run (SOAK-2.5).
+- **Release gate:** `release-check` runs the short soak after perf on `build/perf/Navori Dev.app` and prints the tag only when it passes (SOAK-4.1, SOAK-4.2).
+- **Issue #21:** a known Core stall under the store lock is open as #21. The soak is expected to fail with `soak hang core` while it is open, so #21 blocks releases. There is no skip and no override (operator decision, 2026-11-05): fix #21 first.
+- **Perf visibility edit:** the 3-line change that made perf's `home`, `launch` and `logstream` modules visible to the soak is not a perf-gate change (operator decision, 2026-11-05); budgets, floors and output are unchanged.
+
 ## Design rules (from the architecture spine)
 
 - ARCH-15 — no WebView, Electron or JS runtime.

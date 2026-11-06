@@ -14,10 +14,10 @@ Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md
 
-**Goal:** Pushing a `v<version>` tag builds, signs and publishes Navori on its GitHub Release and in the Homebrew tap, a local `cargo xtask release-check` gates the tag on `ci` and `perf`, and Navori's hooks do nothing once the app is gone.
+**Goal:** Pushing a `v<version>` tag builds, signs and publishes Navori on its GitHub Release and in the Homebrew tap, a local `cargo xtask release-check` gates the tag on `ci`, `perf` and then the soak gate (SOAK-4.x), and Navori's hooks do nothing once the app is gone.
 
 **Architecture:**
-- A new `xtask/src/release.rs` holds every release decision as pure functions plus two commands: `cargo xtask release` (CI: tag check, signed build, designated-requirement check, zip, sha256, cask) and `cargo xtask release-check` (local: preconditions, `ci`, `perf`).
+- A new `xtask/src/release.rs` holds every release decision as pure functions plus two commands: `cargo xtask release` (CI: tag check, signed build, designated-requirement check, zip, sha256, cask) and `cargo xtask release-check` (local: preconditions, `ci`, `perf`, then the soak gate (SOAK-4.x)).
 - `.github/workflows/release.yml` is a thin pipeline over those commands, `gh` and `brew`; a lint in `cargo xtask ci` keeps its actions pinned by SHA.
 - The Integrations Module writes guarded hook commands and still recognizes the earlier form as Navori's, needing repair.
 
