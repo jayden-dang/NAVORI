@@ -168,19 +168,26 @@ mod tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let dir = tempfile::tempdir().unwrap();
         let probe = SoakProbe::compile(&root, &dir.path().join("out")).unwrap();
+        // Opens a descriptor every 10ms for about two seconds. The samples below
+        // only need the count to rise while they run; the judge uses the readings,
+        // not the wall clock.
         let mut child = Command::new("/usr/bin/perl")
             .args([
                 "-e",
-                r#"my @f; for (1..40) { open(my $h, "<", "/dev/null"); push @f, $h; sleep 1 } sleep 5"#,
+                r#"my @f; for (1..200) { open(my $h, "<", "/dev/null"); push @f, $h; select(undef, undef, undef, 0.01) }"#,
             ])
             .stdin(Stdio::null())
             .spawn()
             .unwrap();
-        std::thread::sleep(Duration::from_secs(2));
+        std::thread::sleep(Duration::from_millis(50));
         let mut readings = Vec::new();
         for i in 0..12u64 {
-            readings.push(probe.read(child.id(), Duration::from_secs(i)).unwrap());
-            std::thread::sleep(Duration::from_secs(1));
+            readings.push(
+                probe
+                    .read(child.id(), Duration::from_millis(i * 50))
+                    .unwrap(),
+            );
+            std::thread::sleep(Duration::from_millis(30));
         }
         child.kill().unwrap();
         child.wait().unwrap();

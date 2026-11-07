@@ -22,6 +22,13 @@ fn wait_limit() -> Duration {
         .map_or(ASK_WAIT, Duration::from_millis)
 }
 
+fn notice_after() -> Duration {
+    std::env::var("NAVORI_ASK_NOTICE_MS")
+        .ok()
+        .and_then(|ms| ms.parse().ok())
+        .map_or(NOTICE_AFTER, Duration::from_millis)
+}
+
 fn size_limit() -> usize {
     std::env::var("NAVORI_ASK_MAX_BYTES")
         .ok()
@@ -91,11 +98,12 @@ pub async fn run(client: &mut Client, model: &str, prompt: &str) -> Result<Strin
     let params = params(model, prompt)?;
     let wait = wait_limit();
     let mut call = pin!(client.call(method::ASK, params));
-    let first = match timeout(wait.min(NOTICE_AFTER), &mut call).await {
+    let notice = notice_after();
+    let first = match timeout(wait.min(notice), &mut call).await {
         Ok(answer) => Some(answer),
-        Err(_) if wait > NOTICE_AFTER => {
+        Err(_) if wait > notice => {
             eprintln!("waiting for the answer…");
-            timeout(wait - NOTICE_AFTER, &mut call).await.ok()
+            timeout(wait - notice, &mut call).await.ok()
         }
         Err(_) => None,
     };

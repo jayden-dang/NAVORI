@@ -481,8 +481,10 @@ fn old_event_is_deleted_within_one_second(core: &NavoriCore) {
     panic!("the 40-day event was still in the journal");
 }
 
-fn old_event_stays_for_one_second(core: &NavoriCore) {
-    let deadline = Instant::now() + Duration::from_secs(1);
+/// The sweep runs as the core starts. A pause that failed would delete during
+/// start, so this window only has to outlast that first pass.
+fn old_event_stays_past_the_start_sweep(core: &NavoriCore) {
+    let deadline = Instant::now() + Duration::from_millis(250);
     while Instant::now() < deadline {
         assert!(journal_has_old_event(core), "the 40-day event was deleted");
         std::thread::sleep(Duration::from_millis(10));
@@ -536,7 +538,7 @@ fn a_broken_retention_or_file_keeps_old_events_and_says_the_sweep_is_paused() {
         write_config(&home, body);
         seed_event_from_forty_days_ago(&home);
         let (core, _) = start(&home);
-        old_event_stays_for_one_second(&core);
+        old_event_stays_past_the_start_sweep(&core);
         pause_is_reported(&core);
         core.shutdown();
     }
@@ -548,7 +550,7 @@ fn a_valid_retention_keeps_what_it_says() {
     write_config(&home, "[journal]\nretention_days = 90\n");
     seed_event_from_forty_days_ago(&home);
     let (core, _) = start(&home);
-    old_event_stays_for_one_second(&core);
+    old_event_stays_past_the_start_sweep(&core);
     core.shutdown();
 }
 
@@ -594,7 +596,7 @@ fn fixing_the_file_keeps_the_pause_until_the_next_start() {
     seed_event_from_forty_days_ago(&home);
     let (core, _) = start(&home);
     pause_is_reported(&core);
-    old_event_stays_for_one_second(&core);
+    old_event_stays_past_the_start_sweep(&core);
     write_config(&home, "[journal]\nretention_days = 30\n");
     pause_is_reported(&core);
     core.shutdown();

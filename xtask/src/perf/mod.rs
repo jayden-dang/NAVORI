@@ -154,7 +154,7 @@ fn measure_phase_a(
         *slot = open_submenu_by_hover(&launched, log)?;
     }
     let peak = sample_pid(probe, pid)?;
-    finish_measured(&mut launched)?;
+    finish_measured(&mut launched, MEASURED_EXIT)?;
     Ok(PhaseAProcess {
         cold_start_ms,
         menu_open_after_launch_ms: first.ms,
@@ -193,7 +193,7 @@ fn measure_phase_b(
     }
     let peak_bytes = before.peak;
     let docker = docker_report(PerfHome::docker_linked(&run_dir), ports_list(exe, &run_dir));
-    finish_measured(&mut launched)?;
+    finish_measured(&mut launched, MEASURED_EXIT)?;
     Ok(PhaseBProcess {
         windows,
         peak_bytes,
@@ -440,15 +440,17 @@ fn await_mark(log: &mut LogStream, pid: u32, want: fn(&Mark) -> bool, what: &str
     }
 }
 
-fn finish_measured(launched: &mut Launched) -> Result<()> {
-    if request_exit(launched, MEASURED_EXIT)? {
+fn finish_measured(launched: &mut Launched, term_grace: Duration) -> Result<()> {
+    if request_exit(launched, term_grace)? {
         return Ok(());
     }
-    // PERF-3.4: a measured process that ignores SIGTERM is killed. The samples
-    // already taken stay. Warm-up does not use this path.
+    // A measured process that ignores SIGTERM is killed after the grace. The
+    // samples already taken stay. Warm-up does not use this path. The real
+    // grace is `MEASURED_EXIT` (5s); tests pass a shorter one.
     emit(&format!(
-        "pid {} ignored SIGTERM for 5s; sending SIGKILL",
-        launched.pid
+        "pid {} ignored SIGTERM for {}s; sending SIGKILL",
+        launched.pid,
+        term_grace.as_secs()
     ))?;
     match launched.signal("KILL") {
         Ok(()) => Ok(()),
@@ -845,7 +847,7 @@ mod tests {
             !ignored,
             "SIGTERM ended the process; the ignore did not hold"
         );
-        finish_measured(&mut launched).unwrap();
+        finish_measured(&mut launched, Duration::from_millis(200)).unwrap();
         let gone = launched.wait_exit(Duration::from_secs(2)).unwrap();
         assert!(gone, "pid {} still running", launched.pid);
     }

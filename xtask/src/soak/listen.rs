@@ -19,8 +19,8 @@ mod tests {
 
     #[test]
     fn listening_holds_a_loopback_only_tcp_listener_for_the_duration() {
-        let held = std::thread::spawn(|| listen(2));
-        std::thread::sleep(Duration::from_millis(500));
+        let held = std::thread::spawn(|| listen(1));
+        std::thread::sleep(Duration::from_millis(200));
         let out = Command::new("/usr/sbin/lsof")
             .args(["-nP", "-a", "-iTCP", "-sTCP:LISTEN", "-Fn", "-p"])
             .arg(std::process::id().to_string())

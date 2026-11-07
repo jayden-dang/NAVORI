@@ -498,7 +498,7 @@ fn awake_status_with_the_app_down_exits_3() {
 fn awake_run_holds_while_the_command_runs() {
     let r = running_core();
     let mut child = navori_process(&r.home)
-        .args(["awake", "run", "--", "sleep", "5"])
+        .args(["awake", "run", "--", "sleep", "0.5"])
         .spawn()
         .unwrap();
 
@@ -1489,8 +1489,9 @@ fn ask_when_the_app_is_not_running_exits_three() {
 
 #[test]
 fn ask_prints_a_waiting_notice_on_stderr_when_slow() {
-    let (r, _vault) = running_ai_core("late reply", Duration::from_millis(3500));
+    let (r, _vault) = running_ai_core("late reply", Duration::from_millis(400));
     navori(&r.home)
+        .env("NAVORI_ASK_NOTICE_MS", "100")
         .args(["ask", "--model", "m", "hi"])
         .assert()
         .code(0)
