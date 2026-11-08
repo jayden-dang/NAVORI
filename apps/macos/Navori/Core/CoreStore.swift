@@ -120,7 +120,9 @@ final class CoreStore {
 
     var hasSnapshot: Bool { snapshot != nil }
 
-    var needsYou: NeedsYouView? { snapshot?.needsYou }
+    var needsYou: NeedsYouSnapshot? {
+        snapshot?.needsYou.map(NeedsYouSnapshot.init)
+    }
 
     /// Production hides the Core row while the Core is healthy; the dev profile always shows it.
     var coreRowVisible: Bool {
@@ -464,6 +466,11 @@ final class CoreStore {
         }
     }
 
+    func answerDecide(id: Int64, primary: Bool) async {
+        guard let row = needsYou?.decisions.first(where: { $0.id == id }) else { return }
+        await answer(row.answerRequest(primary: primary))
+    }
+
     fileprivate func apply(_ snapshot: CoreSnapshot) {
         self.snapshot = snapshot
         pruneStopState()
@@ -500,6 +507,93 @@ struct EventRow: Identifiable, Equatable {
 struct ConfigProblem: Equatable {
     let title: String
     let message: String
+}
+
+struct NeedsYouChoice: Equatable {
+    let label: String
+    let risk: String?
+    let action: String?
+    let module: String?
+    let answerRequest: String
+
+    init(_ view: ChoiceView) {
+        label = view.label
+        risk = view.risk
+        action = view.action
+        module = view.module
+        answerRequest = view.answerRequest
+    }
+}
+
+enum NeedsYouDecideState: Equatable {
+    case open
+    case answering(choice: String)
+    case failed(choice: String, error: String)
+
+    init(_ state: DecideState) {
+        switch state {
+        case .open:
+            self = .open
+        case let .answering(choice):
+            self = .answering(choice: choice)
+        case let .failed(choice, error):
+            self = .failed(choice: choice, error: error)
+        }
+    }
+
+    var signature: String {
+        switch self {
+        case .open: "open"
+        case let .answering(choice): "answering:\(choice)"
+        case let .failed(choice, error): "failed:\(choice):\(error)"
+        }
+    }
+}
+
+struct NeedsYouDecideRow: Identifiable, Equatable {
+    let id: Int64
+    let title: String
+    let reason: String
+    let raisedAtMs: Int64
+    let state: NeedsYouDecideState
+    let primary: NeedsYouChoice
+    let secondary: NeedsYouChoice
+
+    init(_ row: DecideRow) {
+        id = row.id
+        title = row.title
+        reason = row.reason
+        raisedAtMs = row.raisedAtMs
+        state = NeedsYouDecideState(row.state)
+        primary = NeedsYouChoice(row.primary)
+        secondary = NeedsYouChoice(row.secondary)
+    }
+
+    func answerRequest(primary wantsPrimary: Bool) -> String {
+        if wantsPrimary {
+            if case let .failed(choice: choice, error: _) = state, choice == "secondary" {
+                return secondary.answerRequest
+            }
+            return primary.answerRequest
+        }
+        return secondary.answerRequest
+    }
+}
+
+struct NeedsYouSnapshot: Equatable {
+    let decisions: [NeedsYouDecideRow]
+    let needsCount: UInt32
+    let anyOverdue: Bool
+    let allCaughtUp: Bool
+    let down: Bool
+
+    init(_ view: NeedsYouView) {
+        decisions = view.decisions.map(NeedsYouDecideRow.init)
+        needsCount = view.needsCount
+        anyOverdue = view.anyOverdue
+        allCaughtUp = view.allCaughtUp
+        down = view.down
+    }
 }
 
 /// Receives snapshots on a core worker thread and forwards them to the main actor.

@@ -1,5 +1,4 @@
 import AppKit
-import NavoriCore
 import NavoriPanel
 import SwiftUI
 
@@ -39,7 +38,7 @@ struct DecideHeaderView: View {
 }
 
 struct DecideRowView: View {
-    let row: DecideRow
+    let row: NeedsYouDecideRow
     let cascade: CascadeController
     let store: CoreStore
     var isDimmed = false
@@ -96,6 +95,13 @@ struct DecideRowView: View {
             primary: row.primary.label,
             secondary: row.secondary.label
         )
+    }
+
+    private var primaryHint: String { hint(for: row.primary) }
+    private var secondaryHint: String { hint(for: row.secondary) }
+
+    private var spokenHints: String {
+        [primaryHint, secondaryHint].filter { !$0.isEmpty }.joined(separator: ". ")
     }
 
     var body: some View {
@@ -176,6 +182,7 @@ struct DecideRowView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(spoken)
         .accessibilityValue(valueText)
+        .accessibilityHint(focused ? spokenHints : "")
         .accessibilityAddTraits(.isButton)
     }
 
@@ -185,7 +192,7 @@ struct DecideRowView: View {
                 title: primaryTitle,
                 prominent: true,
                 selected: selected,
-                action: { answerPrimary() },
+                action: { answer(primary: true) },
                 fontSize: 11.5,
                 minHeight: 20,
                 busy: answeringChoice == "primary",
@@ -196,13 +203,13 @@ struct DecideRowView: View {
             } action: { frame in
                 primaryFrame = frame
             }
-            .accessibilityHint(hint(for: row.primary))
+            .modifier(OptionalHelp(primaryHint))
 
             CapsuleButton(
                 title: row.secondary.label,
                 prominent: false,
                 selected: selected,
-                action: { answerSecondary() },
+                action: { answer(primary: false) },
                 fontSize: 11.5,
                 minHeight: 20,
                 busy: answeringChoice == "secondary",
@@ -213,11 +220,11 @@ struct DecideRowView: View {
             } action: { frame in
                 secondaryFrame = frame
             }
-            .accessibilityHint(hint(for: row.secondary))
+            .modifier(OptionalHelp(secondaryHint))
         }
     }
 
-    private func hint(for choice: ChoiceView) -> String {
+    private func hint(for choice: NeedsYouChoice) -> String {
         guard choice.risk == "destructive",
               let module = choice.module,
               let action = choice.action
@@ -225,20 +232,8 @@ struct DecideRowView: View {
         return NeedsYouText.destructiveHint(module: module, action: action)
     }
 
-    private func answerPrimary() {
-        let request: String
-        if let failed {
-            request = failed.choice == "secondary"
-                ? row.secondary.answerRequest
-                : row.primary.answerRequest
-        } else {
-            request = row.primary.answerRequest
-        }
-        Task { await store.answer(request) }
-    }
-
-    private func answerSecondary() {
-        Task { await store.answer(row.secondary.answerRequest) }
+    private func answer(primary: Bool) {
+        Task { await store.answerDecide(id: row.id, primary: primary) }
     }
 
     private func publishButtons(_ showing: Bool) {
@@ -266,5 +261,21 @@ struct DecideRowView: View {
             width: frame.width,
             height: frame.height
         )
+    }
+}
+
+private struct OptionalHelp: ViewModifier {
+    let text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    func body(content: Content) -> some View {
+        if text.isEmpty {
+            content
+        } else {
+            content.help(text)
+        }
     }
 }

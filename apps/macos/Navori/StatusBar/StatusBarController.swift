@@ -1,5 +1,4 @@
 import AppKit
-import NavoriCore
 import NavoriPanel
 import Observation
 import QuartzCore
@@ -355,20 +354,8 @@ final class StatusBarController: NSObject {
     }
 
     fileprivate func answerDecide(id: String, primary: Bool) {
-        guard let decisionId = Int64(id.dropFirst("decide.".count)),
-              let row = store.needsYou?.decisions.first(where: { $0.id == decisionId })
-        else { return }
-        let request: String
-        if primary {
-            if case let .failed(choice: choice, error: _) = row.state, choice == "secondary" {
-                request = row.secondary.answerRequest
-            } else {
-                request = row.primary.answerRequest
-            }
-        } else {
-            request = row.secondary.answerRequest
-        }
-        Task { [store] in await store.answer(request) }
+        guard let decisionId = Int64(id.dropFirst("decide.".count)) else { return }
+        Task { [store] in await store.answerDecide(id: decisionId, primary: primary) }
     }
 
     private func showSettings(_ tab: SettingsTab = .general) {
@@ -463,20 +450,14 @@ private struct NeedsYouSignature: Equatable {
         self.down = down
     }
 
-    init(_ view: NeedsYouView?) {
+    init(_ view: NeedsYouSnapshot?) {
         guard let view else {
             self = .empty
             return
         }
         self.init(
             decisionIds: view.decisions.map(\.id),
-            decisionStates: view.decisions.map { row in
-                switch row.state {
-                case .open: "open"
-                case let .answering(choice): "answering:\(choice)"
-                case let .failed(choice, error): "failed:\(choice):\(error)"
-                }
-            },
+            decisionStates: view.decisions.map(\.state.signature),
             needsCount: view.needsCount,
             anyOverdue: view.anyOverdue,
             allCaughtUp: view.allCaughtUp,
