@@ -496,9 +496,9 @@ _Requirements: NEEDS-12.1, NEEDS-12.2, NEEDS-12.5_
 
 **Depends-on:** Task 13
 
-- [ ] **Step 1:** Append `(amended by NEEDS-11.1)` to MENU-1.2 and AWAKE-11.1, `(amended by NEEDS-3.9)` to MENU-1.4; add amendment notes to brief rules 6 and 12 naming NEEDS-3.1 and NEEDS-3.9; replace the `inbox_*` row with `needs_you_decisions`, `needs_you_updates` (Owner `needs_you`) and `todo_items` (Owner `todo`); rename the planned crate and directory lines.
-- [ ] **Step 2:** Run the `rg` check above and `audit-trace` — expect: clean.
-- [ ] **Step 3: Commit** `git commit -m "docs: record what Needs you amends"`
+- [x] **Step 1:** Append `(amended by NEEDS-11.1)` to MENU-1.2 and AWAKE-11.1, `(amended by NEEDS-3.9)` to MENU-1.4; add amendment notes to brief rules 6 and 12 naming NEEDS-3.1 and NEEDS-3.9; replace the `inbox_*` row with `needs_you_decisions`, `needs_you_updates` (Owner `needs_you`) and `todo_items` (Owner `todo`); rename the planned crate and directory lines.
+- [x] **Step 2:** Run the `rg` check above and `audit-trace` — expect: clean.
+- [x] **Step 3: Commit** `git commit -m "docs: record what Needs you amends"`
 
 _Requirements: NEEDS-13.10, NEEDS-13.12_
 
