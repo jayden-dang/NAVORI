@@ -273,6 +273,7 @@ pub fn build_kernel(
         .register(Integrations::new(integrations))
         .register(Ports::new(ports))
         .register(NeedsYou::new(*sweep))
+        .grant_destructive("needs_you")
         .start()
 }
 
@@ -626,5 +627,42 @@ pub async fn snapshot_pump(
         revision.borrow_and_update();
         while events.try_recv().is_ok() {}
         notify();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use std::path::PathBuf;
+
+    use navori_config::JournalSweep;
+    use navori_mod_integrations::IntegrationsEnv;
+    use navori_mod_ports::PortsEnv;
+    use navori_store::Store;
+
+    use super::build_kernel;
+
+    #[tokio::test]
+    async fn only_needs_you_holds_the_destructive_grant() {
+        let home = tempfile::Builder::new()
+            .prefix("nv-grant")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let store = Store::open_in_memory().unwrap();
+        let kernel = build_kernel(
+            store,
+            serde_json::Map::new(),
+            &JournalSweep::Paused,
+            "Navori: test",
+            IntegrationsEnv {
+                home: home.path().to_path_buf(),
+                dev: true,
+                helper: PathBuf::from("navori"),
+            },
+            PortsEnv::mac(home.path().to_path_buf()),
+        );
+        assert_eq!(kernel.destructive_grants(), ["needs_you"]);
+        kernel.shutdown().await;
     }
 }

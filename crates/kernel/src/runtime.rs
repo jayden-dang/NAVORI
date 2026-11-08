@@ -391,6 +391,16 @@ impl Kernel {
             .collect()
     }
 
+    /// Module ids allowed to dispatch catalogued `Destructive` Actions through their dispatcher.
+    pub fn destructive_grants(&self) -> Vec<&'static str> {
+        let Some(router) = self.plumbing.router.get() else {
+            unreachable!("router is filled at start");
+        };
+        let mut grants: Vec<&'static str> = router.grants.iter().copied().collect();
+        grants.sort_unstable();
+        grants
+    }
+
     pub async fn dispatch(&self, envelope: Envelope) -> Result<Value, DispatchError> {
         let Some(router) = self.plumbing.router.get() else {
             unreachable!("router is filled at start");

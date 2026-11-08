@@ -644,6 +644,8 @@ fn no_new_action_appears() {
             "ports list read",
             "ports open read",
             "ports kill destructive",
+            "needs_you raise write",
+            "needs_you answer destructive",
         ]
     );
     core.shutdown();

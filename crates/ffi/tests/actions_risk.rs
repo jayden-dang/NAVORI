@@ -62,7 +62,7 @@ fn config(home: &tempfile::TempDir) -> CoreConfig {
     }
 }
 
-const SAMPLED: usize = 28;
+const SAMPLED: usize = 29;
 
 fn sample(module: &str, name: &str) -> Value {
     match (module, name) {
@@ -109,6 +109,13 @@ fn sample(module: &str, name: &str) -> Value {
                 "reason": "r",
                 "primary": {"label": "Ok"},
                 "secondary": {"label": "Later"},
+            }
+        }),
+        ("needs_you", "answer") => json!({
+            "answer": {
+                "id": 1,
+                "revision": 1,
+                "choice": "primary",
             }
         }),
         other => panic!("no sample for the Action {other:?}"),

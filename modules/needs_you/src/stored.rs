@@ -191,7 +191,7 @@ pub fn mark_answering(store: &Store, id: i64, choice: &str) -> Result<(), String
         let changed = conn
             .execute(
                 "UPDATE needs_you_decisions
-                     SET state = 'answering', chosen = ?1
+                     SET state = 'answering', chosen = ?1, error = NULL
                      WHERE id = ?2 AND state IN ('open','failed')",
                 params![choice, id],
             )
@@ -200,6 +200,160 @@ pub fn mark_answering(store: &Store, id: i64, choice: &str) -> Result<(), String
             return Err("Decision was not marked answering".to_owned());
         }
         Ok(())
+    })
+}
+
+#[derive(Debug, Clone)]
+pub struct AnswerRow {
+    pub id: i64,
+    pub revision: u32,
+    /// `None` when the row is already settled (answered/expired).
+    pub kind: Option<OpenKind>,
+    pub expires_at_ms: Option<i64>,
+    pub primary_envelope: Option<String>,
+    pub secondary_envelope: Option<String>,
+}
+
+pub fn find_for_answer(store: &Store, id: i64) -> Result<Option<AnswerRow>, String> {
+    store
+        .with_conn(|conn| {
+            conn.query_row(
+                "SELECT id, revision, state, expires_at_ms, primary_envelope, secondary_envelope
+                 FROM needs_you_decisions WHERE id = ?1",
+                [id],
+                |row| {
+                    let state: String = row.get(2)?;
+                    let kind = match state.as_str() {
+                        "open" => Some(OpenKind::Open),
+                        "answering" => Some(OpenKind::Answering),
+                        "failed" => Some(OpenKind::Failed),
+                        _ => None,
+                    };
+                    Ok(AnswerRow {
+                        id: row.get(0)?,
+                        revision: row.get(1)?,
+                        kind,
+                        expires_at_ms: row.get(3)?,
+                        primary_envelope: row.get(4)?,
+                        secondary_envelope: row.get(5)?,
+                    })
+                },
+            )
+            .optional()
+        })
+        .map_err(|err| err.to_string())
+}
+
+pub fn mark_answered(store: &Store, id: i64, resolved_at_ms: i64) -> Result<(), String> {
+    store.with_conn(|conn| {
+        let changed = conn
+            .execute(
+                "UPDATE needs_you_decisions
+                     SET state = 'answered', error = NULL, resolved_at_ms = ?1
+                     WHERE id = ?2 AND state = 'answering'",
+                params![resolved_at_ms, id],
+            )
+            .map_err(|e| e.to_string())?;
+        if changed != 1 {
+            return Err("Decision was not marked answered".to_owned());
+        }
+        Ok(())
+    })
+}
+
+pub fn mark_failed(store: &Store, id: i64, choice: &str, error: &str) -> Result<(), String> {
+    store.with_conn(|conn| {
+        let changed = conn
+            .execute(
+                "UPDATE needs_you_decisions
+                     SET state = 'failed', chosen = ?1, error = ?2, resolved_at_ms = NULL
+                     WHERE id = ?3 AND state IN ('open','answering','failed')",
+                params![choice, error, id],
+            )
+            .map_err(|e| e.to_string())?;
+        if changed != 1 {
+            return Err("Decision was not marked failed".to_owned());
+        }
+        Ok(())
+    })
+}
+
+pub fn mark_expired(store: &Store, id: i64, resolved_at_ms: i64) -> Result<(), String> {
+    store.with_conn(|conn| {
+        let changed = conn
+            .execute(
+                "UPDATE needs_you_decisions
+                     SET state = 'expired', resolved_at_ms = ?1
+                     WHERE id = ?2 AND state IN ('open','failed')",
+                params![resolved_at_ms, id],
+            )
+            .map_err(|e| e.to_string())?;
+        if changed != 1 {
+            return Err("Decision was not marked expired".to_owned());
+        }
+        Ok(())
+    })
+}
+
+pub fn answering_ids(store: &Store) -> Result<Vec<(i64, String)>, String> {
+    store.with_conn(|conn| {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, COALESCE(chosen, '') FROM needs_you_decisions WHERE state = 'answering'",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())
+    })
+}
+
+pub fn update_choice_risks(
+    store: &Store,
+    id: i64,
+    primary_risk: Option<&str>,
+    secondary_risk: Option<&str>,
+) -> Result<(), String> {
+    store.with_conn(|conn| {
+        conn.execute(
+            "UPDATE needs_you_decisions
+                 SET primary_risk = ?1, secondary_risk = ?2
+                 WHERE id = ?3 AND state IN ('open','answering','failed')",
+            params![primary_risk, secondary_risk, id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+#[derive(Debug, Clone)]
+pub struct OpenEnvelopes {
+    pub id: i64,
+    pub primary_envelope: Option<String>,
+    pub secondary_envelope: Option<String>,
+}
+
+pub fn open_envelopes(store: &Store) -> Result<Vec<OpenEnvelopes>, String> {
+    store.with_conn(|conn| {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, primary_envelope, secondary_envelope FROM needs_you_decisions
+                 WHERE state IN ('open','answering','failed')",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(OpenEnvelopes {
+                    id: row.get(0)?,
+                    primary_envelope: row.get(1)?,
+                    secondary_envelope: row.get(2)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())
     })
 }
 
