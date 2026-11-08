@@ -119,12 +119,13 @@ Updates. Not a list of pull requests.
 _Avoid_: notifications, inbox of PRs, alerts
 
 **Decision**:
-A Needs you item where Navori AI asks and the user decides, answered with an inline button.
+A Needs you item where a Module or Navori AI asks and only the user decides, answered with
+one of two inline buttons.
 _Avoid_: prompt, confirmation dialog
 
 **To-do**:
-A Needs you item that is the user's own task, created by the user or suggested by the AI;
-completed by ticking it.
+A Needs you item that is the user's own task, with a title and an optional due date;
+completed by ticking it. It records no creator.
 _Avoid_: task, reminder
 
 **Update**:
@@ -212,7 +213,7 @@ _Avoid_: proxy, AI client
 - A **Module** emits **Events**; every **Event** passes the **Sensitive Data Shield**, is written to the **Journal** and broadcast
 - Each **Profile** has its own **Journal**
 - An **Agent session** of a **Harness** may hold a **Lease**
-- Navori AI raises **Decisions**, **To-dos** and **Updates** in **Needs you**; a **Destructive** **Action** proposed by the AI always becomes a **Decision** first
+- A **Module** raises **Decisions** in **Needs you** by dispatching an **Action**; Navori AI raises **Decisions**, **To-dos** and **Updates** there; a **Destructive** **Action** proposed by the AI always becomes a **Decision** first
 - Data reaches an LLM only through the **Context Gateway**
 
 ## Flagged ambiguities
