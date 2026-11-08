@@ -258,33 +258,31 @@ struct TodoHistory {
 }
 
 /// Merge `needs_you.history` and `todo.history` JSON replies into one newest-first view.
-pub fn merge_history(decisions: Value, todos: Value) -> HistoryView {
-    let mut entries = Vec::new();
+pub fn merge_history(decisions: Value, todos: Value) -> Result<HistoryView, String> {
+    let decision_rows: Vec<DecisionHistory> =
+        serde_json::from_value(decisions).map_err(|e| e.to_string())?;
+    let todo_rows: Vec<TodoHistory> = serde_json::from_value(todos).map_err(|e| e.to_string())?;
 
-    if let Ok(rows) = serde_json::from_value::<Vec<DecisionHistory>>(decisions) {
-        for row in rows {
-            entries.push(HistoryEntry {
-                kind: row.kind,
-                title: row.title,
-                outcome: row.chosen_label,
-                resolved_at_ms: row.resolved_at_ms,
-                undo_request: None,
-            });
-        }
+    let mut entries = Vec::with_capacity(decision_rows.len() + todo_rows.len());
+    for row in decision_rows {
+        entries.push(HistoryEntry {
+            kind: row.kind,
+            title: row.title,
+            outcome: row.chosen_label,
+            resolved_at_ms: row.resolved_at_ms,
+            undo_request: None,
+        });
     }
-
-    if let Ok(rows) = serde_json::from_value::<Vec<TodoHistory>>(todos) {
-        for row in rows {
-            entries.push(HistoryEntry {
-                kind: "todo".into(),
-                title: row.title,
-                outcome: None,
-                resolved_at_ms: row.done_at_ms,
-                undo_request: Some(json!({"undo": {"id": row.id}}).to_string()),
-            });
-        }
+    for row in todo_rows {
+        entries.push(HistoryEntry {
+            kind: "todo".into(),
+            title: row.title,
+            outcome: None,
+            resolved_at_ms: row.done_at_ms,
+            undo_request: Some(json!({"undo": {"id": row.id}}).to_string()),
+        });
     }
 
     entries.sort_by_key(|entry| (std::cmp::Reverse(entry.resolved_at_ms), entry.kind.clone()));
-    HistoryView { entries }
+    Ok(HistoryView { entries })
 }

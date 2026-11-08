@@ -198,3 +198,14 @@ fn history_merges_both_modules_newest_first() {
 
     core.shutdown();
 }
+
+#[test]
+fn merge_history_fails_when_a_side_is_not_an_array() {
+    let err = navori_ffi::needs_you::merge_history(json!({"not": "an array"}), json!([]))
+        .expect_err("bad decisions side must fail the merge");
+    assert!(!err.is_empty(), "{err}");
+
+    let err = navori_ffi::needs_you::merge_history(json!([]), json!("nope"))
+        .expect_err("bad todos side must fail the merge");
+    assert!(!err.is_empty(), "{err}");
+}

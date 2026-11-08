@@ -537,7 +537,9 @@ impl NavoriCore {
                 .map_err(|e| CoreError::Dispatch {
                     message: e.to_string(),
                 })?;
-            Ok(needs_you::merge_history(decisions, todos))
+            needs_you::merge_history(decisions, todos).map_err(|message| CoreError::InvalidJson {
+                message,
+            })
         })
         .await
     }
