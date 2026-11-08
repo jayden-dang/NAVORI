@@ -251,11 +251,11 @@ _Requirements: NEEDS-6.3, NEEDS-7.2_
 
 **Depends-on:** Task 6
 
-- [ ] **Step 1: Failing tests:** `history_lists_answered_decisions_and_resolved_updates_newest_first`; `history_has_no_answer_for_a_decision` (no request string, no action accepts its id); `items_older_than_retention_are_pruned_at_start_and_daily`; `a_paused_sweep_prunes_nothing` (`JournalSweep::Paused`).
+- [x] **Step 1: Failing tests:** `history_lists_answered_decisions_and_resolved_updates_newest_first`; `history_has_no_answer_for_a_decision` (no request string, no action accepts its id); `items_older_than_retention_are_pruned_at_start_and_daily`; `a_paused_sweep_prunes_nothing` (`JournalSweep::Paused`).
   Run: `cargo nextest run -p navori-mod-needs-you --test history` — expect: compile error, no `History`.
-- [ ] **Step 2: Implement** `history` and prune per design section D (small `DELETE` statements).
+- [x] **Step 2: Implement** `history` and prune per design section D (small `DELETE` statements).
   Run: `cargo nextest run -p navori-mod-needs-you && cargo nextest run -p navori-ffi --test actions_risk` — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(needs-you): keep 30 days of History"`
+- [x] **Step 3: Commit** `git commit -m "feat(needs-you): keep 30 days of History"`
 
 _Requirements: NEEDS-12.2, NEEDS-12.3, NEEDS-12.4_
 
