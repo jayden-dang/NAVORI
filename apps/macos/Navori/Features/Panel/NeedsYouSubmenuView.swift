@@ -6,12 +6,13 @@ struct NeedsYouSubmenuView: View {
     let store: CoreStore
     @Environment(CascadeController.self) private var cascade
 
-    @State private var tab: NeedsYouTab = .all
     @State private var updateFrames: [Int64: CGRect] = [:]
     @State private var listViewport: CGRect = .zero
     @State private var striking: [Int64: NeedsYouTodoRow] = [:]
 
     private var snapshot: NeedsYouSnapshot? { store.needsYou }
+
+    private var tab: NeedsYouTab { store.needsYouTab }
 
     private var today: String { snapshot?.today ?? "" }
 
@@ -57,7 +58,7 @@ struct NeedsYouSubmenuView: View {
         .fixedSize(horizontal: true, vertical: true)
         .onChange(of: updateFrames) { _, _ in publishDrawn() }
         .onChange(of: listViewport) { _, _ in publishDrawn() }
-        .onChange(of: tab) { _, _ in
+        .onChange(of: store.needsYouTab) { _, _ in
             updateFrames = [:]
             publishDrawn()
         }
@@ -88,7 +89,10 @@ struct NeedsYouSubmenuView: View {
 
     private var filter: some View {
         NeedsYouFilterControl(
-            tab: $tab,
+            tab: Binding(
+                get: { store.needsYouTab },
+                set: { store.needsYouTab = $0 }
+            ),
             todoCount: openTodos.count,
             updateCount: updates.count
         )
@@ -140,24 +144,40 @@ struct NeedsYouSubmenuView: View {
     }
 
     private var clearUpdatesRow: some View {
-        Button {
-            Task { await store.clearUpdates() }
-        } label: {
-            Text("Clear updates")
-                .font(.system(size: 14))
-                .foregroundStyle(Color(nsColor: .labelColor))
-                .padding(.horizontal, 8)
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: MenuMetrics.rowHeight,
-                    maxHeight: MenuMetrics.rowHeight,
-                    alignment: .leading
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .focusEffectDisabled()
-        .accessibilityLabel("Clear updates")
+        let selected = cascade.selection == "clear_updates"
+        return Text("Clear updates")
+            .font(.system(size: 14))
+            .foregroundStyle(selected ? Color.white : Color(nsColor: .labelColor))
+            .padding(.horizontal, 8)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: MenuMetrics.rowHeight,
+                maxHeight: MenuMetrics.rowHeight,
+                alignment: .leading
+            )
+            .background {
+                if selected {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color(nsColor: .selectedContentBackgroundColor))
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { cascade.click("clear_updates") }
+            .onContinuousHover { phase in
+                switch phase {
+                case .active:
+                    cascade.pointer(on: "clear_updates", at: NSEvent.mouseLocation)
+                case .ended:
+                    cascade.pointerLeft("clear_updates")
+                }
+            }
+            .onGeometryChange(for: CGRect.self) { proxy in
+                proxy.frame(in: .global)
+            } action: { frame in
+                cascade.setRowFrame("clear_updates", frame)
+            }
+            .accessibilityLabel("Clear updates")
+            .accessibilityAddTraits(.isButton)
     }
 
     private var historyRow: some View {

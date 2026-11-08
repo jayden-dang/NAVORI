@@ -28,6 +28,7 @@ final class CoreStore {
 
     var todoDraftText = ""
     var todoDraftDueOn: String?
+    var needsYouTab: NeedsYouTab = .all
     var drawnUpdateIds: Set<Int64> = []
     var isTerminating = false
 

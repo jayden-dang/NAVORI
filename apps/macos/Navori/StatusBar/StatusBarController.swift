@@ -72,6 +72,7 @@ final class StatusBarController: NSObject {
     private var runningTree: [CascadeNode] = []
     private var coreRowWasVisible = false
     private var needsYouSignature: NeedsYouSignature = .empty
+    private var needsYouTab: NeedsYouTab = .all
     private var motion = StatusIconMotion()
     private var drawn: (state: StatusIconState, loop: Bool)?
     private var accessibilityObserver: NSObjectProtocol?
@@ -278,6 +279,7 @@ final class StatusBarController: NSObject {
             _ = store.runningTree
             _ = store.coreRowVisible
             _ = store.needsYou
+            _ = store.needsYouTab
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.onSnapshotChange()
@@ -292,10 +294,12 @@ final class StatusBarController: NSObject {
         let coreArrived = store.hasSnapshot && !didReplaceCoreTree
         let coreRowVisible = store.coreRowVisible
         let needsSignature = NeedsYouSignature(store.needsYou)
+        let needsTab = store.needsYouTab
         let changed = hasSubmenu != runningHadSubmenu
             || tree != runningTree
             || coreRowVisible != coreRowWasVisible
             || needsSignature != needsYouSignature
+            || needsTab != needsYouTab
         if coreArrived {
             didReplaceCoreTree = true
         }
@@ -303,6 +307,7 @@ final class StatusBarController: NSObject {
         runningTree = tree
         coreRowWasVisible = coreRowVisible
         needsYouSignature = needsSignature
+        needsYouTab = needsTab
         guard panelBuilt, panel.isOpen, coreArrived || changed else { return }
         panel.cascade.replaceTree()
     }
@@ -331,16 +336,7 @@ final class StatusBarController: NSObject {
             needs: CascadeNode(
                 id: "needs",
                 isActionable: true,
-                children: [
-                    CascadeNode(
-                        id: "needs.date",
-                        children: [CascadeNode(id: "needs.date.body")]
-                    ),
-                    CascadeNode(
-                        id: "needs.history",
-                        children: [CascadeNode(id: "needs.history.body")]
-                    ),
-                ]
+                children: needsChildren(from: needs)
             ),
             running: CascadeNode(id: "running", isActionable: true, children: runningChildren),
             core: CascadeNode(id: "core", isActionable: true, children: coreChildren),
@@ -359,6 +355,31 @@ final class StatusBarController: NSObject {
         }
     }
 
+    private func needsChildren(from needs: NeedsYouSnapshot?) -> [CascadeNode] {
+        let todos = needs?.todos ?? []
+        let updates = needs?.updates ?? []
+        let filtered = NeedsYouList.filter(store.needsYouTab, todos: todos, updates: updates)
+        var children: [CascadeNode] = []
+        children += filtered.todos.map { CascadeNode(id: "todo.\($0.id)", isActionable: true) }
+        children += filtered.updates.map { CascadeNode(id: "update.\($0.id)", isActionable: true) }
+        if store.needsYouTab == .updates {
+            children.append(CascadeNode(id: "clear_updates", isActionable: true))
+        }
+        children.append(
+            CascadeNode(
+                id: "needs.history",
+                children: [CascadeNode(id: "needs.history.body")]
+            )
+        )
+        children.append(
+            CascadeNode(
+                id: "needs.date",
+                children: [CascadeNode(id: "needs.date.body")]
+            )
+        )
+        return children
+    }
+
     private func activate(_ id: String) {
         switch id {
         case CoreStore.stopAllId:
@@ -375,8 +396,12 @@ final class StatusBarController: NSObject {
         case "awake.lid":
             let command = store.awakeSubmenu.lidToggle
             Task { [store] in await store.perform(command) }
+        case "clear_updates":
+            Task { [store] in await store.clearUpdates() }
         case "needs", "needs.date", "needs.history", "needs.date.body", "needs.history.body",
              "decide.header":
+            return
+        case _ where id.hasPrefix("todo.") || id.hasPrefix("update."):
             return
         case _ where id.hasPrefix("decide."):
             answerDecide(id: id, primary: true)
