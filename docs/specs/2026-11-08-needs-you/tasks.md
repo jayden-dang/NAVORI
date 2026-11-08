@@ -226,11 +226,11 @@ _Requirements: NEEDS-5.1, NEEDS-5.2, NEEDS-5.4, NEEDS-5.5, NEEDS-11.9, NEEDS-14.
 
 **Depends-on:** Task 5
 
-- [ ] **Step 1: Failing tests:** `marking_viewed_hides_exactly_those_updates`; `an_update_never_marked_stays`; `clear_updates_resolves_every_update`; `viewed_and_cleared_updates_stay_in_history_rows` (resolution `viewed`/`cleared`, `resolved_at_ms` set).
+- [x] **Step 1: Failing tests:** `marking_viewed_hides_exactly_those_updates`; `an_update_never_marked_stays`; `clear_updates_resolves_every_update`; `viewed_and_cleared_updates_stay_in_history_rows` (resolution `viewed`/`cleared`, `resolved_at_ms` set).
   Run: `cargo nextest run -p navori-mod-needs-you --test updates` — expect: compile error, no `MarkViewed`.
-- [ ] **Step 2: Implement** both actions; add their samples to `actions_risk.rs`.
+- [x] **Step 2: Implement** both actions; add their samples to `actions_risk.rs`.
   Run: `cargo nextest run -p navori-mod-needs-you && cargo nextest run -p navori-ffi --test actions_risk` — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(needs-you): mark Updates viewed and clear them"`
+- [x] **Step 3: Commit** `git commit -m "feat(needs-you): mark Updates viewed and clear them"`
 
 _Requirements: NEEDS-6.3, NEEDS-7.2_
 
