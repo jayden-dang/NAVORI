@@ -136,9 +136,10 @@ _Requirements: NEEDS-2.1, NEEDS-2.2, NEEDS-2.3, NEEDS-2.4, NEEDS-2.5, NEEDS-2.6,
 ### Task 3: Needs you Module — raise a Decision
 
 **Files:**
-- Create: `modules/needs_you/Cargo.toml`, `modules/needs_you/src/lib.rs`, `modules/needs_you/src/action.rs`, `modules/needs_you/src/state.rs`, `modules/needs_you/src/stored.rs`, `modules/needs_you/src/raise.rs`, `modules/needs_you/tests/common/mod.rs`, `modules/needs_you/tests/raise.rs`, `modules/needs_you/tests/producer.rs`
-- Modify: `Cargo.toml` (members, `[workspace.dependencies] navori-mod-needs-you`), `crates/ffi/Cargo.toml`, `crates/ffi/src/app.rs` (`build_kernel` registers `NeedsYou::new(sweep.clone())`), `crates/ffi/tests/actions_risk.rs` (sample for `raise`, `needs_you` arm, `SAMPLED`)
-- Test: `modules/needs_you/tests/raise.rs`, `modules/needs_you/tests/producer.rs`, `crates/ffi/tests/actions_risk.rs`
+- Create: `modules/needs_you/Cargo.toml`, `modules/needs_you/src/lib.rs`, `modules/needs_you/src/action.rs`, `modules/needs_you/src/state.rs`, `modules/needs_you/src/stored.rs`, `modules/needs_you/src/raise.rs`, `modules/needs_you/tests/common/mod.rs`, `modules/needs_you/tests/raise.rs`
+- Modify: `Cargo.toml` (members, `[workspace.dependencies] navori-mod-needs-you`), `crates/ffi/Cargo.toml`, `crates/ffi/src/app.rs` (`build_kernel` registers `NeedsYou::new(*sweep)` (`JournalSweep` is `Copy`)), `crates/ffi/tests/actions_risk.rs` (sample for `raise`, a `needs_you` arm in the module match, bump `SAMPLED` by 1)
+- Test: `modules/needs_you/tests/raise.rs`, `crates/ffi/tests/actions_risk.rs`
+- Crate deps (`modules/needs_you/Cargo.toml`): `anyhow`, `navori-kernel`, `navori-store`, `navori-protocol`, `navori-redact`, `navori-config`, `rusqlite`, `schemars`, `serde`, `serde_json`, `tokio`, `tracing`; dev: `tokio` with `test-util`
 
 **Reuse:** 2 — the Module pattern of `modules/awake` (`stored.rs` migrations and `with_conn` idiom, `src/infra/stored.rs:7-124`; externally tagged `snake_case` Action enum with `risk()`/`catalog()`, `src/action.rs:4-86`); `navori_redact::redact_text` (`crates/redact/src/lib.rs:120`)
 
@@ -148,39 +149,39 @@ _Requirements: NEEDS-2.1, NEEDS-2.2, NEEDS-2.3, NEEDS-2.4, NEEDS-2.5, NEEDS-2.6,
 
 **Depends-on:** Task 2
 
-- [ ] **Step 1: Failing tests** in `raise.rs` (kernel with `NeedsYou` + `Target`, in-memory store, `FakeClock`): `a_new_key_adds_an_open_decision`; `a_repeat_key_replaces_and_bumps_revision`; `each_choice_records_its_catalog_risk`; table-driven `refused_raises_add_nothing` (rows: empty key, blank title, blank label, Envelope to an unknown module, unknown action, a `needs_you` action, an Envelope with a `token` field, a past `expires_at_ms`); `title_reason_and_labels_pass_the_shield` (an `sk-…` key in the reason is stored redacted); `open_decisions_survive_a_restart`; `a_raise_while_answering_is_refused` (stub: mark the row `answering` through `stored` and raise again). In `producer.rs`: `a_module_raises_through_its_dispatcher`. Also add the `raise` sample to `actions_risk.rs`.
+- [ ] **Step 1: Failing tests** in `raise.rs` (kernel with `NeedsYou` + `Target`, in-memory store, `FakeClock`): `a_new_key_adds_an_open_decision`; `a_repeat_key_replaces_and_bumps_revision`; `each_choice_records_its_catalog_risk`; table-driven `refused_raises_add_nothing` (rows: empty key, blank title, blank label, Envelope to an unknown module, unknown action, a `needs_you` action, an Envelope with a `token` field, a past `expires_at_ms`); `title_reason_and_labels_pass_the_shield` (an `sk-…` key in the reason is stored redacted); `open_decisions_survive_a_restart`; `a_raise_while_answering_is_refused` (mark the row `answering` through `stored` and raise again). Also add the `raise` sample to `actions_risk.rs`.
   Run: `cargo nextest run -p navori-mod-needs-you` — expect: compile error, crate has no `NeedsYou`.
 - [ ] **Step 2: Implement** the crate (`[lints] workspace = true`), migration v1 for `needs_you_decisions` with its partial unique index, `raise` validation in the order of design section B, redaction, insert/replace in one transaction, reload State at the top of `run`, and register in `build_kernel`.
   Run: `cargo nextest run -p navori-mod-needs-you && cargo nextest run -p navori-ffi --test actions_risk` — expect: pass.
 - [ ] **Step 3: Acceptance** — `cargo xtask run`, then `"build/dev/Navori Dev.app/Contents/Helpers/navori" --profile dev dispatch needs_you '{"raise":{"key":"k1","title":"Try it","reason":"from the CLI","primary":{"label":"Ok"},"secondary":{"label":"Later"}}}'` returns an id; `cargo xtask check-deps` passes.
 - [ ] **Step 4: Commit** `git commit -m "feat(needs-you): raise a Decision through needs_you.raise"`
 
-_Requirements: NEEDS-1.1, NEEDS-1.2, NEEDS-1.3, NEEDS-1.4, NEEDS-1.5, NEEDS-1.6, NEEDS-1.7, NEEDS-1.8, NEEDS-1.9, NEEDS-1.10, NEEDS-1.11, NEEDS-1.12, NEEDS-2.7, NEEDS-13.8_
+_Requirements: NEEDS-1.1, NEEDS-1.2, NEEDS-1.3, NEEDS-1.4, NEEDS-1.5, NEEDS-1.6, NEEDS-1.7, NEEDS-1.8, NEEDS-1.9, NEEDS-1.10, NEEDS-1.11, NEEDS-1.12, NEEDS-5.3, NEEDS-13.8, NEEDS-14.4_
 
 ---
 
 ### Task 4: Needs you Module — answer a Decision, at most once
 
 **Files:**
-- Create: `modules/needs_you/src/answer.rs`, `modules/needs_you/tests/answer.rs`, `crates/ffi/tests/needs_you.rs`
-- Modify: `modules/needs_you/src/lib.rs` (run loop arm, `tray()`), `modules/needs_you/src/action.rs` (`Answer`), `modules/needs_you/src/stored.rs`, `crates/ffi/src/app.rs` (`.grant_destructive("needs_you")`), `crates/ffi/tests/actions_risk.rs`
-- Test: `modules/needs_you/tests/answer.rs`, `crates/ffi/tests/needs_you.rs`
+- Create: `modules/needs_you/src/answer.rs`, `modules/needs_you/tests/answer.rs`, `modules/needs_you/tests/producer.rs`, `crates/ffi/tests/needs_you.rs`
+- Modify: `modules/needs_you/src/lib.rs` (run loop arm, `tray()`), `modules/needs_you/src/action.rs` (`Answer`), `modules/needs_you/src/stored.rs`, `crates/kernel/src/runtime.rs` (`Kernel::destructive_grants()`), `crates/ffi/src/app.rs` (`.grant_destructive("needs_you")` and an in-crate `#[cfg(test)]` test of the grant set — `mod app` is private, `crates/ffi/src/lib.rs:11`), `crates/ffi/tests/actions_risk.rs` (`answer` sample, bump `SAMPLED`)
+- Test: `modules/needs_you/tests/answer.rs`, `modules/needs_you/tests/producer.rs`, `crates/ffi/tests/needs_you.rs`, `crates/ffi/src/app.rs` unit test
 
 **Reuse:** 2 — section A's `ModuleDispatcher`; Navori AI's existing gate (`ai/agent/src/dispatch.rs:33-42`) for NEEDS-4.11 with no edit; the ports actor's in-flight arm (`modules/ports/src/actor.rs:35-44,151-166`); `Module::tray` (`crates/kernel/src/module.rs:75`)
 
 **Interfaces:**
 - Consumes: `ModuleDispatcher::{send, risk_of}`, `Pending` (Task 2); `NeedsYouState`, `stored` (Task 3)
-- Produces: `NeedsYouAction::Answer { id: i64, revision: u32, choice: Pick }`, `Pick::{Primary, Secondary}` (`"primary"`/`"secondary"`), Risk `Destructive`; `DecisionState::{Open, Answering { choice }, Failed { choice, error }}`; attention clause `"N decisions waiting"`
+- Produces: `Kernel::destructive_grants(&self) -> Vec<&'static str>`; `NeedsYouAction::Answer { id: i64, revision: u32, choice: Pick }`, `Pick::{Primary, Secondary}` (`"primary"`/`"secondary"`), Risk `Destructive`; `DecisionState::{Open, Answering { choice }, Failed { choice, error }}`; attention clause `"N decisions waiting"`
 
 **Depends-on:** Task 3
 
-- [ ] **Step 1: Failing tests** in `answer.rs`: `answering_runs_the_chosen_envelope_and_moves_it_to_history` (`Target` records one `poke`); `a_choice_without_an_envelope_closes_the_decision`; `a_failed_dispatch_keeps_it_open_with_the_error`; `a_timeout_says_it_may_already_have_run`; `retry_answers_again_with_the_failed_choice`; table-driven `refused_answers_dispatch_nothing` (rows: unknown id, answered Decision, one already answering, stale revision after a re-raise, answer at or after `expires_at_ms`); `a_restart_mid_answer_marks_it_failed_and_never_reruns` (kill the Module between the `answering` write and the reply, restart, assert `Failed` with `Navori stopped before this finished — it may already have run` and `Target` saw no second `poke`); `a_vanished_action_fails_the_answer`; `risk_is_read_from_the_catalog_at_start`; `attention_is_on_only_while_a_decision_is_open`. In `crates/ffi/tests/needs_you.rs`: `only_needs_you_holds_the_destructive_grant`; `navori_ai_cannot_answer_a_decision` (`navori_agent::Dispatcher::call` with `Toolset::from_specs(&core.actions())` on `needs_you_answer` returns `is_error` with the not-read-only message, and the Decision stays open).
+- [ ] **Step 1: Failing tests** in `answer.rs`: `answering_runs_the_chosen_envelope_and_moves_it_to_history` (`Target` records one `poke`); `a_choice_without_an_envelope_closes_the_decision`; `a_failed_dispatch_keeps_it_open_with_the_error`; `a_timeout_says_it_may_already_have_run`; `retry_answers_again_with_the_failed_choice`; table-driven `refused_answers_dispatch_nothing` (rows: unknown id, answered Decision, one already answering, stale revision after a re-raise, answer at or after `expires_at_ms`); `a_restart_mid_answer_marks_it_failed_and_never_reruns` (kill the Module between the `answering` write and the reply, restart, assert `Failed` with `Navori stopped before this finished — it may already have run` and `Target` saw no second `poke`); `a_vanished_action_fails_the_answer`; `risk_is_read_from_the_catalog_at_start`; `attention_is_on_only_while_a_decision_is_open`. In `producer.rs`: `a_module_raises_through_its_dispatcher_and_its_envelope_runs_on_answer` (`Producer` raises via `ctx.dispatcher()`, the test answers, `Target` records the Envelope). In `crates/ffi/src/app.rs` `#[cfg(test)]`: `only_needs_you_holds_the_destructive_grant` (`build_kernel(..).destructive_grants() == ["needs_you"]`). In `crates/ffi/tests/needs_you.rs`, with a `Kernel` built in the test as `crates/ffi/tests/awake.rs:23-42` does (`Kernel::builder(Store::open_in_memory().unwrap()).pause_journal_sweep().register(NeedsYou::new(JournalSweep::Paused)).grant_destructive("needs_you").start()`): `navori_ai_cannot_answer_a_decision` — `navori_agent::Dispatcher::new(Duration::from_secs(5)).call(&kernel, &navori_agent::Toolset::from_specs(&kernel.actions()), &navori_llm::ToolCall { id: "1".into(), name: "needs_you_answer".into(), arguments: <answer JSON> })` returns `is_error: true` with the not-read-only message, and the Decision stays open.
   Run: `cargo nextest run -p navori-mod-needs-you --test answer` — expect: compile error, no `Answer` variant.
 - [ ] **Step 2: Implement** `answer` per design section C: checks, Risk re-read, `answering` write before `Ok(())`, `send`, `FuturesUnordered` arm, definite vs uncertain errors, `redact_text` on error text, restart rule at the top of `run`, `tray()`; add the grant and the `answer` sample.
   Run: `cargo nextest run -p navori-mod-needs-you && cargo nextest run -p navori-ffi --test needs_you --test actions_risk` — expect: pass.
 - [ ] **Step 3: Commit** `git commit -m "feat(needs-you): answer a Decision once, from the Core"`
 
-_Requirements: NEEDS-3.4, NEEDS-3.8, NEEDS-4.3, NEEDS-4.4, NEEDS-4.5, NEEDS-4.7, NEEDS-4.8, NEEDS-4.9, NEEDS-4.10, NEEDS-4.11, NEEDS-4.12, NEEDS-11.9, NEEDS-13.5_
+_Requirements: NEEDS-2.7, NEEDS-3.4, NEEDS-3.8, NEEDS-4.3, NEEDS-4.4, NEEDS-4.5, NEEDS-4.7, NEEDS-4.8, NEEDS-4.9, NEEDS-4.10, NEEDS-4.11, NEEDS-4.12, NEEDS-11.9, NEEDS-13.5_
 
 ---
 
@@ -199,13 +200,13 @@ _Requirements: NEEDS-3.4, NEEDS-3.8, NEEDS-4.3, NEEDS-4.4, NEEDS-4.5, NEEDS-4.7,
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Failing tests** (`#[tokio::test(start_paused = true)]`, advance both `FakeClock` and tokio time): `a_decision_without_expiry_stays_open`; `an_expired_decision_becomes_an_expired_update` (title `Expired: <title>`, row gone from State); `a_decision_answering_does_not_expire`; `a_failed_decision_expires`; `a_past_deadline_expires_at_start`; `a_wake_after_the_deadline_expires_it_at_once` (`scheduler.wake_pulse()`); `no_action_posts_an_update` (the catalog lists no such action).
+- [ ] **Step 1: Failing tests** (`#[tokio::test(start_paused = true)]`, advance both `FakeClock` and tokio time): `a_decision_without_expiry_stays_open`; `an_expired_decision_becomes_an_expired_update` (title `Expired: <title>`, row gone from State); `a_decision_answering_does_not_expire`; `a_failed_decision_expires`; `a_past_deadline_expires_at_start`; `a_wake_after_the_deadline_expires_it_at_once` (`scheduler.wake_pulse()`); `no_action_posts_an_update` (the catalog lists no such action); `updates_never_turn_on_attention`; `migration_v2_keeps_v1_decisions_and_backs_up` (a store at v1 with a row, upgraded: row kept, `MigrationReport.backup` is `Some`).
   Run: `cargo nextest run -p navori-mod-needs-you --test expiry` — expect: fail, Decision still open after the deadline.
 - [ ] **Step 2: Implement** migration v2 and the deadline logic of design section D.
   Run: `cargo nextest run -p navori-mod-needs-you` — expect: pass.
 - [ ] **Step 3: Commit** `git commit -m "feat(needs-you): expire a Decision into an Update"`
 
-_Requirements: NEEDS-5.1, NEEDS-5.2, NEEDS-5.3, NEEDS-5.4, NEEDS-5.5_
+_Requirements: NEEDS-5.1, NEEDS-5.2, NEEDS-5.4, NEEDS-5.5, NEEDS-11.9, NEEDS-14.4_
 
 ---
 
@@ -213,7 +214,7 @@ _Requirements: NEEDS-5.1, NEEDS-5.2, NEEDS-5.3, NEEDS-5.4, NEEDS-5.5_
 
 **Files:**
 - Create: `modules/needs_you/tests/updates.rs`
-- Modify: `modules/needs_you/src/action.rs` (`MarkViewed`, `ClearUpdates`), `modules/needs_you/src/expiry.rs`, `modules/needs_you/src/stored.rs`, `crates/ffi/tests/actions_risk.rs`
+- Modify: `modules/needs_you/src/action.rs` (`MarkViewed`, `ClearUpdates`), `modules/needs_you/src/expiry.rs`, `modules/needs_you/src/stored.rs`, `crates/ffi/tests/actions_risk.rs` (two samples, bump `SAMPLED`)
 - Test: `modules/needs_you/tests/updates.rs`
 
 **Reuse:** 2 — the Scheduler's `WaitHandle::wait_until(Option<SystemTime>) -> Wake` (`crates/kernel/src/scheduler.rs:112`), wake- and panel-aware with the closed-menu 30 s gap (KCONTRACT-4.9, 5.1, 6.1–6.3; `scheduler.rs:91,118-171`); `System`'s loop as template (`crates/kernel/src/system.rs:107-137`)
@@ -230,7 +231,7 @@ _Requirements: NEEDS-5.1, NEEDS-5.2, NEEDS-5.3, NEEDS-5.4, NEEDS-5.5_
   Run: `cargo nextest run -p navori-mod-needs-you && cargo nextest run -p navori-ffi --test actions_risk` — expect: pass.
 - [ ] **Step 3: Commit** `git commit -m "feat(needs-you): mark Updates viewed and clear them"`
 
-_Requirements: NEEDS-6.3, NEEDS-6.4, NEEDS-6.5, NEEDS-7.2_
+_Requirements: NEEDS-6.3, NEEDS-7.2_
 
 ---
 
@@ -238,7 +239,7 @@ _Requirements: NEEDS-6.3, NEEDS-6.4, NEEDS-6.5, NEEDS-7.2_
 
 **Files:**
 - Create: `modules/needs_you/src/history.rs`, `modules/needs_you/tests/history.rs`
-- Modify: `modules/needs_you/src/action.rs` (`History`, Read), `modules/needs_you/src/lib.rs` (prune deadline), `crates/ffi/tests/actions_risk.rs`
+- Modify: `modules/needs_you/src/action.rs` (`History`, Read), `modules/needs_you/src/lib.rs` (prune deadline), `crates/ffi/tests/actions_risk.rs` (`history` sample, bump `SAMPLED`)
 - Test: `modules/needs_you/tests/history.rs`
 
 **Reuse:** 2 — the Scheduler's `WaitHandle::wait_until(Option<SystemTime>) -> Wake` (`crates/kernel/src/scheduler.rs:112`), wake- and panel-aware with the closed-menu 30 s gap (KCONTRACT-4.9, 5.1, 6.1–6.3; `scheduler.rs:91,118-171`); `System`'s loop as template (`crates/kernel/src/system.rs:107-137`)
@@ -255,7 +256,7 @@ _Requirements: NEEDS-6.3, NEEDS-6.4, NEEDS-6.5, NEEDS-7.2_
   Run: `cargo nextest run -p navori-mod-needs-you && cargo nextest run -p navori-ffi --test actions_risk` — expect: pass.
 - [ ] **Step 3: Commit** `git commit -m "feat(needs-you): keep 30 days of History"`
 
-_Requirements: NEEDS-12.2, NEEDS-12.3, NEEDS-12.4, NEEDS-14.4_
+_Requirements: NEEDS-12.2, NEEDS-12.3, NEEDS-12.4_
 
 ---
 
@@ -288,8 +289,9 @@ _Requirements: NEEDS-9.2_
 
 **Files:**
 - Create: `modules/todo/Cargo.toml`, `modules/todo/src/lib.rs`, `modules/todo/src/action.rs`, `modules/todo/src/state.rs`, `modules/todo/src/stored.rs`, `modules/todo/src/calendar.rs`, `modules/todo/src/actor.rs`, `modules/todo/tests/common/mod.rs`, `modules/todo/tests/todo.rs`, `modules/todo/tests/day.rs`
-- Modify: `Cargo.toml` (members, `navori-mod-todo`, `time` features `parsing`), `crates/ffi/Cargo.toml` (`navori-mod-todo`, `navori-macos` under `[dependencies]`), `crates/ffi/src/app.rs` (`build_kernel` registers `Todo::new(TodoEnv { calendar }, sweep.clone())` with a `LocalCalendar` backed by `navori_macos::local_utc_offset`), `crates/ffi/tests/actions_risk.rs`
+- Modify: `Cargo.toml` (members, `navori-mod-todo`, `time` features `parsing`), `crates/ffi/Cargo.toml` (`navori-mod-todo`, `navori-macos` under `[dependencies]`), `crates/ffi/src/app.rs` (`build_kernel` registers `Todo::new(TodoEnv { calendar }, *sweep)` with a `LocalCalendar` backed by `navori_macos::local_utc_offset`), `crates/ffi/tests/actions_risk.rs`
 - Test: `modules/todo/tests/todo.rs`, `modules/todo/tests/day.rs`
+- Crate deps (`modules/todo/Cargo.toml`): as Task 3 plus `time.workspace = true` (workspace features `formatting`, `macros`, `parsing`); `crates/ffi/tests/actions_risk.rs`: `add` sample, a `todo` arm, bump `SAMPLED`
 
 **Reuse:** 2 — the same Module pattern as B; env injection like `Ports::new(PortsEnv)` (`crates/ffi/src/app.rs:271-273`); `time` 0.3 (rung 5, workspace dep) for `Date` arithmetic; `navori-macos` (rung 2, existing platform crate) gains one function
 
@@ -297,15 +299,15 @@ _Requirements: NEEDS-9.2_
 - Consumes: `navori_macos::local_utc_offset` (Task 8), `JournalSweep`
 - Produces: `Todo::new(TodoEnv, JournalSweep) -> Todo` (ID `"todo"`); `TodoEnv { calendar: Arc<dyn LocalCalendar> }`; `trait LocalCalendar: Send + Sync { fn utc_offset(&self, at: SystemTime) -> i32 }`; `TodoAction::Add { title: String, due_on: Option<String> }` (Write) → `{ "id": i64 }`; `TodoState { today: String, open: Vec<OpenTodo> }`; `OpenTodo { id, title, due_on: Option<String>, status: TodoStatus }`; `TodoStatus::{Overdue, Today, Soon, Later, None}`; table `todo_items` as design section E
 
-**Depends-on:** Task 8, Task 2
+**Depends-on:** Task 8, Task 7 (shares `Cargo.toml`, `crates/ffi/Cargo.toml`, `build_kernel` and `actions_risk.rs` with Tasks 3–7)
 
-- [ ] **Step 1: Failing tests** (fake calendar with a fixed offset, `FakeClock`): `adding_a_todo_shows_it_at_once`; `a_blank_title_adds_nothing`; `the_title_passes_the_shield`; `todos_survive_a_restart`; table-driven `status_follows_the_local_day` (rows: yesterday → Overdue, today → Today, +1 and +3 → Soon, +4 → Later, none → None); `status_changes_at_local_midnight_and_after_a_wake` (advance past midnight; and a `wake_pulse` after a long sleep).
+- [ ] **Step 1: Failing tests** (fake calendar with a fixed offset, `FakeClock`): `adding_a_todo_shows_it_at_once`; `a_blank_title_adds_nothing`; `the_title_passes_the_shield`; `todos_survive_a_restart`; table-driven `status_follows_the_local_day` (rows: yesterday → Overdue, today → Today, +1 and +3 → Soon, +4 → Later, none → None); `status_changes_at_local_midnight_and_after_a_wake` (advance past midnight; and a `wake_pulse` after a long sleep); `todos_never_turn_on_attention`.
   Run: `cargo nextest run -p navori-mod-todo` — expect: compile error, crate has no `Todo`.
 - [ ] **Step 2: Implement** the crate, migration v1, `add`, status from `wait.now()` plus `calendar.utc_offset(now)`, the midnight deadline that calls `update_state` only on change, and registration; add the `add` sample.
   Run: `cargo nextest run -p navori-mod-todo && cargo nextest run -p navori-ffi --test actions_risk && cargo xtask check-deps` — expect: pass.
 - [ ] **Step 3: Commit** `git commit -m "feat(todo): add a To-do with a status by local day"`
 
-_Requirements: NEEDS-8.4, NEEDS-8.5, NEEDS-8.6, NEEDS-8.7, NEEDS-8.8, NEEDS-9.2, NEEDS-9.4, NEEDS-14.3_
+_Requirements: NEEDS-8.4, NEEDS-8.5, NEEDS-8.6, NEEDS-8.7, NEEDS-8.8, NEEDS-9.2, NEEDS-9.4, NEEDS-11.9, NEEDS-14.3_
 
 ---
 
@@ -313,7 +315,7 @@ _Requirements: NEEDS-8.4, NEEDS-8.5, NEEDS-8.6, NEEDS-8.7, NEEDS-8.8, NEEDS-9.2,
 
 **Files:**
 - Create: `modules/todo/tests/history.rs`
-- Modify: `modules/todo/src/action.rs` (`Tick`, `Undo`, `History`), `modules/todo/src/actor.rs` (prune deadline), `modules/todo/src/stored.rs`, `crates/ffi/tests/actions_risk.rs`
+- Modify: `modules/todo/src/action.rs` (`Tick`, `Undo`, `History`), `modules/todo/src/actor.rs` (prune deadline), `modules/todo/src/stored.rs`, `crates/ffi/tests/actions_risk.rs` (three samples, bump `SAMPLED`)
 - Test: `modules/todo/tests/history.rs`
 
 **Reuse:** 2 — the same Module pattern as B; env injection like `Ports::new(PortsEnv)` (`crates/ffi/src/app.rs:271-273`); `time` 0.3 (rung 5, workspace dep) for `Date` arithmetic; `navori-macos` (rung 2, existing platform crate) gains one function
@@ -330,7 +332,7 @@ _Requirements: NEEDS-8.4, NEEDS-8.5, NEEDS-8.6, NEEDS-8.7, NEEDS-8.8, NEEDS-9.2,
   Run: `cargo nextest run -p navori-mod-todo && cargo nextest run -p navori-ffi --test actions_risk` — expect: pass.
 - [ ] **Step 3: Commit** `git commit -m "feat(todo): tick, undo and keep 30 days of History"`
 
-_Requirements: NEEDS-10.1, NEEDS-10.2, NEEDS-12.5, NEEDS-12.6_
+_Requirements: NEEDS-10.1, NEEDS-10.2, NEEDS-12.3, NEEDS-12.4, NEEDS-12.5, NEEDS-12.6_
 
 ---
 
@@ -345,17 +347,17 @@ _Requirements: NEEDS-10.1, NEEDS-10.2, NEEDS-12.5, NEEDS-12.6_
 
 **Interfaces:**
 - Consumes: `NeedsYouState` (Tasks 3–6), `TodoState` (Tasks 9–10)
-- Produces: `NeedsYouView { decisions: Vec<DecideRow>, todos: Vec<TodoRow>, updates: Vec<UpdateRow>, today: String, needs_count: u32, any_overdue: bool, all_caught_up: bool, down: bool }`; `DecideRow { id, title, reason, raised_at_ms, state: DecideState, primary: ChoiceView, secondary: ChoiceView }`; `DecideState::{Open, Answering { choice: String }, Failed { choice: String, error: String }}`; `ChoiceView { label, risk: Option<String>, action: Option<String>, answer_request: String }`; `TodoRow { id, title, due_on: Option<String>, status: TodoStatus, tick_request: String }`; `UpdateRow { id, kind, title, created_at_ms }`; `HistoryView { entries: Vec<HistoryEntry> }`, `HistoryEntry { kind, title, outcome: Option<String>, resolved_at_ms, undo_request: Option<String> }`; all `uniffi::Record`/`uniffi::Enum`
+- Produces: `NeedsYouView { decisions: Vec<DecideRow>, todos: Vec<TodoRow>, updates: Vec<UpdateRow>, today: String, needs_count: u32, any_overdue: bool, all_caught_up: bool, down: bool }`; `DecideRow { id, title, reason, raised_at_ms, state: DecideState, primary: ChoiceView, secondary: ChoiceView }`; `DecideState::{Open, Answering { choice: String }, Failed { choice: String, error: String }}`; `ChoiceView { label, risk: Option<String>, action: Option<String>, answer_request: String }`; `TodoRow { id, title, due_on: Option<String>, status: TodoStatus, tick_request: String }`; `UpdateRow { id, kind, title, created_at_ms }`; `HistoryView { entries: Vec<HistoryEntry> }`, `HistoryEntry { kind, title, outcome: Option<String>, resolved_at_ms, undo_request: Option<String> }`; all `#[derive(Debug, Clone, PartialEq, uniffi::Record)]` or `uniffi::Enum`, like `AwakeView` (`crates/ffi/src/lib.rs:125`)
 
 **Depends-on:** Task 7, Task 10
 
-- [ ] **Step 1: Failing tests** in `needs_you_view.rs` (pure `build`): `decisions_order_by_expiry_then_age`; `todos_order_overdue_first_and_no_date_last`; `updates_order_newest_first`; `needs_count_is_open_todos_plus_unviewed_updates`; `any_overdue_flags_an_overdue_todo`; `all_caught_up_only_when_nothing_is_left`; `the_all_list_is_todos_then_updates`; `no_decision_appears_in_the_submenu_lists`; `answer_requests_carry_id_revision_and_choice`. In `needs_you.rs`: `history_merges_both_modules_newest_first`.
+- [ ] **Step 1: Failing tests** in `needs_you_view.rs` (pure `build`): `decisions_order_by_expiry_then_age`; `todos_order_overdue_first_and_no_date_last`; `updates_order_newest_first`; `needs_count_is_open_todos_plus_unviewed_updates`; `any_overdue_flags_an_overdue_todo`; `all_caught_up_only_when_nothing_is_left`; `the_all_list_is_todos_then_updates`; `no_decision_appears_in_the_submenu_lists`; `answer_requests_carry_id_revision_and_choice`; `choice_risk_and_action_are_carried_into_the_view`. In `needs_you.rs`: `history_merges_both_modules_newest_first`.
   Run: `cargo nextest run -p navori-ffi --test needs_you_view` — expect: compile error, no `needs_you::build`.
 - [ ] **Step 2: Implement** `build`, the record types, the snapshot field, `needs_you_history()`.
   Run: `cargo nextest run -p navori-ffi` — expect: pass (all ffi tests, including `core.rs`, `running.rs`).
 - [ ] **Step 3: Commit** `git commit -m "feat(ffi): join Needs you and To-dos into NeedsYouView"`
 
-_Requirements: NEEDS-3.1, NEEDS-3.7, NEEDS-6.1, NEEDS-9.1, NEEDS-11.2, NEEDS-11.3, NEEDS-11.4, NEEDS-11.6, NEEDS-12.1, NEEDS-13.2_
+_Requirements: NEEDS-3.1, NEEDS-3.7, NEEDS-3.8, NEEDS-6.1, NEEDS-9.1, NEEDS-11.2, NEEDS-11.3, NEEDS-11.4, NEEDS-11.6, NEEDS-12.1_
 
 ---
 
@@ -374,7 +376,7 @@ _Requirements: NEEDS-3.1, NEEDS-3.7, NEEDS-6.1, NEEDS-9.1, NEEDS-11.2, NEEDS-11.
 
 **Depends-on:** none
 
-- [ ] **Step 1: Failing tests:** table-driven `testPillText` (Today, Tomorrow, `Sun` for +2..+6, `Fri 13` and `Thu 5` otherwise, `No date`); table-driven `testPillSpoken` (`Overdue, Thursday 5 November`, `Due today`, `Due soon, Sunday 8 November`, `Due later, Friday 13 November`, `No due date`); `testDecisionSpoken` (`Decision: Review PR #41 in zroute, Minh requested your review, 25 minutes ago, Open, Later`); `testDestructiveHint` (`Runs ports.kill — changes things and cannot be undone`); `testCheckboxSpokenIsMarkDone`; `testFilterTabs`; `testDrawnIdsAreOnlyRowsInsideTheViewport`; `testDecideKeys`; `testLevelZeroOrderPutsDecideAndNeedsBeforeRunning`; `testHitMapFindsRowsAboveRunningAndDecideButtons`.
+- [ ] **Step 1: Failing tests:** table-driven `testPillText` with today = Sunday 2026-11-08 (`Today` for 11-08, `Tomorrow` for 11-09, `Tue` for 11-10, `Fri` for 11-13, `Sat` for 11-14, `Sun 15` for 11-15, `Thu 5` for 11-05, `Sat 7` for 11-07, `No date` for none); table-driven `testPillSpoken` (`Overdue, Thursday 5 November`, `Due today`, `Due soon, Sunday 8 November`, `Due later, Friday 13 November`, `No due date`); `testDecisionSpoken` (`Decision: Review PR #41 in zroute, Minh requested your review, 25 minutes ago, Open, Later`); `testDestructiveHint` (`Runs ports.kill — changes things and cannot be undone`); `testCheckboxSpokenIsMarkDone`; `testFilterTabs`; `testDrawnIdsAreOnlyRowsInsideTheViewport`; `testDecideKeys`; `testLevelZeroOrderPutsDecideAndNeedsBeforeRunning`; `testHitMapFindsRowsAboveRunningAndDecideButtons`.
   Run: `swift test --arch arm64 --package-path apps/macos --filter NeedsYou` — expect: build failure, `NeedsYouText` not found.
 - [ ] **Step 2: Implement** the helpers and the tree and hit-map changes.
   Run: `swift test --arch arm64 --package-path apps/macos` — expect: pass (all NavoriPanel tests).
@@ -395,13 +397,13 @@ _Requirements: NEEDS-3.6, NEEDS-3.10, NEEDS-4.2, NEEDS-6.2, NEEDS-9.3, NEEDS-9.5
 
 **Interfaces:**
 - Consumes: `NeedsYouView`, `DecideRow`, `ChoiceView` (Task 11); `NeedsYouText`, `DecideKey`, `LevelZeroTree.rows`, `MenuHitMap` (Task 12)
-- Produces: `CoreStore.needsYou: NeedsYouView?`; `CoreStore.answer(_ request: String) async`; `DecideRowView(row:cascade:store:)`; `CapsuleButton(title:prominent:selected:action:)`
+- Produces: `CoreStore.needsYou: NeedsYouView?`; `CoreStore.answer(_ request: String) async`; `DecideRowView(row:cascade:store:)`; `CapsuleButton(title:prominent:selected:action:)` with `action` defaulting to `{}` so the preview's calls (`PreviewSampleRows.swift:105,108`) still compile
 
 **Depends-on:** Task 11, Task 12
 
 - [ ] **Step 1: Implement** `CapsuleButton` with a real action, `DecideRowView` (hover/focus swap, spinner, `Retry`, tooltip/accessibility value, Destructive hint), the Decide block, the `Needs you` row (count, red dot, chevron), `✓ You're all caught up`, the new level-0 order, Release visibility, ⌘⌫ routing and button hit-testing.
   Run: `cargo xtask ci` — expect: pass (Swift build and `swift test`).
-- [ ] **Step 2: Acceptance** — `cargo xtask run`; raise two Decisions from the CLI (one with a `ports.kill` primary); check one-line rows, hover and focus swap, Return and ⌘⌫, spinner, `Retry` after making the target fail, the Destructive tooltip, attention on and off, `All caught up`, VoiceOver string; then `cargo xtask install` and `strings /Applications/Navori.app/Contents/MacOS/Navori | grep -c NAVORI-PREVIEW-SAMPLE` — expect `0`, and no Ask field, Ports or Pull Requests rows.
+- [ ] **Step 2: Acceptance** — `cargo xtask run`; start a throwaway listener (`python3 -m http.server 8765`) and raise two Decisions from the CLI — one whose primary is a `ports.kill` Envelope (`modules/ports/src/action.rs:21-26`) naming only that listener's pid, one with no Envelopes; check one-line rows, hover and focus swap, Return and ⌘⌫, spinner, `Retry` after making the target fail, the Destructive tooltip, attention on and off, `All caught up`, VoiceOver string; then `cargo xtask bundle --profile release` (builds `build/release/Navori.app` in the worktree; nothing is installed) and `strings build/release/Navori.app/Contents/MacOS/Navori | grep -c NAVORI-PREVIEW-SAMPLE` — expect `0`; in the dev app, no Ask field, Ports or Pull Requests rows outside the preview.
 - [ ] **Step 3: Commit** `git commit -m "feat(panel): Decide rows and the Needs you row on level 0"`
 
 _Requirements: NEEDS-3.2, NEEDS-3.3, NEEDS-3.5, NEEDS-3.9, NEEDS-4.1, NEEDS-4.6, NEEDS-11.5, NEEDS-13.7, NEEDS-13.10, NEEDS-13.12_
@@ -420,7 +422,7 @@ _Requirements: NEEDS-3.2, NEEDS-3.3, NEEDS-3.5, NEEDS-3.9, NEEDS-4.1, NEEDS-4.6,
 - Consumes: Task 1's spike results
 - Produces: `CascadePanel.acceptsTyping: Bool`; `CascadeController.onSubmenuClosed: ((String) -> Void)?`
 
-**Depends-on:** Task 1
+**Depends-on:** Task 1, Task 13 (both edit `StatusPanel.swift`)
 
 - [ ] **Step 1: Implement** the three changes of design section I exactly as the spike proved them.
   Run: `cargo xtask ci` — expect: pass.
@@ -515,9 +517,9 @@ _Requirements: NEEDS-13.10, NEEDS-13.12_
 
 **Depends-on:** Task 16, Task 17
 
-- [ ] **Step 1:** `cargo xtask ci` — expect: pass, including the unchanged suites `crates/kernel/tests/{kernel,scheduler,tray}.rs`, `crates/kernel/tests/system*`, `modules/awake/tests/`, `ai/agent/tests/`, `crates/ffi/tests/core.rs`, `running.rs`.
+- [ ] **Step 1:** `cargo xtask ci` — expect: pass, including the unchanged suites `crates/kernel/tests/{kernel,scheduler,tray}.rs` (the restart test keeps queued requests), `crates/kernel/tests/system*`, `modules/awake/tests/`, `ai/agent/tests/`, `crates/ffi/tests/core.rs`, `running.rs`.
 - [ ] **Step 2:** Run `write-dogfood` for NEEDS, then `run-dogfood` in the dev app: every Shell-only ID of the design's dogfood row, a timed Keep awake Lease ending as today with no Decision, the keyboard-and-VoiceOver walk of every Needs you control, and the snapshot cadence unchanged (`navori --profile dev status` while open and closed).
 - [ ] **Step 3:** Record that NEEDS-14.1 and NEEDS-14.2 are left to the release perf run (`cargo xtask perf`, once, before release) — no per-feature perf run.
 - [ ] **Step 4: Commit** `git commit -m "test(needs-you): dogfood guide and run"`
 
-_Requirements: NEEDS-13.3, NEEDS-13.4, NEEDS-13.6, NEEDS-13.9, NEEDS-14.1, NEEDS-14.2, NEEDS-14.5_
+_Requirements: NEEDS-13.2, NEEDS-13.3, NEEDS-13.4, NEEDS-13.6, NEEDS-13.9, NEEDS-14.1, NEEDS-14.2, NEEDS-14.5_
