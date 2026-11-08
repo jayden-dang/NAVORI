@@ -114,6 +114,7 @@ Locked 2026-11-04 as variant C1. The brief of record is [`docs/specs/2026-11-02-
 4. RepoBar patterns: multi-level submenus (≤ 3), status block with inline buttons, gray count capsules, dot + text states, real avatars, 14pt text.
 5. Level 0: Awake / Ports / Pull Requests are **one line, one important piece of info** each (2026-11-04: Awake and Ports become one `Running` row, showing only a dot, per [`2026-11-04-running-menu-ui-brief.md`](2026-11-04-running-menu-ui-brief.md)); drop the account & Switch account everywhere.
 6. Handles heavy load: level 0 has at most 3 inbox items + `Show all N`; PRs are grouped and shown **By repository** (top 6 + All); each PR shows only 1 status.
+    *(Amended by NEEDS-3.1 and NEEDS-3.9: open Decisions on level 0 are not capped at 3; the Decide block, the Needs you row, and `You're all caught up` ship in Release.)*
 7. Drop the caption row "Navori · N need you · time" — the menu opens with the Ask field.
 8. **Needs you = the decision inbox between the user and the AI** (Decision / To-do / Update), containing no PRs.
 9. The brief is provisional: each feature updates its own surface when it ships; constraints 1–8 stay unless re-reviewed.
@@ -121,6 +122,7 @@ Locked 2026-11-04 as variant C1. The brief of record is [`docs/specs/2026-11-02-
 11. **The surface is `NSGlassEffectView` with style `.clear` and a tint** (user, 2026-11-02). Chosen tint: black at 69% in dark appearance, white at 57% in light. Measured WCAG 2 on Preview screenshots: dark on white, primary 5.94:1, secondary 3.04:1; light on black, primary 4.88:1, secondary 3.03:1. Starting 65/55 missed secondary 3:1; 1% steps found these first passers. Text on glass uses `labelColor` and `secondaryLabelColor`. `tertiaryLabelColor` was not remeasured at this pair. Reduce Transparency falls back to an opaque surface. Requires macOS 26 or later.
 12. **Until a feature's data exists, level 0 shows only real Core state** (user, 2026-11-02): banners, a `Core` row, then `Settings…`, `About Navori`, `Quit Navori`. The `Core` row is not in the layout above; its submenu holds module states and recent activity, so the cascade runs on real data before Awake. Whether it stays is decided when the Awake row ships. Ask, Needs you and the feature rows appear only in a dev-only preview until their features ship.
     *(Amended 2026-11-05, operator decision: "Whether it stays" is answered. The Running row exists, so in production the `Core` row shows only while the Core is `Needs attention` or `Not running`; the dev profile keeps it always. Requirement MENU-3.11. The Core submenu's Events list is the only in-app view of the counts-only `ports.stopped` Events, so they are now visible in the app only while the Core needs attention.)*
+    *(Amended by NEEDS-3.1 and NEEDS-3.9: open Decisions on level 0 are not capped at 3; the Decide block, the Needs you row, and `You're all caught up` ship in Release. Ask, Ports, and Pull Requests stay out of Release.)*
 
 ## Spike evidence (2026-11-02)
 
@@ -144,4 +146,4 @@ Tint comparison: [`2026-11-02-clear-glass-tints.png`](2026-11-02-clear-glass-tin
 
 ## Open questions for `design-solution`
 
-- Inbox data (Decision/To-do/Update) needs a new module in the kernel (proposed `navori-mod-inbox`, receiving Decisions from the AI runtime via `ActionSpec` + `Risk`).
+- Inbox data (Decision/To-do/Update): answered. The modules are `navori-mod-needs-you` and `navori-mod-todo` (formerly proposed as `navori-mod-inbox`), receiving Decisions from the AI runtime via `ActionSpec` + `Risk`.

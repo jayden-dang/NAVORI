@@ -30,9 +30,9 @@ Terms used below:
 **Story:** As the user, I want to click the status item and see the new glass menu holding only what Navori really knows, so that the menu is pleasant to read and never shows anything invented.
 
 - **MENU-1.1** WHEN level 0 opens THE SYSTEM SHALL show it 360 pt wide on an `NSGlassEffectView` with style `.clear` and a tint.
-- **MENU-1.2** THE SYSTEM SHALL lay out level 0 in this order: any banners, the Awake row, the Core row, a separator, `Settings…`, `About Navori`, `Quit Navori`. (amended by AWAKE-11.1) *(Amended 2026-11-05, operator decision: the Core row is present only as MENU-3.11 says; where it is absent the order is otherwise unchanged and the separator stays before `Settings…`.)*
+- **MENU-1.2** THE SYSTEM SHALL lay out level 0 in this order: any banners, the Awake row, the Core row, a separator, `Settings…`, `About Navori`, `Quit Navori`. (amended by AWAKE-11.1) (amended by NEEDS-11.1) *(Amended 2026-11-05, operator decision: the Core row is present only as MENU-3.11 says; where it is absent the order is otherwise unchanged and the separator stays before `Settings…`.)*
 - **MENU-1.3** THE SYSTEM SHALL NOT show a header row, the app name caption or the version on level 0.
-- **MENU-1.4** WHERE the code is Release code THE SYSTEM SHALL NOT show the Ask field, Needs you, the Ports or Pull Requests rows, or `You're all caught up`. (amended by AWAKE-11.1)
+- **MENU-1.4** WHERE the code is Release code THE SYSTEM SHALL NOT show the Ask field, Needs you, the Ports or Pull Requests rows, or `You're all caught up`. (amended by AWAKE-11.1) (amended by NEEDS-3.9)
 - **MENU-1.5** THE SYSTEM SHALL draw rows with SF Pro 14 pt titles and 13 pt right-aligned values, in `labelColor` and `secondaryLabelColor`, with no `tertiaryLabelColor` on glass.
 - **MENU-1.6** WHEN the pointer or the keyboard selects a row THE SYSTEM SHALL fill it with the accent background at 8 pt corners and draw its text and icon in white.
 - **MENU-1.7** WHEN the user activates `Settings…` THE SYSTEM SHALL close the Cascade and open the Settings window.

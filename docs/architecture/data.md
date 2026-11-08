@@ -34,7 +34,9 @@ Paths are shown for `release`; `dev` uses `Navori Dev` in place of `Navori`. Not
 | Entity / store | Notes |
 |---|---|
 | Keychain items, service `dev.navori` for the release Profile and `dev.navori.dev` for the dev Profile (R2, R4) | GitHub token, other AI provider API keys. Never in the database, config or logs (ARCH-8). |
-| `inbox_*` (R2) | Needs you: Decisions, To-dos, Updates and their outcomes. |
+| `needs_you_decisions` (Owner `needs_you`) | Decisions and their outcomes. |
+| `needs_you_updates` (Owner `needs_you`) | Updates and their outcomes. |
+| `todo_items` (Owner `todo`) | To-dos and their due dates. |
 | Estimated cost per Turn (R2) | Computed from the model catalog's prices; ROAD-11 owns it. Token usage per model call is already in `ai_session_usage`. |
 | `memory_*` (R2) | Facts and preferences, episodic summaries, embeddings. Written only after redaction. |
 | `github_*` (R4) | Cached PR inbox, checks, notification cursor, so the menu shows data without a network call. |

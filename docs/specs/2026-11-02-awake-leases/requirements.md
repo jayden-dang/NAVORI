@@ -173,7 +173,7 @@ Terms used below:
 
 It changes three things in MENU's spec: MENU-1.2 gains the Awake row before the Core row; MENU-1.4 no longer lists the Awake row among what Release code hides; and MENU's "The Awake row ships: decide whether the Core row stays" is answered: it stays.
 
-- **AWAKE-11.1** THE SYSTEM SHALL lay out level 0 in this order: any banners, the Awake row, the Core row, a separator, `Settings…`, `About Navori`, `Quit Navori`. *(Amended 2026-11-04 by PSTOP: the Awake row is now the `Running` row, with the same place in the order and a dot and a chevron but no text, PSTOP-4.8; the Awake Module, its Actions and the name `Awake` keep their names, PSTOP-4.18.)*
+- **AWAKE-11.1** THE SYSTEM SHALL lay out level 0 in this order: any banners, the Awake row, the Core row, a separator, `Settings…`, `About Navori`, `Quit Navori`. *(Amended 2026-11-04 by PSTOP: the Awake row is now the `Running` row, with the same place in the order and a dot and a chevron but no text, PSTOP-4.8; the Awake Module, its Actions and the name `Awake` keep their names, PSTOP-4.18.)* (amended by NEEDS-11.1)
 - **AWAKE-11.2** WHILE no Lease exists THE SYSTEM SHALL show no dot on the Awake row. *(Amended 2026-11-04: the row shows a dot and no text.)*
 - **AWAKE-11.3** WHILE a Lease exists with the System assertion held THE SYSTEM SHALL show a green dot on the Awake row, with VoiceOver reading `On` and the names of the sources holding. *(Amended 2026-11-04: the row shows a dot and no text.)*
 - **AWAKE-11.4** WHILE a Lease exists with no System assertion THE SYSTEM SHALL NOT show a green dot on the Awake row. *(Amended 2026-11-04: the row shows a dot and no text.)*
