@@ -352,11 +352,11 @@ _Requirements: NEEDS-10.1, NEEDS-10.2, NEEDS-12.3, NEEDS-12.4, NEEDS-12.5, NEEDS
 
 **Depends-on:** Task 7, Task 10
 
-- [ ] **Step 1: Failing tests** in `needs_you_view.rs` (pure `build`): `decisions_order_by_expiry_then_age`; `todos_order_overdue_first_and_no_date_last`; `updates_order_newest_first`; `needs_count_is_open_todos_plus_unviewed_updates`; `any_overdue_flags_an_overdue_todo`; `all_caught_up_only_when_nothing_is_left`; `the_all_list_is_todos_then_updates`; `no_decision_appears_in_the_submenu_lists`; `answer_requests_carry_id_revision_and_choice`; `choice_risk_and_action_are_carried_into_the_view`. In `needs_you.rs`: `history_merges_both_modules_newest_first`.
+- [x] **Step 1: Failing tests** in `needs_you_view.rs` (pure `build`): `decisions_order_by_expiry_then_age`; `todos_order_overdue_first_and_no_date_last`; `updates_order_newest_first`; `needs_count_is_open_todos_plus_unviewed_updates`; `any_overdue_flags_an_overdue_todo`; `all_caught_up_only_when_nothing_is_left`; `the_all_list_is_todos_then_updates`; `no_decision_appears_in_the_submenu_lists`; `answer_requests_carry_id_revision_and_choice`; `choice_risk_and_action_are_carried_into_the_view`. In `needs_you.rs`: `history_merges_both_modules_newest_first`.
   Run: `cargo nextest run -p navori-ffi --test needs_you_view` — expect: compile error, no `needs_you::build`.
-- [ ] **Step 2: Implement** `build`, the record types, the snapshot field, `needs_you_history()`.
+- [x] **Step 2: Implement** `build`, the record types, the snapshot field, `needs_you_history()`.
   Run: `cargo nextest run -p navori-ffi` — expect: pass (all ffi tests, including `core.rs`, `running.rs`).
-- [ ] **Step 3: Commit** `git commit -m "feat(ffi): join Needs you and To-dos into NeedsYouView"`
+- [x] **Step 3: Commit** `git commit -m "feat(ffi): join Needs you and To-dos into NeedsYouView"`
 
 _Requirements: NEEDS-3.1, NEEDS-3.7, NEEDS-3.8, NEEDS-6.1, NEEDS-9.1, NEEDS-11.2, NEEDS-11.3, NEEDS-11.4, NEEDS-11.6, NEEDS-12.1_
 
