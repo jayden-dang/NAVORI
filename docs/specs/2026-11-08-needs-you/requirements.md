@@ -23,7 +23,7 @@ operator; the operator confirms or changes it when reading this file.
 
 **Story:** As a Module author, I want to raise a Decision with a title, a reason and its choices by dispatching `needs_you.raise`, so that the user sees in one place what needs their decision.
 
-- **NEEDS-1.1** THE SYSTEM SHALL list `needs_you.raise` in the Action catalog with Risk `Write`, taking a `key`, a `title`, a `reason`, an optional `expires_at`, and a `primary` and a `secondary` choice, each a `label` with an optional Envelope. *(agent-decided — two choices with an optional Envelope, close-package C1)*
+- **NEEDS-1.1** THE SYSTEM SHALL list `needs_you.raise` in the Action catalog with Risk `Write`, taking a `key`, a `title`, a `reason`, an optional `expires_at_ms` (Unix time in milliseconds), and a `primary` and a `secondary` choice, each a `label` with an optional Envelope. *(agent-decided — two choices with an optional Envelope, close-package C1)*
 - **NEEDS-1.2** WHEN `needs_you.raise` names a `key` that no open Decision holds THE SYSTEM SHALL add an open Decision.
 - **NEEDS-1.3** WHEN `needs_you.raise` names the `key` of an open Decision THE SYSTEM SHALL replace that Decision's title, reason, expiry and choices and SHALL NOT add a second Decision.
 - **NEEDS-1.4** WHEN a Decision is raised THE SYSTEM SHALL record each choice's Risk as the catalog Risk of the Action its Envelope names, and no Risk for a choice with no Envelope; a raise carries no Risk field. *(agent-decided — Risk from the catalog, close-package C1)*
@@ -51,7 +51,7 @@ operator; the operator confirms or changes it when reading this file.
 
 **Story:** As the user, I want each open Decision as one compact row at the top of the menu, so that I see what needs my decision the moment I open Navori.
 
-- **NEEDS-3.1** WHILE at least one Decision is open THE SYSTEM SHALL show on level 0, after any banners, a `Decide N` header carrying the open count, then one row per open Decision, ordered by earliest `expires_at` first and then by oldest raise, with no limit on the number of rows (amends rule 6 of the 2026-11-01 menubar brief, at most 3 items). *(agent-decided — order and no cap, close-package F14)*
+- **NEEDS-3.1** WHILE at least one Decision is open THE SYSTEM SHALL show on level 0, after any banners, a `Decide N` header carrying the open count, then one row per open Decision, ordered by earliest `expires_at_ms` first and then by oldest raise, with no limit on the number of rows (amends rule 6 of the 2026-11-01 menubar brief, at most 3 items). *(agent-decided — order and no cap, close-package F14)*
 - **NEEDS-3.2** THE SYSTEM SHALL draw each Decide row on one 26 pt line: a lead icon in the accent color, the title truncated to fit, and the age right-aligned.
 - **NEEDS-3.3** WHILE no Decision is open THE SYSTEM SHALL show neither the `Decide` header nor any Decide row.
 - **NEEDS-3.4** WHILE at least one Decision is open THE SYSTEM SHALL turn on the status icon's attention mark, and WHEN the last open Decision closes THE SYSTEM SHALL turn it off.
@@ -76,15 +76,16 @@ operator; the operator confirms or changes it when reading this file.
 - **NEEDS-4.9** IF `needs_you.answer` names a Decision that is not open, or one whose answer is already running, THEN THE SYSTEM SHALL refuse it and dispatch nothing.
 - **NEEDS-4.10** IF Navori stops while a Decision's answer is running THEN THE SYSTEM SHALL, on the next start, show that Decision in the failed state of NEEDS-4.7 with the error `Navori stopped before this finished — it may already have run`, and SHALL NOT dispatch its Envelope again until the user answers again. *(agent-decided — error copy)*
 - **NEEDS-4.11** WHEN Navori AI calls `needs_you.answer` THE SYSTEM SHALL refuse the call and dispatch no Envelope.
+- **NEEDS-4.12** IF `needs_you.answer` names a version of a Decision that a later raise with the same `key` has replaced THEN THE SYSTEM SHALL refuse it and dispatch nothing. *(agent-decided — a click on stale text never runs)*
 
 ## 5. Let a Decision expire
 
 **Story:** As a Module author, I want a Decision raised with an expiry to lapse on its own, so that the user is not asked something that no longer matters.
 
-- **NEEDS-5.1** WHILE an open Decision has no `expires_at` THE SYSTEM SHALL keep it open until it is answered.
-- **NEEDS-5.2** WHEN an open Decision's `expires_at` passes while it is unanswered and no answer is running THE SYSTEM SHALL close it, remove its row from level 0, and add an Update of kind `decision_expired` titled `Expired: <the Decision's title>`. *(agent-decided — title copy)*
-- **NEEDS-5.3** IF a raise carries an `expires_at` that is not in the future THEN THE SYSTEM SHALL refuse the raise and add nothing. *(agent-decided)*
-- **NEEDS-5.4** WHEN Navori starts or the Mac wakes after an open Decision's `expires_at` has passed THE SYSTEM SHALL expire that Decision as NEEDS-5.2 says.
+- **NEEDS-5.1** WHILE an open Decision has no `expires_at_ms` THE SYSTEM SHALL keep it open until it is answered.
+- **NEEDS-5.2** WHEN an open Decision's `expires_at_ms` passes while it is unanswered and no answer is running THE SYSTEM SHALL close it, remove its row from level 0, and add an Update of kind `decision_expired` titled `Expired: <the Decision's title>`. *(agent-decided — title copy)*
+- **NEEDS-5.3** IF a raise carries an `expires_at_ms` that is not in the future THEN THE SYSTEM SHALL refuse the raise and add nothing. *(agent-decided)*
+- **NEEDS-5.4** WHEN Navori starts or the Mac wakes after an open Decision's `expires_at_ms` has passed THE SYSTEM SHALL expire that Decision as NEEDS-5.2 says.
 - **NEEDS-5.5** THE SYSTEM SHALL produce Updates in this feature only by expiring Decisions, and SHALL offer no Action that posts an Update. *(agent-decided — close-package C2)*
 
 ## 6. Read Updates
@@ -175,6 +176,7 @@ Files this feature touches, and what each must keep:
 - `modules/awake/` — Lease ends (NEEDS-13.9).
 - `apps/macos/Navori/Features/Panel/PanelView.swift`, `apps/macos/Navori/StatusBar/StatusBarController.swift`, `apps/macos/Navori/Core/CoreStore.swift` — level 0 and its submenus (NEEDS-13.10).
 - `apps/macos/Navori/StatusBar/CascadePanel.swift` — key-window rule (NEEDS-13.11).
+- `apps/macos/Navori/StatusBar/StatusPanel.swift` — the menu closes when it loses key to another window (NEEDS-13.13).
 - `apps/macos/Navori/Features/Preview/` — dev-only preview (NEEDS-13.12).
 - `apps/cli/src/main.rs` — no behavior to guard (no change; `navori dispatch` is reused, NEEDS-1.10).
 - `crates/protocol/src/lib.rs` — no behavior to guard (Envelope and Risk reused unchanged).
@@ -192,7 +194,8 @@ Files this feature touches, and what each must keep:
 - **NEEDS-13.8** (guard) WHEN the test suite runs THE SYSTEM SHALL CONTINUE TO check that every Action's catalog Risk equals the Risk the Action reports, now including every `needs_you` and `todo` Action.
 - **NEEDS-13.9** (guard) WHEN a timed Keep awake Lease reaches its end THE SYSTEM SHALL CONTINUE TO end it as today and SHALL raise no Decision.
 - **NEEDS-13.10** (guard) WHERE the code is Release code THE SYSTEM SHALL CONTINUE TO hide the Ask field, the Ports and Pull Requests rows, and every sample row of the dev-only preview.
-- **NEEDS-13.11** (guard) WHILE the `Add a to-do…` field does not have focus THE SYSTEM SHALL CONTINUE TO keep every cascade panel from becoming the key window except while VoiceOver is on, and to route Return to the selected row.
+- **NEEDS-13.11** (guard) WHILE neither the `Add a to-do…` field nor the date calendar has focus THE SYSTEM SHALL CONTINUE TO keep every cascade panel from becoming the key window except while VoiceOver is on, and to route Return to the selected row.
+- **NEEDS-13.13** (guard) WHEN a window outside Navori's menu and its submenus becomes the key window THE SYSTEM SHALL CONTINUE TO close the menu.
 - **NEEDS-13.12** (guard) WHEN a Debug build opens the dev-only preview THE SYSTEM SHALL CONTINUE TO show it with sample data, and Release builds SHALL CONTINUE TO compile the preview out (`#if DEBUG`).
 
 ## 14. Quality attributes
