@@ -31,6 +31,9 @@ final class CoreStore {
     var needsYouTab: NeedsYouTab = .all
     var drawnUpdateIds: Set<Int64> = []
     var isTerminating = false
+    private(set) var historyEntries: [NeedsYouHistoryEntry] = []
+    private(set) var historyError: String?
+    private(set) var historyHasLoaded = false
 
     func start() {
         guard core == nil else { return }
@@ -527,6 +530,36 @@ final class CoreStore {
         }
     }
 
+    func loadHistory() async {
+        guard let core else {
+            historyError = CoreStartupBanner.menuFailure(for: StoreError.notRunning)
+            historyHasLoaded = true
+            return
+        }
+        do {
+            let view = try await core.needsYouHistory()
+            historyEntries = view.entries.enumerated().map { NeedsYouHistoryEntry($1, index: $0) }
+            historyError = nil
+            historyHasLoaded = true
+        } catch {
+            let message = CoreStartupBanner.menuFailure(for: error)
+            historyError = message
+            historyHasLoaded = true
+            log.error("history load failed: \(message, privacy: .public)")
+        }
+    }
+
+    func undo(_ request: String) async {
+        do {
+            _ = try await dispatch(module: "todo", actionJSON: request)
+            await loadHistory()
+        } catch {
+            let message = CoreStartupBanner.menuFailure(for: error)
+            historyError = message
+            log.error("todo undo failed: \(message, privacy: .public)")
+        }
+    }
+
     fileprivate func apply(_ snapshot: CoreSnapshot) {
         self.snapshot = snapshot
         pruneStopState()
@@ -685,6 +718,24 @@ struct NeedsYouSnapshot: Equatable {
         anyOverdue = view.anyOverdue
         allCaughtUp = view.allCaughtUp
         down = view.down
+    }
+}
+
+struct NeedsYouHistoryEntry: Identifiable, Equatable {
+    let id: String
+    let kind: String
+    let title: String
+    let outcome: String?
+    let resolvedAtMs: Int64
+    let undoRequest: String?
+
+    init(_ entry: HistoryEntry, index: Int) {
+        kind = entry.kind
+        title = entry.title
+        outcome = entry.outcome
+        resolvedAtMs = entry.resolvedAtMs
+        undoRequest = entry.undoRequest
+        id = "needs.history.\(entry.kind).\(entry.resolvedAtMs).\(index)"
     }
 }
 

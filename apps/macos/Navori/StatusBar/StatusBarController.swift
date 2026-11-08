@@ -30,7 +30,7 @@ final class StatusBarController: NSObject {
                 case "needs.date":
                     return AnyView(DueCalendarView(store: self.store))
                 case "needs.history":
-                    return AnyView(EmptyView())
+                    return AnyView(HistorySubmenuView(store: self.store))
                 case _ where id.hasPrefix("running.project.") || id == "running.other":
                     return AnyView(ProjectChildView(projectId: id, store: self.store))
                 default:
@@ -73,6 +73,7 @@ final class StatusBarController: NSObject {
     private var coreRowWasVisible = false
     private var needsYouSignature: NeedsYouSignature = .empty
     private var needsYouTab: NeedsYouTab = .all
+    private var historyEntryIds: [String] = []
     private var motion = StatusIconMotion()
     private var drawn: (state: StatusIconState, loop: Bool)?
     private var accessibilityObserver: NSObjectProtocol?
@@ -280,6 +281,7 @@ final class StatusBarController: NSObject {
             _ = store.coreRowVisible
             _ = store.needsYou
             _ = store.needsYouTab
+            _ = store.historyEntries
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.onSnapshotChange()
@@ -295,11 +297,13 @@ final class StatusBarController: NSObject {
         let coreRowVisible = store.coreRowVisible
         let needsSignature = NeedsYouSignature(store.needsYou)
         let needsTab = store.needsYouTab
+        let historyIds = store.historyEntries.map(\.id)
         let changed = hasSubmenu != runningHadSubmenu
             || tree != runningTree
             || coreRowVisible != coreRowWasVisible
             || needsSignature != needsYouSignature
             || needsTab != needsYouTab
+            || historyIds != historyEntryIds
         if coreArrived {
             didReplaceCoreTree = true
         }
@@ -308,6 +312,7 @@ final class StatusBarController: NSObject {
         coreRowWasVisible = coreRowVisible
         needsYouSignature = needsSignature
         needsYouTab = needsTab
+        historyEntryIds = historyIds
         guard panelBuilt, panel.isOpen, coreArrived || changed else { return }
         panel.cascade.replaceTree()
     }
@@ -368,7 +373,7 @@ final class StatusBarController: NSObject {
         children.append(
             CascadeNode(
                 id: "needs.history",
-                children: [CascadeNode(id: "needs.history.body")]
+                children: historyChildren()
             )
         )
         children.append(
@@ -377,6 +382,14 @@ final class StatusBarController: NSObject {
                 children: [CascadeNode(id: "needs.date.body")]
             )
         )
+        return children
+    }
+
+    private func historyChildren() -> [CascadeNode] {
+        var children = [CascadeNode(id: "needs.history.body")]
+        children += store.historyEntries.map {
+            CascadeNode(id: $0.id, isActionable: true)
+        }
         return children
     }
 
@@ -400,6 +413,8 @@ final class StatusBarController: NSObject {
             Task { [store] in await store.clearUpdates() }
         case "needs", "needs.date", "needs.history", "needs.date.body", "needs.history.body",
              "decide.header":
+            return
+        case _ where id.hasPrefix("needs.history."):
             return
         case _ where id.hasPrefix("todo.") || id.hasPrefix("update."):
             return
