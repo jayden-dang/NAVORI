@@ -94,7 +94,7 @@ Run in this order; all must pass before any completion claim.
 Single test file: `cargo nextest run -p <crate> --test <file>` — e.g.
 `cargo nextest run -p navori-redact --test redact_json`. Builds only that test binary.
 
-Task gate (changed units + their dependents; `none` when the whole suite is fast):
+Task gate (tests of the changed units and the dependents that call what changed, plus a compile of every other dependent; `none` when the whole suite is fast):
 `none` — the whole suite is fast; the suite is the gate.
 
 Wave gate (compile + lint every target after a parallel merge; `none` = typecheck + lint):
