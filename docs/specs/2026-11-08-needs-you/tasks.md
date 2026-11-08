@@ -449,10 +449,10 @@ _Requirements: NEEDS-13.11, NEEDS-13.13_
 
 **Depends-on:** Task 13, Task 14
 
-- [ ] **Step 1: Implement** the submenu layout, filter, field and date chip, the `needs.date` calendar with quick picks, To-do rows with the pill and the 0.45 s strike-through hold, Update rows, `Clear updates`, empty tabs, drawn-row tracking and `markViewed` on close.
+- [x] **Step 1: Implement** the submenu layout, filter, field and date chip, the `needs.date` calendar with quick picks, To-do rows with the pill and the 0.45 s strike-through hold, Update rows, `Clear updates`, empty tabs, drawn-row tracking and `markViewed` on close.
   Run: `cargo xtask ci` — expect: pass.
-- [ ] **Step 2: Acceptance** — `cargo xtask run`; type a To-do, pick `Tomorrow`, press Return: it shows at once with a yellow pill and the field resets; blank Return adds nothing; tick it: struck, gone after ~0.45 s; raise a Decision with a 1-minute `expires_at_ms`, wait: an `Expired:` Update shows, clicking it does nothing; close the submenu with it drawn and reopen: gone; `Clear updates` on the Updates tab only; quit with the submenu open and relaunch: the Update is still there; the filter reads as a tab group and the field precedes the list.
-- [ ] **Step 3: Commit** `git commit -m "feat(panel): the Needs you submenu with To-dos, Updates and a calendar"`
+- [x] **Step 2: Acceptance** — `cargo xtask run`; type a To-do, pick `Tomorrow`, press Return: it shows at once with a yellow pill and the field resets; blank Return adds nothing; tick it: struck, gone after ~0.45 s; raise a Decision with a 1-minute `expires_at_ms`, wait: an `Expired:` Update shows, clicking it does nothing; close the submenu with it drawn and reopen: gone; `Clear updates` on the Updates tab only; quit with the submenu open and relaunch: the Update is still there; the filter reads as a tab group and the field precedes the list.
+- [x] **Step 3: Commit** `git commit -m "feat(panel): the Needs you submenu with To-dos, Updates and a calendar"`
 
 _Requirements: NEEDS-6.1, NEEDS-6.2, NEEDS-6.4, NEEDS-6.5, NEEDS-7.1, NEEDS-8.1, NEEDS-8.2, NEEDS-8.3, NEEDS-8.4, NEEDS-8.5, NEEDS-10.1, NEEDS-11.6, NEEDS-11.7, NEEDS-11.8_
 
