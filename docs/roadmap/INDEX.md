@@ -1,6 +1,6 @@
 # Roadmap: Navori
 
-Status: Draft
+Status: Approved
 Date: 2026-11-08
 
 <!--
@@ -84,7 +84,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 - **ROAD-36** ask-walking-skeleton — After: ROAD-10 — Surfaces: `ai/llm/`, `ai/context/`, `crates/ipc/`, `crates/protocol/`, `crates/ffi/`, `apps/cli/`, `apps/macos/Navori/Features/Settings/` — Delivers text-only `navori ask` end to end: one adapter, one key saved from Settings, and a minimal Context Gateway (Shield on text, audit log, fail-closed). First consumer of `crates/secrets/`, so it takes the handoffs the SECRETS spec wrote for ROAD-11.
 - **ROAD-11** providers-and-model-roles — After: ROAD-36 — Surfaces: `ai/llm/`, `ai/models/`, `crates/ffi/`, `apps/macos/Navori/Features/Settings/` <!-- surfaces edited by an agent (keychain-secrets run, 2026-11-03); approved by the operator 2026-11-04 --> — Also records the estimated cost of each Turn from the catalog's prices. <!-- cost deferred here from ROAD-14 by an agent (agent-loop run, 2026-11-05; Lock L19/L20 partly deferred, close-package D3, S-cost); approved by the operator 2026-11-05 -->
 - **ROAD-12** shield-and-context-gateway — After: ROAD-36 — Surfaces: `ai/context/`, `crates/store/`, `crates/ffi/` — Delivers a way for the user to read the Context audit log that ROAD-36 writes (`context_audit`), and its retention, so GOAL-6's "the user can see what the AI has seen" is met. Keeps the text Shield ROAD-36 shipped; the screen-facing Shield layers moved to ROAD-39. <!-- narrowed by the operator 2026-11-05 (ADR 0008 session): app denylist, path blocks, OCR and screenshots deferred until Navori AI sees the screen. The reader's surface is set by the spec. -->
-- **ROAD-13** needs-you-inbox — After: none — Surfaces: `modules/needs_you/`, `modules/todo/`, `crates/kernel/`, `crates/ffi/`, `crates/macos/`, `apps/macos/Navori/Features/Panel/`, `apps/macos/Navori/StatusBar/`, `apps/macos/NavoriPanel/` <!-- surfaces edited by an agent (needs-you auto run, 2026-11-08; close-package F1: two Modules `needs_you` and `todo` per close.md L5, kernel Dispatcher, ffi NeedsYouView; NEEDS design: local calendar in navori-macos, cascade key window, pure Swift helpers); awaits the operator -->
+- **ROAD-13** needs-you-inbox — After: none — Surfaces: `modules/needs_you/`, `modules/todo/`, `crates/kernel/`, `crates/ffi/`, `crates/macos/`, `apps/macos/Navori/Features/Panel/`, `apps/macos/Navori/StatusBar/`, `apps/macos/NavoriPanel/` <!-- surfaces edited by an agent (needs-you auto run, 2026-11-08; close-package F1: two Modules `needs_you` and `todo` per close.md L5, kernel Dispatcher, ffi NeedsYouView; NEEDS design: local calendar in navori-macos, cascade key window, pure Swift helpers); approved by the operator 2026-11-08 ("approve") -->
 - **ROAD-14** agent-loop-and-session — After: ROAD-36 — Surfaces: `ai/agent/`, `crates/store/`, `crates/ffi/` — Ports dsh's agent loop, session log, tool registry and guards to Rust on Navori's Actions and Journal (ADR 0008), using the one adapter ROAD-36 shipped. Records what started each turn (THR-11) and usage from the first model call, and sends every tool call through one dispatch point. Runs only `Read` Actions until ROAD-37.
 - **ROAD-37** policy-and-approvals — After: ROAD-13, ROAD-14 — Surfaces: `ai/agent/`, `crates/protocol/`, `crates/ffi/`, `apps/macos/Navori/Features/Panel/` — Ports dsh's user approval and permission presets (ADR 0008).
 - **ROAD-38** ai-eval-harness — After: ROAD-14 — Surfaces: `xtask/`, `ai/agent/` — Delivers `cargo xtask eval` (`docs/standards/testing.md`).
@@ -96,7 +96,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Deferred:**
 - ROAD-39 shield-screen-layers → unscheduled (2026-11-05, app denylist, path blocks, OCR and screenshots wait until Navori AI sees the screen; split from ROAD-12)
 - ROAD-40 computer-use → unscheduled (2026-11-05, built in `navori-macos` by porting cua-driver, cheapest Control path first, ADR 0009; waits for ROAD-14, ROAD-37, ROAD-25 and ROAD-39) — Notes: [ROAD-40](roads/ROAD-40.notes.md)
-- ROAD-42 todo-full → unscheduled (2026-11-08, lists, notes, repeats, editing and deleting a To-do, on the `todo` Module ROAD-13 ships; out of ROAD-13's scope) <!-- added by an agent (needs-you auto run, close-package F6/F11); awaits the operator -->
+- ROAD-42 todo-full → unscheduled (2026-11-08, lists, notes, repeats, editing and deleting a To-do, on the `todo` Module ROAD-13 ships; out of ROAD-13's scope) <!-- added by an agent (needs-you auto run, close-package F6/F11); approved by the operator 2026-11-08 ("approve") -->
 **Blockers:** None
 
 ## MILE-4 — Ports (R3)
@@ -132,7 +132,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 **Goals:** GOAL-9, GOAL-1
 **Members:**
 - **ROAD-22** triggers-and-budget — After: none — Surfaces: `ai/triggers/`, `crates/kernel/`
-- **ROAD-23** proactive-notifications — After: ROAD-22 — Surfaces: `ai/triggers/`, `modules/needs_you/`, `apps/macos/Navori/Platform/` <!-- surface renamed by an agent (needs-you auto run, 2026-11-08; close-package F1); awaits the operator -->
+- **ROAD-23** proactive-notifications — After: ROAD-22 — Surfaces: `ai/triggers/`, `modules/needs_you/`, `apps/macos/Navori/Platform/` <!-- surface renamed by an agent (needs-you auto run, 2026-11-08; close-package F1); approved by the operator 2026-11-08 ("approve") -->
 **Depends-on:** MILE-4, MILE-5
 **Commitment:** Planned
 **Closed:** None
