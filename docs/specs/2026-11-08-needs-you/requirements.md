@@ -51,14 +51,14 @@ operator; the operator confirms or changes it when reading this file.
 
 **Story:** As the user, I want each open Decision as one compact row at the top of the menu, so that I see what needs my decision the moment I open Navori.
 
-- **NEEDS-3.1** WHILE at least one Decision is open THE SYSTEM SHALL show on level 0, after any banners, a `Decide N` header carrying the open count, then one row per open Decision, ordered by earliest `expires_at` first and then by oldest raise, with no limit on the number of rows (amends rule 6 of the 2026-11-01 menubar brief, at most 3 items).
+- **NEEDS-3.1** WHILE at least one Decision is open THE SYSTEM SHALL show on level 0, after any banners, a `Decide N` header carrying the open count, then one row per open Decision, ordered by earliest `expires_at` first and then by oldest raise, with no limit on the number of rows (amends rule 6 of the 2026-11-01 menubar brief, at most 3 items). *(agent-decided — order and no cap, close-package F14)*
 - **NEEDS-3.2** THE SYSTEM SHALL draw each Decide row on one 26 pt line: a lead icon in the accent color, the title truncated to fit, and the age right-aligned.
 - **NEEDS-3.3** WHILE no Decision is open THE SYSTEM SHALL show neither the `Decide` header nor any Decide row.
 - **NEEDS-3.4** WHILE at least one Decision is open THE SYSTEM SHALL turn on the status icon's attention mark, and WHEN the last open Decision closes THE SYSTEM SHALL turn it off.
 - **NEEDS-3.5** THE SYSTEM SHALL give each Decide row its full reason as its tooltip and its accessibility value.
 - **NEEDS-3.6** WHEN VoiceOver reads a Decide row THE SYSTEM SHALL read the kind, the title, the reason, the age and both choice labels, as in `Decision: Review PR #41 in zroute, Minh requested your review, 25 minutes ago, Open, Later`.
 - **NEEDS-3.7** THE SYSTEM SHALL NOT list a Decision anywhere in the Needs you submenu.
-- **NEEDS-3.8** THE SYSTEM SHALL carry each choice's recorded Risk in the Core's Needs you view.
+- **NEEDS-3.8** THE SYSTEM SHALL carry each choice's Risk in the Core's Needs you view as the Action catalog lists it now, not as it was at raise. *(agent-decided — Risk read again after an upgrade, close-package C1)*
 - **NEEDS-3.9** WHERE the code is Release code THE SYSTEM SHALL show the Decide block, the `Needs you` row and `✓ You're all caught up` (amends MENU-1.4 and rule 12 of the 2026-11-01 menubar brief).
 
 ## 4. Answer a Decision
@@ -74,7 +74,7 @@ operator; the operator confirms or changes it when reading this file.
 - **NEEDS-4.7** IF the chosen Envelope's dispatch fails, or its Action is no longer in the Action catalog when the answer arrives, THEN THE SYSTEM SHALL keep the Decision open, show `Retry` as its primary button, and carry the error in the row's tooltip and accessibility value.
 - **NEEDS-4.8** WHEN the user activates `Retry` THE SYSTEM SHALL answer the Decision again with the choice that failed.
 - **NEEDS-4.9** IF `needs_you.answer` names a Decision that is not open, or one whose answer is already running, THEN THE SYSTEM SHALL refuse it and dispatch nothing.
-- **NEEDS-4.10** IF Navori stops while a Decision's answer is running THEN THE SYSTEM SHALL, on the next start, show that Decision in the failed state of NEEDS-4.7 and SHALL NOT dispatch its Envelope again until the user answers again.
+- **NEEDS-4.10** IF Navori stops while a Decision's answer is running THEN THE SYSTEM SHALL, on the next start, show that Decision in the failed state of NEEDS-4.7 with the error `Navori stopped before this finished — it may already have run`, and SHALL NOT dispatch its Envelope again until the user answers again.
 - **NEEDS-4.11** WHEN Navori AI calls `needs_you.answer` THE SYSTEM SHALL refuse the call and dispatch no Envelope.
 
 ## 5. Let a Decision expire
@@ -82,7 +82,7 @@ operator; the operator confirms or changes it when reading this file.
 **Story:** As a Module author, I want a Decision raised with an expiry to lapse on its own, so that the user is not asked something that no longer matters.
 
 - **NEEDS-5.1** WHILE an open Decision has no `expires_at` THE SYSTEM SHALL keep it open until it is answered.
-- **NEEDS-5.2** WHEN an open Decision's `expires_at` passes while it is unanswered and no answer is running THE SYSTEM SHALL close it, remove its row from level 0, and add an Update of kind `decision_expired` titled `Expired: <the Decision's title>`.
+- **NEEDS-5.2** WHEN an open Decision's `expires_at` passes while it is unanswered and no answer is running THE SYSTEM SHALL close it, remove its row from level 0, and add an Update of kind `decision_expired` titled `Expired: <the Decision's title>`. *(agent-decided — title copy)*
 - **NEEDS-5.3** IF a raise carries an `expires_at` that is not in the future THEN THE SYSTEM SHALL refuse the raise and add nothing. *(agent-decided)*
 - **NEEDS-5.4** WHEN Navori starts or the Mac wakes after an open Decision's `expires_at` has passed THE SYSTEM SHALL expire that Decision as NEEDS-5.2 says.
 - **NEEDS-5.5** THE SYSTEM SHALL produce Updates in this feature only by expiring Decisions, and SHALL offer no Action that posts an Update. *(agent-decided — close-package C2)*
@@ -155,7 +155,7 @@ operator; the operator confirms or changes it when reading this file.
 
 - **NEEDS-12.1** WHEN the user opens `History ›` THE SYSTEM SHALL list, newest first, the ticked To-dos with an `Undo` each, the answered Decisions with the label chosen, and the viewed or cleared Updates, resolved within the last `journal.retention_days` days.
 - **NEEDS-12.2** THE SYSTEM SHALL offer no way to answer again a Decision listed in History.
-- **NEEDS-12.3** THE SYSTEM SHALL delete each History item resolved more than `journal.retention_days` days ago, at start and at least once a day.
+- **NEEDS-12.3** THE SYSTEM SHALL delete each History item resolved more than `journal.retention_days` days ago, at start and at least once a day. *(agent-decided — cadence)*
 - **NEEDS-12.4** WHILE `journal.retention_days` is invalid, so that the Journal sweep is paused, THE SYSTEM SHALL delete no History item.
 - **NEEDS-12.5** WHEN the user activates `Undo` on a ticked To-do in History THE SYSTEM SHALL return it to the open list with its title and due date.
 - **NEEDS-12.6** THE SYSTEM SHALL list `todo.undo` in the Action catalog with Risk `Write`.
