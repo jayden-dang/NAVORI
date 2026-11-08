@@ -130,7 +130,10 @@ Validation order on `raise`, refusing with `ActionError::Invalid` and writing no
 `module` is `needs_you` (NEEDS-1.6); a choice Envelope for which `ctx.dispatcher().risk_of` is `None` (NEEDS-1.5);
 an open Decision with this `key` whose state is `answering` (NEEDS-1.11); a choice Envelope in which
 `navori_redact::redact_json` on a copy finds anything (NEEDS-1.12 — the stored Envelope is never altered, so it
-still runs as raised). Then `redact_text(..).text` on title,
+still runs as raised). Known limit: `redact_json` also replaces any value under a secret-looking key —
+`token`, `password`, `*_secret`, `api_key`, … (`crates/redact/src/lib.rs:95-117,172-180`) — so a choice whose Action
+takes such a field can never be raised; ROAD-20 and ROAD-37 Actions must avoid those field names or revisit
+NEEDS-1.12. Then `redact_text(..).text` on title,
 reason and both labels (NEEDS-1.8), and in one transaction either insert a new `open` row (NEEDS-1.2) or, for an
 open/failed row with this `key`, replace its text, expiry and choices, bump `revision`, clear `chosen` and `error`, and set it back to `open`
 (NEEDS-1.3). Each choice's Risk is stored as the lowercase Risk name or NULL (NEEDS-1.4). The CLI reaches the same
@@ -179,7 +182,7 @@ Locality: `modules/needs_you/src/actor.rs` (run loop), `answer.rs`; `crates/ffi/
 
 `answer` is catalogued `Destructive` (NEEDS-4.3), so Navori AI's gate refuses it (NEEDS-4.11). In the run loop:
 refuse unless the row is `open` or `failed` and `revision` matches (NEEDS-4.9, NEEDS-4.12); re-read the chosen
-Envelope's Risk with `risk_of` — `None` → `failed` with "this action no longer exists" (NEEDS-4.7). Write
+Envelope's Risk with `risk_of` — `None` → `failed` with "this action no longer exists" *(agent-decided — copy)* (NEEDS-4.7). Write
 `state='answering', chosen=…` and `update_state` **before** dispatching (decision 4), reply `Ok(())` to the
 caller, then `send` the Envelope and push its `Pending` into a `FuturesUnordered` arm keyed by row id (NEEDS-4.4,
 NEEDS-2.2). The `Ok(())` reply goes only after the `answering` write has committed. On `Ok` → `state='answered',
@@ -193,7 +196,7 @@ once (NEEDS-4.9, NEEDS-5.2). A choice with no Envelope goes straight to `answere
 an ordinary `answer` with the failed choice (NEEDS-4.8). At the top of `run`, every `answering` row becomes
 `failed` with `Navori stopped before this finished — it may already have run` (NEEDS-4.10), and every open row's
 choice Risk is recomputed from the live catalog into State (NEEDS-3.8). `tray()` returns
-`attention: Some("N decisions waiting")` exactly while State holds an open, answering or failed Decision, and
+`attention: Some("N decisions waiting")` *(agent-decided — copy)* exactly while State holds an open, answering or failed Decision, and
 nothing for Updates (NEEDS-3.4, NEEDS-11.9); it reads only State (`module.rs:63-77`).
 
 Known limit: the store runs WAL with `synchronous=NORMAL` (`crates/store/src/lib.rs:89,98`), so a committed
@@ -401,7 +404,7 @@ A11y: status never by color alone; the pill reads `Overdue, Thursday 5 November`
 
 Layout: depth-2 cascade from `History ›`, same width as the Needs you submenu; newest first; one line per entry: ticked To-dos with `Undo`, answered Decisions with the label chosen, viewed or cleared Updates.
 Components: rung 2 `MenuRowView` rows; `Undo` — rung 2 `CapsuleButton` (fill).
-States: loading (the rows the last load returned, or `Loading…` on the first open) · empty (`Nothing in the last N days`, N = retention days) · error (the error as one dimmed line).
+States: loading (the rows the last load returned, or `Loading…` on the first open) · empty (`Nothing in the last N days`, N = retention days) · error (the error as one dimmed line). *(agent-decided — the History copy; brief D leaves History to the spec, ui-brief:52)*
 Type & color: as the Needs you submenu; resolved entries in `secondaryLabelColor`.
 A11y: ↑↓ through entries; `Undo` in the row's Tab order; VoiceOver reads kind, title and outcome.
 
@@ -420,7 +423,7 @@ A11y: ↑↓ through entries; `Undo` in the row's Tab order; VoiceOver reads kin
 | Existing suites kept green: `crates/kernel/tests/{kernel,scheduler,tray}.rs`, `modules/awake/tests/`, `crates/ffi/tests/core.rs`, `running.rs` | integration | NEEDS-13.1, 13.2, 13.3, 13.4, 13.6, 13.9 |
 | Release-build check: `strings` on the Release binary has no `PreviewSampleRows.marker` | integration (build script step) | NEEDS-13.10, 13.12 |
 | Throwaway `run-spike` (scratch target, deleted) | spike | decision 9 facts behind NEEDS-8.2, 8.3, 13.11, 13.13 |
-| Dogfood walk in the running dev app (`docs/agents/verify.md` Launch / Drive / Evidence) | e2e (manual) | NEEDS-3.2, 3.3, 3.5, 3.9, 4.1, 4.2, 4.6, 6.1, 6.2, 6.6, 7.1, 8.1, 8.2, 8.3, 9.1, 10.1, 10.3, 11.1, 11.5, 11.7, 11.8, 12.1, 13.7, 13.11, 13.13, 14.5 |
+| Dogfood walk in the running dev app (`docs/agents/verify.md` Launch / Drive / Evidence) | e2e (manual) | NEEDS-3.2, 3.3, 3.5, 3.9, 4.1, 4.2, 4.6, 6.1, 6.2, 6.4, 7.1, 8.1, 8.2, 8.3, 9.1, 10.1, 10.3, 11.1, 11.5, 11.7, 11.8, 12.1, 13.7, 13.11, 13.13, 14.5 |
 | Release perf run, once before release (`cargo xtask perf`) — not per feature | perf (release) | NEEDS-14.1, 14.2 |
 
 ## Upstream sync-back
