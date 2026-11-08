@@ -263,7 +263,7 @@ fn no_action_posts_an_update() {
         .collect();
     assert_eq!(
         names,
-        vec!["raise", "answer", "mark_viewed", "clear_updates"]
+        vec!["raise", "answer", "mark_viewed", "clear_updates", "history"]
     );
 }
 

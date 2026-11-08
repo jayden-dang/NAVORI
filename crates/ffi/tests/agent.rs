@@ -648,6 +648,7 @@ fn no_new_action_appears() {
             "needs_you answer destructive",
             "needs_you mark_viewed write",
             "needs_you clear_updates write",
+            "needs_you history read",
         ]
     );
     core.shutdown();

@@ -3,6 +3,7 @@
 mod action;
 mod answer;
 mod expiry;
+mod history;
 mod raise;
 mod state;
 pub mod stored;
@@ -13,6 +14,7 @@ pub use state::{ChoiceState, DecisionState, NeedsYouState, OpenDecision, Unviewe
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::SystemTime;
 
 use futures::stream::{FuturesUnordered, StreamExt};
 use navori_config::JournalSweep;
@@ -55,7 +57,6 @@ impl Module for NeedsYou {
     }
 
     async fn run(&mut self, ctx: &mut ModuleCtx<Self>) -> anyhow::Result<()> {
-        let _ = self.retention;
         stored::migrate(&ctx.store)?;
         answer::fail_answering_on_restart(ctx)
             .map_err(|err| anyhow::anyhow!("needs_you restart repair failed: {err}"))?;
@@ -63,18 +64,26 @@ impl Module for NeedsYou {
             .map_err(|err| anyhow::anyhow!("needs_you risk refresh failed: {err}"))?;
         expiry::expire_due(ctx)
             .map_err(|err| anyhow::anyhow!("needs_you expiry at start failed: {err}"))?;
+        let mut next_prune = match self.retention {
+            JournalSweep::KeepDays(days) => {
+                history::prune(ctx, days)
+                    .map_err(|err| anyhow::anyhow!("needs_you prune at start failed: {err}"))?;
+                Some(ctx.wait_handle().now() + history::PRUNE_EVERY)
+            }
+            JournalSweep::Paused => None,
+        };
         reload_state(ctx)?;
 
         let mut wait = ctx.wait_handle();
         let mut pending: FuturesUnordered<AnswerFlight> = FuturesUnordered::new();
         loop {
-            let deadline = expiry::soonest_deadline(ctx);
+            let deadline = earlier(expiry::soonest_deadline(ctx), next_prune);
             tokio::select! {
                 req = ctx.recv() => {
                     let Some(req) = req else {
                         return Ok(());
                     };
-                    if let Some(flight) = handle(ctx, req) {
+                    if let Some(flight) = handle(ctx, &self.retention, req) {
                         pending.push(flight);
                     }
                 }
@@ -100,13 +109,31 @@ impl Module for NeedsYou {
                         if let Err(err) = expiry::expire_due(ctx) {
                             tracing::warn!(error = %err, "needs_you expiry failed");
                         }
+                        if let (JournalSweep::KeepDays(days), Some(due)) =
+                            (self.retention, next_prune)
+                            && wait.now() >= due
+                        {
+                            if let Err(err) = history::prune(ctx, days) {
+                                tracing::warn!(error = %err, "needs_you prune failed");
+                            }
+                            next_prune = Some(wait.now() + history::PRUNE_EVERY);
+                        }
                         if let Err(err) = reload_state(ctx) {
-                            tracing::warn!(error = %err, "needs_you reload after expiry failed");
+                            tracing::warn!(error = %err, "needs_you reload after deadline failed");
                         }
                     }
                 }
             }
         }
+    }
+}
+
+fn earlier(a: Option<SystemTime>, b: Option<SystemTime>) -> Option<SystemTime> {
+    match (a, b) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (Some(a), None) => Some(a),
+        (None, Some(b)) => Some(b),
+        (None, None) => None,
     }
 }
 
@@ -122,7 +149,11 @@ fn reload_state(ctx: &ModuleCtx<NeedsYou>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn handle(ctx: &ModuleCtx<NeedsYou>, req: Request<NeedsYouAction>) -> Option<AnswerFlight> {
+fn handle(
+    ctx: &ModuleCtx<NeedsYou>,
+    retention: &JournalSweep,
+    req: Request<NeedsYouAction>,
+) -> Option<AnswerFlight> {
     match &req.action {
         NeedsYouAction::Raise {
             key,
@@ -229,6 +260,15 @@ fn handle(ctx: &ModuleCtx<NeedsYou>, req: Request<NeedsYouAction>) -> Option<Ans
                     req.respond(Ok(()));
                 }
                 Err(err) => req.respond::<()>(Err(ActionError::Failed(err))),
+            }
+            None
+        }
+        NeedsYouAction::History => {
+            match history::list(ctx, *retention) {
+                Ok(entries) => req.respond(Ok(entries)),
+                Err(err) => {
+                    req.respond::<Vec<history::HistoryEntry>>(Err(ActionError::Failed(err)))
+                }
             }
             None
         }

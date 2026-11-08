@@ -52,6 +52,7 @@ pub enum NeedsYouAction {
         ids: Vec<i64>,
     },
     ClearUpdates,
+    History,
 }
 
 impl ModuleAction for NeedsYouAction {
@@ -60,6 +61,7 @@ impl ModuleAction for NeedsYouAction {
             Self::Raise { .. } => Risk::Write,
             Self::Answer { .. } => Risk::Destructive,
             Self::MarkViewed { .. } | Self::ClearUpdates => Risk::Write,
+            Self::History => Risk::Read,
         }
     }
 
@@ -84,6 +86,11 @@ impl ModuleAction for NeedsYouAction {
                 name: "clear_updates",
                 description: "Clear every unviewed Update into History.",
                 risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "history",
+                description: "List resolved Decisions and Updates inside the retention window, newest first.",
+                risk: Risk::Read,
             },
         ]
     }
