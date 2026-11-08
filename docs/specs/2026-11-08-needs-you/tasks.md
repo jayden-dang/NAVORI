@@ -518,9 +518,9 @@ _Requirements: NEEDS-13.10, NEEDS-13.12_
 
 **Depends-on:** Task 16, Task 17
 
-- [ ] **Step 1:** `cargo xtask ci` — expect: pass, including the unchanged suites `crates/kernel/tests/{kernel,scheduler,tray}.rs` (the restart test keeps queued requests), `crates/kernel/tests/system*`, `modules/awake/tests/`, `ai/agent/tests/`, `crates/ffi/tests/core.rs`, `running.rs`.
-- [ ] **Step 2:** Run `write-dogfood` for NEEDS, then `run-dogfood` in the dev app: every Shell-only ID of the design's dogfood row, a timed Keep awake Lease ending as today with no Decision, the keyboard-and-VoiceOver walk of every Needs you control, and the snapshot cadence unchanged (`navori --profile dev status` while open and closed).
-- [ ] **Step 3:** Record that NEEDS-14.1 and NEEDS-14.2 are left to the release perf run (`cargo xtask perf`, once, before release) — no per-feature perf run.
-- [ ] **Step 4: Commit** `git commit -m "test(needs-you): dogfood guide and run"`
+- [x] **Step 1:** `cargo xtask ci` — expect: pass, including the unchanged suites `crates/kernel/tests/{kernel,scheduler,tray}.rs` (the restart test keeps queued requests), `crates/kernel/tests/system*`, `modules/awake/tests/`, `ai/agent/tests/`, `crates/ffi/tests/core.rs`, `running.rs`.
+- [x] **Step 2:** Run `write-dogfood` for NEEDS, then `run-dogfood` in the dev app: every Shell-only ID of the design's dogfood row, a timed Keep awake Lease ending as today with no Decision, the keyboard-and-VoiceOver walk of every Needs you control, and the snapshot cadence unchanged (`navori --profile dev status` while open and closed).
+- [x] **Step 3:** Record that NEEDS-14.1 and NEEDS-14.2 are left to the release perf run (`cargo xtask perf`, once, before release) — no per-feature perf run.
+- [x] **Step 4: Commit** `git commit -m "test(needs-you): dogfood guide and run"`
 
 _Requirements: NEEDS-13.2, NEEDS-13.3, NEEDS-13.4, NEEDS-13.6, NEEDS-13.9, NEEDS-14.1, NEEDS-14.2, NEEDS-14.5_
