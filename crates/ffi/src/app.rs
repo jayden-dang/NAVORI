@@ -17,9 +17,9 @@ use navori_mod_awake::{Awake, AwakeState, LeaseKind, LeaseState, Platform, Timin
 use navori_mod_integrations::{
     Harness, Integrations, IntegrationsEnv, IntegrationsState, State, inspect,
 };
-use navori_mod_needs_you::NeedsYou;
+use navori_mod_needs_you::{NeedsYou, NeedsYouState};
 use navori_mod_ports::{Ports, PortsEnv, PortsState};
-use navori_mod_todo::{LocalCalendar, Todo, TodoEnv};
+use navori_mod_todo::{LocalCalendar, Todo, TodoEnv, TodoState};
 use navori_protocol::{
     AskReply, AskRequest, Check, CoreStatus, Envelope, Event, ModuleInfo, Severity, rpc,
 };
@@ -397,6 +397,32 @@ pub fn running_view(
         ports_state(kernel)
     };
     crate::running::build(awake, ports.as_ref(), own)
+}
+
+/// Needs you view from Module State. `down` when either Module has stopped or failed.
+pub fn needs_you_view(kernel: &Kernel) -> Option<crate::NeedsYouView> {
+    let needs = module_state::<NeedsYouState>(kernel, NeedsYou::ID);
+    let todo = module_state::<TodoState>(kernel, Todo::ID);
+    let down = module_is_down(kernel, NeedsYou::ID) || module_is_down(kernel, Todo::ID);
+    match (crate::needs_you::build(needs.as_ref(), todo.as_ref()), down) {
+        (Some(mut view), _) => {
+            view.down = down;
+            Some(view)
+        }
+        (None, true) => Some(crate::needs_you::empty_down()),
+        (None, false) => None,
+    }
+}
+
+fn module_state<T: serde::de::DeserializeOwned>(kernel: &Kernel, id: &str) -> Option<T> {
+    let value = kernel.state(id)?;
+    match serde_json::from_value(value) {
+        Ok(state) => Some(state),
+        Err(error) => {
+            tracing::warn!(%error, module = id, "module state will not deserialize");
+            None
+        }
+    }
 }
 
 fn module_is_down(kernel: &Kernel, id: &str) -> bool {

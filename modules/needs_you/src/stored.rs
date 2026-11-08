@@ -1,5 +1,7 @@
+use navori_protocol::Envelope;
 use navori_store::{Migration, MigrationReport, Store};
 use rusqlite::{OptionalExtension, params};
+use serde_json::Value;
 
 use crate::state::{ChoiceState, DecisionState, OpenDecision, UnviewedUpdate};
 
@@ -363,7 +365,8 @@ pub fn load_open_decisions(store: &Store) -> Result<Vec<OpenDecision>, String> {
         let mut stmt = conn
             .prepare(
                 "SELECT id, key, revision, state, title, reason, raised_at_ms, expires_at_ms,
-                            primary_label, primary_risk, secondary_label, secondary_risk,
+                            primary_label, primary_risk, primary_envelope,
+                            secondary_label, secondary_risk, secondary_envelope,
                             chosen, error
                      FROM needs_you_decisions
                      WHERE state IN ('open','answering','failed')
@@ -373,8 +376,8 @@ pub fn load_open_decisions(store: &Store) -> Result<Vec<OpenDecision>, String> {
         let rows = stmt
             .query_map([], |row| {
                 let state: String = row.get(3)?;
-                let chosen: Option<String> = row.get(12)?;
-                let error: Option<String> = row.get(13)?;
+                let chosen: Option<String> = row.get(14)?;
+                let error: Option<String> = row.get(15)?;
                 let decision_state = match state.as_str() {
                     "open" => DecisionState::Open,
                     "answering" => DecisionState::Answering {
@@ -392,6 +395,8 @@ pub fn load_open_decisions(store: &Store) -> Result<Vec<OpenDecision>, String> {
                         ));
                     }
                 };
+                let primary_envelope: Option<String> = row.get(10)?;
+                let secondary_envelope: Option<String> = row.get(13)?;
                 Ok(OpenDecision {
                     id: row.get(0)?,
                     key: row.get(1)?,
@@ -403,10 +408,12 @@ pub fn load_open_decisions(store: &Store) -> Result<Vec<OpenDecision>, String> {
                     primary: ChoiceState {
                         label: row.get(8)?,
                         risk: row.get(9)?,
+                        action: action_name(primary_envelope.as_deref()),
                     },
                     secondary: ChoiceState {
-                        label: row.get(10)?,
-                        risk: row.get(11)?,
+                        label: row.get(11)?,
+                        risk: row.get(12)?,
+                        action: action_name(secondary_envelope.as_deref()),
                     },
                     state: decision_state,
                 })
@@ -415,6 +422,16 @@ pub fn load_open_decisions(store: &Store) -> Result<Vec<OpenDecision>, String> {
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())
     })
+}
+
+fn action_name(raw: Option<&str>) -> Option<String> {
+    let raw = raw?;
+    let envelope: Envelope = serde_json::from_str(raw).ok()?;
+    match envelope.action {
+        Value::String(name) => Some(name),
+        Value::Object(map) if map.len() == 1 => map.into_iter().next().map(|(name, _)| name),
+        _ => None,
+    }
 }
 
 #[derive(Debug, Clone)]

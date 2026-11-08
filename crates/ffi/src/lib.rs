@@ -10,6 +10,7 @@
 mod ai;
 mod app;
 mod logging;
+pub mod needs_you;
 pub mod running;
 mod session;
 
@@ -33,12 +34,18 @@ use crate::ai::AiRuntime;
 use crate::app::{Inner, IpcBridge};
 
 pub use ai::{AiDeps, LlmChatSender, LlmSender, ask_error_to_rpc, service_for};
-pub use app::{awake_check, awake_view, config_notice, lid_check, ports_check, running_view};
+pub use app::{
+    awake_check, awake_view, config_notice, lid_check, needs_you_view, ports_check, running_view,
+};
 pub use navori_agent::{
     ConversationId, ConversationStore, Origin, StoreConversations, TurnEnd, TurnErrorKind,
     TurnOutcome, TurnRequest, TurnStartError,
 };
 pub use navori_context::StoreAudit;
+pub use needs_you::{
+    ChoiceView, DecideRow, DecideState, HistoryEntry, HistoryView, NeedsYouView, TodoRow,
+    TodoStatus, UpdateRow,
+};
 
 uniffi::setup_scaffolding!();
 
@@ -205,6 +212,9 @@ pub struct CoreSnapshot {
     /// Projects, sessions and ports joined for the Running menu. Absent when neither Awake nor
     /// Ports has a state to read.
     pub running: Option<running::RunningView>,
+    /// Decisions, To-dos and Updates joined for Needs you. Absent when neither Module has state
+    /// and neither is down.
+    pub needs_you: Option<NeedsYouView>,
     /// The status icon state, composed once per snapshot.
     pub tray: TrayView,
 }
@@ -504,6 +514,34 @@ impl NavoriCore {
             .await
     }
 
+    /// History of Decisions, Updates and To-dos, newest `resolved_at_ms` first.
+    pub async fn needs_you_history(&self) -> Result<HistoryView, CoreError> {
+        self.on_runtime(|inner| async move {
+            let decisions = inner
+                .kernel
+                .dispatch(Envelope {
+                    module: "needs_you".into(),
+                    action: serde_json::json!("history"),
+                })
+                .await
+                .map_err(|e| CoreError::Dispatch {
+                    message: e.to_string(),
+                })?;
+            let todos = inner
+                .kernel
+                .dispatch(Envelope {
+                    module: "todo".into(),
+                    action: serde_json::json!("history"),
+                })
+                .await
+                .map_err(|e| CoreError::Dispatch {
+                    message: e.to_string(),
+                })?;
+            Ok(needs_you::merge_history(decisions, todos))
+        })
+        .await
+    }
+
     /// Faster snapshot pushes while the menubar panel is open.
     pub fn set_panel_visible(&self, visible: bool) {
         self.inner.kernel.scheduler().set_panel_visible(visible);
@@ -583,6 +621,7 @@ fn snapshot(inner: &Inner) -> CoreSnapshot {
             helper: Some(inner.integrations.helper.clone()),
         },
     );
+    let needs_you = app::needs_you_view(&inner.kernel);
     CoreSnapshot {
         version: status.version,
         profile: status.profile,
@@ -618,6 +657,7 @@ fn snapshot(inner: &Inner) -> CoreSnapshot {
             .collect(),
         awake,
         running,
+        needs_you,
         tray: status.tray.into(),
     }
 }
