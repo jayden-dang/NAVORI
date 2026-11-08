@@ -562,7 +562,9 @@ fn rpc_err(code: i64, e: impl std::fmt::Display) -> rpc::Error {
 pub fn dispatch_to_rpc(e: DispatchError) -> rpc::Error {
     let code = match &e {
         DispatchError::UnknownModule(_) => rpc::code::UNKNOWN_MODULE,
-        DispatchError::InvalidAction { .. } => rpc::code::INVALID_PARAMS,
+        DispatchError::InvalidAction { .. } | DispatchError::Refused { .. } => {
+            rpc::code::INVALID_PARAMS
+        }
         DispatchError::Unavailable(_) | DispatchError::Timeout(_) => rpc::code::MODULE_UNAVAILABLE,
         DispatchError::Action(_) => rpc::code::ACTION_FAILED,
     };

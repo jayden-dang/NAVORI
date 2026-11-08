@@ -12,6 +12,7 @@ use tokio::sync::{mpsc, oneshot, watch};
 use tokio_util::sync::CancellationToken;
 
 use crate::bus::EventBus;
+use crate::dispatcher::ModuleDispatcher;
 use crate::scheduler::{Scheduler, WaitHandle};
 use crate::tray::TrayContribution;
 
@@ -128,6 +129,7 @@ pub struct ModuleCtx<M: Module> {
     pub shutdown: CancellationToken,
     pub(crate) scheduler: Scheduler,
     pub(crate) config: Arc<M::Config>,
+    pub(crate) dispatcher: ModuleDispatcher,
 }
 
 impl<M: Module> std::fmt::Debug for ModuleCtx<M> {
@@ -168,5 +170,9 @@ impl<M: Module> ModuleCtx<M> {
 
     pub fn config(&self) -> Arc<M::Config> {
         Arc::clone(&self.config)
+    }
+
+    pub fn dispatcher(&self) -> ModuleDispatcher {
+        self.dispatcher.clone()
     }
 }
