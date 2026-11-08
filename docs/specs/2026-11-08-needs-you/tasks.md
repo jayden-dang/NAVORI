@@ -473,10 +473,10 @@ _Requirements: NEEDS-6.1, NEEDS-6.2, NEEDS-6.4, NEEDS-6.5, NEEDS-7.1, NEEDS-8.1,
 
 **Depends-on:** Task 15
 
-- [ ] **Step 1: Implement** the History submenu (loading, empty, error states; `Undo` on To-do entries only; answered Decisions read-only).
+- [x] **Step 1: Implement** the History submenu (loading, empty, error states; `Undo` on To-do entries only; answered Decisions read-only).
   Run: `cargo xtask ci` — expect: pass.
-- [ ] **Step 2: Acceptance** — `cargo xtask run`; after ticking a To-do, answering a Decision and clearing an Update, `History ›` lists all three newest first; `Undo` returns the To-do with its date; the Decision entry has no answer control.
-- [ ] **Step 3: Commit** `git commit -m "feat(panel): History of the last 30 days"`
+- [x] **Step 2: Acceptance** — `cargo xtask run`; after ticking a To-do, answering a Decision and clearing an Update, `History ›` lists all three newest first; `Undo` returns the To-do with its date; the Decision entry has no answer control.
+- [x] **Step 3: Commit** `git commit -m "feat(panel): History of the last 30 days"`
 
 _Requirements: NEEDS-12.1, NEEDS-12.2, NEEDS-12.5_
 
