@@ -74,7 +74,7 @@ operator; the operator confirms or changes it when reading this file.
 - **NEEDS-4.7** IF the chosen Envelope's dispatch fails, or its Action is no longer in the Action catalog when the answer arrives, THEN THE SYSTEM SHALL keep the Decision open, show `Retry` as its primary button, and carry the error in the row's tooltip and accessibility value.
 - **NEEDS-4.8** WHEN the user activates `Retry` THE SYSTEM SHALL answer the Decision again with the choice that failed.
 - **NEEDS-4.9** IF `needs_you.answer` names a Decision that is not open, or one whose answer is already running, THEN THE SYSTEM SHALL refuse it and dispatch nothing.
-- **NEEDS-4.10** IF Navori stops while a Decision's answer is running THEN THE SYSTEM SHALL, on the next start, show that Decision in the failed state of NEEDS-4.7 with the error `Navori stopped before this finished — it may already have run`, and SHALL NOT dispatch its Envelope again until the user answers again.
+- **NEEDS-4.10** IF Navori stops while a Decision's answer is running THEN THE SYSTEM SHALL, on the next start, show that Decision in the failed state of NEEDS-4.7 with the error `Navori stopped before this finished — it may already have run`, and SHALL NOT dispatch its Envelope again until the user answers again. *(agent-decided — error copy)*
 - **NEEDS-4.11** WHEN Navori AI calls `needs_you.answer` THE SYSTEM SHALL refuse the call and dispatch no Envelope.
 
 ## 5. Let a Decision expire
