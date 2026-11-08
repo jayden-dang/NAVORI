@@ -120,7 +120,7 @@ _Avoid_: notifications, inbox of PRs, alerts
 
 **Decision**:
 A Needs you item where a Module or Navori AI asks and only the user decides, answered with
-one of two inline buttons.
+an inline button.
 _Avoid_: prompt, confirmation dialog
 
 **To-do**:
