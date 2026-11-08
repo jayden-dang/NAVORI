@@ -402,10 +402,10 @@ _Requirements: NEEDS-3.6, NEEDS-3.10, NEEDS-4.2, NEEDS-6.2, NEEDS-9.3, NEEDS-9.5
 
 **Depends-on:** Task 11, Task 12
 
-- [ ] **Step 1: Implement** `CapsuleButton` with a real action, `DecideRowView` (hover/focus swap, spinner, `Retry`, tooltip/accessibility value, Destructive hint), the Decide block, the `Needs you` row (count, red dot, chevron), `✓ You're all caught up`, the new level-0 order, Release visibility, ⌘⌫ routing and button hit-testing.
+- [x] **Step 1: Implement** `CapsuleButton` with a real action, `DecideRowView` (hover/focus swap, spinner, `Retry`, tooltip/accessibility value, Destructive hint), the Decide block, the `Needs you` row (count, red dot, chevron), `✓ You're all caught up`, the new level-0 order, Release visibility, ⌘⌫ routing and button hit-testing.
   Run: `cargo xtask ci` — expect: pass (Swift build and `swift test`).
-- [ ] **Step 2: Acceptance** — `cargo xtask run`; start a throwaway listener (`python3 -m http.server 8765`) and raise two Decisions from the CLI — one whose primary is a `ports.kill` Envelope (`modules/ports/src/action.rs:21-26`) naming only that listener's pid, one with no Envelopes; check one-line rows, hover and focus swap, Return and ⌘⌫, spinner, `Retry` after making the target fail, the Destructive tooltip, attention on and off, `All caught up`, VoiceOver string; then `cargo xtask bundle --profile release` (builds `build/release/Navori.app` in the worktree; nothing is installed) and `strings build/release/Navori.app/Contents/MacOS/Navori | grep -c NAVORI-PREVIEW-SAMPLE` — expect `0`; in the dev app, no Ask field, Ports or Pull Requests rows outside the preview.
-- [ ] **Step 3: Commit** `git commit -m "feat(panel): Decide rows and the Needs you row on level 0"`
+- [x] **Step 2: Acceptance** — `cargo xtask run`; start a throwaway listener (`python3 -m http.server 8765`) and raise two Decisions from the CLI — one whose primary is a `ports.kill` Envelope (`modules/ports/src/action.rs:21-26`) naming only that listener's pid, one with no Envelopes; check one-line rows, hover and focus swap, Return and ⌘⌫, spinner, `Retry` after making the target fail, the Destructive tooltip, attention on and off, `All caught up`, VoiceOver string; then `cargo xtask bundle --profile release` (builds `build/release/Navori.app` in the worktree; nothing is installed) and `strings build/release/Navori.app/Contents/MacOS/Navori | grep -c NAVORI-PREVIEW-SAMPLE` — expect `0`; in the dev app, no Ask field, Ports or Pull Requests rows outside the preview.
+- [x] **Step 3: Commit** `git commit -m "feat(panel): Decide rows and the Needs you row on level 0"`
 
 _Requirements: NEEDS-3.2, NEEDS-3.3, NEEDS-3.5, NEEDS-3.9, NEEDS-4.1, NEEDS-4.6, NEEDS-11.5, NEEDS-13.7, NEEDS-13.10, NEEDS-13.12_
 
