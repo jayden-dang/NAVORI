@@ -225,6 +225,7 @@ pub struct AnswerRow {
     pub revision: u32,
     /// `None` when the row is already settled (answered/expired).
     pub kind: Option<OpenKind>,
+    pub title: String,
     pub expires_at_ms: Option<i64>,
     pub primary_envelope: Option<String>,
     pub secondary_envelope: Option<String>,
@@ -234,7 +235,7 @@ pub fn find_for_answer(store: &Store, id: i64) -> Result<Option<AnswerRow>, Stri
     store
         .with_conn(|conn| {
             conn.query_row(
-                "SELECT id, revision, state, expires_at_ms, primary_envelope, secondary_envelope
+                "SELECT id, revision, state, title, expires_at_ms, primary_envelope, secondary_envelope
                  FROM needs_you_decisions WHERE id = ?1",
                 [id],
                 |row| {
@@ -249,9 +250,10 @@ pub fn find_for_answer(store: &Store, id: i64) -> Result<Option<AnswerRow>, Stri
                         id: row.get(0)?,
                         revision: row.get(1)?,
                         kind,
-                        expires_at_ms: row.get(3)?,
-                        primary_envelope: row.get(4)?,
-                        secondary_envelope: row.get(5)?,
+                        title: row.get(3)?,
+                        expires_at_ms: row.get(4)?,
+                        primary_envelope: row.get(5)?,
+                        secondary_envelope: row.get(6)?,
                     })
                 },
             )
@@ -289,23 +291,6 @@ pub fn mark_failed(store: &Store, id: i64, choice: &str, error: &str) -> Result<
             .map_err(|e| e.to_string())?;
         if changed != 1 {
             return Err("Decision was not marked failed".to_owned());
-        }
-        Ok(())
-    })
-}
-
-pub fn mark_expired(store: &Store, id: i64, resolved_at_ms: i64) -> Result<(), String> {
-    store.with_conn(|conn| {
-        let changed = conn
-            .execute(
-                "UPDATE needs_you_decisions
-                     SET state = 'expired', resolved_at_ms = ?1
-                     WHERE id = ?2 AND state IN ('open','failed')",
-                params![resolved_at_ms, id],
-            )
-            .map_err(|e| e.to_string())?;
-        if changed != 1 {
-            return Err("Decision was not marked expired".to_owned());
         }
         Ok(())
     })

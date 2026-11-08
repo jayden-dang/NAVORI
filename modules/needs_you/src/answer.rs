@@ -52,7 +52,8 @@ pub fn answer(
     if let Some(expires) = row.expires_at_ms
         && expires <= now_ms
     {
-        stored::mark_expired(&ctx.store, id, now_ms).map_err(ActionError::Failed)?;
+        stored::expire_to_update(&ctx.store, id, &row.title, now_ms)
+            .map_err(ActionError::Failed)?;
         return Err(ActionError::Invalid("Decision has expired".into()));
     }
 

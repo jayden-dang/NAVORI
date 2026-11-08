@@ -328,17 +328,15 @@ async fn refused_answers_dispatch_nothing() {
             .expect_err("expired");
         assert!(matches!(err, DispatchError::Action(_)), "{err:?}");
         assert_eq!(h.target_state()["seen"], json!([]));
-        let state: String = h
-            .store
-            .with_conn(|conn| {
-                conn.query_row(
-                    "SELECT state FROM needs_you_decisions WHERE id = ?1",
-                    [id],
-                    |row| row.get(0),
-                )
-            })
-            .unwrap();
-        assert_eq!(state, "expired");
+        let state = h.state();
+        assert!(
+            state["decisions"].as_array().unwrap().is_empty(),
+            "expired Decision must leave State: {state}"
+        );
+        let updates = state["updates"].as_array().unwrap();
+        assert_eq!(updates.len(), 1, "{state}");
+        assert_eq!(updates[0]["kind"], "decision_expired");
+        assert_eq!(updates[0]["title"], "Expired: Expiring");
         h.shutdown().await;
     }
 }
