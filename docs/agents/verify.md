@@ -98,6 +98,7 @@ Index:
 | Action catalog | `actions --json` | lists `system.ping` (read) and `system.prune_journal` |
 | Dispatch | `dispatch system '"ping"'` | prints `"pong"` |
 | Awake | `awake status`, `hold`, `release-all`, `lid on\|off`, `run -- <cmd>` | a lease is listed while held; gone after `release-all` or when the command exits |
+| Needs you | `dispatch needs_you …`, `dispatch todo …`, menubar Decide / Needs you | an answered Decision and a ticked To-do appear in History; empty History reads `Nothing here yet` |
 | Integrations | `dispatch integrations ...`, `doctor` | Install writes the Harness hook entries into the Hook file under the temp home; Remove takes them out |
 | Ports | `dispatch ports '"list"'`, `doctor` | the listening ports of the user's processes, grouped by project; the `ports` row passes (`not scanned yet` before the first scan) and fails with the outcome after a failed scan |
 | Menubar panel | click the Navori Dev menu bar icon | manual drive only for now (see below) |
@@ -156,6 +157,14 @@ Index:
   4. `"$CLI" --profile dev awake run -- sleep 5` — the command's exit code, even 3; with the Core off the command still runs.
 - **Gotchas:** no flag on `hold` means until turned off. `Display on` has no CLI verb; dispatch `{"display":{"on":true}}`. Session hold is `dispatch`, not a CLI verb. Tracking agents is `dispatch` too: `{"tracking":{"on":false}}`. While it is off, `status` lists no session, though Navori still follows them.
 - **Persist check:** a command or session lease is still listed after quit and relaunch if the process is still the same; a duration or until-off lease is not. Tracking agents reads the same after relaunch.
+
+### Needs you
+
+- **Sub-features:** Decisions, Updates, To-dos, History
+- **How to get to it (user POV):** open the panel — Decide block on level 0, then the `Needs you` row and `History ›`.
+- **Driving it with the CLI:** `"$CLI" --profile dev dispatch needs_you '{"raise":{…}}'` then `'{"answer":{"id":…,"revision":…,"choice":"primary"}}'`; `"$CLI" --profile dev dispatch todo '{"add":{"title":"…","due_on":null}}'` then `'{"tick":{"id":…}}'`; `"$CLI" --profile dev dispatch needs_you '"history"'` and `dispatch todo '"history"'`.
+- **Gotchas:** there is no `navori needs-you` verb — only `dispatch`. `navori doctor` lists these Modules on the existing `modules` row, not a new one. Empty History reads `Nothing here yet`. Do not treat `cargo xtask perf` as part of this feature's branch gate; the open budget is measured once before release.
+- **Persist check:** open Decisions, To-dos, Updates and History survive quit and relaunch.
 
 ### Ports
 
