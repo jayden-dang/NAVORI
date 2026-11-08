@@ -82,6 +82,15 @@ Design: ./design.md
 | `docs/specs/2026-11-02-menubar-visual-foundation/requirements.md`, `docs/specs/2026-11-02-awake-leases/requirements.md` | amendment notes on MENU-1.2, MENU-1.4, AWAKE-11.1 |
 | `docs/design/2026-11-01-menubar-ui-brief.md` | amendment notes on rules 6 and 12 |
 | `docs/architecture/data.md`, `docs/codebase/modules.md`, `docs/codebase/map.md` | real table and crate names |
+| `docs/architecture/system.md` | Needs you row names the built modules |
+| `docs/agents/verify.md` | how to drive Needs you |
+| `docs/features/needs-you.md` | operator note |
+| `docs/adr/0011-modules-dispatch-through-a-kernel-given-dispatcher.md` | dispatcher decision |
+| `docs/roadmap/INDEX.md` | roadmap row for this feature |
+| `CONTEXT.md` | glossary |
+| `Cargo.lock` | lockfile for the new crates |
+| `crates/ffi/tests/agent.rs` | catalog lock for the new Actions |
+| `crates/kernel/tests/kernel.rs` | kernel drop closes module inboxes |
 
 Retrieval (load-subgraph, schema 1.1, fsubr-1.2): owns_coverage 15/20 (0.75); observations `[]`. blast_radius names ICON and KCONTRACT on the kernel files; ASK, AWAKE, HOOKS, ICON, KCONTRACT, LID, PORTS, PSTOP (and LOOP on `lib.rs`) on the ffi files; MENU, PSTOP, AWAKE, PERF, ICON, LID on the Shell files. `cluster(NEEDS)` holds NEEDS only — NEEDS has no OWNS until this file exists.
 
