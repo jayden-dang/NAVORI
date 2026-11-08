@@ -9,6 +9,9 @@ struct PanelView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             banners
+            decideBlock
+            MenuRowView(row: needsYouRow, cascade: cascade)
+            Divider()
             MenuRowView(row: runningRow, cascade: cascade)
             if store.coreRowVisible {
                 MenuRowView(row: coreRow, cascade: cascade)
@@ -21,6 +24,48 @@ struct PanelView: View {
         .padding(MenuMetrics.pad)
         .frame(width: MenuMetrics.level0Width, alignment: .topLeading)
         .fixedSize(horizontal: true, vertical: true)
+    }
+
+    @ViewBuilder
+    private var decideBlock: some View {
+        let needs = store.needsYou
+        let down = needs?.down == true
+        let decisions = needs?.decisions ?? []
+        if !decisions.isEmpty {
+            DecideHeaderView(count: decisions.count, cascade: cascade)
+            ForEach(decisions, id: \.id) { row in
+                DecideRowView(row: row, cascade: cascade, store: store, isDimmed: down)
+            }
+        } else if needs?.allCaughtUp == true, !down {
+            Text("✓ You're all caught up")
+                .font(.system(size: 14))
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .padding(.horizontal, 8)
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: MenuMetrics.rowHeight,
+                    maxHeight: MenuMetrics.rowHeight,
+                    alignment: .leading
+                )
+                .accessibilityLabel("You're all caught up")
+        }
+    }
+
+    private var needsYouRow: MenuRow {
+        let needs = store.needsYou
+        let count = needs?.needsCount ?? 0
+        let down = needs?.down == true
+        let caughtUp = needs?.allCaughtUp == true && !down
+        return MenuRow(
+            id: "needs",
+            icon: "sparkle",
+            title: "Needs you",
+            value: caughtUp || count == 0 ? nil : "\(count)",
+            dot: needs?.anyOverdue == true ? .red : nil,
+            opensSubmenu: true,
+            shortcut: nil,
+            isDimmed: down
+        )
     }
 
     @ViewBuilder

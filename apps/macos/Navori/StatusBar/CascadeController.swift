@@ -13,6 +13,7 @@ final class CascadeController {
     @ObservationIgnored private var state: CascadeState
     @ObservationIgnored private var hoverTimer: DispatchWorkItem?
     @ObservationIgnored private var rowFrames = CascadeRowFrames()
+    @ObservationIgnored private var decideButtons: [String: DecideButtonFrames] = [:]
     @ObservationIgnored private var panels: [Int: CascadePanel] = [:]
     @ObservationIgnored private var lastClickRow: String?
     @ObservationIgnored private var lastClickAt: CFTimeInterval = 0
@@ -24,6 +25,7 @@ final class CascadeController {
     @ObservationIgnored private let activateRow: (String) -> Void
     @ObservationIgnored private let log = Logger(subsystem: "dev.navori", category: "cascade")
     @ObservationIgnored var interceptKey: ((CascadeKey) -> Bool)?
+    @ObservationIgnored var answerDecide: ((String, Bool) -> Void)?
     @ObservationIgnored weak var panel: StatusPanel?
     @ObservationIgnored private var surfaceTint: NSColor = GlassTint.standard
 
@@ -77,6 +79,18 @@ final class CascadeController {
         if state.openPath.contains(row) {
             schedulePlace(row)
         }
+    }
+
+    func setDecideButtons(_ row: String, _ frames: DecideButtonFrames?) {
+        if let frames {
+            decideButtons[row] = frames
+        } else {
+            decideButtons.removeValue(forKey: row)
+        }
+    }
+
+    func decideButtonFrames() -> [String: DecideButtonFrames] {
+        decideButtons
     }
 
     func replaceTree() {

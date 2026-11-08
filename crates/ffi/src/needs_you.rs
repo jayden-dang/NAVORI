@@ -19,6 +19,7 @@ pub struct ChoiceView {
     pub label: String,
     pub risk: Option<String>,
     pub action: Option<String>,
+    pub module: Option<String>,
     pub answer_request: String,
 }
 
@@ -168,6 +169,7 @@ fn choice_view(choice: &ChoiceState, id: i64, revision: u32, which: &str) -> Cho
         label: choice.label.clone(),
         risk: choice.risk.clone(),
         action: choice.action.clone(),
+        module: choice.module.clone(),
         answer_request: json!({
             "answer": {
                 "id": id,

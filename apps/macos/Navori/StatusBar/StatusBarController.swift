@@ -1,4 +1,5 @@
 import AppKit
+import NavoriCore
 import NavoriPanel
 import Observation
 import QuartzCore
@@ -48,6 +49,9 @@ final class StatusBarController: NSObject {
                 return false
             }
         }
+        panel.cascade.answerDecide = { [weak self] id, primary in
+            self?.answerDecide(id: id, primary: primary)
+        }
         return panel
     }()
     #if DEBUG
@@ -59,6 +63,7 @@ final class StatusBarController: NSObject {
     private var runningHadSubmenu = false
     private var runningTree: [CascadeNode] = []
     private var coreRowWasVisible = false
+    private var needsYouSignature: NeedsYouSignature = .empty
     private var motion = StatusIconMotion()
     private var drawn: (state: StatusIconState, loop: Bool)?
     private var accessibilityObserver: NSObjectProtocol?
@@ -255,6 +260,7 @@ final class StatusBarController: NSObject {
             _ = store.hasSnapshot
             _ = store.runningTree
             _ = store.coreRowVisible
+            _ = store.needsYou
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.onSnapshotChange()
@@ -268,13 +274,18 @@ final class StatusBarController: NSObject {
         let tree = store.runningTree
         let coreArrived = store.hasSnapshot && !didReplaceCoreTree
         let coreRowVisible = store.coreRowVisible
-        let changed = hasSubmenu != runningHadSubmenu || tree != runningTree || coreRowVisible != coreRowWasVisible
+        let needsSignature = NeedsYouSignature(store.needsYou)
+        let changed = hasSubmenu != runningHadSubmenu
+            || tree != runningTree
+            || coreRowVisible != coreRowWasVisible
+            || needsSignature != needsYouSignature
         if coreArrived {
             didReplaceCoreTree = true
         }
         runningHadSubmenu = hasSubmenu
         runningTree = tree
         coreRowWasVisible = coreRowVisible
+        needsYouSignature = needsSignature
         guard panelBuilt, panel.isOpen, coreArrived || changed else { return }
         panel.cascade.replaceTree()
     }
@@ -290,7 +301,17 @@ final class StatusBarController: NSObject {
         let runningChildren = store.hasSnapshot && RunningRowState(running: store.running).hasSubmenu
             ? runningCommands + store.runningTree
             : []
+        let needs = store.needsYou
+        let decisions: [CascadeNode]
+        if let needs, !needs.decisions.isEmpty {
+            decisions = [CascadeNode(id: "decide.header")]
+                + needs.decisions.map { CascadeNode(id: "decide.\($0.id)", isActionable: true) }
+        } else {
+            decisions = []
+        }
         return LevelZeroTree.rows(
+            decisions: decisions,
+            needs: CascadeNode(id: "needs", isActionable: true),
             running: CascadeNode(id: "running", isActionable: true, children: runningChildren),
             core: CascadeNode(id: "core", isActionable: true, children: coreChildren),
             status: store.coreStatus,
@@ -322,11 +343,32 @@ final class StatusBarController: NSObject {
         case "awake.lid":
             let command = store.awakeSubmenu.lidToggle
             Task { [store] in await store.perform(command) }
+        case "needs", "decide.header":
+            return
+        case _ where id.hasPrefix("decide."):
+            answerDecide(id: id, primary: true)
         default:
             guard let choice = KeepAwakeChoice(id: id) else { return }
             let command = store.awakeSubmenu.command(picking: choice)
             Task { [store] in await store.perform(command) }
         }
+    }
+
+    fileprivate func answerDecide(id: String, primary: Bool) {
+        guard let decisionId = Int64(id.dropFirst("decide.".count)),
+              let row = store.needsYou?.decisions.first(where: { $0.id == decisionId })
+        else { return }
+        let request: String
+        if primary {
+            if case let .failed(choice: choice, error: _) = row.state, choice == "secondary" {
+                request = row.secondary.answerRequest
+            } else {
+                request = row.primary.answerRequest
+            }
+        } else {
+            request = row.secondary.answerRequest
+        }
+        Task { [store] in await store.answer(request) }
     }
 
     private func showSettings(_ tab: SettingsTab = .general) {
@@ -385,5 +427,60 @@ final class StatusBarController: NSObject {
     @objc private func openLogs() {
         guard let dir = store.snapshot?.logsDir else { return }
         NSWorkspace.shared.open(URL(filePath: dir, directoryHint: .isDirectory))
+    }
+}
+
+private struct NeedsYouSignature: Equatable {
+    var decisionIds: [Int64]
+    var decisionStates: [String]
+    var needsCount: UInt32
+    var anyOverdue: Bool
+    var allCaughtUp: Bool
+    var down: Bool
+
+    static let empty = NeedsYouSignature(
+        decisionIds: [],
+        decisionStates: [],
+        needsCount: 0,
+        anyOverdue: false,
+        allCaughtUp: false,
+        down: false
+    )
+
+    init(
+        decisionIds: [Int64],
+        decisionStates: [String],
+        needsCount: UInt32,
+        anyOverdue: Bool,
+        allCaughtUp: Bool,
+        down: Bool
+    ) {
+        self.decisionIds = decisionIds
+        self.decisionStates = decisionStates
+        self.needsCount = needsCount
+        self.anyOverdue = anyOverdue
+        self.allCaughtUp = allCaughtUp
+        self.down = down
+    }
+
+    init(_ view: NeedsYouView?) {
+        guard let view else {
+            self = .empty
+            return
+        }
+        self.init(
+            decisionIds: view.decisions.map(\.id),
+            decisionStates: view.decisions.map { row in
+                switch row.state {
+                case .open: "open"
+                case let .answering(choice): "answering:\(choice)"
+                case let .failed(choice, error): "failed:\(choice):\(error)"
+                }
+            },
+            needsCount: view.needsCount,
+            anyOverdue: view.anyOverdue,
+            allCaughtUp: view.allCaughtUp,
+            down: view.down
+        )
     }
 }

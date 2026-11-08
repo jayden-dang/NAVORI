@@ -409,11 +409,13 @@ pub fn load_open_decisions(store: &Store) -> Result<Vec<OpenDecision>, String> {
                         label: row.get(8)?,
                         risk: row.get(9)?,
                         action: action_name(primary_envelope.as_deref()),
+                        module: module_name(primary_envelope.as_deref()),
                     },
                     secondary: ChoiceState {
                         label: row.get(11)?,
                         risk: row.get(12)?,
                         action: action_name(secondary_envelope.as_deref()),
+                        module: module_name(secondary_envelope.as_deref()),
                     },
                     state: decision_state,
                 })
@@ -432,6 +434,12 @@ fn action_name(raw: Option<&str>) -> Option<String> {
         Value::Object(map) if map.len() == 1 => map.into_iter().next().map(|(name, _)| name),
         _ => None,
     }
+}
+
+fn module_name(raw: Option<&str>) -> Option<String> {
+    let raw = raw?;
+    let envelope: Envelope = serde_json::from_str(raw).ok()?;
+    Some(envelope.module)
 }
 
 #[derive(Debug, Clone)]

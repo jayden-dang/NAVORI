@@ -8,11 +8,17 @@ use navori_mod_needs_you::{
 use navori_mod_todo::{OpenTodo, TodoState, TodoStatus as OpenStatus};
 use serde_json::json;
 
-fn choice(label: &str, risk: Option<&str>, action: Option<&str>) -> ChoiceState {
+fn choice(
+    label: &str,
+    risk: Option<&str>,
+    action: Option<&str>,
+    module: Option<&str>,
+) -> ChoiceState {
     ChoiceState {
         label: label.to_owned(),
         risk: risk.map(str::to_owned),
         action: action.map(str::to_owned),
+        module: module.map(str::to_owned),
     }
 }
 
@@ -25,8 +31,8 @@ fn decision(id: i64, title: &str, raised_at_ms: i64, expires_at_ms: Option<i64>)
         reason: "because".into(),
         raised_at_ms,
         expires_at_ms,
-        primary: choice("Yes", Some("write"), Some("poke")),
-        secondary: choice("No", None, None),
+        primary: choice("Yes", Some("write"), Some("poke"), Some("target")),
+        secondary: choice("No", None, None, None),
         state: DecisionState::Open,
     }
 }
@@ -265,8 +271,8 @@ fn answer_requests_carry_id_revision_and_choice() {
             reason: "R".into(),
             raised_at_ms: 1,
             expires_at_ms: None,
-            primary: choice("Go", None, None),
-            secondary: choice("Stop", None, None),
+            primary: choice("Go", None, None, None),
+            secondary: choice("Stop", None, None, None),
             state: DecisionState::Open,
         }],
         updates: vec![],
@@ -305,8 +311,8 @@ fn choice_risk_and_action_are_carried_into_the_view() {
             reason: "R".into(),
             raised_at_ms: 1,
             expires_at_ms: None,
-            primary: choice("Kill", Some("destructive"), Some("kill")),
-            secondary: choice("Skip", Some("read"), None),
+            primary: choice("Kill", Some("destructive"), Some("kill"), Some("ports")),
+            secondary: choice("Skip", Some("read"), None, None),
             state: DecisionState::Answering {
                 choice: "primary".into(),
             },
@@ -319,9 +325,11 @@ fn choice_risk_and_action_are_carried_into_the_view() {
     assert_eq!(row.primary.label, "Kill");
     assert_eq!(row.primary.risk.as_deref(), Some("destructive"));
     assert_eq!(row.primary.action.as_deref(), Some("kill"));
+    assert_eq!(row.primary.module.as_deref(), Some("ports"));
     assert_eq!(row.secondary.label, "Skip");
     assert_eq!(row.secondary.risk.as_deref(), Some("read"));
     assert_eq!(row.secondary.action, None);
+    assert_eq!(row.secondary.module, None);
     assert_eq!(
         row.state,
         DecideState::Answering {

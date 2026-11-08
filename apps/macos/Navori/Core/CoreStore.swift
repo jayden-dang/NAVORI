@@ -120,6 +120,8 @@ final class CoreStore {
 
     var hasSnapshot: Bool { snapshot != nil }
 
+    var needsYou: NeedsYouView? { snapshot?.needsYou }
+
     /// Production hides the Core row while the Core is healthy; the dev profile always shows it.
     var coreRowVisible: Bool {
         CoreRowState.isVisible(status: coreStatus, inDevProfile: AppEnvironment.isDev)
@@ -450,6 +452,15 @@ final class CoreStore {
                 message: message,
                 marks: awakeMarks
             )
+        }
+    }
+
+    func answer(_ request: String) async {
+        do {
+            _ = try await dispatch(module: "needs_you", actionJSON: request)
+        } catch {
+            let message = CoreStartupBanner.menuFailure(for: error)
+            log.error("needs you answer failed: \(message, privacy: .public)")
         }
     }
 

@@ -27,6 +27,9 @@ pub struct ChoiceState {
     /// Action name from the choice's envelope, when one is set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub action: Option<String>,
+    /// Module id from the choice's envelope, when one is set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub module: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
