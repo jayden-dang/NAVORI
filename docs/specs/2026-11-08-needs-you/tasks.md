@@ -327,11 +327,11 @@ _Requirements: NEEDS-8.4, NEEDS-8.5, NEEDS-8.6, NEEDS-8.7, NEEDS-8.8, NEEDS-9.2,
 
 **Depends-on:** Task 9
 
-- [ ] **Step 1: Failing tests:** `ticking_moves_a_todo_to_history`; `undo_returns_it_with_title_and_date`; `tick_and_undo_are_write_actions` (catalog); `old_done_todos_are_pruned`; `a_paused_sweep_prunes_nothing`.
+- [x] **Step 1: Failing tests:** `ticking_moves_a_todo_to_history`; `undo_returns_it_with_title_and_date`; `tick_and_undo_are_write_actions` (catalog); `old_done_todos_are_pruned`; `a_paused_sweep_prunes_nothing`.
   Run: `cargo nextest run -p navori-mod-todo --test history` — expect: compile error, no `Tick`.
-- [ ] **Step 2: Implement** per design section E; add samples.
+- [x] **Step 2: Implement** per design section E; add samples.
   Run: `cargo nextest run -p navori-mod-todo && cargo nextest run -p navori-ffi --test actions_risk` — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(todo): tick, undo and keep 30 days of History"`
+- [x] **Step 3: Commit** `git commit -m "feat(todo): tick, undo and keep 30 days of History"`
 
 _Requirements: NEEDS-10.1, NEEDS-10.2, NEEDS-12.3, NEEDS-12.4, NEEDS-12.5, NEEDS-12.6_
 
