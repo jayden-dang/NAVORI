@@ -101,9 +101,9 @@ Retrieval (load-subgraph, schema 1.1, fsubr-1.2): owns_coverage 15/20 (0.75); ob
 
 **Depends-on:** none
 
-- [ ] **Step 1:** Copy the shape of `StatusPanel` (`.nonactivatingPanel`, `canBecomeKey` true, `resignKey` closes) and of `CascadePanel` (`canBecomeKey` false) into the scratch package; add a child panel with `canBecomeKey { acceptsTyping }`, `becomesKeyOnlyIfNeeded = true`, an `NSTextField` hosted through `NSViewRepresentable`, and a depth-2 panel with a graphical `NSDatePicker`.
-- [ ] **Step 2:** Run it (`swift run`) and check, writing each result: (a) clicking the field makes the child key and typing lands in it; (b) with `resignKey` deferred and checking "key still inside my panels", the parent stays open; (c) the date picker takes a first click and arrow keys; (d) Return in the field reaches the field, Esc closes.
-- [ ] **Step 3:** Write the four results with screenshots to the evidence file, then `rm -rf /tmp/navori-spike-cascade-key`. Any "no" stops the plan and reopens design decision 9.
+- [x] **Step 1:** Copy the shape of `StatusPanel` (`.nonactivatingPanel`, `canBecomeKey` true, `resignKey` closes) and of `CascadePanel` (`canBecomeKey` false) into the scratch package; add a child panel with `canBecomeKey { acceptsTyping }`, `becomesKeyOnlyIfNeeded = true`, an `NSTextField` hosted through `NSViewRepresentable`, and a depth-2 panel with a graphical `NSDatePicker`.
+- [x] **Step 2:** Run it (`swift run`) and check, writing each result: (a) clicking the field makes the child key and typing lands in it; (b) with `resignKey` deferred and checking "key still inside my panels", the parent stays open; (c) the date picker takes a first click and arrow keys; (d) Return in the field reaches the field, Esc closes.
+- [x] **Step 3:** Write the four results with screenshots to the evidence file, then `rm -rf /tmp/navori-spike-cascade-key`. Any "no" stops the plan and reopens design decision 9.
 
 _Requirements: NEEDS-8.2, NEEDS-13.11, NEEDS-13.13_
 
@@ -124,11 +124,11 @@ _Requirements: NEEDS-8.2, NEEDS-13.11, NEEDS-13.13_
 
 **Depends-on:** none
 
-- [ ] **Step 1: Failing tests** in `crates/kernel/tests/dispatcher.rs`, with two test Modules (`Asker`, which on a request dispatches an Envelope through `ctx.dispatcher()` and reports the outcome, and `Target`, with a `Write` action `poke`, a `Destructive` action `wipe` and a `stall` action that never replies): `a_module_reaches_another_and_gets_its_reply`; `send_returns_before_the_target_handles_it` (the Asker answers a second request while `Target` is stalled); `a_module_can_dispatch_to_itself`; `unknown_module_and_timeout_report_dispatch_errors` (`UnknownModule`, `Timeout` with a 100 ms builder timeout); `a_destructive_action_is_refused_without_a_grant` (`Refused`, `wipe` never runs); `a_granted_module_runs_a_destructive_action`; `risk_of_reads_the_catalog_for_string_and_object_actions`; `kernel_dispatch_is_unchanged_for_destructive_actions`.
+- [x] **Step 1: Failing tests** in `crates/kernel/tests/dispatcher.rs`, with two test Modules (`Asker`, which on a request dispatches an Envelope through `ctx.dispatcher()` and reports the outcome, and `Target`, with a `Write` action `poke`, a `Destructive` action `wipe` and a `stall` action that never replies): `a_module_reaches_another_and_gets_its_reply`; `send_returns_before_the_target_handles_it` (the Asker answers a second request while `Target` is stalled); `a_module_can_dispatch_to_itself`; `unknown_module_and_timeout_report_dispatch_errors` (`UnknownModule`, `Timeout` with a 100 ms builder timeout); `a_destructive_action_is_refused_without_a_grant` (`Refused`, `wipe` never runs); `a_granted_module_runs_a_destructive_action`; `risk_of_reads_the_catalog_for_string_and_object_actions`; `kernel_dispatch_is_unchanged_for_destructive_actions`.
   Run: `cargo nextest run -p navori-kernel --test dispatcher` — expect: compile error, `dispatcher` not found on `ModuleCtx`.
-- [ ] **Step 2: Implement** the router (`Arc<OnceLock<Router>>` in `Plumbing`, filled in `start()` before the first launcher runs), `ModuleDispatcher`, `Pending` (wraps the receiver in `tokio::time::timeout(dispatch_timeout)`, maps like `Kernel::dispatch`), the grant set (a grant naming no registered Module is logged and dropped at `start()`), `Refused`, and the `dispatch_to_rpc` arm mapping `Refused` to `rpc::code::INVALID_PARAMS`.
+- [x] **Step 2: Implement** the router (`Arc<OnceLock<Router>>` in `Plumbing`, filled in `start()` before the first launcher runs), `ModuleDispatcher`, `Pending` (wraps the receiver in `tokio::time::timeout(dispatch_timeout)`, maps like `Kernel::dispatch`), the grant set (a grant naming no registered Module is logged and dropped at `start()`), `Refused`, and the `dispatch_to_rpc` arm mapping `Refused` to `rpc::code::INVALID_PARAMS`.
   Run: `cargo nextest run -p navori-kernel` — expect: pass (new and existing kernel tests).
-- [ ] **Step 3: Commit** `git commit -m "feat(kernel): give Modules a dispatcher with a Destructive grant"`
+- [x] **Step 3: Commit** `git commit -m "feat(kernel): give Modules a dispatcher with a Destructive grant"`
 
 _Requirements: NEEDS-2.1, NEEDS-2.2, NEEDS-2.3, NEEDS-2.4, NEEDS-2.5, NEEDS-2.6, NEEDS-13.1_
 
@@ -276,11 +276,11 @@ _Requirements: NEEDS-12.2, NEEDS-12.3, NEEDS-12.4_
 
 **Depends-on:** none
 
-- [ ] **Step 1: Failing test** `offset_matches_the_system_zone`: compare with `date +%z` run through `std::process::Command` for `SystemTime::now()`.
+- [x] **Step 1: Failing test** `offset_matches_the_system_zone`: compare with `date +%z` run through `std::process::Command` for `SystemTime::now()`.
   Run: `cargo nextest run -p navori-macos --test clock` — expect: compile error, no `local_utc_offset`.
-- [ ] **Step 2: Implement** with `libc::localtime_r`.
+- [x] **Step 2: Implement** with `libc::localtime_r`.
   Run: same command — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(macos): read the local UTC offset"`
+- [x] **Step 3: Commit** `git commit -m "feat(macos): read the local UTC offset"`
 
 _Requirements: NEEDS-9.2_
 
@@ -377,11 +377,11 @@ _Requirements: NEEDS-3.1, NEEDS-3.7, NEEDS-3.8, NEEDS-6.1, NEEDS-9.1, NEEDS-11.2
 
 **Depends-on:** none
 
-- [ ] **Step 1: Failing tests:** table-driven `testPillText` with today = Sunday 2026-11-08 (`Today` for 11-08, `Tomorrow` for 11-09, `Tue` for 11-10, `Fri` for 11-13, `Sat` for 11-14, `Sun 15` for 11-15, `Thu 5` for 11-05, `Sat 7` for 11-07, `No date` for none); table-driven `testPillSpoken` (`Overdue, Thursday 5 November`, `Due today`, `Due soon, Sunday 8 November`, `Due later, Friday 13 November`, `No due date`); `testDecisionSpoken` (`Decision: Review PR #41 in zroute, Minh requested your review, 25 minutes ago, Open, Later`); `testDestructiveHint` (`Runs ports.kill — changes things and cannot be undone`); `testCheckboxSpokenIsMarkDone`; `testFilterTabs`; `testDrawnIdsAreOnlyRowsInsideTheViewport`; `testDecideKeys`; `testLevelZeroOrderPutsDecideAndNeedsBeforeRunning`; `testHitMapFindsRowsAboveRunningAndDecideButtons`.
+- [x] **Step 1: Failing tests:** table-driven `testPillText` with today = Sunday 2026-11-08 (`Today` for 11-08, `Tomorrow` for 11-09, `Tue` for 11-10, `Fri` for 11-13, `Sat` for 11-14, `Sun 15` for 11-15, `Thu 5` for 11-05, `Sat 7` for 11-07, `No date` for none); table-driven `testPillSpoken` (`Overdue, Thursday 5 November`, `Due today`, `Due soon, Sunday 8 November`, `Due later, Friday 13 November`, `No due date`); `testDecisionSpoken` (`Decision: Review PR #41 in zroute, Minh requested your review, 25 minutes ago, Open, Later`); `testDestructiveHint` (`Runs ports.kill — changes things and cannot be undone`); `testCheckboxSpokenIsMarkDone`; `testFilterTabs`; `testDrawnIdsAreOnlyRowsInsideTheViewport`; `testDecideKeys`; `testLevelZeroOrderPutsDecideAndNeedsBeforeRunning`; `testHitMapFindsRowsAboveRunningAndDecideButtons`.
   Run: `swift test --arch arm64 --package-path apps/macos --filter NeedsYou` — expect: build failure, `NeedsYouText` not found.
-- [ ] **Step 2: Implement** the helpers and the tree and hit-map changes.
+- [x] **Step 2: Implement** the helpers and the tree and hit-map changes.
   Run: `swift test --arch arm64 --package-path apps/macos` — expect: pass (all NavoriPanel tests).
-- [ ] **Step 3: Commit** `git commit -m "feat(panel): Needs you text, lists and level-0 tree"`
+- [x] **Step 3: Commit** `git commit -m "feat(panel): Needs you text, lists and level-0 tree"`
 
 _Requirements: NEEDS-3.6, NEEDS-3.10, NEEDS-4.2, NEEDS-6.2, NEEDS-9.3, NEEDS-9.5, NEEDS-10.3, NEEDS-11.1_
 
