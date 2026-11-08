@@ -201,11 +201,11 @@ _Requirements: NEEDS-2.7, NEEDS-3.4, NEEDS-3.8, NEEDS-4.3, NEEDS-4.4, NEEDS-4.5,
 
 **Depends-on:** Task 4
 
-- [ ] **Step 1: Failing tests** (`#[tokio::test(start_paused = true)]`, advance both `FakeClock` and tokio time): `a_decision_without_expiry_stays_open`; `an_expired_decision_becomes_an_expired_update` (title `Expired: <title>`, row gone from State); `a_decision_answering_does_not_expire`; `a_failed_decision_expires`; `a_past_deadline_expires_at_start`; `a_wake_after_the_deadline_expires_it_at_once` (`scheduler.wake_pulse()`); `no_action_posts_an_update` (the catalog lists no such action); `updates_never_turn_on_attention`; `migration_v2_keeps_v1_decisions_and_backs_up` (a store at v1 with a row, upgraded: row kept, `MigrationReport.backup` is `Some`).
+- [x] **Step 1: Failing tests** (`#[tokio::test(start_paused = true)]`, advance both `FakeClock` and tokio time): `a_decision_without_expiry_stays_open`; `an_expired_decision_becomes_an_expired_update` (title `Expired: <title>`, row gone from State); `a_decision_answering_does_not_expire`; `a_failed_decision_expires`; `a_past_deadline_expires_at_start`; `a_wake_after_the_deadline_expires_it_at_once` (`scheduler.wake_pulse()`); `no_action_posts_an_update` (the catalog lists no such action); `updates_never_turn_on_attention`; `migration_v2_keeps_v1_decisions_and_backs_up` (a store at v1 with a row, upgraded: row kept, `MigrationReport.backup` is `Some`).
   Run: `cargo nextest run -p navori-mod-needs-you --test expiry` — expect: fail, Decision still open after the deadline.
-- [ ] **Step 2: Implement** migration v2 and the deadline logic of design section D.
+- [x] **Step 2: Implement** migration v2 and the deadline logic of design section D.
   Run: `cargo nextest run -p navori-mod-needs-you` — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(needs-you): expire a Decision into an Update"`
+- [x] **Step 3: Commit** `git commit -m "feat(needs-you): expire a Decision into an Update"`
 
 _Requirements: NEEDS-5.1, NEEDS-5.2, NEEDS-5.4, NEEDS-5.5, NEEDS-11.9, NEEDS-14.4_
 
