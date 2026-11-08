@@ -425,10 +425,10 @@ _Requirements: NEEDS-3.2, NEEDS-3.3, NEEDS-3.5, NEEDS-3.9, NEEDS-4.1, NEEDS-4.6,
 
 **Depends-on:** Task 1, Task 13 (both edit `StatusPanel.swift`)
 
-- [ ] **Step 1: Implement** the three changes of design section I exactly as the spike proved them.
+- [x] **Step 1: Implement** the three changes of design section I exactly as the spike proved them.
   Run: `cargo xtask ci` — expect: pass.
-- [ ] **Step 2: Acceptance** — `cargo xtask run`; open `Running` and Core submenus: arrows, Return and Esc behave as before and no submenu takes key without VoiceOver; click another app's window with the menu open: the menu closes; with VoiceOver on, cascade navigation is unchanged.
-- [ ] **Step 3: Commit** `git commit -m "feat(panel): let a submenu take typing without closing the menu"`
+- [x] **Step 2: Acceptance** — `cargo xtask run`; open `Running` and Core submenus: arrows, Return and Esc behave as before and no submenu takes key without VoiceOver; click another app's window with the menu open: the menu closes; with VoiceOver on, cascade navigation is unchanged.
+- [x] **Step 3: Commit** `git commit -m "feat(panel): let a submenu take typing without closing the menu"`
 
 _Requirements: NEEDS-13.11, NEEDS-13.13_
 
