@@ -97,7 +97,7 @@ operator; the operator confirms or changes it when reading this file.
 - **NEEDS-6.1** THE SYSTEM SHALL list Updates in the Needs you submenu after the To-dos, newest first, each as a two-line row with a `bell` lead, dimmer than a To-do, and no buttons.
 - **NEEDS-6.2** WHEN the Needs you submenu closes THE SYSTEM SHALL mark as viewed exactly the Updates whose rows were drawn in the visible part of the list on the tab then shown. *(agent-decided — close-package C3)*
 - **NEEDS-6.3** WHEN the Needs you submenu opens THE SYSTEM SHALL leave viewed Updates out of the list and out of every count, and keep them in History.
-- **NEEDS-6.4** WHEN the user clicks an Update of kind `decision_expired` THE SYSTEM SHALL open nothing.
+- **NEEDS-6.4** WHEN the user clicks an Update of kind `decision_expired` THE SYSTEM SHALL open nothing. *(agent-decided — an expiry has no context to open; the 2026-11-01 Update row's "click opens the context" waits for ROAD-23, close-package F12)*
 - **NEEDS-6.5** IF Navori stops before the Needs you submenu closes THEN THE SYSTEM SHALL mark no Update as viewed for that showing.
 
 ## 7. Clear updates
@@ -214,7 +214,7 @@ Files this feature touches, and what each must keep:
 
 ## Out of Scope
 
-- Choosing which source raises a Decision on ship day — the operator's open question (Open Questions).
+- Choosing which source raises a Decision on ship day — the operator's open question (Open Questions). On ship day nothing raises a Decision on its own: the Decide rows and the attention mark appear only for Decisions raised by hand (`navori dispatch needs_you`) or by a test.
 - Decisions raised by Navori AI, approvals and permission presets (ROAD-37).
 - Proactive Updates and any Action that posts an Update (ROAD-23). *(agent-decided — close-package C2)*
 - Pull requests (ROAD-20).
@@ -229,4 +229,4 @@ Files this feature touches, and what each must keep:
 
 ## Open Questions
 
-- Which sources raise a Decision on ship day (a PR review request, a reminder, …) — operator — 2026-11-08 — forbid-guess (cấm đoán). The spec ships the contract, a test producer and hand raising through `navori dispatch needs_you`. In roadmap order the first real source is ROAD-37 (MILE-3), then ROAD-20 (MILE-5).
+- Which sources raise a Decision on ship day (a PR review request, a reminder, …) — operator — 2026-11-08 — forbid-guess (cấm đoán). The spec ships the contract, a test producer and hand raising through `navori dispatch needs_you`; until a source exists, nothing raises a Decision on its own, so in normal use the Decide block stays absent and the attention mark stays off. In roadmap order the first real source is ROAD-37 (MILE-3), then ROAD-20 (MILE-5).
