@@ -176,14 +176,10 @@ final class StatusPanel: NSPanel {
 
     override func resignKey() {
         super.resignKey()
-        if NSWorkspace.shared.isVoiceOverEnabled {
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.isOpen else { return }
-                if self.cascade.keyIsInside { return }
-                self.close()
-            }
-        } else {
-            close()
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isOpen else { return }
+            if self.cascade.keyIsInside { return }
+            self.close()
         }
     }
 
