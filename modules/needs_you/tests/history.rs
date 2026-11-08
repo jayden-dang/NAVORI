@@ -200,7 +200,7 @@ async fn history_lists_answered_decisions_and_resolved_updates_newest_first() {
 
     let entries = history(&h).await;
     let list = entries.as_array().unwrap();
-    assert_eq!(list.len(), 3, "{entries}");
+    assert_eq!(list.len(), 2, "{entries}");
 
     assert_eq!(list[0]["kind"], "update");
     assert_eq!(list[0]["title"], "Expired: Late");
@@ -208,15 +208,14 @@ async fn history_lists_answered_decisions_and_resolved_updates_newest_first() {
     assert_eq!(list[0]["resolved_at_ms"], ORIGIN_MS + 1_000);
 
     assert_eq!(list[1]["kind"], "decision");
-    assert_eq!(list[1]["title"], "Late");
-    assert!(list[1].get("chosen_label").is_none());
-    assert_eq!(list[1]["resolved_at_ms"], ORIGIN_MS + 1_000);
-
-    assert_eq!(list[2]["kind"], "decision");
-    assert_eq!(list[2]["title"], "Ship it");
-    assert_eq!(list[2]["chosen_label"], "Ship");
-    assert_eq!(list[2]["resolved_at_ms"], ORIGIN_MS);
-    assert!(list[2].get("id").is_none());
+    assert_eq!(list[1]["title"], "Ship it");
+    assert_eq!(list[1]["chosen_label"], "Ship");
+    assert_eq!(list[1]["resolved_at_ms"], ORIGIN_MS);
+    assert!(list[1].get("id").is_none());
+    assert!(
+        list.iter().all(|row| row["title"] != "Late"),
+        "expired Decisions are the Update, not a History Decision: {entries}"
+    );
 
     h.shutdown().await;
 }

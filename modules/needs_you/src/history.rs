@@ -55,7 +55,7 @@ fn load_history(store: &Store, cutoff: i64) -> Result<Vec<HistoryEntry>, String>
                            END AS chosen_label,
                            resolved_at_ms
                     FROM needs_you_decisions
-                    WHERE state IN ('answered', 'expired')
+                    WHERE state = 'answered'
                       AND resolved_at_ms IS NOT NULL
                       AND resolved_at_ms >= ?1
                     UNION ALL
