@@ -48,6 +48,10 @@ pub enum NeedsYouAction {
         revision: u32,
         choice: Pick,
     },
+    MarkViewed {
+        ids: Vec<i64>,
+    },
+    ClearUpdates,
 }
 
 impl ModuleAction for NeedsYouAction {
@@ -55,6 +59,7 @@ impl ModuleAction for NeedsYouAction {
         match self {
             Self::Raise { .. } => Risk::Write,
             Self::Answer { .. } => Risk::Destructive,
+            Self::MarkViewed { .. } | Self::ClearUpdates => Risk::Write,
         }
     }
 
@@ -69,6 +74,16 @@ impl ModuleAction for NeedsYouAction {
                 name: "answer",
                 description: "Answer an open Decision with one of its choices.",
                 risk: Risk::Destructive,
+            },
+            ActionDoc {
+                name: "mark_viewed",
+                description: "Mark the given Updates as viewed so they leave the list and stay in History.",
+                risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "clear_updates",
+                description: "Clear every unviewed Update into History.",
+                risk: Risk::Write,
             },
         ]
     }

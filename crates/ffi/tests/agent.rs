@@ -646,6 +646,8 @@ fn no_new_action_appears() {
             "ports kill destructive",
             "needs_you raise write",
             "needs_you answer destructive",
+            "needs_you mark_viewed write",
+            "needs_you clear_updates write",
         ]
     );
     core.shutdown();

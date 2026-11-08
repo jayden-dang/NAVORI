@@ -261,7 +261,10 @@ fn no_action_posts_an_update() {
         .into_iter()
         .map(|doc| doc.name)
         .collect();
-    assert_eq!(names, vec!["raise", "answer"]);
+    assert_eq!(
+        names,
+        vec!["raise", "answer", "mark_viewed", "clear_updates"]
+    );
 }
 
 #[tokio::test(start_paused = true)]

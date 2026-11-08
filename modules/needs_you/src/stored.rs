@@ -514,3 +514,36 @@ pub fn load_unviewed_updates(store: &Store) -> Result<Vec<UnviewedUpdate>, Strin
             .map_err(|e| e.to_string())
     })
 }
+
+pub fn mark_updates_viewed(store: &Store, ids: &[i64], resolved_at_ms: i64) -> Result<(), String> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    store.with_conn(|conn| {
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        for id in ids {
+            tx.execute(
+                "UPDATE needs_you_updates
+                     SET resolution = 'viewed', resolved_at_ms = ?1
+                     WHERE id = ?2 AND resolution IS NULL",
+                params![resolved_at_ms, id],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+pub fn clear_unresolved_updates(store: &Store, resolved_at_ms: i64) -> Result<(), String> {
+    store.with_conn(|conn| {
+        conn.execute(
+            "UPDATE needs_you_updates
+                 SET resolution = 'cleared', resolved_at_ms = ?1
+                 WHERE resolution IS NULL",
+            params![resolved_at_ms],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}

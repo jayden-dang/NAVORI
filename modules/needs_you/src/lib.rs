@@ -204,6 +204,34 @@ fn handle(ctx: &ModuleCtx<NeedsYou>, req: Request<NeedsYouAction>) -> Option<Ans
                 }
             }
         }
+        NeedsYouAction::MarkViewed { ids } => {
+            let result = expiry::mark_viewed(ctx, ids);
+            match result {
+                Ok(()) => {
+                    if let Err(err) = reload_state(ctx) {
+                        req.respond::<()>(Err(ActionError::Failed(err.to_string())));
+                        return None;
+                    }
+                    req.respond(Ok(()));
+                }
+                Err(err) => req.respond::<()>(Err(ActionError::Failed(err))),
+            }
+            None
+        }
+        NeedsYouAction::ClearUpdates => {
+            let result = expiry::clear_updates(ctx);
+            match result {
+                Ok(()) => {
+                    if let Err(err) = reload_state(ctx) {
+                        req.respond::<()>(Err(ActionError::Failed(err.to_string())));
+                        return None;
+                    }
+                    req.respond(Ok(()));
+                }
+                Err(err) => req.respond::<()>(Err(ActionError::Failed(err))),
+            }
+            None
+        }
     }
 }
 

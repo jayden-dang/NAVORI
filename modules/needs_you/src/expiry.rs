@@ -26,6 +26,16 @@ pub fn expire_due(ctx: &ModuleCtx<NeedsYou>) -> Result<(), String> {
     Ok(())
 }
 
+pub fn mark_viewed(ctx: &ModuleCtx<NeedsYou>, ids: &[i64]) -> Result<(), String> {
+    let now_ms = millis(ctx.wait_handle().now())?;
+    stored::mark_updates_viewed(&ctx.store, ids, now_ms)
+}
+
+pub fn clear_updates(ctx: &ModuleCtx<NeedsYou>) -> Result<(), String> {
+    let now_ms = millis(ctx.wait_handle().now())?;
+    stored::clear_unresolved_updates(&ctx.store, now_ms)
+}
+
 fn millis(now: SystemTime) -> Result<i64, String> {
     let duration = now
         .duration_since(UNIX_EPOCH)
