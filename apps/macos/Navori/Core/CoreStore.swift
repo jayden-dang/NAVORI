@@ -26,6 +26,11 @@ final class CoreStore {
     private(set) var stopFlows: [String: StopFlow] = [:]
     private(set) var stopProgress = StopProgress()
 
+    var todoDraftText = ""
+    var todoDraftDueOn: String?
+    var drawnUpdateIds: Set<Int64> = []
+    var isTerminating = false
+
     func start() {
         guard core == nil else { return }
         let config = CoreConfig(
@@ -471,6 +476,56 @@ final class CoreStore {
         await answer(row.answerRequest(primary: primary))
     }
 
+    func addTodo(title: String, dueOn: String?) async {
+        var fields: [String: Any] = ["title": title]
+        if let dueOn {
+            fields["due_on"] = dueOn
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: ["add": fields]),
+              let json = String(data: data, encoding: .utf8)
+        else { return }
+        do {
+            _ = try await dispatch(module: "todo", actionJSON: json)
+            todoDraftText = ""
+            todoDraftDueOn = nil
+        } catch {
+            let message = CoreStartupBanner.menuFailure(for: error)
+            log.error("todo add failed: \(message, privacy: .public)")
+        }
+    }
+
+    func tick(_ request: String) async {
+        do {
+            _ = try await dispatch(module: "todo", actionJSON: request)
+        } catch {
+            let message = CoreStartupBanner.menuFailure(for: error)
+            log.error("todo tick failed: \(message, privacy: .public)")
+        }
+    }
+
+    func clearUpdates() async {
+        do {
+            _ = try await dispatch(module: "needs_you", actionJSON: "\"clear_updates\"")
+        } catch {
+            let message = CoreStartupBanner.menuFailure(for: error)
+            log.error("clear updates failed: \(message, privacy: .public)")
+        }
+    }
+
+    func markViewed(_ ids: Set<Int64>) async {
+        guard !isTerminating, !ids.isEmpty else { return }
+        let sorted = ids.sorted()
+        guard let data = try? JSONSerialization.data(withJSONObject: ["mark_viewed": ["ids": sorted]]),
+              let json = String(data: data, encoding: .utf8)
+        else { return }
+        do {
+            _ = try await dispatch(module: "needs_you", actionJSON: json)
+        } catch {
+            let message = CoreStartupBanner.menuFailure(for: error)
+            log.error("mark viewed failed: \(message, privacy: .public)")
+        }
+    }
+
     fileprivate func apply(_ snapshot: CoreSnapshot) {
         self.snapshot = snapshot
         pruneStopState()
@@ -580,8 +635,41 @@ struct NeedsYouDecideRow: Identifiable, Equatable {
     }
 }
 
+struct NeedsYouTodoRow: Identifiable, Equatable {
+    let id: Int64
+    let title: String
+    let dueOn: String?
+    let status: DueStatus
+    let tickRequest: String
+
+    init(_ row: TodoRow) {
+        id = row.id
+        title = row.title
+        dueOn = row.dueOn
+        status = DueStatus(row.status)
+        tickRequest = row.tickRequest
+    }
+}
+
+struct NeedsYouUpdateRow: Identifiable, Equatable {
+    let id: Int64
+    let kind: String
+    let title: String
+    let createdAtMs: Int64
+
+    init(_ row: UpdateRow) {
+        id = row.id
+        kind = row.kind
+        title = row.title
+        createdAtMs = row.createdAtMs
+    }
+}
+
 struct NeedsYouSnapshot: Equatable {
     let decisions: [NeedsYouDecideRow]
+    let todos: [NeedsYouTodoRow]
+    let updates: [NeedsYouUpdateRow]
+    let today: String
     let needsCount: UInt32
     let anyOverdue: Bool
     let allCaughtUp: Bool
@@ -589,10 +677,25 @@ struct NeedsYouSnapshot: Equatable {
 
     init(_ view: NeedsYouView) {
         decisions = view.decisions.map(NeedsYouDecideRow.init)
+        todos = view.todos.map(NeedsYouTodoRow.init)
+        updates = view.updates.map(NeedsYouUpdateRow.init)
+        today = view.today
         needsCount = view.needsCount
         anyOverdue = view.anyOverdue
         allCaughtUp = view.allCaughtUp
         down = view.down
+    }
+}
+
+private extension DueStatus {
+    init(_ status: TodoStatus) {
+        switch status {
+        case .overdue: self = .overdue
+        case .today: self = .today
+        case .soon: self = .soon
+        case .later: self = .later
+        case .none: self = .none
+        }
     }
 }
 

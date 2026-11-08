@@ -25,6 +25,12 @@ final class StatusBarController: NSObject {
                     return AnyView(RunningSubmenuView(store: self.store))
                 case "awake.keep":
                     return AnyView(KeepAwakeSubmenuView(store: self.store))
+                case "needs":
+                    return AnyView(NeedsYouSubmenuView(store: self.store))
+                case "needs.date":
+                    return AnyView(DueCalendarView(store: self.store))
+                case "needs.history":
+                    return AnyView(EmptyView())
                 case _ where id.hasPrefix("running.project.") || id == "running.other":
                     return AnyView(ProjectChildView(projectId: id, store: self.store))
                 default:
@@ -50,6 +56,9 @@ final class StatusBarController: NSObject {
         }
         panel.cascade.answerDecide = { [weak self] id, primary in
             self?.answerDecide(id: id, primary: primary)
+        }
+        panel.cascade.onSubmenuClosed = { [weak self] id in
+            self?.needsSubmenuClosed(id)
         }
         return panel
     }()
@@ -94,6 +103,15 @@ final class StatusBarController: NSObject {
         }
         observeStatusIcon()
         observeSnapshot()
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.store.isTerminating = true
+            }
+        }
     }
 
     isolated deinit {
@@ -310,7 +328,20 @@ final class StatusBarController: NSObject {
         }
         return LevelZeroTree.rows(
             decisions: decisions,
-            needs: CascadeNode(id: "needs", isActionable: true),
+            needs: CascadeNode(
+                id: "needs",
+                isActionable: true,
+                children: [
+                    CascadeNode(
+                        id: "needs.date",
+                        children: [CascadeNode(id: "needs.date.body")]
+                    ),
+                    CascadeNode(
+                        id: "needs.history",
+                        children: [CascadeNode(id: "needs.history.body")]
+                    ),
+                ]
+            ),
             running: CascadeNode(id: "running", isActionable: true, children: runningChildren),
             core: CascadeNode(id: "core", isActionable: true, children: coreChildren),
             status: store.coreStatus,
@@ -335,14 +366,17 @@ final class StatusBarController: NSObject {
         case _ where id.hasPrefix("running."): store.askChildStop(id)
         case "settings": showSettings(.general)
         case "about": showSettings(.about)
-        case "quit": NSApp.terminate(nil)
+        case "quit":
+            store.isTerminating = true
+            NSApp.terminate(nil)
         case "awake.tracking":
             let command = AwakeCommand.tracking(store.awakeSubmenu.trackingOn == false)
             Task { [store] in await store.perform(command) }
         case "awake.lid":
             let command = store.awakeSubmenu.lidToggle
             Task { [store] in await store.perform(command) }
-        case "needs", "decide.header":
+        case "needs", "needs.date", "needs.history", "needs.date.body", "needs.history.body",
+             "decide.header":
             return
         case _ where id.hasPrefix("decide."):
             answerDecide(id: id, primary: true)
@@ -351,6 +385,13 @@ final class StatusBarController: NSObject {
             let command = store.awakeSubmenu.command(picking: choice)
             Task { [store] in await store.perform(command) }
         }
+    }
+
+    private func needsSubmenuClosed(_ id: String) {
+        guard id == "needs" else { return }
+        let ids = store.drawnUpdateIds
+        store.drawnUpdateIds = []
+        Task { [store] in await store.markViewed(ids) }
     }
 
     fileprivate func answerDecide(id: String, primary: Bool) {
