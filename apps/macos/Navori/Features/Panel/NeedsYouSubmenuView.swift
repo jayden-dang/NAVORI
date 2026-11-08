@@ -51,6 +51,9 @@ struct NeedsYouSubmenuView: View {
             if tab == .updates {
                 clearUpdatesRow
             }
+            if let error = store.needsYouActionError {
+                actionErrorLine(error)
+            }
             historyRow
         }
         .padding(MenuMetrics.pad)
@@ -178,6 +181,20 @@ struct NeedsYouSubmenuView: View {
             }
             .accessibilityLabel("Clear updates")
             .accessibilityAddTraits(.isButton)
+    }
+
+    private func actionErrorLine(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 14))
+            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+            .padding(.horizontal, 8)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: MenuMetrics.rowHeight,
+                maxHeight: MenuMetrics.rowHeight,
+                alignment: .leading
+            )
+            .accessibilityAddTraits(.isStaticText)
     }
 
     private var historyRow: some View {

@@ -34,6 +34,7 @@ final class CoreStore {
     private(set) var historyEntries: [NeedsYouHistoryEntry] = []
     private(set) var historyError: String?
     private(set) var historyHasLoaded = false
+    private(set) var needsYouActionError: String?
 
     func start() {
         guard core == nil else { return }
@@ -469,9 +470,11 @@ final class CoreStore {
     func answer(_ request: String) async {
         do {
             _ = try await dispatch(module: "needs_you", actionJSON: request)
+            needsYouActionError = nil
         } catch {
             let message = CoreStartupBanner.menuFailure(for: error)
             log.error("needs you answer failed: \(message, privacy: .public)")
+            needsYouActionError = message
         }
     }
 
@@ -492,27 +495,33 @@ final class CoreStore {
             _ = try await dispatch(module: "todo", actionJSON: json)
             todoDraftText = ""
             todoDraftDueOn = nil
+            needsYouActionError = nil
         } catch {
             let message = CoreStartupBanner.menuFailure(for: error)
             log.error("todo add failed: \(message, privacy: .public)")
+            needsYouActionError = message
         }
     }
 
     func tick(_ request: String) async {
         do {
             _ = try await dispatch(module: "todo", actionJSON: request)
+            needsYouActionError = nil
         } catch {
             let message = CoreStartupBanner.menuFailure(for: error)
             log.error("todo tick failed: \(message, privacy: .public)")
+            needsYouActionError = message
         }
     }
 
     func clearUpdates() async {
         do {
             _ = try await dispatch(module: "needs_you", actionJSON: "\"clear_updates\"")
+            needsYouActionError = nil
         } catch {
             let message = CoreStartupBanner.menuFailure(for: error)
             log.error("clear updates failed: \(message, privacy: .public)")
+            needsYouActionError = message
         }
     }
 
