@@ -473,6 +473,15 @@ impl Kernel {
     }
 }
 
+impl Drop for Kernel {
+    fn drop(&mut self) {
+        // Router keeps inbox senders alive in an Arc the module tasks also hold, so
+        // dropping the Kernel alone no longer closes those inboxes. Cancel so recv
+        // returns None the way a closed inbox used to.
+        self.plumbing.shutdown.cancel();
+    }
+}
+
 async fn supervise<M: Module>(
     mut module: M,
     mut ctx: ModuleCtx<M>,
