@@ -517,26 +517,22 @@ impl NavoriCore {
     /// History of Decisions, Updates and To-dos, newest `resolved_at_ms` first.
     pub async fn needs_you_history(&self) -> Result<HistoryView, CoreError> {
         self.on_runtime(|inner| async move {
-            let decisions = inner
-                .kernel
-                .dispatch(Envelope {
+            let (decisions, todos) = tokio::join!(
+                inner.kernel.dispatch(Envelope {
                     module: "needs_you".into(),
                     action: serde_json::json!("history"),
-                })
-                .await
-                .map_err(|e| CoreError::Dispatch {
-                    message: e.to_string(),
-                })?;
-            let todos = inner
-                .kernel
-                .dispatch(Envelope {
+                }),
+                inner.kernel.dispatch(Envelope {
                     module: "todo".into(),
                     action: serde_json::json!("history"),
-                })
-                .await
-                .map_err(|e| CoreError::Dispatch {
-                    message: e.to_string(),
-                })?;
+                }),
+            );
+            let decisions = decisions.map_err(|e| CoreError::Dispatch {
+                message: e.to_string(),
+            })?;
+            let todos = todos.map_err(|e| CoreError::Dispatch {
+                message: e.to_string(),
+            })?;
             needs_you::merge_history(decisions, todos)
                 .map_err(|message| CoreError::InvalidJson { message })
         })

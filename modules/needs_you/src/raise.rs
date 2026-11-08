@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use navori_kernel::{ActionError, Module, ModuleCtx};
 use navori_protocol::{Envelope, Risk};
 use navori_redact::{redact_json, redact_text};
@@ -8,6 +6,7 @@ use serde::Serialize;
 use crate::NeedsYou;
 use crate::action::Choice;
 use crate::stored::{self, OpenKind, RaiseRow};
+use crate::{millis, risk_name};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct RaiseReply {
@@ -31,7 +30,7 @@ pub fn raise(
     }
 
     let now = ctx.wait_handle().now();
-    let now_ms = millis(now)?;
+    let now_ms = millis(now).map_err(ActionError::Failed)?;
     if let Some(expires) = expires_at_ms {
         let expires =
             i64::try_from(expires).map_err(|err| ActionError::Invalid(err.to_string()))?;
@@ -130,19 +129,4 @@ fn envelope_json(envelope: Option<&Envelope>) -> Result<Option<String>, ActionEr
 
 fn blank(value: &str) -> bool {
     value.trim().is_empty()
-}
-
-fn risk_name(risk: Risk) -> String {
-    match risk {
-        Risk::Read => "read".to_owned(),
-        Risk::Write => "write".to_owned(),
-        Risk::Destructive => "destructive".to_owned(),
-    }
-}
-
-fn millis(now: SystemTime) -> Result<i64, ActionError> {
-    let duration = now
-        .duration_since(UNIX_EPOCH)
-        .map_err(|err| ActionError::Failed(err.to_string()))?;
-    i64::try_from(duration.as_millis()).map_err(|err| ActionError::Failed(err.to_string()))
 }

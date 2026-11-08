@@ -3,6 +3,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use navori_kernel::ModuleCtx;
 
 use crate::NeedsYou;
+use crate::millis;
 use crate::stored;
 
 pub fn soonest_deadline(ctx: &ModuleCtx<NeedsYou>) -> Option<SystemTime> {
@@ -34,11 +35,4 @@ pub fn mark_viewed(ctx: &ModuleCtx<NeedsYou>, ids: &[i64]) -> Result<(), String>
 pub fn clear_updates(ctx: &ModuleCtx<NeedsYou>) -> Result<(), String> {
     let now_ms = millis(ctx.wait_handle().now())?;
     stored::clear_unresolved_updates(&ctx.store, now_ms)
-}
-
-fn millis(now: SystemTime) -> Result<i64, String> {
-    let duration = now
-        .duration_since(UNIX_EPOCH)
-        .map_err(|err| err.to_string())?;
-    i64::try_from(duration.as_millis()).map_err(|err| err.to_string())
 }

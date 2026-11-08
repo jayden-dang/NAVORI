@@ -103,7 +103,7 @@ pub fn build(needs: Option<&NeedsYouState>, todo: Option<&TodoState>) -> Option<
     let todos: Vec<TodoRow> = todo
         .map(|state| {
             let mut rows: Vec<_> = state.open.iter().collect();
-            rows.sort_by_key(|t| (due_key(t), t.id));
+            rows.sort_by_cached_key(|t| (due_key(t), t.id));
             rows.into_iter().map(todo_row).collect()
         })
         .unwrap_or_default();
@@ -283,6 +283,7 @@ pub fn merge_history(decisions: Value, todos: Value) -> Result<HistoryView, Stri
         });
     }
 
-    entries.sort_by_key(|entry| (std::cmp::Reverse(entry.resolved_at_ms), entry.kind.clone()));
+    entries
+        .sort_by_cached_key(|entry| (std::cmp::Reverse(entry.resolved_at_ms), entry.kind.clone()));
     Ok(HistoryView { entries })
 }

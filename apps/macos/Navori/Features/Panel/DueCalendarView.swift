@@ -6,6 +6,15 @@ struct DueCalendarView: View {
     let store: CoreStore
     @Environment(CascadeController.self) private var cascade
 
+    fileprivate static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
     private var today: String {
         store.needsYou?.today ?? ""
     }
@@ -42,11 +51,7 @@ struct DueCalendarView: View {
     }
 
     static func nextDay(after day: String) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone.current
-        formatter.dateFormat = "yyyy-MM-dd"
+        let formatter = dayFormatter
         guard let date = formatter.date(from: day) else { return day }
         let next = Calendar.current.date(byAdding: .day, value: 1, to: date) ?? date
         return formatter.string(from: next)
@@ -98,21 +103,11 @@ private struct DueDatePicker: NSViewRepresentable {
         }
 
         static func parse(_ day: String) -> Date? {
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            formatter.calendar = Calendar(identifier: .gregorian)
-            formatter.timeZone = TimeZone.current
-            formatter.dateFormat = "yyyy-MM-dd"
-            return formatter.date(from: day)
+            DueCalendarView.dayFormatter.date(from: day)
         }
 
         static func format(_ date: Date) -> String {
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            formatter.calendar = Calendar(identifier: .gregorian)
-            formatter.timeZone = TimeZone.current
-            formatter.dateFormat = "yyyy-MM-dd"
-            return formatter.string(from: date)
+            DueCalendarView.dayFormatter.string(from: date)
         }
     }
 }

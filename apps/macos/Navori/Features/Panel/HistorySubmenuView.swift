@@ -27,7 +27,7 @@ struct HistorySubmenuView: View {
         } else if store.historyEntries.isEmpty {
             statusLine("Nothing here yet")
         } else {
-            ForEach(Array(store.historyEntries.enumerated()), id: \.element.id) { _, entry in
+            ForEach(store.historyEntries) { entry in
                 HistoryRowView(entry: entry, cascade: cascade) {
                     guard let request = entry.undoRequest else { return }
                     Task { await store.undo(request) }

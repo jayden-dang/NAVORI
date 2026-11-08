@@ -24,20 +24,19 @@ struct NeedsYouSubmenuView: View {
         snapshot?.updates ?? []
     }
 
-    private var listedTodos: [NeedsYouTodoRow] {
-        let filtered = NeedsYouList.filter(tab, todos: openTodos, updates: updates).todos
-        guard tab != .updates else { return filtered }
-        let liveIds = Set(openTodos.map(\.id))
-        let held = striking.values.filter { !liveIds.contains($0.id) }
-        return filtered + held.sorted { $0.id < $1.id }
-    }
-
-    private var listedUpdates: [NeedsYouUpdateRow] {
-        NeedsYouList.filter(tab, todos: openTodos, updates: updates).updates
+    private var listed: (todos: [NeedsYouTodoRow], updates: [NeedsYouUpdateRow]) {
+        let filtered = NeedsYouList.filter(tab, todos: openTodos, updates: updates)
+        let todos: [NeedsYouTodoRow] = {
+            guard tab != .updates else { return filtered.todos }
+            let liveIds = Set(openTodos.map(\.id))
+            let held = striking.values.filter { !liveIds.contains($0.id) }
+            return filtered.todos + held.sorted { $0.id < $1.id }
+        }()
+        return (todos, filtered.updates)
     }
 
     private var listEmpty: Bool {
-        listedTodos.isEmpty && listedUpdates.isEmpty
+        listed.todos.isEmpty && listed.updates.isEmpty
     }
 
     var body: some View {
@@ -122,7 +121,7 @@ struct NeedsYouSubmenuView: View {
                         )
                         .accessibilityLabel("You're all caught up")
                 } else {
-                    ForEach(listedTodos) { row in
+                    ForEach(listed.todos) { row in
                         TodoRowView(
                             row: row,
                             today: today,
@@ -131,7 +130,7 @@ struct NeedsYouSubmenuView: View {
                             onTick: { tick(row) }
                         )
                     }
-                    ForEach(listedUpdates) { row in
+                    ForEach(listed.updates) { row in
                         UpdateRowView(row: row, cascade: cascade) { id, frame in
                             updateFrames[id] = frame
                         }
@@ -222,7 +221,7 @@ struct NeedsYouSubmenuView: View {
     }
 
     private func publishDrawn() {
-        let visibleUpdates = Set(listedUpdates.map(\.id))
+        let visibleUpdates = Set(listed.updates.map(\.id))
         let frames = updateFrames.filter { visibleUpdates.contains($0.key) }
         store.drawnUpdateIds = NeedsYouList.drawnIds(rowFrames: frames, viewport: listViewport)
     }

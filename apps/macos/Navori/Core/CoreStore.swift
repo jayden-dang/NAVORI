@@ -468,14 +468,11 @@ final class CoreStore {
     }
 
     func answer(_ request: String) async {
-        do {
-            _ = try await dispatch(module: "needs_you", actionJSON: request)
-            needsYouActionError = nil
-        } catch {
-            let message = CoreStartupBanner.menuFailure(for: error)
-            log.error("needs you answer failed: \(message, privacy: .public)")
-            needsYouActionError = message
-        }
+        _ = await runNeedsYouAction(
+            module: "needs_you",
+            actionJSON: request,
+            failedLabel: "needs you answer failed"
+        )
     }
 
     func answerDecide(id: Int64, primary: Bool) async {
@@ -491,37 +488,40 @@ final class CoreStore {
         guard let data = try? JSONSerialization.data(withJSONObject: ["add": fields]),
               let json = String(data: data, encoding: .utf8)
         else { return }
-        do {
-            _ = try await dispatch(module: "todo", actionJSON: json)
+        if await runNeedsYouAction(module: "todo", actionJSON: json, failedLabel: "todo add failed") {
             todoDraftText = ""
             todoDraftDueOn = nil
-            needsYouActionError = nil
-        } catch {
-            let message = CoreStartupBanner.menuFailure(for: error)
-            log.error("todo add failed: \(message, privacy: .public)")
-            needsYouActionError = message
         }
     }
 
     func tick(_ request: String) async {
-        do {
-            _ = try await dispatch(module: "todo", actionJSON: request)
-            needsYouActionError = nil
-        } catch {
-            let message = CoreStartupBanner.menuFailure(for: error)
-            log.error("todo tick failed: \(message, privacy: .public)")
-            needsYouActionError = message
-        }
+        _ = await runNeedsYouAction(
+            module: "todo",
+            actionJSON: request,
+            failedLabel: "todo tick failed"
+        )
     }
 
     func clearUpdates() async {
+        _ = await runNeedsYouAction(
+            module: "needs_you",
+            actionJSON: "\"clear_updates\"",
+            failedLabel: "clear updates failed"
+        )
+    }
+
+    @discardableResult
+    private func runNeedsYouAction(module: String, actionJSON: String, failedLabel: String) async -> Bool {
         do {
-            _ = try await dispatch(module: "needs_you", actionJSON: "\"clear_updates\"")
+            _ = try await dispatch(module: module, actionJSON: actionJSON)
             needsYouActionError = nil
+            return true
         } catch {
             let message = CoreStartupBanner.menuFailure(for: error)
-            log.error("clear updates failed: \(message, privacy: .public)")
+            let text = "\(failedLabel): \(message)"
+            log.error("\(text, privacy: .public)")
             needsYouActionError = message
+            return false
         }
     }
 

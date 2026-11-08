@@ -55,12 +55,11 @@ struct PanelView: View {
         let needs = store.needsYou
         let count = needs?.needsCount ?? 0
         let down = needs?.down == true
-        let caughtUp = needs?.allCaughtUp == true && !down
         return MenuRow(
             id: "needs",
             icon: "sparkle",
             title: "Needs you",
-            value: caughtUp || count == 0 ? nil : "\(count)",
+            value: count == 0 ? nil : "\(count)",
             dot: needs?.anyOverdue == true ? .red : nil,
             opensSubmenu: true,
             shortcut: nil,

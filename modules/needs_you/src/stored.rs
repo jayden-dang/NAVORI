@@ -397,6 +397,9 @@ pub fn load_open_decisions(store: &Store) -> Result<Vec<OpenDecision>, String> {
                 };
                 let primary_envelope: Option<String> = row.get(10)?;
                 let secondary_envelope: Option<String> = row.get(13)?;
+                let (primary_action, primary_module) = envelope_names(primary_envelope.as_deref());
+                let (secondary_action, secondary_module) =
+                    envelope_names(secondary_envelope.as_deref());
                 Ok(OpenDecision {
                     id: row.get(0)?,
                     key: row.get(1)?,
@@ -408,14 +411,14 @@ pub fn load_open_decisions(store: &Store) -> Result<Vec<OpenDecision>, String> {
                     primary: ChoiceState {
                         label: row.get(8)?,
                         risk: row.get(9)?,
-                        action: action_name(primary_envelope.as_deref()),
-                        module: module_name(primary_envelope.as_deref()),
+                        action: primary_action,
+                        module: primary_module,
                     },
                     secondary: ChoiceState {
                         label: row.get(11)?,
                         risk: row.get(12)?,
-                        action: action_name(secondary_envelope.as_deref()),
-                        module: module_name(secondary_envelope.as_deref()),
+                        action: secondary_action,
+                        module: secondary_module,
                     },
                     state: decision_state,
                 })
@@ -426,20 +429,19 @@ pub fn load_open_decisions(store: &Store) -> Result<Vec<OpenDecision>, String> {
     })
 }
 
-fn action_name(raw: Option<&str>) -> Option<String> {
-    let raw = raw?;
-    let envelope: Envelope = serde_json::from_str(raw).ok()?;
-    match envelope.action {
+fn envelope_names(raw: Option<&str>) -> (Option<String>, Option<String>) {
+    let Some(raw) = raw else {
+        return (None, None);
+    };
+    let Ok(envelope) = serde_json::from_str::<Envelope>(raw) else {
+        return (None, None);
+    };
+    let action = match envelope.action {
         Value::String(name) => Some(name),
         Value::Object(map) if map.len() == 1 => map.into_iter().next().map(|(name, _)| name),
         _ => None,
-    }
-}
-
-fn module_name(raw: Option<&str>) -> Option<String> {
-    let raw = raw?;
-    let envelope: Envelope = serde_json::from_str(raw).ok()?;
-    Some(envelope.module)
+    };
+    (action, Some(envelope.module))
 }
 
 #[derive(Debug, Clone)]

@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use navori_kernel::{ActionError, DispatchError, ModuleCtx};
 use navori_protocol::Envelope;
 use navori_redact::redact_text;
@@ -7,6 +5,7 @@ use navori_redact::redact_text;
 use crate::NeedsYou;
 use crate::action::Pick;
 use crate::stored::{self, OpenKind};
+use crate::{millis, risk_name};
 
 pub const STOPPED_MID_ANSWER: &str =
     "Navori stopped before this finished — it may already have run";
@@ -48,7 +47,7 @@ pub fn answer(
         }
     }
 
-    let now_ms = millis(ctx.wait_handle().now())?;
+    let now_ms = millis(ctx.wait_handle().now()).map_err(ActionError::Failed)?;
     if let Some(expires) = row.expires_at_ms
         && expires <= now_ms
     {
@@ -82,7 +81,7 @@ pub fn answer(
 }
 
 pub fn finish_ok(ctx: &ModuleCtx<NeedsYou>, id: i64) -> Result<(), String> {
-    let now_ms = millis(ctx.wait_handle().now()).map_err(|err| err.to_string())?;
+    let now_ms = millis(ctx.wait_handle().now())?;
     stored::mark_answered(&ctx.store, id, now_ms)?;
     Ok(())
 }
@@ -127,14 +126,6 @@ fn envelope_risk(ctx: &ModuleCtx<NeedsYou>, raw: Option<&str>) -> Result<Option<
     Ok(ctx.dispatcher().risk_of(&envelope).map(risk_name))
 }
 
-fn risk_name(risk: navori_protocol::Risk) -> String {
-    match risk {
-        navori_protocol::Risk::Read => "read".to_owned(),
-        navori_protocol::Risk::Write => "write".to_owned(),
-        navori_protocol::Risk::Destructive => "destructive".to_owned(),
-    }
-}
-
 /// Formats an error from `ModuleDispatcher::send` failing before the target runs.
 pub fn format_send_error(err: DispatchError) -> String {
     redact_text(&err.to_string()).text
@@ -162,11 +153,4 @@ pub fn finish_send_err(
 ) -> Result<(), String> {
     stored::mark_failed(&ctx.store, id, choice, &format_send_error(err))?;
     Ok(())
-}
-
-fn millis(now: SystemTime) -> Result<i64, ActionError> {
-    let duration = now
-        .duration_since(UNIX_EPOCH)
-        .map_err(|err| ActionError::Failed(err.to_string()))?;
-    i64::try_from(duration.as_millis()).map_err(|err| ActionError::Failed(err.to_string()))
 }

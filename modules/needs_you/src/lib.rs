@@ -14,15 +14,31 @@ pub use state::{ChoiceState, DecisionState, NeedsYouState, OpenDecision, Unviewe
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::SystemTime;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use futures::stream::{FuturesUnordered, StreamExt};
 use navori_config::JournalSweep;
 use navori_kernel::{
     ActionError, Module, ModuleCtx, NoConfig, Pending, Request, TrayContribution, Wake,
 };
+use navori_protocol::Risk;
 
 use crate::answer::AnswerOutcome;
+
+pub(crate) fn risk_name(risk: Risk) -> String {
+    match risk {
+        Risk::Read => "read".to_owned(),
+        Risk::Write => "write".to_owned(),
+        Risk::Destructive => "destructive".to_owned(),
+    }
+}
+
+fn millis(now: SystemTime) -> Result<i64, String> {
+    let duration = now
+        .duration_since(UNIX_EPOCH)
+        .map_err(|err| err.to_string())?;
+    i64::try_from(duration.as_millis()).map_err(|err| err.to_string())
+}
 
 #[derive(Debug)]
 pub struct NeedsYou {

@@ -1,6 +1,6 @@
 //! History reads and retention prune for Decisions and Updates.
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use navori_config::JournalSweep;
 use navori_kernel::ModuleCtx;
@@ -9,6 +9,7 @@ use rusqlite::params;
 use serde::Serialize;
 
 use crate::NeedsYou;
+use crate::millis;
 
 const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 
@@ -100,11 +101,4 @@ fn delete_older_than(store: &Store, cutoff: i64) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
         Ok(())
     })
-}
-
-fn millis(now: SystemTime) -> Result<i64, String> {
-    let duration = now
-        .duration_since(UNIX_EPOCH)
-        .map_err(|err| err.to_string())?;
-    i64::try_from(duration.as_millis()).map_err(|err| err.to_string())
 }

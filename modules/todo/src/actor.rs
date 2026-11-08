@@ -179,8 +179,9 @@ fn reload_state(module: &Todo, ctx: &ModuleCtx<Todo>) -> anyhow::Result<()> {
     let now = ctx.wait_handle().now();
     let offset = module.calendar.utc_offset(now);
     let today = local_today(now, offset).map_err(|err| anyhow::anyhow!("{err}"))?;
+    let today_date = Date::parse(&today, &DUE_ON_FORMAT).ok();
     let rows = stored::load_open(&ctx.store).map_err(|err| anyhow::anyhow!("{err}"))?;
-    let open = stored::into_open_todos(rows, |due| status_for(due, &today));
+    let open = stored::into_open_todos(rows, |due| status_for(due, today_date));
     ctx.update_state(|state| {
         state.today = today;
         state.open = open;
@@ -192,8 +193,9 @@ fn refresh_if_changed(module: &Todo, ctx: &ModuleCtx<Todo>) -> anyhow::Result<()
     let now = ctx.wait_handle().now();
     let offset = module.calendar.utc_offset(now);
     let today = local_today(now, offset).map_err(|err| anyhow::anyhow!("{err}"))?;
+    let today_date = Date::parse(&today, &DUE_ON_FORMAT).ok();
     let rows = stored::load_open(&ctx.store).map_err(|err| anyhow::anyhow!("{err}"))?;
-    let open = stored::into_open_todos(rows, |due| status_for(due, &today));
+    let open = stored::into_open_todos(rows, |due| status_for(due, today_date));
     let current = ctx.state();
     if current.today == today && current.open == open {
         return Ok(());
@@ -204,14 +206,14 @@ fn refresh_if_changed(module: &Todo, ctx: &ModuleCtx<Todo>) -> anyhow::Result<()
     Ok(())
 }
 
-fn status_for(due_on: Option<&str>, today: &str) -> TodoStatus {
+fn status_for(due_on: Option<&str>, today: Option<Date>) -> TodoStatus {
     let Some(due_on) = due_on else {
         return TodoStatus::None;
     };
     let Ok(due) = Date::parse(due_on, &DUE_ON_FORMAT) else {
         return TodoStatus::None;
     };
-    let Ok(today) = Date::parse(today, &DUE_ON_FORMAT) else {
+    let Some(today) = today else {
         return TodoStatus::None;
     };
     let days = (due - today).whole_days();

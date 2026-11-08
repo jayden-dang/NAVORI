@@ -403,7 +403,13 @@ pub fn running_view(
 pub fn needs_you_view(kernel: &Kernel) -> Option<crate::NeedsYouView> {
     let needs = module_state::<NeedsYouState>(kernel, NeedsYou::ID);
     let todo = module_state::<TodoState>(kernel, Todo::ID);
-    let down = module_is_down(kernel, NeedsYou::ID) || module_is_down(kernel, Todo::ID);
+    let down = kernel.modules().into_iter().any(|module| {
+        (module.id == NeedsYou::ID || module.id == Todo::ID)
+            && matches!(
+                module.state,
+                ModuleState::Failed { .. } | ModuleState::Stopped
+            )
+    });
     match (crate::needs_you::build(needs.as_ref(), todo.as_ref()), down) {
         (Some(mut view), _) => {
             view.down = down;
