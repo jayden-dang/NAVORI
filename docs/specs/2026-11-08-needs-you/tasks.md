@@ -302,11 +302,11 @@ _Requirements: NEEDS-9.2_
 
 **Depends-on:** Task 8, Task 7 (shares `Cargo.toml`, `crates/ffi/Cargo.toml`, `build_kernel` and `actions_risk.rs` with Tasks 3–7)
 
-- [ ] **Step 1: Failing tests** (fake calendar with a fixed offset, `FakeClock`): `adding_a_todo_shows_it_at_once`; `a_blank_title_adds_nothing`; `the_title_passes_the_shield`; `todos_survive_a_restart`; table-driven `status_follows_the_local_day` (rows: yesterday → Overdue, today → Today, +1 and +3 → Soon, +4 → Later, none → None); `status_changes_at_local_midnight_and_after_a_wake` (advance past midnight; and a `wake_pulse` after a long sleep); `todos_never_turn_on_attention`.
+- [x] **Step 1: Failing tests** (fake calendar with a fixed offset, `FakeClock`): `adding_a_todo_shows_it_at_once`; `a_blank_title_adds_nothing`; `the_title_passes_the_shield`; `todos_survive_a_restart`; table-driven `status_follows_the_local_day` (rows: yesterday → Overdue, today → Today, +1 and +3 → Soon, +4 → Later, none → None); `status_changes_at_local_midnight_and_after_a_wake` (advance past midnight; and a `wake_pulse` after a long sleep); `todos_never_turn_on_attention`.
   Run: `cargo nextest run -p navori-mod-todo` — expect: compile error, crate has no `Todo`.
-- [ ] **Step 2: Implement** the crate, migration v1, `add`, status from `wait.now()` plus `calendar.utc_offset(now)`, the midnight deadline that calls `update_state` only on change, and registration; add the `add` sample.
+- [x] **Step 2: Implement** the crate, migration v1, `add`, status from `wait.now()` plus `calendar.utc_offset(now)`, the midnight deadline that calls `update_state` only on change, and registration; add the `add` sample.
   Run: `cargo nextest run -p navori-mod-todo && cargo nextest run -p navori-ffi --test actions_risk && cargo xtask check-deps` — expect: pass.
-- [ ] **Step 3: Commit** `git commit -m "feat(todo): add a To-do with a status by local day"`
+- [x] **Step 3: Commit** `git commit -m "feat(todo): add a To-do with a status by local day"`
 
 _Requirements: NEEDS-8.4, NEEDS-8.5, NEEDS-8.6, NEEDS-8.7, NEEDS-8.8, NEEDS-9.2, NEEDS-9.4, NEEDS-11.9, NEEDS-14.3_
 
