@@ -418,7 +418,7 @@ A11y: ↑↓ through entries; `Undo` in the row's Tab order; VoiceOver reads kin
 | `navori-macos` `local_utc_offset` against the system zone (`crates/macos/tests/`) | integration | NEEDS-9.2 (offset input) |
 | `ffi::needs_you::build` pure join (`crates/ffi/tests/needs_you_view.rs` or unit) | unit | NEEDS-3.1, 3.7 (no Decision in the submenu lists), 11.2, 11.3, 11.4, 11.6, 9.1 (order), 6.1 (order) |
 | `NavoriCore` with the real `build_kernel` (`crates/ffi/tests/actions_risk.rs`, `core.rs`) | integration | NEEDS-13.8, 12.1 (history merge via `needs_you_history`), 13.1, 13.2 (kept green) |
-| Navori AI's tool gate with `needs_you.answer` in the toolset (`ai/agent/tests/`) | integration | NEEDS-4.11, 13.5 |
+| Navori AI's tool gate with `needs_you.answer` in the toolset, built from the real catalog (`crates/ffi/tests/needs_you.rs` — AI crates may not depend on Modules, `xtask` check-deps) | integration | NEEDS-4.11, 13.5 |
 | `NavoriPanel` pure Swift (`apps/macos/Tests/NavoriPanelTests/`) | unit | NEEDS-3.6 (VoiceOver string), 3.10 (Destructive hint text), 9.3 (pill text), 9.5 (pill words), 10.3, 6.2 (drawn-row set), 11.6 (filter), 11.1 (`LevelZeroTree` order), 4.2 (key map) |
 | Existing suites kept green: `crates/kernel/tests/{kernel,scheduler,tray}.rs`, `modules/awake/tests/`, `crates/ffi/tests/core.rs`, `running.rs` | integration | NEEDS-13.1, 13.2, 13.3, 13.4, 13.6, 13.9 |
 | Release-build check: `strings` on the Release binary has no `PreviewSampleRows.marker` | integration (build script step) | NEEDS-13.10, 13.12 |
