@@ -3,7 +3,7 @@
 use std::os::unix::net::UnixStream as StdUnixStream;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use crate::ai::ask_error_to_rpc;
 use futures::FutureExt;
@@ -19,6 +19,7 @@ use navori_mod_integrations::{
 };
 use navori_mod_needs_you::NeedsYou;
 use navori_mod_ports::{Ports, PortsEnv, PortsState};
+use navori_mod_todo::{LocalCalendar, Todo, TodoEnv};
 use navori_protocol::{
     AskReply, AskRequest, Check, CoreStatus, Envelope, Event, ModuleInfo, Severity, rpc,
 };
@@ -273,8 +274,23 @@ pub fn build_kernel(
         .register(Integrations::new(integrations))
         .register(Ports::new(ports))
         .register(NeedsYou::new(*sweep))
+        .register(Todo::new(
+            TodoEnv {
+                calendar: Arc::new(MacCalendar),
+            },
+            *sweep,
+        ))
         .grant_destructive("needs_you")
         .start()
+}
+
+#[derive(Debug)]
+struct MacCalendar;
+
+impl LocalCalendar for MacCalendar {
+    fn utc_offset(&self, at: SystemTime) -> i32 {
+        navori_macos::local_utc_offset(at)
+    }
 }
 
 impl From<LeaseKind> for crate::LeaseKindView {

@@ -649,6 +649,7 @@ fn no_new_action_appears() {
             "needs_you mark_viewed write",
             "needs_you clear_updates write",
             "needs_you history read",
+            "todo add write",
         ]
     );
     core.shutdown();

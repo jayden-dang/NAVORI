@@ -11,6 +11,7 @@ use navori_mod_awake::AwakeAction;
 use navori_mod_integrations::IntegrationsAction;
 use navori_mod_needs_you::NeedsYouAction;
 use navori_mod_ports::PortsAction;
+use navori_mod_todo::TodoAction;
 use navori_secrets::Secret;
 use navori_secrets::SecretStore;
 use navori_secrets::fake::{FakeKeychain, MemoryStore};
@@ -62,7 +63,7 @@ fn config(home: &tempfile::TempDir) -> CoreConfig {
     }
 }
 
-const SAMPLED: usize = 32;
+const SAMPLED: usize = 33;
 
 fn sample(module: &str, name: &str) -> Value {
     match (module, name) {
@@ -121,6 +122,7 @@ fn sample(module: &str, name: &str) -> Value {
         ("needs_you", "mark_viewed") => json!({ "mark_viewed": { "ids": [1] } }),
         ("needs_you", "clear_updates") => json!("clear_updates"),
         ("needs_you", "history") => json!("history"),
+        ("todo", "add") => json!({ "add": { "title": "t", "due_on": "2023-11-15" } }),
         other => panic!("no sample for the Action {other:?}"),
     }
 }
@@ -147,6 +149,7 @@ fn every_action_s_catalog_risk_matches_its_own_risk() {
             "ports" => own_risk::<PortsAction>(value),
             "integrations" => own_risk::<IntegrationsAction>(value),
             "needs_you" => own_risk::<NeedsYouAction>(value),
+            "todo" => own_risk::<TodoAction>(value),
             module => panic!("no action type for the module {module}"),
         };
         assert_eq!(

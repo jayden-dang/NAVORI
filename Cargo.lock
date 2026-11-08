@@ -1218,6 +1218,7 @@ dependencies = [
  "navori-mod-integrations",
  "navori-mod-needs-you",
  "navori-mod-ports",
+ "navori-mod-todo",
  "navori-protocol",
  "navori-redact",
  "navori-secrets",
@@ -1364,6 +1365,26 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "navori-mod-todo"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "navori-config",
+ "navori-kernel",
+ "navori-protocol",
+ "navori-redact",
+ "navori-store",
+ "rusqlite",
+ "schemars",
+ "serde",
+ "serde_json",
+ "time",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
