@@ -42,6 +42,7 @@ The user's words (verbatim, in order; the Vietnamese quotes are kept as-is, with
   4. Separator → `Settings… ⌘,` · `About Navori` · `Quit Navori ⌘Q`.
   - Ask, Needs you, Ports and Pull Requests are not on level 0. They stay in the dev-only preview until those features ship.
   - No account, API quota, or "updated" row at level 0.
+  - *(Amended 2026-11-08: when Needs you ships, a `Decide N` block of one-line Decision rows and a `Needs you ›` row sit above `Running`. See [`2026-11-08-needs-you-ui-brief.md`](2026-11-08-needs-you-ui-brief.md) Surface 1.)*
 - **Components:**
   - Menu + submenu cascade: `new (rung 7) — panel cascade` on `StatusPanel` (`NSPanel`). Reason: Amendment 10.
   - Glass surface: `rung 1 — NSGlassEffectView` (Amendment 11).
@@ -55,6 +56,8 @@ The user's words (verbatim, in order; the Vietnamese quotes are kept as-is, with
 - **A11y:** NSMenu-style keyboard navigation, built by the panel cascade (↑↓, → opens a submenu, ← closes, Return, Esc); VoiceOver reads "title, secondary line, time" as one; state is never conveyed by color alone (always text: "2 failing", "On"); respects Reduce Transparency (opaque material) and Reduce Motion; inline button hit area ≥ 24pt tall.
 
 ## Surface 2 — Needs you (inbox) — on level 0 and in the `Show all` submenu
+
+> Superseded 2026-11-08 by [`2026-11-08-needs-you-ui-brief.md`](2026-11-08-needs-you-ui-brief.md): Decisions are compact rows on level 0 only, the submenu filters All · To-dos · Updates, a to-do's status is its date pill's color, and Keep awake raises no Decision (the `Keep 1 h` / `Let it end` example no longer applies).
 
 The inbox is **the shared decision place between the user and Navori AI** — it is *not* a PR list (PRs live only in Surface 5).
 
