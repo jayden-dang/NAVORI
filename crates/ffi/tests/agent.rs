@@ -650,6 +650,9 @@ fn no_new_action_appears() {
             "needs_you clear_updates write",
             "needs_you history read",
             "todo add write",
+            "todo tick write",
+            "todo undo write",
+            "todo history read",
         ]
     );
     core.shutdown();

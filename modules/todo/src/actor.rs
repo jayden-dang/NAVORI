@@ -1,5 +1,6 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use navori_config::JournalSweep;
 use navori_kernel::{ActionError, ModuleCtx, Request, Wake};
 use navori_redact::redact_text;
 use serde::Serialize;
@@ -14,6 +15,9 @@ use crate::stored;
 const DUE_ON_FORMAT: &[FormatItem<'static>] =
     time::macros::format_description!("[year]-[month]-[day]");
 
+const DAY_MS: i64 = 24 * 60 * 60 * 1000;
+const PRUNE_EVERY: Duration = Duration::from_secs(24 * 60 * 60);
+
 #[derive(Debug, Clone, Serialize)]
 pub struct AddReply {
     pub id: i64,
@@ -21,11 +25,19 @@ pub struct AddReply {
 
 pub async fn run(module: &mut Todo, ctx: &mut ModuleCtx<Todo>) -> anyhow::Result<()> {
     stored::migrate(&ctx.store)?;
+    let mut next_prune = match module.retention {
+        JournalSweep::KeepDays(days) => {
+            prune(ctx, days).map_err(|err| anyhow::anyhow!("todo prune at start failed: {err}"))?;
+            Some(ctx.wait_handle().now() + PRUNE_EVERY)
+        }
+        JournalSweep::Paused => None,
+    };
     reload_state(module, ctx)?;
 
     let mut wait = ctx.wait_handle();
     loop {
-        let deadline = next_local_midnight(wait.now(), module.calendar.utc_offset(wait.now()));
+        let midnight = next_local_midnight(wait.now(), module.calendar.utc_offset(wait.now()));
+        let deadline = earlier(midnight, next_prune);
         tokio::select! {
             req = ctx.recv() => {
                 let Some(req) = req else {
@@ -36,6 +48,16 @@ pub async fn run(module: &mut Todo, ctx: &mut ModuleCtx<Todo>) -> anyhow::Result
             wake = wait.wait_until(deadline) => {
                 match wake {
                     Wake::Due | Wake::PanelChanged => {
+                        if matches!(wake, Wake::Due)
+                            && let (JournalSweep::KeepDays(days), Some(due)) =
+                                (module.retention, next_prune)
+                            && wait.now() >= due
+                        {
+                            if let Err(err) = prune(ctx, days) {
+                                tracing::warn!(error = %err, "todo prune failed");
+                            }
+                            next_prune = Some(wait.now() + PRUNE_EVERY);
+                        }
                         if let Err(err) = refresh_if_changed(module, ctx) {
                             tracing::warn!(error = %err, "todo day refresh failed");
                         }
@@ -57,6 +79,30 @@ fn handle(module: &Todo, ctx: &ModuleCtx<Todo>, req: Request<TodoAction>) {
                 req.respond(Ok(reply));
             }
             Err(err) => req.respond::<AddReply>(Err(err)),
+        },
+        TodoAction::Tick { id } => match tick(ctx, *id) {
+            Ok(()) => {
+                if let Err(err) = reload_state(module, ctx) {
+                    req.respond::<()>(Err(ActionError::Failed(err.to_string())));
+                    return;
+                }
+                req.respond(Ok(()));
+            }
+            Err(err) => req.respond::<()>(Err(err)),
+        },
+        TodoAction::Undo { id } => match undo(ctx, *id) {
+            Ok(()) => {
+                if let Err(err) = reload_state(module, ctx) {
+                    req.respond::<()>(Err(ActionError::Failed(err.to_string())));
+                    return;
+                }
+                req.respond(Ok(()));
+            }
+            Err(err) => req.respond::<()>(Err(err)),
+        },
+        TodoAction::History => match history(module, ctx) {
+            Ok(entries) => req.respond(Ok(entries)),
+            Err(err) => req.respond::<Vec<stored::HistoryRow>>(Err(err)),
         },
     }
 }
@@ -86,6 +132,30 @@ fn add(
     let id = stored::insert_open(&ctx.store, &title, due_on.as_deref(), created_at_ms)
         .map_err(ActionError::Failed)?;
     Ok(AddReply { id })
+}
+
+fn tick(ctx: &ModuleCtx<Todo>, id: i64) -> Result<(), ActionError> {
+    let done_at_ms = millis(ctx.wait_handle().now())?;
+    stored::mark_done(&ctx.store, id, done_at_ms).map_err(ActionError::Failed)
+}
+
+fn undo(ctx: &ModuleCtx<Todo>, id: i64) -> Result<(), ActionError> {
+    stored::clear_done(&ctx.store, id).map_err(ActionError::Failed)
+}
+
+fn history(module: &Todo, ctx: &ModuleCtx<Todo>) -> Result<Vec<stored::HistoryRow>, ActionError> {
+    let now_ms = millis(ctx.wait_handle().now())?;
+    let cutoff = match module.retention {
+        JournalSweep::KeepDays(days) => now_ms.saturating_sub(i64::from(days) * DAY_MS),
+        JournalSweep::Paused => i64::MIN,
+    };
+    stored::load_history(&ctx.store, cutoff).map_err(ActionError::Failed)
+}
+
+fn prune(ctx: &ModuleCtx<Todo>, days: u32) -> Result<(), String> {
+    let now_ms = millis(ctx.wait_handle().now()).map_err(|err| err.to_string())?;
+    let cutoff = now_ms.saturating_sub(i64::from(days) * DAY_MS);
+    stored::prune_older_than(&ctx.store, cutoff)
 }
 
 fn parse_due_on(raw: &str) -> Result<String, ActionError> {
@@ -172,6 +242,15 @@ fn next_local_midnight(now: SystemTime, offset_secs: i32) -> Option<SystemTime> 
         return None;
     };
     Some(UNIX_EPOCH + Duration::new(secs, midnight.nanosecond()))
+}
+
+fn earlier(a: Option<SystemTime>, b: Option<SystemTime>) -> Option<SystemTime> {
+    match (a, b) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (Some(a), None) => Some(a),
+        (None, Some(b)) => Some(b),
+        (None, None) => None,
+    }
 }
 
 fn to_offset_datetime(now: SystemTime, offset_secs: i32) -> Result<OffsetDateTime, ActionError> {

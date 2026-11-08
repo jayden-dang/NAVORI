@@ -1,5 +1,6 @@
 use navori_store::{Migration, MigrationReport, Store};
 use rusqlite::params;
+use serde::Serialize;
 
 use crate::state::OpenTodo;
 
@@ -84,4 +85,75 @@ pub fn into_open_todos(
             due_on: row.due_on,
         })
         .collect()
+}
+
+pub fn mark_done(store: &Store, id: i64, done_at_ms: i64) -> Result<(), String> {
+    store.with_conn(|conn| {
+        conn.execute(
+            "UPDATE todo_items SET done_at_ms = ?1
+             WHERE id = ?2 AND done_at_ms IS NULL",
+            params![done_at_ms, id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+pub fn clear_done(store: &Store, id: i64) -> Result<(), String> {
+    store.with_conn(|conn| {
+        conn.execute(
+            "UPDATE todo_items SET done_at_ms = NULL
+             WHERE id = ?1 AND done_at_ms IS NOT NULL",
+            params![id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct HistoryRow {
+    pub id: i64,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_on: Option<String>,
+    pub done_at_ms: i64,
+}
+
+pub fn load_history(store: &Store, cutoff: i64) -> Result<Vec<HistoryRow>, String> {
+    store.with_conn(|conn| {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, title, due_on, done_at_ms FROM todo_items
+                 WHERE done_at_ms IS NOT NULL
+                   AND done_at_ms >= ?1
+                 ORDER BY done_at_ms DESC, id DESC",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([cutoff], |row| {
+                Ok(HistoryRow {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    due_on: row.get(2)?,
+                    done_at_ms: row.get(3)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())
+    })
+}
+
+pub fn prune_older_than(store: &Store, cutoff: i64) -> Result<(), String> {
+    store.with_conn(|conn| {
+        conn.execute(
+            "DELETE FROM todo_items
+             WHERE done_at_ms IS NOT NULL
+               AND done_at_ms < ?1",
+            params![cutoff],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
 }

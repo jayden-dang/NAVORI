@@ -97,7 +97,13 @@ async fn todos_never_turn_on_attention() {
 #[test]
 fn add_is_listed_as_write() {
     let docs = TodoAction::catalog();
-    assert_eq!(docs.len(), 1);
+    assert_eq!(docs.len(), 4);
     assert_eq!(docs[0].name, "add");
     assert_eq!(docs[0].risk, navori_kernel::Risk::Write);
+    assert_eq!(docs[1].name, "tick");
+    assert_eq!(docs[1].risk, navori_kernel::Risk::Write);
+    assert_eq!(docs[2].name, "undo");
+    assert_eq!(docs[2].risk, navori_kernel::Risk::Write);
+    assert_eq!(docs[3].name, "history");
+    assert_eq!(docs[3].risk, navori_kernel::Risk::Read);
 }

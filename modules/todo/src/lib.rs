@@ -27,7 +27,6 @@ impl std::fmt::Debug for TodoEnv {
 
 pub struct Todo {
     calendar: Arc<dyn LocalCalendar>,
-    #[allow(dead_code)] // Task 10 prunes against this retention.
     retention: JournalSweep,
 }
 
