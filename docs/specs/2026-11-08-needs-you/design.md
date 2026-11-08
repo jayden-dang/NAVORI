@@ -78,9 +78,10 @@ Satisfies: NEEDS-2.1, NEEDS-2.2, NEEDS-2.3, NEEDS-2.4, NEEDS-2.5, NEEDS-2.6
 Reuse: 2 — extends the existing `SendFn` table (`crates/kernel/src/runtime.rs:60,167-178`, already a non-blocking `try_send` returning a `oneshot::Receiver`) and `Kernel::dispatch`'s timeout and error mapping (`:330-343`)
 Respects: ARCH-3, ARCH-4, ARCH-5, ARCH-10
 Surface:
-- `DispatchError` (`crates/kernel/src/runtime.rs:29`) gains `Refused { module, action }` — readers: `dispatch_to_rpc` in `crates/ffi/src/app.rs:517-528` (**replace**: maps it to the existing `INVALID_PARAMS`-style refusal code), `CoreError::Dispatch` Display in `crates/ffi/src/lib.rs` (**replace**: Display text), every `match` on `DispatchError` found by `rg 'DispatchError::' crates ai apps` (**replace**). `Kernel::dispatch` never returns it, so CLI, Shell and Navori AI see no change (NEEDS-13.1).
+- `DispatchError` (`crates/kernel/src/runtime.rs:29`) gains `Refused { module, action }` — readers: `dispatch_to_rpc` (`crates/ffi/src/app.rs:562-570`, **replace**: an exhaustive arm mapping it to `INVALID_PARAMS`, unreachable from `Kernel::dispatch` but required by the match); `CoreError::Dispatch` (`crates/ffi/src/lib.rs`, uses `Display`, needs no edit); every other `match` found by `rg 'DispatchError::' crates ai apps` (**replace**). `Kernel::dispatch` never returns it, so CLI, Shell and Navori AI see no change (NEEDS-13.1).
+- `Registered`, `Plumbing`, the `Launcher` type and `start()` (`runtime.rs:60-83,232-248`) — **replace**: the router moves into an `Arc<OnceLock<Router>>` that `start()` fills **before** the first launcher runs, and `Kernel::actions` / `Kernel::dispatch` read the same router.
 - `ModuleCtx` (`module.rs:122`) gains a private `dispatcher` field — readers: the launcher closure that builds it (`runtime.rs:205-219`, **replace**); no reader outside `navori-kernel` builds a `ModuleCtx`.
-- `KernelBuilder` gains `grant_destructive(id)` — no existing reader.
+- `KernelBuilder` gains `grant_destructive(id)` — no existing reader. `start()` logs an error and drops a grant naming no registered Module, and a test on `build_kernel` asserts the grant set is exactly `{"needs_you"}`, so a typo cannot pass silently.
 Interface:
 ```
 impl<M: Module> ModuleCtx<M> { pub fn dispatcher(&self) -> ModuleDispatcher }
@@ -92,7 +93,7 @@ impl ModuleDispatcher {
 pub struct Pending;  impl Future for Pending { type Output = Result<Value, DispatchError>; } // own timeout
 impl KernelBuilder { pub fn grant_destructive(self, module: &'static str) -> Self }
 ```
-Depth: if it vanished, a Module would still need to know only "send this Envelope, later get a reply or an error, and ask an Envelope's Risk" — routing, the 30 s timeout, catalog lookup and the grant stay hidden.
+Depth: if it vanished, a Module would have to reach every peer's inbox, the catalog and the timeout itself, and rebuild the grant check — the dispatcher hides the router, the action-name parsing, the timeout and the grant behind one non-blocking send.
 Locality: extend `crates/kernel/src/runtime.rs` (router built at `start()`) and `module.rs` (ctx field + accessor); new `crates/kernel/src/dispatcher.rs`. Neighbors: `Kernel::dispatch` reuses the same router (leave its behavior).
 
 The router is the list of `(id, SendFn, Vec<ActionSpec>)` moved into an `Arc<OnceLock<Router>>` in `Plumbing` and
@@ -110,7 +111,7 @@ the type's doc comment, is to await `Pending` in a `select!` arm or a spawned ta
 
 ### B. The Needs you Module: raise and its validation (`modules/needs_you`)
 
-Satisfies: NEEDS-1.1, NEEDS-1.2, NEEDS-1.3, NEEDS-1.4, NEEDS-1.5, NEEDS-1.6, NEEDS-1.7, NEEDS-1.8, NEEDS-1.9, NEEDS-1.10, NEEDS-1.11, NEEDS-2.7
+Satisfies: NEEDS-1.1, NEEDS-1.2, NEEDS-1.3, NEEDS-1.4, NEEDS-1.5, NEEDS-1.6, NEEDS-1.7, NEEDS-1.8, NEEDS-1.9, NEEDS-1.10, NEEDS-1.11, NEEDS-1.12, NEEDS-2.7
 Reuse: 2 — the Module pattern of `modules/awake` (`stored.rs` migrations and `with_conn` idiom, `src/infra/stored.rs:7-124`; externally tagged `snake_case` Action enum with `risk()`/`catalog()`, `src/action.rs:4-86`); `navori_redact::redact_text` (`crates/redact/src/lib.rs:120`)
 Respects: ARCH-3, ARCH-4, ARCH-6, ARCH-10, ARCH-12
 Security: THR-3, TB-6
@@ -122,14 +123,16 @@ Choice { label, envelope?: Envelope }
 NeedsYou::new(retention: JournalSweep) -> NeedsYou        // Module ID "needs_you"
 ```
 Depth: if it vanished, a producer would still need to know only the raise payload and that a repeat `key` replaces — dedupe, validation, the Shield, persistence and Risk lookup stay inside.
-Locality: new crate `modules/needs_you/` (`Cargo.toml` with `[lints] workspace = true`, deps `navori-kernel`, `navori-store`, `navori-protocol`, `navori-redact`, `rusqlite`, `serde`, `serde_json`, `schemars`, `tokio`, `tracing`, `anyhow`); workspace `members` and `[workspace.dependencies]` (`Cargo.toml:3-21`); leave every other Module.
+Locality: new crate `modules/needs_you/` (`Cargo.toml` with `[lints] workspace = true`, deps `navori-kernel`, `navori-store`, `navori-protocol`, `navori-redact`, `navori-config` (for `JournalSweep`), `rusqlite`, `serde`, `serde_json`, `schemars`, `tokio`, `tracing`, `anyhow`); workspace `members` and `[workspace.dependencies]` (`Cargo.toml:3-21`); leave every other Module.
 
 Validation order on `raise`, refusing with `ActionError::Invalid` and writing nothing: empty or whitespace `key`,
 `title` or a `label` (NEEDS-1.7); `expires_at_ms` not after `wait.now()` (NEEDS-5.3); a choice Envelope whose
 `module` is `needs_you` (NEEDS-1.6); a choice Envelope for which `ctx.dispatcher().risk_of` is `None` (NEEDS-1.5);
-an open Decision with this `key` whose state is `answering` (NEEDS-1.11). Then `redact_text(..).text` on title,
+an open Decision with this `key` whose state is `answering` (NEEDS-1.11); a choice Envelope in which
+`navori_redact::redact_json` on a copy finds anything (NEEDS-1.12 — the stored Envelope is never altered, so it
+still runs as raised). Then `redact_text(..).text` on title,
 reason and both labels (NEEDS-1.8), and in one transaction either insert a new `open` row (NEEDS-1.2) or, for an
-open/failed row with this `key`, replace its text, expiry and choices, bump `revision`, and set it back to `open`
+open/failed row with this `key`, replace its text, expiry and choices, bump `revision`, clear `chosen` and `error`, and set it back to `open`
 (NEEDS-1.3). Each choice's Risk is stored as the lowercase Risk name or NULL (NEEDS-1.4). The CLI reaches the same
 code through IPC (`navori dispatch needs_you '{"raise":{…}}'`, `apps/cli/src/main.rs:58-63`; NEEDS-1.10), and a
 Module through `ModuleDispatcher::send` (NEEDS-2.7). At the top of every `run` the Module migrates (no-op when
@@ -139,20 +142,25 @@ Tables (designed here; the migration is written in the build, never in this run)
 ```
 needs_you_decisions(
   id INTEGER PRIMARY KEY, key TEXT NOT NULL, revision INTEGER NOT NULL,
-  state TEXT NOT NULL CHECK (state IN ('open','answering','failed','answered','expired')),
+  state TEXT NOT NULL,                 -- 'open' | 'answering' | 'failed' | 'answered' | 'expired'
   title TEXT NOT NULL, reason TEXT NOT NULL, raised_at_ms INTEGER NOT NULL, expires_at_ms INTEGER,
   primary_label TEXT NOT NULL, primary_envelope TEXT, primary_risk TEXT,
   secondary_label TEXT NOT NULL, secondary_envelope TEXT, secondary_risk TEXT,
-  chosen TEXT CHECK (chosen IN ('primary','secondary')), error TEXT, resolved_at_ms INTEGER)
+  chosen TEXT,                         -- 'primary' | 'secondary'
+  error TEXT, resolved_at_ms INTEGER)
 UNIQUE INDEX needs_you_decisions_open_key ON needs_you_decisions(key) WHERE state IN ('open','answering','failed')
 needs_you_updates(
-  id INTEGER PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('decision_expired')),
-  title TEXT NOT NULL, decision_id INTEGER REFERENCES needs_you_decisions(id),
+  id INTEGER PRIMARY KEY, kind TEXT NOT NULL,   -- 'decision_expired' (ROAD-23 adds kinds)
+  title TEXT NOT NULL, decision_id INTEGER,      -- soft link, no FOREIGN KEY
   created_at_ms INTEGER NOT NULL, resolved_at_ms INTEGER,
-  resolution TEXT CHECK (resolution IN ('viewed','cleared')))
+  resolution TEXT)                               -- 'viewed' | 'cleared'
 ```
 `failed` counts as open for the `key` index and for attention; `answered` and `expired` rows with a
-`resolved_at_ms` are History. Envelopes are stored as their JSON text.
+`resolved_at_ms` are History. Envelopes are stored as their JSON text. The string columns carry no `CHECK`: the
+values are permanent (Compat External), but a later kind or state (ROAD-23, a snooze) is then an added value, not
+a table rebuild; the Rust enums validate on read and write. `decision_id` has no `FOREIGN KEY` because the store
+runs with `foreign_keys=ON` (`crates/store/src/lib.rs:99`) and History prunes Decisions and Updates on their own
+clocks.
 
 ### C. Answering a Decision (`modules/needs_you`)
 
@@ -174,13 +182,24 @@ refuse unless the row is `open` or `failed` and `revision` matches (NEEDS-4.9, N
 Envelope's Risk with `risk_of` — `None` → `failed` with "this action no longer exists" (NEEDS-4.7). Write
 `state='answering', chosen=…` and `update_state` **before** dispatching (decision 4), reply `Ok(())` to the
 caller, then `send` the Envelope and push its `Pending` into a `FuturesUnordered` arm keyed by row id (NEEDS-4.4,
-NEEDS-2.2). On `Ok` → `state='answered', resolved_at_ms=now` (History, NEEDS-4.5); on `Err(e)` → `state='failed',
-error=e.to_string()` (NEEDS-4.7). A choice with no Envelope goes straight to `answered` (NEEDS-4.5). `Retry` is
+NEEDS-2.2). The `Ok(())` reply goes only after the `answering` write has committed. On `Ok` → `state='answered',
+resolved_at_ms=now` (History, NEEDS-4.5). Errors split by whether the Envelope may have run: `send` failing at once
+(`UnknownModule`, `InvalidAction`, `Refused`, or `Unavailable` because the inbox is full) and `Action(_)` are
+definite — nothing ran, or the target said it failed — and give `failed` with the error; `Timeout`, or
+`Unavailable` after the request was queued, are uncertain and give `failed` with `<error> — it may already have
+run`, so `Retry` is never a blind second run (NEEDS-4.7). Error text passes `redact_text` before it is stored
+(ARCH-6). An `answer` arriving at or after the Decision's `expires_at_ms` is refused and the Decision expires at
+once (NEEDS-4.9, NEEDS-5.2). A choice with no Envelope goes straight to `answered` (NEEDS-4.5). `Retry` is
 an ordinary `answer` with the failed choice (NEEDS-4.8). At the top of `run`, every `answering` row becomes
 `failed` with `Navori stopped before this finished — it may already have run` (NEEDS-4.10), and every open row's
 choice Risk is recomputed from the live catalog into State (NEEDS-3.8). `tray()` returns
 `attention: Some("N decisions waiting")` exactly while State holds an open, answering or failed Decision, and
 nothing for Updates (NEEDS-3.4, NEEDS-11.9); it reads only State (`module.rs:63-77`).
+
+Known limit: the store runs WAL with `synchronous=NORMAL` (`crates/store/src/lib.rs:89,98`), so a committed
+`answering` row survives a process crash but may be lost on power loss; after a power cut mid-answer the Decision
+can come back `open` although its Envelope ran. Accepted here, named in the report; `FULL` for this one write would
+cost every Module's store latency.
 
 ### D. Expiry, Updates and their History (`modules/needs_you`)
 
@@ -200,7 +219,7 @@ The loop's deadline is the earliest of: the soonest `expires_at_ms` of an `open`
 does not expire, NEEDS-5.2), and the next History prune. On `Wake::Due` (also delivered at once after a wake
 pulse past the deadline, KCONTRACT-6.1, and at `run` start for anything already past, NEEDS-5.4) each due row
 becomes `expired` and a `needs_you_updates` row of kind `decision_expired`, title `Expired: <title>`, is added
-(NEEDS-5.2). No deadline while nothing expires and no prune is due → `wait_until(None)` parks (NEEDS-5.1;
+(NEEDS-5.2). A `failed` Decision is unanswered with no answer running, so it expires too, as NEEDS-5.2 reads. No deadline while nothing expires and no prune is due → `wait_until(None)` parks (NEEDS-5.1;
 KCONTRACT-4.2). No Action posts an Update (NEEDS-5.5). `mark_viewed` sets `resolution='viewed',
 resolved_at_ms=now` for exactly the ids given (the Shell decides which, section H, NEEDS-6.2); State then omits
 them from the list and every count and History keeps them (NEEDS-6.3). An Update has no click target, so a click
@@ -227,7 +246,7 @@ trait LocalCalendar: Send + Sync { fn utc_offset(&self, at: SystemTime) -> i32 }
 TodoState { today: "YYYY-MM-DD", open: Vec<OpenTodo { id, title, due_on?, status: Overdue|Today|Soon|Later|None }> }
 ```
 Depth: callers know four Actions and a status per To-do; storage, ordering inputs, midnight rollover and pruning stay inside.
-Locality: new crate `modules/todo/` (same deps as B plus `time`); one function in `crates/macos/src/` beside the existing `unsafe` FFI; `build_kernel` registers it (extend).
+Locality: new crate `modules/todo/` (same deps as B plus `time` with its `parsing` feature for `due_on`; `crates/ffi` takes `navori-macos` as a normal dependency for the real `LocalCalendar`); one function in `crates/macos/src/` beside the existing `unsafe` FFI; `build_kernel` registers it (extend).
 
 `add` trims the title, refuses empty (NEEDS-8.5, enforced here as well as in the field), redacts it (NEEDS-8.6) and
 inserts (NEEDS-8.4 data). Status per To-do is computed in the Module from `due_on` against today's local date,
@@ -252,10 +271,9 @@ Satisfies: NEEDS-3.1, NEEDS-11.2, NEEDS-11.3, NEEDS-11.4, NEEDS-11.6, NEEDS-13.8
 Reuse: 2 — the `running.rs` pure-function join (`crates/ffi/src/running.rs:96`) and `awake_view`'s state read with `module_is_down` overlay (`crates/ffi/src/app.rs:344-400`); pre-built request strings as `RunningPort.stop_request` (`running.rs:43,349`)
 Respects: ARCH-1, ARCH-2
 Surface:
-- `CoreSnapshot` (`crates/ffi/src/lib.rs:187-209`) gains `needs_you: Option<NeedsYouView>` — readers: `snapshot()` (`lib.rs:575-623`, **replace**), the generated UniFFI Swift bindings (**replace**, regenerated by the build), `CoreStore.apply` and its computed properties (`apps/macos/Navori/Core/CoreStore.swift:456`, **replace**), five test `SnapshotListener`s that ignore the record (`crates/ffi/tests/{agent,ask,integrations,config_privacy,actions_risk}.rs`, **replace** — compile unchanged).
+- `CoreSnapshot` (`crates/ffi/src/lib.rs:187-209`) gains `needs_you: Option<NeedsYouView>` — readers: `snapshot()` (`lib.rs:575-623`, **replace**), the generated UniFFI Swift bindings (**replace**, regenerated by the build), `CoreStore.apply` and its computed properties (`apps/macos/Navori/Core/CoreStore.swift:456`, **replace**), the test `SnapshotListener`s and `status()` readers (`crates/ffi/tests/{agent,ask,integrations,config_privacy,actions_risk,status_lock,live_agent,core}.rs`, `apps/cli/tests/cli.rs`) — **replace**, compile unchanged (none builds a `CoreSnapshot` literal).
 - `build_kernel` (`crates/ffi/src/app.rs:257-275`) registers `NeedsYou` and `Todo`, passes `JournalSweep` and the `TodoEnv`, and grants `needs_you` — reader: `NavoriCore::start_with` only (**replace**).
 - `crates/ffi/tests/actions_risk.rs`: `SAMPLED` (`:63`), the `sample()` match (`:65-107`) and the per-module match (`:125-132`) — **replace**: add every `needs_you` and `todo` Action and two arms (NEEDS-13.8).
-- `crates/ffi/tests/core.rs` / `running.rs` assertions on `status().modules` — **replace** if any asserts a module count or list (check with `rg 'modules\.len\(\)|modules\[' crates/ffi/tests` in the first build task).
 - A new `NavoriCore::needs_you_history() -> HistoryView` export — new, no reader.
 Interface:
 ```
@@ -282,23 +300,24 @@ merges them newest first (NEEDS-12.1's data). Dispatch errors from the Shell kee
 
 ### G. Level 0 in the Shell (`apps/macos`)
 
-Satisfies: NEEDS-3.2, NEEDS-3.3, NEEDS-3.5, NEEDS-3.6, NEEDS-3.9, NEEDS-4.1, NEEDS-4.2, NEEDS-4.6, NEEDS-11.1, NEEDS-11.5, NEEDS-13.7
+Satisfies: NEEDS-3.2, NEEDS-3.3, NEEDS-3.5, NEEDS-3.6, NEEDS-3.9, NEEDS-3.10, NEEDS-4.1, NEEDS-4.2, NEEDS-4.6, NEEDS-11.1, NEEDS-11.5, NEEDS-13.7
 Reuse: 2 — `MenuRowView`/`MenuRow` (`apps/macos/Navori/Features/Panel/MenuRowView.swift:5-133`) for the `Needs you` row; `CapsuleButton` moved out of `#if DEBUG` (`Features/Preview/PreviewSampleRows.swift:40-73`) into `Features/Panel/`; `LevelZeroTree.rows` (`apps/macos/NavoriPanel/CoreRowState.swift:84-102`); `CoreStore.perform` pattern (`CoreStore.swift:441-454`); new `DecideRowView` (rung 7 — `MenuRowView` has no inline action slot, brief :33)
 Respects: ARCH-1, ARCH-2
 Surface:
 - `PanelView` body (`PanelView.swift:9-24`) — **replace**: Decide block and `Needs you` row before `Running`, a separator after (NEEDS-11.1).
 - `LevelZeroTree.rows(running:core:status:inDevProfile:)` (`CoreRowState.swift:84-102`) and `StatusBarController.menuTree()` / `onSnapshotChange` / `observeSnapshot` (`StatusBar/StatusBarController.swift:253-299`) — **replace**: Decide row ids, the `needs` node and its children join the tree and the change comparison.
-- `MenuHitMap.rowId` (`apps/macos/NavoriPanel/MenuMetrics.swift:19-35`) — **replace**: first-mouse hit-testing covers rows above `running`.
+- `MenuHitMap.rowId` (`apps/macos/NavoriPanel/MenuMetrics.swift:19-35`) and `StatusPanel.activateRow(at:)` (`StatusPanel.swift:299`) — **replace**: first-mouse hit-testing covers rows above `running`, and a Decide row reports its two button frames so a first mouse-up on a button answers that choice (a SwiftUI `Button` misses the first mouse-up in this panel); `CapsuleButton` gains a real action instead of `{}`.
 - `CapsuleButton` readers: `PreviewSampleRows.swift`, `PreviewMenu.swift` — **replace**: import the moved component; Preview stays `#if DEBUG` (NEEDS-13.12).
 - `StatusPanel.routeKey` (`StatusBar/StatusPanel.swift:283-297`) — **replace**: ⌘⌫ on a focused Decide row answers the secondary choice (NEEDS-4.2); every other ⌘ chord passes through as today.
 Interface: `CoreStore.needsYou: NeedsYouView?`, `CoreStore.answer(_ request: String)`; views `DecideBlockView`, `DecideRowView`.
 Depth: rung 7 for `DecideRowView` — callers know a `DecideRow` and a cascade; the hover/focus swap, spinner, Retry and VoiceOver string stay inside.
+Tooltip and accessibility hint of a `Destructive` choice: `Runs <module>.<action> — changes things and cannot be undone` (NEEDS-3.10), from `ChoiceView.risk` and the Envelope.
 Locality: new `Features/Panel/DecideRowView.swift`, `NeedsYouRow` in `PanelView.swift`; pure helpers (age text, VoiceOver string) in `apps/macos/NavoriPanel/NeedsYouText.swift`; extend `CoreStore.swift`, `StatusBarController.swift`, `CoreRowState.swift`, `MenuMetrics.swift`.
 
 ### H. The Needs you submenu, the calendar and History (`apps/macos`)
 
 Satisfies: NEEDS-3.7, NEEDS-6.1, NEEDS-6.2, NEEDS-6.5, NEEDS-7.1, NEEDS-8.1, NEEDS-8.3, NEEDS-8.5, NEEDS-9.3, NEEDS-9.5, NEEDS-10.1, NEEDS-10.3, NEEDS-11.7, NEEDS-11.8, NEEDS-12.1
-Reuse: 2 — `RunningSubmenuView` as template (`Features/Panel/RunningSubmenuView.swift:5-23`, `CappedScroll`, `MenuDivider`); the `awake.keep` depth-2 child precedent for the calendar and History (`StatusBarController.swift:301-309`); `InboxRowView` moved out of `#if DEBUG` as `UpdateRowView` (`PreviewSampleRows.swift:75-143`); AppKit `NSSegmentedControl`, `NSTextField`, `NSDatePicker` (rung 4) through `NSViewRepresentable`; new `TodoRowView`, `DuePill` (rung 7 — no kit row has a trailing pill, brief :49-50)
+Reuse: 2 — `RunningSubmenuView` as template (`Features/Panel/RunningSubmenuView.swift:5-23`, `CappedScroll`, `MenuDivider`); the `awake.keep` depth-2 child precedent for the calendar and History (`StatusBarController.swift:301-309`); a new `UpdateRowView` drawn on the shape of the preview's `InboxRowView` (`PreviewSampleRows.swift:75-143`) — `InboxRowView` itself stays in the preview, which still reads it (`PreviewMenu.swift:126`), and keeps `PreviewSampleRows.marker` (`:142`), which must never reach Release code; AppKit `NSSegmentedControl`, `NSTextField`, `NSDatePicker` (rung 4) through `NSViewRepresentable`; new `TodoRowView`, `DuePill` (rung 7 — no kit row has a trailing pill, brief :49-50)
 Respects: ARCH-1, ARCH-2
 Surface:
 - `StatusBarController.panel` submenu switch and `activate` switch (`StatusBarController.swift:21-32,311-330`) — **replace**: `needs`, `needs.date`, `needs.history` cases.
@@ -307,7 +326,8 @@ Interface: `NeedsYouSubmenuView(store:)`, `HistorySubmenuView(store:)`, `CoreSto
 Depth: rung 7 for `TodoRowView` / `DuePill` — callers know a `TodoRow` and `today`; the pill text, color mapping, strike-through hold and VoiceOver words stay inside.
 Locality: new `Features/Panel/NeedsYouSubmenuView.swift`, `TodoRowView.swift`, `UpdateRowView.swift`, `AddTodoField.swift`, `DueCalendarView.swift`, `HistorySubmenuView.swift`; pure helpers `apps/macos/NavoriPanel/NeedsYouText.swift` (pill text, VoiceOver words) and `NeedsYouList.swift` (filter, drawn-row set); extend `CoreStore.swift`, `CascadeController.swift`.
 
-The submenu records, for each Update row, whether its frame intersects the scroll viewport (`onGeometryChange`),
+The list, not the header, field or footer, sits in `CappedScroll`. The field's draft text and picked date live in
+`CoreStore`, so closing and reopening the submenu keeps them until Navori quits. The submenu records, for each Update row, whether its frame intersects the scroll viewport (`onGeometryChange`),
 keeping the set of drawn Update ids for the tab shown; `onSubmenuClosed("needs")` sends exactly that set through
 `markViewed` (NEEDS-6.2). Nothing is sent if Navori stops first (NEEDS-6.5 by construction). Ticking strikes the
 row through at once and dispatches `todo.tick`; the view keeps a transient copy for ~0.45 s after the snapshot
@@ -322,7 +342,8 @@ Reuse: 4 — AppKit `NSPanel.becomesKeyOnlyIfNeeded` and `NSView.needsPanelToBec
 Surface:
 - `CascadePanel.canBecomeKey` (`CascadePanel.swift:57`) — **replace**: `isVoiceOverEnabled || acceptsTyping`, with `acceptsTyping` set only on the panel hosting `needs` or `needs.date`, and `becomesKeyOnlyIfNeeded = true` so a click elsewhere in it does not take key (NEEDS-13.11).
 - `CascadePanel.routeKey` (`:77-86`) — **replace**: pass keys through while the first responder is an `NSText` (Esc still closes), so typing and Return-to-add reach the field (NEEDS-8.2).
-- `StatusPanel.resignKey` non-VoiceOver branch (`:177-188`) — **replace**: close only when key left the cascade (`cascade.keyIsInside` false), as the VoiceOver branch already does; a window outside the menu becoming key still closes it (NEEDS-13.13).
+- `StatusPanel.resignKey` non-VoiceOver branch (`:177-188`) — **replace**: defer the check to the next main-queue turn and close only when key left the cascade (`cascade.keyIsInside` false), exactly as the VoiceOver branch does; a window outside the menu becoming key still closes it (NEEDS-13.13).
+- `CascadeController.hideFrom` / `closeSubmenus` (`CascadeController.swift:103-111,246-250`) — **replace**: when the panel being hidden is key, make the level-0 `StatusPanel` key again before `orderOut`, so arrows and Esc keep working on level 0.
 Interface: `CascadePanel.acceptsTyping: Bool`.
 Depth: n/a — extends `CascadePanel` and `StatusPanel`.
 Locality: extend `CascadePanel.swift`, `StatusPanel.swift`; leave every other submenu (they never set `acceptsTyping`).
@@ -389,13 +410,13 @@ A11y: ↑↓ through entries; `Undo` in the row's Tab order; VoiceOver reads kin
 | Seam | Kind | Covers |
 |---|---|---|
 | `ModuleDispatcher` through a `Kernel` built with test Modules (`crates/kernel/tests/dispatcher.rs`) | integration | NEEDS-2.1, 2.2, 2.3, 2.4, 2.5, 2.6 |
-| `needs_you` through `Kernel::dispatch` + `Kernel::state` + a `FakeClock`, with the `Producer`/`Target` test Modules (`modules/needs_you/tests/`) | integration | NEEDS-1.1–1.11, 2.7, 3.4, 3.8, 11.9 (tray), 4.3, 4.4, 4.5, 4.7, 4.8, 4.9, 4.10, 4.12, 5.1–5.5, 6.3, 6.4, 6.5, 7.2, 12.2, 12.3, 12.4 (Decisions/Updates), 14.3 (Shield), 14.4 (restart, migration) |
+| `needs_you` through `Kernel::dispatch` + `Kernel::state` + a `FakeClock`, with the `Producer`/`Target` test Modules (`modules/needs_you/tests/`) | integration | NEEDS-1.1–1.12, 2.7, 3.4, 3.8, 11.9 (tray), 4.3, 4.4, 4.5, 4.7, 4.8, 4.9, 4.10, 4.12, 5.1–5.5, 6.3, 6.4, 6.5, 7.2, 12.2, 12.3, 12.4 (Decisions/Updates), 14.3 (Shield), 14.4 (restart, migration) |
 | `todo` through `Kernel::dispatch` + `Kernel::state` + `FakeClock` + a fake `LocalCalendar` (`modules/todo/tests/`) | integration | NEEDS-8.4 (data), 8.5, 8.6, 8.7, 8.8, 9.2, 9.4, 10.1 (data), 10.2, 12.3, 12.4 (To-dos), 12.5, 12.6, 14.3, 14.4 |
 | `navori-macos` `local_utc_offset` against the system zone (`crates/macos/tests/`) | integration | NEEDS-9.2 (offset input) |
 | `ffi::needs_you::build` pure join (`crates/ffi/tests/needs_you_view.rs` or unit) | unit | NEEDS-3.1, 3.7 (no Decision in the submenu lists), 11.2, 11.3, 11.4, 11.6, 9.1 (order), 6.1 (order) |
 | `NavoriCore` with the real `build_kernel` (`crates/ffi/tests/actions_risk.rs`, `core.rs`) | integration | NEEDS-13.8, 12.1 (history merge via `needs_you_history`), 13.1, 13.2 (kept green) |
 | Navori AI's tool gate with `needs_you.answer` in the toolset (`ai/agent/tests/`) | integration | NEEDS-4.11, 13.5 |
-| `NavoriPanel` pure Swift (`apps/macos/Tests/NavoriPanelTests/`) | unit | NEEDS-3.6 (VoiceOver string), 9.3 (pill text), 9.5 (pill words), 10.3, 6.2 (drawn-row set), 11.6 (filter), 11.1 (`LevelZeroTree` order), 4.2 (key map) |
+| `NavoriPanel` pure Swift (`apps/macos/Tests/NavoriPanelTests/`) | unit | NEEDS-3.6 (VoiceOver string), 3.10 (Destructive hint text), 9.3 (pill text), 9.5 (pill words), 10.3, 6.2 (drawn-row set), 11.6 (filter), 11.1 (`LevelZeroTree` order), 4.2 (key map) |
 | Existing suites kept green: `crates/kernel/tests/{kernel,scheduler,tray}.rs`, `modules/awake/tests/`, `crates/ffi/tests/core.rs`, `running.rs` | integration | NEEDS-13.1, 13.2, 13.3, 13.4, 13.6, 13.9 |
 | Release-build check: `strings` on the Release binary has no `PreviewSampleRows.marker` | integration (build script step) | NEEDS-13.10, 13.12 |
 | Throwaway `run-spike` (scratch target, deleted) | spike | decision 9 facts behind NEEDS-8.2, 8.3, 13.11, 13.13 |
@@ -413,10 +434,14 @@ Changed in `requirements.md` while designing (to be re-approved with this design
   External and the repo names times `*_ms`.
 - NEEDS-4.12 added *(agent-decided)*: an answer naming a Decision version a re-raise replaced is refused — the
   `revision` in section C.
+- NEEDS-1.12 added *(agent-decided)*, from the design review: a raise whose Envelope holds text the Shield would
+  redact is refused — ARCH-6 covers the stored Envelope, and redacting it would change what runs.
+- NEEDS-3.10 added *(agent-decided)*, from the design review: a `Destructive` choice's tooltip and accessibility
+  hint name the Action it runs — the button label is the raising Module's text.
 
 ## Coverage check
 
-Checked by script: each of the 100 IDs in `requirements.md` appears in exactly one `Satisfies:` line, except guards
+Checked by script: each of the 102 IDs in `requirements.md` appears in exactly one `Satisfies:` line, except guards
 NEEDS-13.1–13.6 and 13.9 and NFRs NEEDS-14.1–14.5, which no section changes — they are kept by leaving the guarded
 code alone or measured as a whole, and map to rows of the seams table. Where a second section carries part of a
 behavior, its text says so: NEEDS-6.2 (Shell picks the set, H; Core records it, D), NEEDS-10.1 (Core data, E; the

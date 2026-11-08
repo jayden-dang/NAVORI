@@ -34,6 +34,7 @@ operator; the operator confirms or changes it when reading this file.
 - **NEEDS-1.9** WHEN Navori or the `needs_you` Module restarts THE SYSTEM SHALL keep every open Decision with its title, reason, expiry, choices and raise time.
 - **NEEDS-1.10** WHEN the user runs `navori dispatch needs_you` with a raise THE SYSTEM SHALL raise the Decision exactly as a raise from a Module does.
 - **NEEDS-1.11** IF `needs_you.raise` names the `key` of an open Decision whose answer is running THEN THE SYSTEM SHALL refuse the raise and change nothing. *(agent-decided)*
+- **NEEDS-1.12** IF a choice's Envelope holds text the Sensitive Data Shield would redact THEN THE SYSTEM SHALL refuse the raise and add nothing, so a stored Envelope never carries a secret and is never altered. *(agent-decided — ARCH-6 without corrupting the Envelope)*
 
 ## 2. Dispatch an Action from inside a Module
 
@@ -60,6 +61,7 @@ operator; the operator confirms or changes it when reading this file.
 - **NEEDS-3.7** THE SYSTEM SHALL NOT list a Decision anywhere in the Needs you submenu.
 - **NEEDS-3.8** THE SYSTEM SHALL carry each choice's Risk in the Core's Needs you view as the Action catalog lists it now, not as it was at raise. *(agent-decided — Risk read again after an upgrade, close-package C1)*
 - **NEEDS-3.9** WHERE the code is Release code THE SYSTEM SHALL show the Decide block, the `Needs you` row and `✓ You're all caught up` (amends MENU-1.4 and rule 12 of the 2026-11-01 menubar brief).
+- **NEEDS-3.10** WHILE a choice's Risk is `Destructive` THE SYSTEM SHALL name the Action it runs in that button's tooltip and accessibility hint, as `Runs ports.kill — changes things and cannot be undone`. *(agent-decided — the label is the raising Module's text)*
 
 ## 4. Answer a Decision
 
