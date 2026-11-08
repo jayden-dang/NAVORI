@@ -30,6 +30,7 @@ navori-kernel.workspace = true
 navori-llm.workspace = true
 navori-mod-awake.workspace = true
 navori-mod-integrations.workspace = true
+navori-mod-needs-you.workspace = true
 navori-mod-ports.workspace = true
 navori-protocol.workspace = true
 navori-redact.workspace = true

@@ -9,6 +9,7 @@ use navori_ffi::{AiDeps, CoreConfig, CoreSnapshot, NavoriCore, SnapshotListener}
 use navori_kernel::{ModuleAction, SystemAction};
 use navori_mod_awake::AwakeAction;
 use navori_mod_integrations::IntegrationsAction;
+use navori_mod_needs_you::NeedsYouAction;
 use navori_mod_ports::PortsAction;
 use navori_secrets::Secret;
 use navori_secrets::SecretStore;
@@ -61,7 +62,7 @@ fn config(home: &tempfile::TempDir) -> CoreConfig {
     }
 }
 
-const SAMPLED: usize = 27;
+const SAMPLED: usize = 28;
 
 fn sample(module: &str, name: &str) -> Value {
     match (module, name) {
@@ -101,6 +102,15 @@ fn sample(module: &str, name: &str) -> Value {
         ("integrations", "install") => json!({"install": {"harness": "claude"}}),
         ("integrations", "repair") => json!({"repair": {"harness": "claude"}}),
         ("integrations", "remove") => json!({"remove": {"harness": "claude"}}),
+        ("needs_you", "raise") => json!({
+            "raise": {
+                "key": "k",
+                "title": "t",
+                "reason": "r",
+                "primary": {"label": "Ok"},
+                "secondary": {"label": "Later"},
+            }
+        }),
         other => panic!("no sample for the Action {other:?}"),
     }
 }
@@ -126,6 +136,7 @@ fn every_action_s_catalog_risk_matches_its_own_risk() {
             "awake" => own_risk::<AwakeAction>(value),
             "ports" => own_risk::<PortsAction>(value),
             "integrations" => own_risk::<IntegrationsAction>(value),
+            "needs_you" => own_risk::<NeedsYouAction>(value),
             module => panic!("no action type for the module {module}"),
         };
         assert_eq!(

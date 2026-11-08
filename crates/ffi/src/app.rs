@@ -17,6 +17,7 @@ use navori_mod_awake::{Awake, AwakeState, LeaseKind, LeaseState, Platform, Timin
 use navori_mod_integrations::{
     Harness, Integrations, IntegrationsEnv, IntegrationsState, State, inspect,
 };
+use navori_mod_needs_you::NeedsYou;
 use navori_mod_ports::{Ports, PortsEnv, PortsState};
 use navori_protocol::{
     AskReply, AskRequest, Check, CoreStatus, Envelope, Event, ModuleInfo, Severity, rpc,
@@ -271,6 +272,7 @@ pub fn build_kernel(
         .register(Awake::new(Platform::mac(), name, Timing::FIXED))
         .register(Integrations::new(integrations))
         .register(Ports::new(ports))
+        .register(NeedsYou::new(*sweep))
         .start()
 }
 
