@@ -2,6 +2,7 @@
 
 mod action;
 mod answer;
+mod expiry;
 mod raise;
 mod state;
 pub mod stored;
@@ -15,7 +16,9 @@ use std::task::{Context, Poll};
 
 use futures::stream::{FuturesUnordered, StreamExt};
 use navori_config::JournalSweep;
-use navori_kernel::{ActionError, Module, ModuleCtx, NoConfig, Pending, Request, TrayContribution};
+use navori_kernel::{
+    ActionError, Module, ModuleCtx, NoConfig, Pending, Request, TrayContribution, Wake,
+};
 
 use crate::answer::AnswerOutcome;
 
@@ -58,10 +61,14 @@ impl Module for NeedsYou {
             .map_err(|err| anyhow::anyhow!("needs_you restart repair failed: {err}"))?;
         answer::refresh_choice_risks(ctx)
             .map_err(|err| anyhow::anyhow!("needs_you risk refresh failed: {err}"))?;
+        expiry::expire_due(ctx)
+            .map_err(|err| anyhow::anyhow!("needs_you expiry at start failed: {err}"))?;
         reload_state(ctx)?;
 
+        let mut wait = ctx.wait_handle();
         let mut pending: FuturesUnordered<AnswerFlight> = FuturesUnordered::new();
         loop {
+            let deadline = expiry::soonest_deadline(ctx);
             tokio::select! {
                 req = ctx.recv() => {
                     let Some(req) = req else {
@@ -88,6 +95,16 @@ impl Module for NeedsYou {
                         tracing::warn!(error = %err, "needs_you reload after answer failed");
                     }
                 }
+                wake = wait.wait_until(deadline) => {
+                    if matches!(wake, Wake::Due) {
+                        if let Err(err) = expiry::expire_due(ctx) {
+                            tracing::warn!(error = %err, "needs_you expiry failed");
+                        }
+                        if let Err(err) = reload_state(ctx) {
+                            tracing::warn!(error = %err, "needs_you reload after expiry failed");
+                        }
+                    }
+                }
             }
         }
     }
@@ -96,9 +113,11 @@ impl Module for NeedsYou {
 fn reload_state(ctx: &ModuleCtx<NeedsYou>) -> anyhow::Result<()> {
     let decisions = stored::load_open_decisions(&ctx.store)
         .map_err(|err| anyhow::anyhow!("needs_you reload failed: {err}"))?;
+    let updates = stored::load_unviewed_updates(&ctx.store)
+        .map_err(|err| anyhow::anyhow!("needs_you reload updates failed: {err}"))?;
     ctx.update_state(|state| {
         state.decisions = decisions;
-        state.updates = Vec::new();
+        state.updates = updates;
     });
     Ok(())
 }

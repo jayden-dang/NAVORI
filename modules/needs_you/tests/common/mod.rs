@@ -319,6 +319,11 @@ impl Harness {
     pub async fn shutdown(self) {
         self.kernel.shutdown().await;
     }
+
+    pub async fn advance(&self, by: Duration) {
+        self.clock.advance(by);
+        tokio::time::advance(by).await;
+    }
 }
 
 pub fn raise_body(

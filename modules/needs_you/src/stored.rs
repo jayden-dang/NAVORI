@@ -1,14 +1,15 @@
-use navori_store::{Migration, Store};
+use navori_store::{Migration, MigrationReport, Store};
 use rusqlite::{OptionalExtension, params};
 
-use crate::state::{ChoiceState, DecisionState, OpenDecision};
+use crate::state::{ChoiceState, DecisionState, OpenDecision, UnviewedUpdate};
 
 const OWNER: &str = "needs_you";
 
-const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "needs_you_decisions",
-    sql: "
+pub const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "needs_you_decisions",
+        sql: "
         CREATE TABLE needs_you_decisions (
           id INTEGER PRIMARY KEY,
           key TEXT NOT NULL,
@@ -32,7 +33,23 @@ const MIGRATIONS: &[Migration] = &[Migration {
           ON needs_you_decisions(key)
           WHERE state IN ('open','answering','failed');
     ",
-}];
+    },
+    Migration {
+        version: 2,
+        name: "needs_you_updates",
+        sql: "
+        CREATE TABLE needs_you_updates (
+          id INTEGER PRIMARY KEY,
+          kind TEXT NOT NULL,
+          title TEXT NOT NULL,
+          decision_id INTEGER,
+          created_at_ms INTEGER NOT NULL,
+          resolved_at_ms INTEGER,
+          resolution TEXT
+        );
+    ",
+    },
+];
 
 #[derive(Debug, Clone)]
 pub struct RaiseRow {
@@ -63,11 +80,10 @@ pub struct OpenKey {
     pub kind: OpenKind,
 }
 
-pub fn migrate(store: &Store) -> anyhow::Result<()> {
+pub fn migrate(store: &Store) -> anyhow::Result<MigrationReport> {
     store
         .migrate(OWNER, MIGRATIONS)
-        .map_err(|err| anyhow::anyhow!("needs_you migration failed: {err}"))?;
-    Ok(())
+        .map_err(|err| anyhow::anyhow!("needs_you migration failed: {err}"))
 }
 
 pub fn find_open_key(store: &Store, key: &str) -> Result<Option<OpenKey>, String> {
@@ -408,6 +424,104 @@ pub fn load_open_decisions(store: &Store) -> Result<Vec<OpenDecision>, String> {
                         risk: row.get(11)?,
                     },
                     state: decision_state,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())
+    })
+}
+
+#[derive(Debug, Clone)]
+pub struct DueExpiry {
+    pub id: i64,
+    pub title: String,
+}
+
+pub fn due_expiries(store: &Store, now_ms: i64) -> Result<Vec<DueExpiry>, String> {
+    store.with_conn(|conn| {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, title FROM needs_you_decisions
+                 WHERE state IN ('open','failed')
+                   AND expires_at_ms IS NOT NULL
+                   AND expires_at_ms <= ?1
+                 ORDER BY id",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([now_ms], |row| {
+                Ok(DueExpiry {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())
+    })
+}
+
+pub fn soonest_expires_at_ms(store: &Store) -> Result<Option<i64>, String> {
+    store.with_conn(|conn| {
+        conn.query_row(
+            "SELECT MIN(expires_at_ms) FROM needs_you_decisions
+             WHERE state IN ('open','failed') AND expires_at_ms IS NOT NULL",
+            [],
+            |row| row.get::<_, Option<i64>>(0),
+        )
+        .map_err(|e| e.to_string())
+    })
+}
+
+pub fn expire_to_update(
+    store: &Store,
+    id: i64,
+    title: &str,
+    created_at_ms: i64,
+) -> Result<i64, String> {
+    let update_title = format!("Expired: {title}");
+    store.with_conn(|conn| {
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let changed = tx
+            .execute(
+                "UPDATE needs_you_decisions
+                     SET state = 'expired', resolved_at_ms = ?1
+                     WHERE id = ?2 AND state IN ('open','failed')",
+                params![created_at_ms, id],
+            )
+            .map_err(|e| e.to_string())?;
+        if changed != 1 {
+            return Err("Decision was not marked expired".to_owned());
+        }
+        tx.execute(
+            "INSERT INTO needs_you_updates (kind, title, decision_id, created_at_ms)
+             VALUES ('decision_expired', ?1, ?2, ?3)",
+            params![update_title, id, created_at_ms],
+        )
+        .map_err(|e| e.to_string())?;
+        let update_id = tx.last_insert_rowid();
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(update_id)
+    })
+}
+
+pub fn load_unviewed_updates(store: &Store) -> Result<Vec<UnviewedUpdate>, String> {
+    store.with_conn(|conn| {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, kind, title, created_at_ms FROM needs_you_updates
+                 WHERE resolution IS NULL
+                 ORDER BY id",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(UnviewedUpdate {
+                    id: row.get(0)?,
+                    kind: row.get(1)?,
+                    title: row.get(2)?,
+                    created_at_ms: row.get(3)?,
                 })
             })
             .map_err(|e| e.to_string())?;
