@@ -10,7 +10,7 @@ Feature code: NEEDS
 Status: Approved
 Approved by the operator: "approve", 2026-11-08 17:37 +07, after reading the spec sheet at 270a07d (relayed by the conductor navori-47 in .skills/_pending-needs-you/auto/operator-reply.md). The ship-day Decision source stays an Open Question.
 Date: 2026-11-08
-Execution-mode: unset
+Execution-mode: continuous
 Max-concurrency: auto
 Requirements: ./requirements.md
 Design: ./design.md

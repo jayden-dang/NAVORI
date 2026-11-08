@@ -1,7 +1,7 @@
 # Requirements: Needs you
 
 Feature code: NEEDS
-Status: Approved
+Status: In-progress
 Approved by the operator: "approve", 2026-11-08 17:37 +07, after reading the spec sheet at 270a07d (relayed by the conductor navori-47 in .skills/_pending-needs-you/auto/operator-reply.md). The ship-day Decision source stays an Open Question.
 Date: 2026-11-08
 
