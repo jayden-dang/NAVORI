@@ -84,6 +84,15 @@ public enum NeedsYouText {
 
     public static let checkboxSpoken = "Mark done"
 
+    /// Filter segment titles; a count shows only when it is above zero.
+    public static func filterLabels(todoCount: Int, updateCount: Int) -> [String] {
+        ["All", counted("To-dos", todoCount), counted("Updates", updateCount)]
+    }
+
+    private static func counted(_ title: String, _ count: Int) -> String {
+        count > 0 ? "\(title) \(count)" : title
+    }
+
     public static func age(raisedAtMs: Int64, nowMs: Int64) -> String {
         let raised = Date(timeIntervalSince1970: TimeInterval(raisedAtMs) / 1000)
         let now = Date(timeIntervalSince1970: TimeInterval(nowMs) / 1000)

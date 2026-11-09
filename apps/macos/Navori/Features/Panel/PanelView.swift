@@ -36,18 +36,6 @@ struct PanelView: View {
             ForEach(decisions, id: \.id) { row in
                 DecideRowView(row: row, cascade: cascade, store: store, isDimmed: down)
             }
-        } else if needs?.allCaughtUp == true, !down {
-            Text("✓ You're all caught up")
-                .font(.system(size: 14))
-                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-                .padding(.horizontal, 8)
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: MenuMetrics.rowHeight,
-                    maxHeight: MenuMetrics.rowHeight,
-                    alignment: .leading
-                )
-                .accessibilityLabel("You're all caught up")
         }
     }
 

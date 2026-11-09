@@ -56,7 +56,7 @@ struct MenuHitMapTests {
         #expect(CascadeKey.fromKeyCode(0) == nil)
     }
 
-    @Test func a_caught_up_line_sits_above_needs_and_is_not_a_hit() {
+    @Test func with_no_decision_needs_is_the_top_row_and_nothing_sits_above_it() {
         let tree: [CascadeNode] = [
             CascadeNode(id: "needs", isActionable: true),
             CascadeNode(id: "running", isActionable: true),
@@ -64,14 +64,11 @@ struct MenuHitMapTests {
             CascadeNode(id: "about", isActionable: true),
             CascadeNode(id: "quit", isActionable: true),
         ]
-        // Bottom-up: quit, about, settings, running, divider, needs, caught-up.
+        // Bottom-up: quit, about, settings, running, divider, needs. Nothing above needs.
         let needsY = Self.pad + 4 * Self.row + MenuMetrics.divider + 1
-        let caughtY = Self.pad + 5 * Self.row + MenuMetrics.divider + 1
-        let dividerY = Self.pad + 4 * Self.row + 0.5
-        #expect(hit(needsY, in: tree, caughtUp: true) == "needs")
-        #expect(hit(caughtY, in: tree, caughtUp: true) == nil)
-        #expect(hit(dividerY, in: tree, caughtUp: true) == nil)
-        #expect(hit(caughtY, in: tree, caughtUp: false) == nil)
+        let aboveY = Self.pad + 5 * Self.row + MenuMetrics.divider + 1
+        #expect(hit(needsY, in: tree) == "needs")
+        #expect(hit(aboveY, in: tree) == nil)
     }
 
     @Test func testHitMapFindsRowsAboveRunningAndDecideButtons() {
@@ -119,13 +116,8 @@ struct MenuHitMapTests {
         )
     }
 
-    private func hit(_ y: CGFloat, in tree: [CascadeNode], caughtUp: Bool = false) -> String? {
-        switch MenuHitMap.hit(
-            at: CGPoint(x: 20, y: y),
-            width: Self.width,
-            tree: tree,
-            caughtUp: caughtUp
-        ) {
+    private func hit(_ y: CGFloat, in tree: [CascadeNode]) -> String? {
+        switch MenuHitMap.hit(at: CGPoint(x: 20, y: y), width: Self.width, tree: tree) {
         case let .row(id), let .decidePrimary(id), let .decideSecondary(id):
             id
         case nil:

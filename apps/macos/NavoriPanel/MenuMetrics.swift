@@ -31,8 +31,7 @@ public enum MenuHitMap {
         at point: CGPoint,
         width: CGFloat,
         tree: [CascadeNode],
-        decideButtons: [String: DecideButtonFrames] = [:],
-        caughtUp: Bool = false
+        decideButtons: [String: DecideButtonFrames] = [:]
     ) -> MenuHit? {
         guard point.x >= MenuMetrics.pad, point.x <= width - MenuMetrics.pad else { return nil }
         let row = MenuMetrics.rowHeight
@@ -41,10 +40,7 @@ public enum MenuHitMap {
             if id == "core" { y += MenuMetrics.divider }
             if id == "needs" { y += MenuMetrics.divider }
             let band = y ..< (y + row)
-            defer {
-                y += row
-                if id == "needs", caughtUp { y += row }
-            }
+            defer { y += row }
             guard band.contains(point.y) else { continue }
             if id == "running" { return nil }
             if let buttons = decideButtons[id] {
