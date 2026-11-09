@@ -210,20 +210,18 @@ fn handle(
             let choice = *choice;
             match answer::answer(ctx, id, revision, choice) {
                 Ok(AnswerOutcome::Closed) => {
-                    if let Err(err) = reload_state(ctx) {
-                        req.respond::<()>(Err(ActionError::Failed(err.to_string())));
-                        return None;
-                    }
                     req.respond(Ok(()));
+                    if let Err(err) = reload_state(ctx) {
+                        tracing::warn!(error = %err, "needs_you reload after close failed");
+                    }
                     None
                 }
                 Ok(AnswerOutcome::Dispatch(envelope)) => {
-                    if let Err(err) = reload_state(ctx) {
-                        req.respond::<()>(Err(ActionError::Failed(err.to_string())));
-                        return None;
-                    }
                     // Answering is committed; reply before the Envelope runs.
                     req.respond(Ok(()));
+                    if let Err(err) = reload_state(ctx) {
+                        tracing::warn!(error = %err, id, "needs_you reload after answering failed");
+                    }
                     match ctx.dispatcher().send(envelope) {
                         Ok(wait) => Some(AnswerFlight {
                             id,
@@ -245,7 +243,12 @@ fn handle(
                 }
                 Err(err) => {
                     // Expired path may have written; refresh State either way.
-                    let _ = reload_state(ctx);
+                    if let Err(reload) = reload_state(ctx) {
+                        tracing::warn!(
+                            error = %reload,
+                            "needs_you reload after answer error failed"
+                        );
+                    }
                     req.respond::<()>(Err(err));
                     None
                 }

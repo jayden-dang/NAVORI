@@ -50,11 +50,15 @@ pub enum TargetAction {
     Poke,
     Fail,
     Stall,
+    Wipe,
 }
 
 impl ModuleAction for TargetAction {
     fn risk(&self) -> Risk {
-        Risk::Write
+        match self {
+            Self::Wipe => Risk::Destructive,
+            Self::Poke | Self::Fail | Self::Stall => Risk::Write,
+        }
     }
 
     fn catalog() -> Vec<ActionDoc> {
@@ -73,6 +77,11 @@ impl ModuleAction for TargetAction {
                 name: "stall",
                 description: "Never replies.",
                 risk: Risk::Write,
+            },
+            ActionDoc {
+                name: "wipe",
+                description: "A Destructive Action for Needs you tests.",
+                risk: Risk::Destructive,
             },
         ]
     }
@@ -107,6 +116,10 @@ impl Module for Target {
                 TargetAction::Fail => {
                     ctx.update_state(|state| state.seen.push(json!("fail")));
                     req.respond::<Value>(Err(ActionError::Failed("target refused".into())));
+                }
+                TargetAction::Wipe => {
+                    ctx.update_state(|state| state.seen.push(json!("wipe")));
+                    req.respond(Ok(json!("wiped")));
                 }
                 TargetAction::Stall => stalled.push(req),
             }
@@ -232,18 +245,27 @@ pub fn harness() -> Harness {
 }
 
 pub fn harness_with_timeout(timeout: Duration) -> Harness {
+    start_harness(timeout, true)
+}
+
+pub fn harness_ungranted() -> Harness {
+    start_harness(Duration::from_secs(30), false)
+}
+
+fn start_harness(timeout: Duration, grant: bool) -> Harness {
     let clock = FakeClock::at(ORIGIN_MS);
     let store = Store::open_in_memory().unwrap();
-    let kernel = Kernel::builder_with_clock(store.clone(), Arc::new(clock.clone()))
+    let mut builder = Kernel::builder_with_clock(store.clone(), Arc::new(clock.clone()))
         .pause_journal_sweep()
         .dispatch_timeout(timeout)
         .register(NeedsYou::new(JournalSweep::Paused))
         .register(Target)
-        .register(Producer)
-        .grant_destructive("needs_you")
-        .start();
+        .register(Producer);
+    if grant {
+        builder = builder.grant_destructive("needs_you");
+    }
     Harness {
-        kernel,
+        kernel: builder.start(),
         clock,
         store,
     }

@@ -448,3 +448,91 @@ async fn attention_is_on_only_while_a_decision_is_open() {
 
     h.shutdown().await;
 }
+
+#[tokio::test(start_paused = true)]
+async fn answering_still_runs_the_envelope_if_reload_fails() {
+    let h = harness();
+    h.idle().await;
+
+    let (id, revision) = raise_poke(&h).await;
+    h.store.with_conn(|conn| {
+        conn.execute("DROP TABLE needs_you_updates", []).unwrap();
+    });
+
+    h.answer(id, revision, "primary").await.unwrap();
+    h.settle().await;
+
+    assert_eq!(h.target_state()["seen"], json!(["poke"]));
+
+    h.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn answering_a_destructive_choice_runs_it() {
+    let h = harness();
+    h.idle().await;
+
+    let reply = h
+        .raise(json!({
+            "raise": {
+                "key": "wipe",
+                "title": "Wipe",
+                "reason": "needed",
+                "primary": {
+                    "label": "Wipe",
+                    "envelope": { "module": "target", "action": "wipe" }
+                },
+                "secondary": { "label": "Later" }
+            }
+        }))
+        .await
+        .unwrap();
+    let id = reply["id"].as_i64().unwrap();
+    let revision = reply["revision"].as_u64().unwrap() as u32;
+
+    h.answer(id, revision, "primary").await.unwrap();
+    h.settle().await;
+
+    assert_eq!(h.target_state()["seen"], json!(["wipe"]));
+    assert!(h.state()["decisions"].as_array().unwrap().is_empty());
+
+    h.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn answering_a_destructive_choice_without_a_grant_fails_before_it_runs() {
+    let h = common::harness_ungranted();
+    h.idle().await;
+
+    let reply = h
+        .raise(json!({
+            "raise": {
+                "key": "wipe",
+                "title": "Wipe",
+                "reason": "needed",
+                "primary": {
+                    "label": "Wipe",
+                    "envelope": { "module": "target", "action": "wipe" }
+                },
+                "secondary": { "label": "Later" }
+            }
+        }))
+        .await
+        .unwrap();
+    let id = reply["id"].as_i64().unwrap();
+    let revision = reply["revision"].as_u64().unwrap() as u32;
+
+    h.answer(id, revision, "primary").await.unwrap();
+    h.settle().await;
+
+    let d = &h.state()["decisions"][0];
+    let error = d["state"]["failed"]["error"].as_str().unwrap();
+    assert!(!error.contains("may already have run"), "{error}");
+    assert!(
+        error.contains("Refused") || error.contains("refused"),
+        "{error}"
+    );
+    assert_eq!(h.target_state()["seen"], json!([]));
+
+    h.shutdown().await;
+}

@@ -12,7 +12,7 @@ pub const STOPPED_MID_ANSWER: &str =
 pub const VANISHED_ACTION: &str = "this action no longer exists";
 
 pub enum AnswerOutcome {
-    /// Decision closed with no Envelope to run.
+    /// No Envelope to run: either answered with no Envelope, or marked failed because the Action is gone from the catalog.
     Closed,
     /// Answering marker written; caller must reply Ok then dispatch.
     Dispatch(Envelope),
