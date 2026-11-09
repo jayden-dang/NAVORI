@@ -3,7 +3,7 @@
 use std::os::unix::net::UnixStream as StdUnixStream;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use crate::ai::ask_error_to_rpc;
 use futures::FutureExt;
@@ -17,7 +17,9 @@ use navori_mod_awake::{Awake, AwakeState, LeaseKind, LeaseState, Platform, Timin
 use navori_mod_integrations::{
     Harness, Integrations, IntegrationsEnv, IntegrationsState, State, inspect,
 };
+use navori_mod_needs_you::{NeedsYou, NeedsYouState};
 use navori_mod_ports::{Ports, PortsEnv, PortsState};
+use navori_mod_todo::{LocalCalendar, Todo, TodoEnv, TodoState};
 use navori_protocol::{
     AskReply, AskRequest, Check, CoreStatus, Envelope, Event, ModuleInfo, Severity, rpc,
 };
@@ -271,7 +273,24 @@ pub fn build_kernel(
         .register(Awake::new(Platform::mac(), name, Timing::FIXED))
         .register(Integrations::new(integrations))
         .register(Ports::new(ports))
+        .register(NeedsYou::new(*sweep))
+        .register(Todo::new(
+            TodoEnv {
+                calendar: Arc::new(MacCalendar),
+            },
+            *sweep,
+        ))
+        .grant_destructive("needs_you")
         .start()
+}
+
+#[derive(Debug)]
+struct MacCalendar;
+
+impl LocalCalendar for MacCalendar {
+    fn utc_offset(&self, at: SystemTime) -> i32 {
+        navori_macos::local_utc_offset(at)
+    }
 }
 
 impl From<LeaseKind> for crate::LeaseKindView {
@@ -378,6 +397,38 @@ pub fn running_view(
         ports_state(kernel)
     };
     crate::running::build(awake, ports.as_ref(), own)
+}
+
+/// Needs you view from Module State. `down` when either Module has stopped or failed.
+pub fn needs_you_view(kernel: &Kernel) -> Option<crate::NeedsYouView> {
+    let needs = module_state::<NeedsYouState>(kernel, NeedsYou::ID);
+    let todo = module_state::<TodoState>(kernel, Todo::ID);
+    let down = kernel.modules().into_iter().any(|module| {
+        (module.id == NeedsYou::ID || module.id == Todo::ID)
+            && matches!(
+                module.state,
+                ModuleState::Failed { .. } | ModuleState::Stopped
+            )
+    });
+    match (crate::needs_you::build(needs.as_ref(), todo.as_ref()), down) {
+        (Some(mut view), _) => {
+            view.down = down;
+            Some(view)
+        }
+        (None, true) => Some(crate::needs_you::empty_down()),
+        (None, false) => None,
+    }
+}
+
+fn module_state<T: serde::de::DeserializeOwned>(kernel: &Kernel, id: &str) -> Option<T> {
+    let value = kernel.state(id)?;
+    match serde_json::from_value(value) {
+        Ok(state) => Some(state),
+        Err(error) => {
+            tracing::warn!(%error, module = id, "module state will not deserialize");
+            None
+        }
+    }
 }
 
 fn module_is_down(kernel: &Kernel, id: &str) -> bool {
@@ -562,7 +613,9 @@ fn rpc_err(code: i64, e: impl std::fmt::Display) -> rpc::Error {
 pub fn dispatch_to_rpc(e: DispatchError) -> rpc::Error {
     let code = match &e {
         DispatchError::UnknownModule(_) => rpc::code::UNKNOWN_MODULE,
-        DispatchError::InvalidAction { .. } => rpc::code::INVALID_PARAMS,
+        DispatchError::InvalidAction { .. } | DispatchError::Refused { .. } => {
+            rpc::code::INVALID_PARAMS
+        }
         DispatchError::Unavailable(_) | DispatchError::Timeout(_) => rpc::code::MODULE_UNAVAILABLE,
         DispatchError::Action(_) => rpc::code::ACTION_FAILED,
     };
@@ -622,5 +675,42 @@ pub async fn snapshot_pump(
         revision.borrow_and_update();
         while events.try_recv().is_ok() {}
         notify();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use std::path::PathBuf;
+
+    use navori_config::JournalSweep;
+    use navori_mod_integrations::IntegrationsEnv;
+    use navori_mod_ports::PortsEnv;
+    use navori_store::Store;
+
+    use super::build_kernel;
+
+    #[tokio::test]
+    async fn only_needs_you_holds_the_destructive_grant() {
+        let home = tempfile::Builder::new()
+            .prefix("nv-grant")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let store = Store::open_in_memory().unwrap();
+        let kernel = build_kernel(
+            store,
+            serde_json::Map::new(),
+            &JournalSweep::Paused,
+            "Navori: test",
+            IntegrationsEnv {
+                home: home.path().to_path_buf(),
+                dev: true,
+                helper: PathBuf::from("navori"),
+            },
+            PortsEnv::mac(home.path().to_path_buf()),
+        );
+        assert_eq!(kernel.destructive_grants(), ["needs_you"]);
+        kernel.shutdown().await;
     }
 }

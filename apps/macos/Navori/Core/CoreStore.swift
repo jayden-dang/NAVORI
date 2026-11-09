@@ -26,6 +26,16 @@ final class CoreStore {
     private(set) var stopFlows: [String: StopFlow] = [:]
     private(set) var stopProgress = StopProgress()
 
+    var todoDraftText = ""
+    var todoDraftDueOn: String?
+    var needsYouTab: NeedsYouTab = .all
+    var drawnUpdateIds: Set<Int64> = []
+    var isTerminating = false
+    private(set) var historyEntries: [NeedsYouHistoryEntry] = []
+    private(set) var historyError: String?
+    private(set) var historyHasLoaded = false
+    private(set) var needsYouActionError: String?
+
     func start() {
         guard core == nil else { return }
         let config = CoreConfig(
@@ -119,6 +129,10 @@ final class CoreStore {
     }
 
     var hasSnapshot: Bool { snapshot != nil }
+
+    var needsYou: NeedsYouSnapshot? {
+        snapshot?.needsYou.map(NeedsYouSnapshot.init)
+    }
 
     /// Production hides the Core row while the Core is healthy; the dev profile always shows it.
     var coreRowVisible: Bool {
@@ -453,6 +467,108 @@ final class CoreStore {
         }
     }
 
+    func answer(_ request: String) async {
+        _ = await runNeedsYouAction(
+            module: "needs_you",
+            actionJSON: request,
+            failedLabel: "needs you answer failed"
+        )
+    }
+
+    func answerDecide(id: Int64, primary: Bool) async {
+        guard let row = needsYou?.decisions.first(where: { $0.id == id }) else { return }
+        await answer(row.answerRequest(primary: primary))
+    }
+
+    func addTodo(title: String, dueOn: String?) async {
+        var fields: [String: Any] = ["title": title]
+        if let dueOn {
+            fields["due_on"] = dueOn
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: ["add": fields]),
+              let json = String(data: data, encoding: .utf8)
+        else { return }
+        if await runNeedsYouAction(module: "todo", actionJSON: json, failedLabel: "todo add failed") {
+            todoDraftText = ""
+            todoDraftDueOn = nil
+        }
+    }
+
+    func tick(_ request: String) async {
+        _ = await runNeedsYouAction(
+            module: "todo",
+            actionJSON: request,
+            failedLabel: "todo tick failed"
+        )
+    }
+
+    func clearUpdates() async {
+        _ = await runNeedsYouAction(
+            module: "needs_you",
+            actionJSON: "\"clear_updates\"",
+            failedLabel: "clear updates failed"
+        )
+    }
+
+    @discardableResult
+    private func runNeedsYouAction(module: String, actionJSON: String, failedLabel: String) async -> Bool {
+        do {
+            _ = try await dispatch(module: module, actionJSON: actionJSON)
+            needsYouActionError = nil
+            return true
+        } catch {
+            let message = CoreStartupBanner.menuFailure(for: error)
+            let text = "\(failedLabel): \(message)"
+            log.error("\(text, privacy: .public)")
+            needsYouActionError = message
+            return false
+        }
+    }
+
+    func markViewed(_ ids: Set<Int64>) async {
+        guard !isTerminating, !ids.isEmpty else { return }
+        let sorted = ids.sorted()
+        guard let data = try? JSONSerialization.data(withJSONObject: ["mark_viewed": ["ids": sorted]]),
+              let json = String(data: data, encoding: .utf8)
+        else { return }
+        do {
+            _ = try await dispatch(module: "needs_you", actionJSON: json)
+        } catch {
+            let message = CoreStartupBanner.menuFailure(for: error)
+            log.error("mark viewed failed: \(message, privacy: .public)")
+        }
+    }
+
+    func loadHistory() async {
+        guard let core else {
+            historyError = CoreStartupBanner.menuFailure(for: StoreError.notRunning)
+            historyHasLoaded = true
+            return
+        }
+        do {
+            let view = try await core.needsYouHistory()
+            historyEntries = view.entries.enumerated().map { NeedsYouHistoryEntry($1, index: $0) }
+            historyError = nil
+            historyHasLoaded = true
+        } catch {
+            let message = CoreStartupBanner.menuFailure(for: error)
+            historyError = message
+            historyHasLoaded = true
+            log.error("history load failed: \(message, privacy: .public)")
+        }
+    }
+
+    func undo(_ request: String) async {
+        do {
+            _ = try await dispatch(module: "todo", actionJSON: request)
+            await loadHistory()
+        } catch {
+            let message = CoreStartupBanner.menuFailure(for: error)
+            historyError = message
+            log.error("todo undo failed: \(message, privacy: .public)")
+        }
+    }
+
     fileprivate func apply(_ snapshot: CoreSnapshot) {
         self.snapshot = snapshot
         pruneStopState()
@@ -489,6 +605,162 @@ struct EventRow: Identifiable, Equatable {
 struct ConfigProblem: Equatable {
     let title: String
     let message: String
+}
+
+struct NeedsYouChoice: Equatable {
+    let label: String
+    let risk: String?
+    let action: String?
+    let module: String?
+    let answerRequest: String
+
+    init(_ view: ChoiceView) {
+        label = view.label
+        risk = view.risk
+        action = view.action
+        module = view.module
+        answerRequest = view.answerRequest
+    }
+}
+
+enum NeedsYouDecideState: Equatable {
+    case open
+    case answering(choice: String)
+    case failed(choice: String, error: String)
+
+    init(_ state: DecideState) {
+        switch state {
+        case .open:
+            self = .open
+        case let .answering(choice):
+            self = .answering(choice: choice)
+        case let .failed(choice, error):
+            self = .failed(choice: choice, error: error)
+        }
+    }
+
+    var signature: String {
+        switch self {
+        case .open: "open"
+        case let .answering(choice): "answering:\(choice)"
+        case let .failed(choice, error): "failed:\(choice):\(error)"
+        }
+    }
+}
+
+struct NeedsYouDecideRow: Identifiable, Equatable {
+    let id: Int64
+    let title: String
+    let reason: String
+    let raisedAtMs: Int64
+    let state: NeedsYouDecideState
+    let primary: NeedsYouChoice
+    let secondary: NeedsYouChoice
+
+    init(_ row: DecideRow) {
+        id = row.id
+        title = row.title
+        reason = row.reason
+        raisedAtMs = row.raisedAtMs
+        state = NeedsYouDecideState(row.state)
+        primary = NeedsYouChoice(row.primary)
+        secondary = NeedsYouChoice(row.secondary)
+    }
+
+    func answerRequest(primary wantsPrimary: Bool) -> String {
+        let failedChoice: String? = {
+            if case let .failed(choice, _) = state { return choice }
+            return nil
+        }()
+        return NeedsYouList.answerRequest(
+            primary: wantsPrimary,
+            failedChoice: failedChoice,
+            primaryRequest: primary.answerRequest,
+            secondaryRequest: secondary.answerRequest
+        )
+    }
+}
+
+struct NeedsYouTodoRow: Identifiable, Equatable {
+    let id: Int64
+    let title: String
+    let dueOn: String?
+    let status: DueStatus
+    let tickRequest: String
+
+    init(_ row: TodoRow) {
+        id = row.id
+        title = row.title
+        dueOn = row.dueOn
+        status = DueStatus(row.status)
+        tickRequest = row.tickRequest
+    }
+}
+
+struct NeedsYouUpdateRow: Identifiable, Equatable {
+    let id: Int64
+    let kind: String
+    let title: String
+    let createdAtMs: Int64
+
+    init(_ row: UpdateRow) {
+        id = row.id
+        kind = row.kind
+        title = row.title
+        createdAtMs = row.createdAtMs
+    }
+}
+
+struct NeedsYouSnapshot: Equatable {
+    let decisions: [NeedsYouDecideRow]
+    let todos: [NeedsYouTodoRow]
+    let updates: [NeedsYouUpdateRow]
+    let today: String
+    let needsCount: UInt32
+    let anyOverdue: Bool
+    let allCaughtUp: Bool
+    let down: Bool
+
+    init(_ view: NeedsYouView) {
+        decisions = view.decisions.map(NeedsYouDecideRow.init)
+        todos = view.todos.map(NeedsYouTodoRow.init)
+        updates = view.updates.map(NeedsYouUpdateRow.init)
+        today = view.today
+        needsCount = view.needsCount
+        anyOverdue = view.anyOverdue
+        allCaughtUp = view.allCaughtUp
+        down = view.down
+    }
+}
+
+struct NeedsYouHistoryEntry: Identifiable, Equatable {
+    let id: String
+    let kind: String
+    let title: String
+    let outcome: String?
+    let resolvedAtMs: Int64
+    let undoRequest: String?
+
+    init(_ entry: HistoryEntry, index: Int) {
+        kind = entry.kind
+        title = entry.title
+        outcome = entry.outcome
+        resolvedAtMs = entry.resolvedAtMs
+        undoRequest = entry.undoRequest
+        id = "needs.history.\(entry.kind).\(entry.resolvedAtMs).\(index)"
+    }
+}
+
+private extension DueStatus {
+    init(_ status: TodoStatus) {
+        switch status {
+        case .overdue: self = .overdue
+        case .today: self = .today
+        case .soon: self = .soon
+        case .later: self = .later
+        case .none: self = .none
+        }
+    }
 }
 
 /// Receives snapshots on a core worker thread and forwards them to the main actor.

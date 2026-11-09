@@ -82,14 +82,18 @@ public enum ModuleDot {
 }
 
 public enum LevelZeroTree {
-    /// The level 0 rows of the Cascade; the `core` node is present only where the Core row is shown.
+    /// Level-0 cascade rows: Decide block, Needs you, Running, optional Core, then the footer.
     public static func rows(
+        decisions: [CascadeNode] = [],
+        needs: CascadeNode,
         running: CascadeNode,
         core: CascadeNode,
         status: CoreStatus,
         inDevProfile: Bool
     ) -> [CascadeNode] {
-        var rows = [running]
+        var rows = decisions
+        rows.append(needs)
+        rows.append(running)
         if CoreRowState.isVisible(status: status, inDevProfile: inDevProfile) {
             rows.append(core)
         }

@@ -9,6 +9,9 @@ struct PanelView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             banners
+            decideBlock
+            MenuRowView(row: needsYouRow, cascade: cascade)
+            Divider()
             MenuRowView(row: runningRow, cascade: cascade)
             if store.coreRowVisible {
                 MenuRowView(row: coreRow, cascade: cascade)
@@ -24,12 +27,56 @@ struct PanelView: View {
     }
 
     @ViewBuilder
+    private var decideBlock: some View {
+        let needs = store.needsYou
+        let down = needs?.down == true
+        let decisions = needs?.decisions ?? []
+        if !decisions.isEmpty {
+            DecideHeaderView(count: decisions.count, cascade: cascade)
+            ForEach(decisions, id: \.id) { row in
+                DecideRowView(row: row, cascade: cascade, store: store, isDimmed: down)
+            }
+        } else if needs?.allCaughtUp == true, !down {
+            Text("✓ You're all caught up")
+                .font(.system(size: 14))
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .padding(.horizontal, 8)
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: MenuMetrics.rowHeight,
+                    maxHeight: MenuMetrics.rowHeight,
+                    alignment: .leading
+                )
+                .accessibilityLabel("You're all caught up")
+        }
+    }
+
+    private var needsYouRow: MenuRow {
+        let needs = store.needsYou
+        let count = needs?.needsCount ?? 0
+        let down = needs?.down == true
+        return MenuRow(
+            id: "needs",
+            icon: "sparkle",
+            title: "Needs you",
+            value: count == 0 ? nil : "\(count)",
+            dot: needs?.anyOverdue == true ? .red : nil,
+            opensSubmenu: true,
+            shortcut: nil,
+            isDimmed: down
+        )
+    }
+
+    @ViewBuilder
     private var banners: some View {
         if let error = store.startupError {
             Banner(style: .error, title: "The core did not start", message: error)
         }
         if let unclean = store.uncleanExit {
             Banner(style: .warning, title: "Navori quit unexpectedly last time", message: unclean)
+        }
+        if let error = store.needsYouActionError {
+            Banner(style: .error, title: "Needs you", message: error)
         }
         if let problem = store.configProblem {
             Banner(style: .warning, title: problem.title, message: problem.message)

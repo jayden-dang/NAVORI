@@ -176,14 +176,10 @@ final class StatusPanel: NSPanel {
 
     override func resignKey() {
         super.resignKey()
-        if NSWorkspace.shared.isVoiceOverEnabled {
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.isOpen else { return }
-                if self.cascade.keyIsInside { return }
-                self.close()
-            }
-        } else {
-            close()
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isOpen else { return }
+            if self.cascade.keyIsInside { return }
+            self.close()
         }
     }
 
@@ -281,6 +277,21 @@ final class StatusPanel: NSPanel {
 
     /// Hosting view is first responder and would eat arrows, Return, and Esc.
     private func routeKey(_ event: NSEvent) -> Bool {
+        var modifiers = DecideModifiers()
+        if event.modifierFlags.contains(.command) { modifiers.insert(.command) }
+        if let decide = DecideKey.from(keyCode: event.keyCode, modifiers: modifiers),
+           let selection = cascade.selection,
+           selection.hasPrefix("decide."),
+           selection != "decide.header"
+        {
+            switch decide {
+            case .primary:
+                cascade.click(selection)
+            case .secondary:
+                answerDecide(selection, primary: false)
+            }
+            return true
+        }
         // ⌘-chords and VoiceOver (Control-Option / Caps Lock) must reach the system.
         if event.modifierFlags.contains(.command)
             || event.modifierFlags.contains(.control)
@@ -297,12 +308,25 @@ final class StatusPanel: NSPanel {
 
     /// SwiftUI Button does not see first mouse-up in this non-activating panel.
     private func activateRow(at windowPoint: CGPoint) {
-        guard let id = MenuHitMap.rowId(
+        guard let hit = MenuHitMap.hit(
             at: windowPoint,
             width: frame.width,
-            tree: content.tree()
+            tree: content.tree(),
+            decideButtons: cascade.decideButtonFrames(),
+            caughtUp: content.caughtUp()
         ) else { return }
-        cascade.click(id)
+        switch hit {
+        case let .row(id):
+            cascade.click(id)
+        case let .decidePrimary(row):
+            answerDecide(row, primary: true)
+        case let .decideSecondary(row):
+            answerDecide(row, primary: false)
+        }
+    }
+
+    private func answerDecide(_ id: String, primary: Bool) {
+        cascade.answerDecide?(id, primary)
     }
 }
 

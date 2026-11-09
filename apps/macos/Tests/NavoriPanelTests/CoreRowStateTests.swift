@@ -98,8 +98,15 @@ struct CoreRowStateTests {
 
 @Suite
 struct LevelZeroTreeTests {
-    private func ids(_ status: CoreStatus, dev: Bool) -> [String] {
+    private func ids(
+        decisions: [CascadeNode] = [],
+        needs: CascadeNode = CascadeNode(id: "needs", isActionable: true),
+        status: CoreStatus,
+        dev: Bool
+    ) -> [String] {
         LevelZeroTree.rows(
+            decisions: decisions,
+            needs: needs,
             running: CascadeNode(id: "running", isActionable: true),
             core: CascadeNode(id: "core", isActionable: true),
             status: status,
@@ -108,14 +115,41 @@ struct LevelZeroTreeTests {
     }
 
     @Test func the_core_node_is_in_the_tree_only_where_the_row_is_shown() {
-        let withCore = ["running", "core", "settings", "about", "quit"]
-        let without = ["running", "settings", "about", "quit"]
-        #expect(ids(.running, dev: false) == without)
-        #expect(ids(.starting, dev: false) == without)
-        #expect(ids(.needsAttention, dev: false) == withCore)
-        #expect(ids(.notRunning, dev: false) == withCore)
+        let withCore = ["needs", "running", "core", "settings", "about", "quit"]
+        let without = ["needs", "running", "settings", "about", "quit"]
+        #expect(ids(status: .running, dev: false) == without)
+        #expect(ids(status: .starting, dev: false) == without)
+        #expect(ids(status: .needsAttention, dev: false) == withCore)
+        #expect(ids(status: .notRunning, dev: false) == withCore)
         for status in [CoreStatus.starting, .running, .needsAttention, .notRunning] {
-            #expect(ids(status, dev: true) == withCore)
+            #expect(ids(status: status, dev: true) == withCore)
         }
+    }
+
+    @Test func testLevelZeroOrderPutsDecideAndNeedsBeforeRunning() {
+        let decisions = [
+            CascadeNode(id: "decide.header"),
+            CascadeNode(id: "decide.1", isActionable: true),
+            CascadeNode(id: "decide.2", isActionable: true),
+        ]
+        let needs = CascadeNode(id: "needs", isActionable: true, children: [
+            CascadeNode(id: "needs.date"),
+            CascadeNode(id: "needs.history"),
+        ])
+        #expect(
+            ids(decisions: decisions, needs: needs, status: .running, dev: false)
+                == ["decide.header", "decide.1", "decide.2", "needs", "running", "settings", "about", "quit"]
+        )
+        #expect(
+            ids(decisions: decisions, needs: needs, status: .needsAttention, dev: false)
+                == [
+                    "decide.header", "decide.1", "decide.2", "needs", "running", "core",
+                    "settings", "about", "quit",
+                ]
+        )
+        #expect(
+            ids(decisions: [], needs: needs, status: .running, dev: false)
+                == ["needs", "running", "settings", "about", "quit"]
+        )
     }
 }

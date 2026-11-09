@@ -37,41 +37,6 @@ enum PreviewSampleRows {
     ]
 }
 
-struct CapsuleButton: View {
-    let title: String
-    var prominent = false
-    var selected = false
-
-    var body: some View {
-        Button(action: {}) {
-            Text(title)
-                .font(.system(size: 12.5, weight: .medium))
-                .foregroundStyle(label)
-                .padding(.horizontal, 10)
-                .frame(minHeight: 24)
-                .background(Capsule().fill(fill))
-        }
-        .buttonStyle(.plain)
-        .focusEffectDisabled()
-    }
-
-    private var label: Color {
-        if prominent {
-            selected ? Color(nsColor: .controlAccentColor) : Color.white
-        } else {
-            selected ? Color.white : Color(nsColor: .labelColor)
-        }
-    }
-
-    private var fill: Color {
-        if prominent {
-            selected ? Color.white : Color(nsColor: .controlAccentColor)
-        } else {
-            selected ? Color.white.opacity(0.22) : Color.primary.opacity(0.08)
-        }
-    }
-}
-
 struct InboxRowView: View {
     let item: PreviewSampleRows.InboxItem
     let cascade: CascadeController

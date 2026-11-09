@@ -25,13 +25,23 @@ final class StatusBarController: NSObject {
                     return AnyView(RunningSubmenuView(store: self.store))
                 case "awake.keep":
                     return AnyView(KeepAwakeSubmenuView(store: self.store))
+                case "needs":
+                    return AnyView(NeedsYouSubmenuView(store: self.store))
+                case "needs.date":
+                    return AnyView(DueCalendarView(store: self.store))
+                case "needs.history":
+                    return AnyView(HistorySubmenuView(store: self.store))
                 case _ where id.hasPrefix("running.project.") || id == "running.other":
                     return AnyView(ProjectChildView(projectId: id, store: self.store))
                 default:
                     return AnyView(EmptyView())
                 }
             },
-            activate: { [weak self] id in self?.activate(id) }
+            activate: { [weak self] id in self?.activate(id) },
+            caughtUp: { [weak self] in
+                guard let needs = self?.store.needsYou, needs.down != true else { return false }
+                return needs.allCaughtUp
+            }
         )
         let panel = StatusPanel(content: content, onVisibility: { [weak self] visible in
             self?.store.setPanelVisible(visible)
@@ -48,6 +58,12 @@ final class StatusBarController: NSObject {
                 return false
             }
         }
+        panel.cascade.answerDecide = { [weak self] id, primary in
+            self?.answerDecide(id: id, primary: primary)
+        }
+        panel.cascade.onSubmenuClosed = { [weak self] id in
+            self?.needsSubmenuClosed(id)
+        }
         return panel
     }()
     #if DEBUG
@@ -59,6 +75,9 @@ final class StatusBarController: NSObject {
     private var runningHadSubmenu = false
     private var runningTree: [CascadeNode] = []
     private var coreRowWasVisible = false
+    private var needsYouSignature: NeedsYouSignature = .empty
+    private var needsYouTab: NeedsYouTab = .all
+    private var historyEntryIds: [String] = []
     private var motion = StatusIconMotion()
     private var drawn: (state: StatusIconState, loop: Bool)?
     private var accessibilityObserver: NSObjectProtocol?
@@ -90,6 +109,15 @@ final class StatusBarController: NSObject {
         }
         observeStatusIcon()
         observeSnapshot()
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.store.isTerminating = true
+            }
+        }
     }
 
     isolated deinit {
@@ -255,6 +283,9 @@ final class StatusBarController: NSObject {
             _ = store.hasSnapshot
             _ = store.runningTree
             _ = store.coreRowVisible
+            _ = store.needsYou
+            _ = store.needsYouTab
+            _ = store.historyEntries
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.onSnapshotChange()
@@ -268,13 +299,24 @@ final class StatusBarController: NSObject {
         let tree = store.runningTree
         let coreArrived = store.hasSnapshot && !didReplaceCoreTree
         let coreRowVisible = store.coreRowVisible
-        let changed = hasSubmenu != runningHadSubmenu || tree != runningTree || coreRowVisible != coreRowWasVisible
+        let needsSignature = NeedsYouSignature(store.needsYou)
+        let needsTab = store.needsYouTab
+        let historyIds = store.historyEntries.map(\.id)
+        let changed = hasSubmenu != runningHadSubmenu
+            || tree != runningTree
+            || coreRowVisible != coreRowWasVisible
+            || needsSignature != needsYouSignature
+            || needsTab != needsYouTab
+            || historyIds != historyEntryIds
         if coreArrived {
             didReplaceCoreTree = true
         }
         runningHadSubmenu = hasSubmenu
         runningTree = tree
         coreRowWasVisible = coreRowVisible
+        needsYouSignature = needsSignature
+        needsYouTab = needsTab
+        historyEntryIds = historyIds
         guard panelBuilt, panel.isOpen, coreArrived || changed else { return }
         panel.cascade.replaceTree()
     }
@@ -290,7 +332,21 @@ final class StatusBarController: NSObject {
         let runningChildren = store.hasSnapshot && RunningRowState(running: store.running).hasSubmenu
             ? runningCommands + store.runningTree
             : []
+        let needs = store.needsYou
+        let decisions: [CascadeNode]
+        if let needs, !needs.decisions.isEmpty {
+            decisions = [CascadeNode(id: "decide.header")]
+                + needs.decisions.map { CascadeNode(id: "decide.\($0.id)", isActionable: true) }
+        } else {
+            decisions = []
+        }
         return LevelZeroTree.rows(
+            decisions: decisions,
+            needs: CascadeNode(
+                id: "needs",
+                isActionable: true,
+                children: needsChildren(from: needs)
+            ),
             running: CascadeNode(id: "running", isActionable: true, children: runningChildren),
             core: CascadeNode(id: "core", isActionable: true, children: coreChildren),
             status: store.coreStatus,
@@ -308,6 +364,39 @@ final class StatusBarController: NSObject {
         }
     }
 
+    private func needsChildren(from needs: NeedsYouSnapshot?) -> [CascadeNode] {
+        let todos = needs?.todos ?? []
+        let updates = needs?.updates ?? []
+        let filtered = NeedsYouList.filter(store.needsYouTab, todos: todos, updates: updates)
+        var children: [CascadeNode] = []
+        children += filtered.todos.map { CascadeNode(id: "todo.\($0.id)", isActionable: true) }
+        children += filtered.updates.map { CascadeNode(id: "update.\($0.id)", isActionable: true) }
+        if store.needsYouTab == .updates {
+            children.append(CascadeNode(id: "clear_updates", isActionable: true))
+        }
+        children.append(
+            CascadeNode(
+                id: "needs.history",
+                children: historyChildren()
+            )
+        )
+        children.append(
+            CascadeNode(
+                id: "needs.date",
+                children: [CascadeNode(id: "needs.date.body")]
+            )
+        )
+        return children
+    }
+
+    private func historyChildren() -> [CascadeNode] {
+        var children = [CascadeNode(id: "needs.history.body")]
+        children += store.historyEntries.map {
+            CascadeNode(id: $0.id, isActionable: true)
+        }
+        return children
+    }
+
     private func activate(_ id: String) {
         switch id {
         case CoreStore.stopAllId:
@@ -315,18 +404,43 @@ final class StatusBarController: NSObject {
         case _ where id.hasPrefix("running."): store.askChildStop(id)
         case "settings": showSettings(.general)
         case "about": showSettings(.about)
-        case "quit": NSApp.terminate(nil)
+        case "quit":
+            store.isTerminating = true
+            NSApp.terminate(nil)
         case "awake.tracking":
             let command = AwakeCommand.tracking(store.awakeSubmenu.trackingOn == false)
             Task { [store] in await store.perform(command) }
         case "awake.lid":
             let command = store.awakeSubmenu.lidToggle
             Task { [store] in await store.perform(command) }
+        case "clear_updates":
+            Task { [store] in await store.clearUpdates() }
+        case "needs", "needs.date", "needs.history", "needs.date.body", "needs.history.body",
+             "decide.header":
+            return
+        case _ where id.hasPrefix("needs.history."):
+            return
+        case _ where id.hasPrefix("todo.") || id.hasPrefix("update."):
+            return
+        case _ where id.hasPrefix("decide."):
+            answerDecide(id: id, primary: true)
         default:
             guard let choice = KeepAwakeChoice(id: id) else { return }
             let command = store.awakeSubmenu.command(picking: choice)
             Task { [store] in await store.perform(command) }
         }
+    }
+
+    private func needsSubmenuClosed(_ id: String) {
+        guard id == "needs" else { return }
+        let ids = store.drawnUpdateIds
+        store.drawnUpdateIds = []
+        Task { [store] in await store.markViewed(ids) }
+    }
+
+    fileprivate func answerDecide(id: String, primary: Bool) {
+        guard let decisionId = Int64(id.dropFirst("decide.".count)) else { return }
+        Task { [store] in await store.answerDecide(id: decisionId, primary: primary) }
     }
 
     private func showSettings(_ tab: SettingsTab = .general) {
@@ -385,5 +499,54 @@ final class StatusBarController: NSObject {
     @objc private func openLogs() {
         guard let dir = store.snapshot?.logsDir else { return }
         NSWorkspace.shared.open(URL(filePath: dir, directoryHint: .isDirectory))
+    }
+}
+
+private struct NeedsYouSignature: Equatable {
+    var decisionIds: [Int64]
+    var decisionStates: [String]
+    var needsCount: UInt32
+    var anyOverdue: Bool
+    var allCaughtUp: Bool
+    var down: Bool
+
+    static let empty = NeedsYouSignature(
+        decisionIds: [],
+        decisionStates: [],
+        needsCount: 0,
+        anyOverdue: false,
+        allCaughtUp: false,
+        down: false
+    )
+
+    init(
+        decisionIds: [Int64],
+        decisionStates: [String],
+        needsCount: UInt32,
+        anyOverdue: Bool,
+        allCaughtUp: Bool,
+        down: Bool
+    ) {
+        self.decisionIds = decisionIds
+        self.decisionStates = decisionStates
+        self.needsCount = needsCount
+        self.anyOverdue = anyOverdue
+        self.allCaughtUp = allCaughtUp
+        self.down = down
+    }
+
+    init(_ view: NeedsYouSnapshot?) {
+        guard let view else {
+            self = .empty
+            return
+        }
+        self.init(
+            decisionIds: view.decisions.map(\.id),
+            decisionStates: view.decisions.map(\.state.signature),
+            needsCount: view.needsCount,
+            anyOverdue: view.anyOverdue,
+            allCaughtUp: view.allCaughtUp,
+            down: view.down
+        )
     }
 }

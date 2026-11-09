@@ -644,6 +644,15 @@ fn no_new_action_appears() {
             "ports list read",
             "ports open read",
             "ports kill destructive",
+            "needs_you raise write",
+            "needs_you answer destructive",
+            "needs_you mark_viewed write",
+            "needs_you clear_updates write",
+            "needs_you history read",
+            "todo add write",
+            "todo tick write",
+            "todo undo write",
+            "todo history read",
         ]
     );
     core.shutdown();

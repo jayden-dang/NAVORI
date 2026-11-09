@@ -41,7 +41,7 @@ Where things live in this repository and where new code belongs. Covers the top-
 | Path | Purpose |
 |---|---|
 | `crates/secrets/` | `navori-secrets` — Keychain (landed; consumed by `navori-llm`, `navori-context` and `navori-ffi`; ROAD-11 and ROAD-19 still to come). |
-| `modules/` | Remaining feature modules: `inbox/` (R2), `github/` (R4). |
+| `modules/` | Remaining feature modules: `needs_you/`, `todo/` (R2), `github/` (R4). |
 | `ai/` | Remaining AI runtime crates: `models/`, `agent/`, `memory/` (R2), `triggers/` (R5), `mcp/` (R6). |
 | `integrations/` | Files Navori installs into other tools: `claude-code/`, `codex/`, `grok/` hook and MCP snippets (R1, R6). |
 

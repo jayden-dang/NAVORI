@@ -13,6 +13,7 @@ final class CascadeController {
     @ObservationIgnored private var state: CascadeState
     @ObservationIgnored private var hoverTimer: DispatchWorkItem?
     @ObservationIgnored private var rowFrames = CascadeRowFrames()
+    @ObservationIgnored private var decideButtons: [String: DecideButtonFrames] = [:]
     @ObservationIgnored private var panels: [Int: CascadePanel] = [:]
     @ObservationIgnored private var lastClickRow: String?
     @ObservationIgnored private var lastClickAt: CFTimeInterval = 0
@@ -24,8 +25,11 @@ final class CascadeController {
     @ObservationIgnored private let activateRow: (String) -> Void
     @ObservationIgnored private let log = Logger(subsystem: "dev.navori", category: "cascade")
     @ObservationIgnored var interceptKey: ((CascadeKey) -> Bool)?
+    @ObservationIgnored var answerDecide: ((String, Bool) -> Void)?
+    @ObservationIgnored var onSubmenuClosed: ((String) -> Void)?
     @ObservationIgnored weak var panel: StatusPanel?
     @ObservationIgnored private var surfaceTint: NSColor = GlassTint.standard
+    @ObservationIgnored private var panelRows: [Int: String] = [:]
 
     init(
         tree: @escaping () -> [CascadeNode],
@@ -79,6 +83,18 @@ final class CascadeController {
         }
     }
 
+    func setDecideButtons(_ row: String, _ frames: DecideButtonFrames?) {
+        if let frames {
+            decideButtons[row] = frames
+        } else {
+            decideButtons.removeValue(forKey: row)
+        }
+    }
+
+    func decideButtonFrames() -> [String: DecideButtonFrames] {
+        decideButtons
+    }
+
     func replaceTree() {
         apply(state.handle(.replaceTree(tree())))
     }
@@ -103,6 +119,12 @@ final class CascadeController {
     func closeSubmenus() {
         hoverTimer?.cancel()
         hoverTimer = nil
+        restoreLevelZeroKeyIfNeeded()
+        for depth in panelRows.keys.sorted().reversed() {
+            if let id = panelRows.removeValue(forKey: depth) {
+                onSubmenuClosed?(id)
+            }
+        }
         for child in panels.values {
             child.hide()
         }
@@ -166,6 +188,8 @@ final class CascadeController {
         let depth = (state.openPath.firstIndex(of: row) ?? 0) + 1
         let child = panels[depth] ?? CascadePanel()
         panels[depth] = child
+        panelRows[depth] = row
+        child.acceptsTyping = row == "needs" || row == "needs.date"
         child.onResignKey = { [weak self] in
             self?.handleResignKey()
         }
@@ -244,9 +268,21 @@ final class CascadeController {
     }
 
     private func hideFrom(depth: Int) {
-        for key in panels.keys where key >= depth {
+        restoreLevelZeroKeyIfNeeded(fromDepth: depth)
+        for key in panels.keys.sorted().reversed() where key >= depth {
+            if let id = panelRows.removeValue(forKey: key) {
+                onSubmenuClosed?(id)
+            }
             panels[key]?.hide()
         }
+    }
+
+    private func restoreLevelZeroKeyIfNeeded(fromDepth: Int? = nil) {
+        let hiding = panels.filter { key, _ in
+            fromDepth.map { key >= $0 } ?? true
+        }
+        guard hiding.values.contains(where: { $0 === NSApp.keyWindow }) else { return }
+        panel?.makeKey()
     }
 
     private var openSubmenuRect: CGRect? {

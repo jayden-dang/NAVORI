@@ -6,4 +6,5 @@ struct CascadeContent {
     let root: AnyView
     let submenu: (String) -> AnyView
     let activate: (String) -> Void
+    let caughtUp: () -> Bool
 }

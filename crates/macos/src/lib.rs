@@ -1,5 +1,6 @@
 //! macOS process, exit and power reads.
 
+mod clock;
 mod error;
 mod exits;
 mod lid;
@@ -10,6 +11,7 @@ mod process;
 mod signals;
 mod sockets;
 
+pub use clock::*;
 pub use error::*;
 pub use exits::*;
 pub use lid::*;

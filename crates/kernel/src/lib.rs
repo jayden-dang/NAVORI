@@ -7,6 +7,7 @@
 //! - Supervision: a crashed module is restarted with backoff and keeps its inbox.
 
 mod bus;
+mod dispatcher;
 mod module;
 mod runtime;
 mod scheduler;
@@ -14,6 +15,7 @@ mod system;
 mod tray;
 
 pub use bus::EventBus;
+pub use dispatcher::{ModuleDispatcher, Pending};
 pub use module::{
     ActionDoc, ActionError, Module, ModuleAction, ModuleConfig, ModuleCtx, NoConfig, Request,
 };

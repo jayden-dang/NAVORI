@@ -50,11 +50,16 @@ final class CascadePanel: NSPanel {
             guard let self, !self.measuring else { return }
             self.onFittingSizeChange?()
         }
+        becomesKeyOnlyIfNeeded = true
     }
 
     required init?(coder: NSCoder) { nil }
 
-    override var canBecomeKey: Bool { NSWorkspace.shared.isVoiceOverEnabled }
+    var acceptsTyping = false
+
+    override var canBecomeKey: Bool {
+        NSWorkspace.shared.isVoiceOverEnabled || acceptsTyping
+    }
 
     var onResignKey: (() -> Void)?
     var onKey: ((CascadeKey) -> Void)?
@@ -81,6 +86,9 @@ final class CascadePanel: NSPanel {
             return false
         }
         guard let key = CascadeKey.fromKeyCode(event.keyCode) else { return false }
+        if firstResponder is NSText, key != .escape {
+            return false
+        }
         onKey?(key)
         return true
     }

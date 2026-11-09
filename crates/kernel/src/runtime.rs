@@ -1,8 +1,9 @@
 //! Kernel: module registry, command routing and supervision.
 
+use std::collections::HashSet;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::{Duration, Instant};
 
 use futures::FutureExt;
@@ -15,6 +16,7 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::bus::{EventBus, now_ms};
+use crate::dispatcher::{ModuleDispatcher, Route, Router, SharedRouter};
 use crate::module::{ActionError, Module, ModuleAction, ModuleConfig, ModuleCtx, Reply, Request};
 use crate::scheduler::{Scheduler, SystemClock, WallClock};
 use crate::system::{SweepPolicy, System};
@@ -35,6 +37,8 @@ pub enum DispatchError {
     Unavailable(String),
     #[error("module {0} did not answer in time")]
     Timeout(String),
+    #[error("refused destructive action {module}.{action}")]
+    Refused { module: String, action: String },
     #[error(transparent)]
     Action(#[from] ActionError),
 }
@@ -57,7 +61,8 @@ impl Default for RestartPolicy {
     }
 }
 
-type SendFn = Box<dyn Fn(Value) -> Result<oneshot::Receiver<Reply>, DispatchError> + Send + Sync>;
+pub(crate) type SendFn =
+    Box<dyn Fn(Value) -> Result<oneshot::Receiver<Reply>, DispatchError> + Send + Sync>;
 type StateFn = Box<dyn Fn() -> Value + Send + Sync>;
 type TrayFn = Box<dyn Fn() -> TrayContribution + Send + Sync>;
 type Launcher = Box<
@@ -72,7 +77,7 @@ type Launcher = Box<
 struct Registered {
     id: &'static str,
     specs: Vec<ActionSpec>,
-    send: SendFn,
+    send: Option<SendFn>,
     state: StateFn,
     tray: TrayFn,
     info: Arc<Mutex<ModuleInfo>>,
@@ -86,6 +91,7 @@ struct Plumbing {
     revision: Arc<watch::Sender<u64>>,
     shutdown: CancellationToken,
     scheduler: Scheduler,
+    router: SharedRouter,
 }
 
 pub struct KernelBuilder {
@@ -96,6 +102,7 @@ pub struct KernelBuilder {
     dispatch_timeout: Duration,
     sweep_policy: Arc<Mutex<SweepPolicy>>,
     sections: serde_json::Map<String, Value>,
+    destructive_grants: Vec<&'static str>,
 }
 
 impl std::fmt::Debug for KernelBuilder {
@@ -132,6 +139,12 @@ impl KernelBuilder {
 
     pub fn config_sections(mut self, sections: serde_json::Map<String, Value>) -> Self {
         self.sections = sections;
+        self
+    }
+
+    /// Allows `module` to dispatch catalogued `Destructive` Actions through its dispatcher.
+    pub fn grant_destructive(mut self, module: &'static str) -> Self {
+        self.destructive_grants.push(module);
         self
     }
 
@@ -214,13 +227,17 @@ impl KernelBuilder {
                     shutdown: plumbing.shutdown.clone(),
                     scheduler: plumbing.scheduler.clone(),
                     config,
+                    dispatcher: ModuleDispatcher {
+                        caller: M::ID,
+                        router: plumbing.router.clone(),
+                    },
                 };
                 tokio::spawn(supervise(module, ctx, sup_info, policy, plumbing))
             }));
         self.modules.push(Registered {
             id: M::ID,
             specs,
-            send,
+            send: Some(send),
             state,
             tray,
             info,
@@ -230,6 +247,47 @@ impl KernelBuilder {
 
     /// Spawns every module on the current tokio runtime.
     pub fn start(mut self) -> Kernel {
+        let registered_ids: HashSet<&'static str> = self.modules.iter().map(|m| m.id).collect();
+        let grants: HashSet<&'static str> = self
+            .destructive_grants
+            .into_iter()
+            .filter(|id| {
+                if registered_ids.contains(id) {
+                    true
+                } else {
+                    tracing::error!(
+                        module = %id,
+                        "destructive grant names no registered module; dropping"
+                    );
+                    false
+                }
+            })
+            .collect();
+
+        let mut routes = Vec::with_capacity(self.modules.len());
+        for m in &mut self.modules {
+            let Some(send) = m.send.take() else {
+                unreachable!("each registered module has a send fn once");
+            };
+            routes.push(Route {
+                id: m.id,
+                send,
+                specs: m.specs.clone(),
+            });
+        }
+        if self
+            .plumbing
+            .router
+            .set(Router {
+                routes,
+                grants,
+                timeout: self.dispatch_timeout,
+            })
+            .is_err()
+        {
+            unreachable!("router is set only once at start");
+        }
+
         let sections = std::mem::take(&mut self.sections);
         let mut config_issues = Vec::new();
         let tasks = std::mem::take(&mut self.launchers)
@@ -298,6 +356,7 @@ impl Kernel {
             revision: Arc::new(revision),
             shutdown: CancellationToken::new(),
             scheduler: Scheduler::new(clock),
+            router: Arc::new(OnceLock::new()),
         };
         let system = System::default();
         KernelBuilder {
@@ -308,6 +367,7 @@ impl Kernel {
             dispatch_timeout: Duration::from_secs(30),
             sweep_policy: Arc::clone(&system.sweep_policy),
             sections: serde_json::Map::new(),
+            destructive_grants: Vec::new(),
         }
         .register(system)
     }
@@ -321,22 +381,38 @@ impl Kernel {
     }
 
     pub fn actions(&self) -> Vec<ActionSpec> {
-        self.modules
+        let Some(router) = self.plumbing.router.get() else {
+            unreachable!("router is filled at start");
+        };
+        router
+            .routes
             .iter()
-            .flat_map(|m| m.specs.iter().cloned())
+            .flat_map(|r| r.specs.iter().cloned())
             .collect()
     }
 
+    /// Module ids allowed to dispatch catalogued `Destructive` Actions through their dispatcher.
+    pub fn destructive_grants(&self) -> Vec<&'static str> {
+        let Some(router) = self.plumbing.router.get() else {
+            unreachable!("router is filled at start");
+        };
+        let mut grants: Vec<&'static str> = router.grants.iter().copied().collect();
+        grants.sort_unstable();
+        grants
+    }
+
     pub async fn dispatch(&self, envelope: Envelope) -> Result<Value, DispatchError> {
-        let module = self
-            .modules
-            .iter()
-            .find(|m| m.id == envelope.module)
+        let Some(router) = self.plumbing.router.get() else {
+            unreachable!("router is filled at start");
+        };
+        let route = router
+            .get(envelope.module.as_str())
             .ok_or_else(|| DispatchError::UnknownModule(envelope.module.clone()))?;
-        let rx = (module.send)(envelope.action)?;
+        let module = envelope.module.clone();
+        let rx = (route.send)(envelope.action)?;
         match tokio::time::timeout(self.dispatch_timeout, rx).await {
-            Err(_) => Err(DispatchError::Timeout(module.id.to_owned())),
-            Ok(Err(_)) => Err(DispatchError::Unavailable(module.id.to_owned())),
+            Err(_) => Err(DispatchError::Timeout(module)),
+            Ok(Err(_)) => Err(DispatchError::Unavailable(module)),
             Ok(Ok(reply)) => reply.map_err(DispatchError::from),
         }
     }
@@ -404,6 +480,15 @@ impl Kernel {
         for m in &self.modules {
             set_state(&m.info, &self.plumbing.revision, ModuleState::Stopped);
         }
+    }
+}
+
+impl Drop for Kernel {
+    fn drop(&mut self) {
+        // Router keeps inbox senders alive in an Arc the module tasks also hold, so
+        // dropping the Kernel alone no longer closes those inboxes. Cancel so recv
+        // returns None the way a closed inbox used to.
+        self.plumbing.shutdown.cancel();
     }
 }
 

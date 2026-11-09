@@ -1,0 +1,30 @@
+[package]
+name = "navori-mod-todo"
+description = "To-dos that need the user, with a status by local day."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+futures.workspace = true
+navori-config.workspace = true
+navori-kernel.workspace = true
+navori-protocol.workspace = true
+navori-redact.workspace = true
+navori-store.workspace = true
+rusqlite.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+time.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true

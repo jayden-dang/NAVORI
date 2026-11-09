@@ -8,20 +8,61 @@ public enum MenuMetrics {
     public static let level0Width: CGFloat = 360
 }
 
-/// First-mouse hits on the footer (and Core when shown). Window y = 0 is the bottom edge.
+public struct DecideButtonFrames: Equatable, Sendable {
+    public var primary: CGRect
+    public var secondary: CGRect
+
+    public init(primary: CGRect, secondary: CGRect) {
+        self.primary = primary
+        self.secondary = secondary
+    }
+}
+
+public enum MenuHit: Equatable, Sendable {
+    case row(String)
+    case decidePrimary(row: String)
+    case decideSecondary(row: String)
+}
+
+/// First-mouse hits on level-0 rows (footer, Core, Needs you, Decide) and Decide choice buttons.
+/// Window y = 0 is the bottom edge. `running` occupies space but is not a first-mouse target.
 public enum MenuHitMap {
-    public static func rowId(at point: CGPoint, width: CGFloat, tree: [CascadeNode]) -> String? {
+    public static func hit(
+        at point: CGPoint,
+        width: CGFloat,
+        tree: [CascadeNode],
+        decideButtons: [String: DecideButtonFrames] = [:],
+        caughtUp: Bool = false
+    ) -> MenuHit? {
         guard point.x >= MenuMetrics.pad, point.x <= width - MenuMetrics.pad else { return nil }
         let row = MenuMetrics.rowHeight
         var y = MenuMetrics.pad
         for id in tree.map(\.id).reversed() {
-            if id == "running" { break }
             if id == "core" { y += MenuMetrics.divider }
+            if id == "needs" { y += MenuMetrics.divider }
             let band = y ..< (y + row)
-            if band.contains(point.y) { return id }
-            y += row
+            defer {
+                y += row
+                if id == "needs", caughtUp { y += row }
+            }
+            guard band.contains(point.y) else { continue }
+            if id == "running" { return nil }
+            if let buttons = decideButtons[id] {
+                if buttons.primary.contains(point) { return .decidePrimary(row: id) }
+                if buttons.secondary.contains(point) { return .decideSecondary(row: id) }
+            }
+            return .row(id)
         }
         return nil
+    }
+
+    public static func rowId(at point: CGPoint, width: CGFloat, tree: [CascadeNode]) -> String? {
+        switch hit(at: point, width: width, tree: tree) {
+        case let .row(id), let .decidePrimary(id), let .decideSecondary(id):
+            id
+        case nil:
+            nil
+        }
     }
 }
 

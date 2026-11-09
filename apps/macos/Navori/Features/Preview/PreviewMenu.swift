@@ -15,7 +15,8 @@ enum PreviewMenu {
             tree: { tree },
             root: AnyView(PreviewRootView(setTint: setTint, setIconSample: setIconSample, playBeat: playBeat).accessibilityIdentifier(marker)),
             submenu: { id in AnyView(PreviewSubmenuView(id: id)) },
-            activate: { _ in }
+            activate: { _ in },
+            caughtUp: { false }
         )
     }
 

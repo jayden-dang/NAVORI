@@ -56,7 +56,80 @@ struct MenuHitMapTests {
         #expect(CascadeKey.fromKeyCode(0) == nil)
     }
 
-    private func hit(_ y: CGFloat, in tree: [CascadeNode]) -> String? {
-        MenuHitMap.rowId(at: CGPoint(x: 20, y: y), width: Self.width, tree: tree)
+    @Test func a_caught_up_line_sits_above_needs_and_is_not_a_hit() {
+        let tree: [CascadeNode] = [
+            CascadeNode(id: "needs", isActionable: true),
+            CascadeNode(id: "running", isActionable: true),
+            CascadeNode(id: "settings", isActionable: true),
+            CascadeNode(id: "about", isActionable: true),
+            CascadeNode(id: "quit", isActionable: true),
+        ]
+        // Bottom-up: quit, about, settings, running, divider, needs, caught-up.
+        let needsY = Self.pad + 4 * Self.row + MenuMetrics.divider + 1
+        let caughtY = Self.pad + 5 * Self.row + MenuMetrics.divider + 1
+        let dividerY = Self.pad + 4 * Self.row + 0.5
+        #expect(hit(needsY, in: tree, caughtUp: true) == "needs")
+        #expect(hit(caughtY, in: tree, caughtUp: true) == nil)
+        #expect(hit(dividerY, in: tree, caughtUp: true) == nil)
+        #expect(hit(caughtY, in: tree, caughtUp: false) == nil)
+    }
+
+    @Test func testHitMapFindsRowsAboveRunningAndDecideButtons() {
+        let tree: [CascadeNode] = [
+            CascadeNode(id: "decide.1", isActionable: true),
+            CascadeNode(id: "needs", isActionable: true),
+            CascadeNode(id: "running", isActionable: true),
+            CascadeNode(id: "settings", isActionable: true),
+            CascadeNode(id: "about", isActionable: true),
+            CascadeNode(id: "quit", isActionable: true),
+        ]
+        // Bottom-up: quit, about, settings, running (skipped), divider, needs, decide.1
+        let needsY = Self.pad + 4 * Self.row + MenuMetrics.divider + 1
+        let decideY = Self.pad + 5 * Self.row + MenuMetrics.divider + 1
+        #expect(hit(needsY, in: tree) == "needs")
+        #expect(hit(decideY, in: tree) == "decide.1")
+        #expect(hit(Self.pad + 3 * Self.row + 1, in: tree) == nil) // running
+
+        let primary = CGRect(x: 280, y: decideY - 1, width: 40, height: 20)
+        let secondary = CGRect(x: 230, y: decideY - 1, width: 40, height: 20)
+        let buttons = ["decide.1": DecideButtonFrames(primary: primary, secondary: secondary)]
+        #expect(
+            MenuHitMap.hit(
+                at: CGPoint(x: primary.midX, y: primary.midY),
+                width: Self.width,
+                tree: tree,
+                decideButtons: buttons
+            ) == .decidePrimary(row: "decide.1")
+        )
+        #expect(
+            MenuHitMap.hit(
+                at: CGPoint(x: secondary.midX, y: secondary.midY),
+                width: Self.width,
+                tree: tree,
+                decideButtons: buttons
+            ) == .decideSecondary(row: "decide.1")
+        )
+        #expect(
+            MenuHitMap.hit(
+                at: CGPoint(x: 20, y: decideY),
+                width: Self.width,
+                tree: tree,
+                decideButtons: buttons
+            ) == .row("decide.1")
+        )
+    }
+
+    private func hit(_ y: CGFloat, in tree: [CascadeNode], caughtUp: Bool = false) -> String? {
+        switch MenuHitMap.hit(
+            at: CGPoint(x: 20, y: y),
+            width: Self.width,
+            tree: tree,
+            caughtUp: caughtUp
+        ) {
+        case let .row(id), let .decidePrimary(id), let .decideSecondary(id):
+            id
+        case nil:
+            nil
+        }
     }
 }

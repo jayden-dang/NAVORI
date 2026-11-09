@@ -337,6 +337,79 @@ async fn shutdown_stops_every_module() {
     assert_eq!(info.state, ModuleState::Stopped);
 }
 
+/// Counts how many times `recv` returned `None` (kernel shut down).
+#[derive(Debug, Default)]
+struct QuitProbe {
+    ended: Arc<AtomicU32>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+enum QuitProbeAction {
+    Ping,
+}
+
+impl ModuleAction for QuitProbeAction {
+    fn risk(&self) -> Risk {
+        Risk::Read
+    }
+
+    fn catalog() -> Vec<ActionDoc> {
+        vec![ActionDoc {
+            name: "ping",
+            description: "Prove the module is running.",
+            risk: Risk::Read,
+        }]
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+struct QuitProbeState;
+
+impl Module for QuitProbe {
+    const ID: &'static str = "quit_probe";
+    type Action = QuitProbeAction;
+    type Config = NoConfig;
+    type State = QuitProbeState;
+
+    fn initial_state(&self) -> QuitProbeState {
+        QuitProbeState
+    }
+
+    async fn run(&mut self, ctx: &mut ModuleCtx<Self>) -> anyhow::Result<()> {
+        while let Some(req) = ctx.recv().await {
+            match req.action {
+                QuitProbeAction::Ping => req.respond(Ok(json!("pong"))),
+            }
+        }
+        self.ended.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn dropping_the_kernel_ends_module_recv() {
+    let ended = Arc::new(AtomicU32::new(0));
+    let kernel = Kernel::builder(Store::open_in_memory().unwrap())
+        .register(QuitProbe {
+            ended: ended.clone(),
+        })
+        .start();
+    let out = kernel
+        .dispatch(Envelope {
+            module: "quit_probe".into(),
+            action: json!("ping"),
+        })
+        .await
+        .unwrap();
+    assert_eq!(out, json!("pong"));
+
+    drop(kernel);
+    tokio::task::yield_now().await;
+
+    assert_eq!(ended.load(Ordering::SeqCst), 1);
+}
+
 #[tokio::test]
 async fn the_builtin_system_module_answers_ping() {
     let kernel = Kernel::builder(Store::open_in_memory().unwrap()).start();
