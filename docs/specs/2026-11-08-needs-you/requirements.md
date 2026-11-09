@@ -61,7 +61,7 @@ operator; the operator confirms or changes it when reading this file.
 - **NEEDS-3.6** WHEN VoiceOver reads a Decide row THE SYSTEM SHALL read the kind, the title, the reason, the age and both choice labels, as in `Decision: Review PR #41 in zroute, Minh requested your review, 25 minutes ago, Open, Later`.
 - **NEEDS-3.7** THE SYSTEM SHALL NOT list a Decision anywhere in the Needs you submenu.
 - **NEEDS-3.8** THE SYSTEM SHALL carry each choice's Risk in the Core's Needs you view as the Action catalog lists it now, not as it was at raise. *(agent-decided — Risk read again after an upgrade, close-package C1)*
-- **NEEDS-3.9** WHERE the code is Release code THE SYSTEM SHALL show the Decide block, the `Needs you` row and `✓ You're all caught up` (amends MENU-1.4 and rule 12 of the 2026-11-01 menubar brief).
+- **NEEDS-3.9** WHERE the code is Release code THE SYSTEM SHALL show the Decide block and the `Needs you` row (amends MENU-1.4 and rule 12 of the 2026-11-01 menubar brief). *(Amended 2026-11-09, operator decision: level 0 no longer shows `You're all caught up`; see NEEDS-11.4.)*
 - **NEEDS-3.10** WHILE a choice's Risk is `Destructive` THE SYSTEM SHALL name the Action it runs in that button's tooltip and accessibility hint, as `Runs ports.kill — changes things and cannot be undone`. *(agent-decided — the label is the raising Module's text)*
 
 ## 4. Answer a Decision
@@ -112,7 +112,7 @@ operator; the operator confirms or changes it when reading this file.
 
 **Story:** As the user, I want to type a To-do and pick its due date in the Needs you submenu, so that my own task sits beside everything else that needs me.
 
-- **NEEDS-8.1** THE SYSTEM SHALL show in the Needs you submenu, below the filter, an `Add a to-do…` field in a rounded fill with a date chip reading `No date` or the picked day.
+- **NEEDS-8.1** THE SYSTEM SHALL show in the Needs you submenu, below the filter, an `Add a to-do…` field: one rounded fill (8 pt radius) holding a `+` lead, the text and a date chip reading `No date` or the picked day, with an accent border while the field has focus. *(Amended 2026-11-09, operator decision: the field and its date chip are one control, so they no longer differ in height and shape.)*
 - **NEEDS-8.2** WHEN the user clicks the field or tabs into it THE SYSTEM SHALL make the Needs you submenu the key window and take the user's typing into the field, with Return adding the To-do (NEEDS-8.4) instead of activating a row.
 - **NEEDS-8.3** WHEN the user activates the date chip THE SYSTEM SHALL open a month calendar beside the submenu, with `Today`, `Tomorrow` and `No date` quick picks, and set the chip to the day picked.
 - **NEEDS-8.4** WHEN the user presses Return in the field with a title that is not empty or only whitespace THE SYSTEM SHALL add a To-do with that title and the chip's due date, show it in the list at once, empty the field and reset the chip to `No date`.
@@ -146,12 +146,13 @@ operator; the operator confirms or changes it when reading this file.
 - **NEEDS-11.1** THE SYSTEM SHALL lay out level 0 in this order: any banners, the Decide block (NEEDS-3.1), the `Needs you` row, a separator, the `Running` row, the Core row as MENU-3.11 says, a separator, `Settings…`, `About Navori`, `Quit Navori` (amends MENU-1.2 and AWAKE-11.1).
 - **NEEDS-11.2** THE SYSTEM SHALL draw the `Needs you` row with a `sparkle` icon, a value equal to the number of open To-dos plus unviewed Updates, and a chevron that opens the Needs you submenu.
 - **NEEDS-11.3** WHILE any open To-do is Overdue THE SYSTEM SHALL show a red status dot on the `Needs you` row.
-- **NEEDS-11.4** WHILE no Decision is open, no To-do is open and no Update is unviewed THE SYSTEM SHALL show `✓ You're all caught up` where the Decide block would be and show the `Needs you` row with no count.
-- **NEEDS-11.5** THE SYSTEM SHALL lay out the Needs you submenu, about 350 pt wide, as: a `Needs you N` header, a segmented filter `All · To-dos n · Updates n`, the `Add a to-do…` field, a separator, the list, a separator, `Clear updates` on the Updates tab, and `History ›`.
+- **NEEDS-11.4** WHILE no Decision is open, no To-do is open and no Update is unviewed THE SYSTEM SHALL show the `Needs you` row with no count, and SHALL NOT show a `You're all caught up` line on level 0. *(Amended 2026-11-09, operator decision: the level-0 line repeated the submenu's empty list; it is gone, and the empty list (NEEDS-11.7) is the only place that says it.)*
+- **NEEDS-11.5** THE SYSTEM SHALL lay out the Needs you submenu, about 350 pt wide, as: a filter of three capsule tabs `All · To-dos n · Updates n`, each count shown only when it is above zero, the `Add a to-do…` field, a separator, the list, a separator, `Clear updates` on the Updates tab, and `History ›`. *(Amended 2026-11-09, operator decision: the `Needs you N` header is dropped, since the level-0 row that opens the submenu already names it and carries the count; the segmented control becomes capsule tabs; zero counts are hidden.)*
 - **NEEDS-11.6** WHEN the user picks a filter segment THE SYSTEM SHALL list only that kind, and on `All` list the open To-dos and then the unviewed Updates.
-- **NEEDS-11.7** WHILE the shown tab has nothing to list THE SYSTEM SHALL show `✓ You're all caught up` in the list and keep the field shown.
+- **NEEDS-11.7** WHILE the shown tab has nothing to list THE SYSTEM SHALL show a checkmark icon and `You're all caught up` in the list and keep the field shown. *(Amended 2026-11-09: the `✓` glyph became a `checkmark.circle` icon in the row's lead column.)*
 - **NEEDS-11.8** THE SYSTEM SHALL expose the filter to VoiceOver as a tab group and put the field before the list in the keyboard order.
 - **NEEDS-11.9** THE SYSTEM SHALL NOT turn on the status icon's attention mark for a To-do or an Update.
+- **NEEDS-11.10** (guard) WHILE no Decision is open, no To-do is open and no Update is unviewed THE SYSTEM SHALL CONTINUE TO open the Needs you submenu from the `Needs you` row, and a first click on that row SHALL CONTINUE TO hit it. *(Added 2026-11-09 with the NEEDS-11.4 amendment.)*
 
 ## 12. History
 
