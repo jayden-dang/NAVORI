@@ -10,6 +10,7 @@ struct CapsuleButton: View {
     var minHeight: CGFloat = 24
     var busy = false
     var disabled = false
+    var systemImage: String?
 
     var body: some View {
         Button(action: action) {
@@ -18,12 +19,18 @@ struct CapsuleButton: View {
                     ProgressView()
                         .controlSize(.small)
                 } else {
-                    Text(title)
-                        .font(.system(size: fontSize, weight: .medium))
-                        .foregroundStyle(label)
+                    HStack(spacing: 4) {
+                        if let systemImage {
+                            Image(systemName: systemImage)
+                                .font(.system(size: fontSize - 1, weight: .medium))
+                        }
+                        Text(title)
+                            .font(.system(size: fontSize, weight: .medium))
+                    }
+                    .foregroundStyle(label)
                 }
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, systemImage == nil ? 10 : 8)
             .frame(minHeight: minHeight)
             .background(Capsule().fill(fill))
         }

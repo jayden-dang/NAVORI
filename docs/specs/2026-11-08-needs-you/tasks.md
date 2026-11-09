@@ -534,3 +534,24 @@ _Requirements: NEEDS-13.10, NEEDS-13.12_
 - [x] **Step 4: Commit** `git commit -m "test(needs-you): dogfood guide and run"`
 
 _Requirements: NEEDS-13.2, NEEDS-13.3, NEEDS-13.4, NEEDS-13.6, NEEDS-13.9, NEEDS-14.1, NEEDS-14.2, NEEDS-14.5_
+
+---
+
+### Task 19: Amendment 2026-11-09 — menu polish
+
+**Files:**
+- Modify: `apps/macos/Navori/Features/Panel/{PanelView,NeedsYouSubmenuView,AddTodoField,CapsuleButton,TodoRowView}.swift`, `apps/macos/NavoriPanel/{MenuMetrics,NeedsYouText}.swift`, `apps/macos/Navori/StatusBar/{CascadeContent,StatusBarController,StatusPanel}.swift`, `apps/macos/Navori/Features/Preview/PreviewMenu.swift`
+- Test: `apps/macos/Tests/NavoriPanelTests/{NeedsYouTextTests,MenuHitMapTests}.swift`
+
+**Reuse:** 2 — `MenuRowView` for `Clear updates`, `CapsuleButton` for the date chip and the filter's look.
+
+**Interfaces:**
+- Produces: `NeedsYouText.filterLabels(todoCount:updateCount:) -> [String]`; `MenuHitMap.hit(at:width:tree:decideButtons:)` without the `caughtUp` offset.
+
+**Depends-on:** Task 15
+
+- [x] **Step 1: Failing tests:** `filter_labels_show_a_count_only_when_there_is_one`; `with_no_decision_needs_is_the_top_row_and_nothing_sits_above_it` (replaces the caught-up hit test).
+- [x] **Step 2: Implement** no level-0 caught-up line and no `caughtUp` plumbing; capsule filter tabs; no submenu header; one rounded field with `+` lead, chip with `calendar` icon, accent border on focus; lead icons for `History` and `Clear updates`; the To-do checkbox no longer stretches across the row.
+- [x] **Step 3: Acceptance** — `cargo xtask run`; open the panel: no caught-up line on level 0; the submenu shows the tabs, the field (focus border on click), an empty tab's `You're all caught up`, and rows whose text starts in one column.
+
+_Requirements: NEEDS-3.9, NEEDS-8.1, NEEDS-11.4, NEEDS-11.5, NEEDS-11.7, NEEDS-11.10_

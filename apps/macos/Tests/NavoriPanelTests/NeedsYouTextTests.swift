@@ -23,6 +23,12 @@ struct NeedsYouTextTests {
         }
     }
 
+    @Test func filter_labels_show_a_count_only_when_there_is_one() {
+        #expect(NeedsYouText.filterLabels(todoCount: 0, updateCount: 0) == ["All", "To-dos", "Updates"])
+        #expect(NeedsYouText.filterLabels(todoCount: 3, updateCount: 0) == ["All", "To-dos 3", "Updates"])
+        #expect(NeedsYouText.filterLabels(todoCount: 0, updateCount: 12) == ["All", "To-dos", "Updates 12"])
+    }
+
     @Test func testPillSpoken() {
         let cases: [(DueStatus, String?, String)] = [
             (.overdue, "2026-11-05", "Overdue, Thursday 5 November"),

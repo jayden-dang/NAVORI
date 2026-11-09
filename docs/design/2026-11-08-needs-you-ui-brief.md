@@ -27,23 +27,23 @@ The user's words, in order (Vietnamese verbatim, with an English translation):
 
 - **Layout:** banners · `Decide N` header · one row per open Decision · `Needs you` row · separator · `Running` · separator · `Settings… ⌘,` · `About Navori` · `Quit Navori ⌘Q`. Core row rules from the 2026-11-01 brief are unchanged.
   - With no open Decision, the `Decide` header and its rows are absent; `Needs you` follows the banners.
-  - With nothing at all to show, `✓ You're all caught up` replaces the Decide block and `Needs you` has no count.
+  - With nothing at all to show, `Needs you` has no count and nothing replaces the Decide block (Amendment 6).
 - **Components:**
   - `Decide N` header: `rung 2 — section header` as in the Running submenu (12pt semibold, secondary label, count on the right).
   - Decide row: `new (rung 7) — DecideRowView`. One line, 26pt like every kit row: lead icon in the accent color · title (truncates) · age right-aligned. On hover or keyboard focus the age is replaced by two inline `CapsuleButton`s at a mini size (20pt, 11.5pt medium): primary accent, secondary fill. Reason: `MenuRowView` has no inline action slot, and `InboxRowView` is two lines.
   - `Needs you` row: `rung 2 — MenuRowView`, icon `sparkle`, value = count of To-dos plus Updates, a red status dot when any To-do is overdue, chevron.
-- **States:** no Decision · 1–N Decisions · hover/focus on a Decide row (buttons replace the age) · button running (spinner in the button, other button disabled) · action error (the row's tooltip and VoiceOver carry the error; the row shows `Retry` as its primary) · all caught up.
+- **States:** no Decision · 1–N Decisions · hover/focus on a Decide row (buttons replace the age) · button running (spinner in the button, other button disabled) · action error (the row's tooltip and VoiceOver carry the error; the row shows `Retry` as its primary) · all caught up (no extra line).
 - **Type & color:** as Surface 1 of the 2026-11-01 brief. Decide title 14pt medium; lead icon accent; age 12pt secondary label. Selected row: primary button white with accent text, secondary 22% white.
 - **A11y:** ↑↓ reach each Decide row; focus reveals its buttons; Return = primary, ⌘⌫ = secondary. VoiceOver reads "Decision: Review PR #41 in zroute, Minh requested your review, 25 minutes ago, Open, Later". The full reason, hidden on screen, is the tooltip and the accessibility value.
 
 ## Surface 2: Needs you submenu (replaces Surface 2 of 2026-11-01)
 
-- **Layout:** header `Needs you N` · segmented filter **All · To-dos n · Updates n** · `Add a to-do…` field with a date chip (`No date`, or the picked day) · separator · the list · separator · `Clear updates` (Updates tab only) · `History ›`. Panel about 350pt wide.
+- **Layout:** capsule filter tabs **All · To-dos n · Updates n** (a count only when above zero; no header, Amendment 6) · `Add a to-do…` field with a date chip (`No date`, or the picked day) · separator · the list · separator · `Clear updates` (Updates tab only) · `History ›`. Panel about 350pt wide.
   - List order: To-dos by due date (overdue first, no date last), then Updates newest first.
   - Decisions are not in this submenu. They live only on level 0.
   - The date chip cascades a month calendar to the side with `Today` · `Tomorrow` · `No date` quick picks.
 - **Components:**
-  - Filter: `rung 1 — NSSegmentedControl` (small).
+  - Filter: `new (rung 7) — FilterTab` capsules, left-aligned, 22pt (Amendment 6).
   - Field: `rung 1 — NSTextField` in a rounded fill; date chip: `CapsuleButton` (fill; accent when a date is set).
   - Calendar: `rung 1 — NSDatePicker` (graphical) in a cascade panel.
   - To-do row: `new (rung 7) — TodoRowView`. One line, 26pt: checkbox (`rung 1 — NSButton` checkbox look) · title (truncates) · date pill. Reason: no kit row has a trailing pill.
@@ -63,8 +63,8 @@ The user's words, in order (Vietnamese verbatim, with an English translation):
 
   - Pill text: `Today`, `Tomorrow`, the weekday within a week, `Wkd D` beyond. Pill fill is the color at 16–22% with the color as text (`systemYellow` text uses a darker ink in light mode).
   - Ticked To-do: strikethrough, then leaves the list after ~0.45 s; Undo lives in History.
-  - Empty tab: `✓ You're all caught up`, with the field still shown.
-- **Type & color:** row title 14pt; pill 11.5pt semibold, 8pt radius; segmented 12pt medium. On a selected row the pill turns 22% white with white text.
+  - Empty tab: `checkmark.circle` + `You're all caught up` in the lead column, with the field still shown.
+- **Type & color:** row title 14pt; pill 11.5pt semibold, 8pt radius; filter tabs 12pt medium (selected semibold). On a selected row the pill turns 22% white with white text.
 - **A11y:** status is never color alone. VoiceOver reads the pill as "Overdue, Thursday 5 November", "Due today", "Due soon, Sunday 8 November", "Due later, Friday 13 November", "No due date". The checkbox reads "Mark done". The filter is a tab group; the field is in the Tab order before the list.
 
 ## Amendments
@@ -76,3 +76,4 @@ Decided during review, binding on the spec and design:
 3. **Decide rows are compact.** One line each; answer buttons only on hover or focus; no tinted card, no countdown.
 4. **A to-do's status is the color of its date pill**, with no separate badge. This extends the 2026-11-01 rule that semantic color is only the 7pt dot: the date pill may also carry `systemRed`, `systemOrange`, `systemYellow` and `systemBlue`. Blue on a date pill means "due later"; blue on a dot still means review or decision.
 5. **The Add a to-do field lives in the submenu**, not on level 0.
+6. **Polish after first use (2026-11-09).** The user found the shipped menu rough: "the button switch, the input to do and duplicated the all catch up … we can be remove the status you're all caught up". So: level 0 drops `✓ You're all caught up` (the submenu's empty list already says it); the submenu drops its `Needs you N` header (the row that opens it names it and shows the count); the segmented control becomes left-aligned capsule tabs whose counts show only above zero; the field and date chip become one 30pt rounded control with a `+` lead, a `calendar` icon on the chip and an accent border on focus; `History` and `Clear updates` get lead icons so every row's text starts in one column.

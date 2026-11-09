@@ -18,6 +18,8 @@ struct TodoRowView: View {
     var body: some View {
         HStack(spacing: 6) {
             TodoCheckbox(struck: struck, action: onTick)
+                .fixedSize()
+                .frame(width: 20, height: 20)
                 .accessibilityLabel(NeedsYouText.checkboxSpoken)
             Text(row.title)
                 .font(.system(size: 14))
