@@ -32,6 +32,41 @@ struct NeedsYouListTests {
         #expect(NeedsYouList.drawnIds(rowFrames: frames, viewport: viewport) == [1, 2])
     }
 
+    @Test func retry_on_a_failed_secondary_choice_sends_the_secondary_request() {
+        #expect(
+            NeedsYouList.answerRequest(
+                primary: true,
+                failedChoice: "secondary",
+                primaryRequest: "primary-json",
+                secondaryRequest: "secondary-json"
+            ) == "secondary-json"
+        )
+        #expect(
+            NeedsYouList.answerRequest(
+                primary: true,
+                failedChoice: "primary",
+                primaryRequest: "primary-json",
+                secondaryRequest: "secondary-json"
+            ) == "primary-json"
+        )
+        #expect(
+            NeedsYouList.answerRequest(
+                primary: true,
+                failedChoice: nil,
+                primaryRequest: "primary-json",
+                secondaryRequest: "secondary-json"
+            ) == "primary-json"
+        )
+        #expect(
+            NeedsYouList.answerRequest(
+                primary: false,
+                failedChoice: "secondary",
+                primaryRequest: "primary-json",
+                secondaryRequest: "secondary-json"
+            ) == "secondary-json"
+        )
+    }
+
     @Test func testDecideKeys() {
         #expect(DecideKey.from(keyCode: 36, modifiers: []) == .primary)
         #expect(DecideKey.from(keyCode: 76, modifiers: []) == .primary)

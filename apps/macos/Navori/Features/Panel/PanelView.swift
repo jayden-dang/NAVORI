@@ -75,6 +75,9 @@ struct PanelView: View {
         if let unclean = store.uncleanExit {
             Banner(style: .warning, title: "Navori quit unexpectedly last time", message: unclean)
         }
+        if let error = store.needsYouActionError {
+            Banner(style: .error, title: "Needs you", message: error)
+        }
         if let problem = store.configProblem {
             Banner(style: .warning, title: problem.title, message: problem.message)
         }

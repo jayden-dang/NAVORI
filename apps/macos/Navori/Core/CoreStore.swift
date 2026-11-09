@@ -668,13 +668,16 @@ struct NeedsYouDecideRow: Identifiable, Equatable {
     }
 
     func answerRequest(primary wantsPrimary: Bool) -> String {
-        if wantsPrimary {
-            if case let .failed(choice: choice, error: _) = state, choice == "secondary" {
-                return secondary.answerRequest
-            }
-            return primary.answerRequest
-        }
-        return secondary.answerRequest
+        let failedChoice: String? = {
+            if case let .failed(choice, _) = state { return choice }
+            return nil
+        }()
+        return NeedsYouList.answerRequest(
+            primary: wantsPrimary,
+            failedChoice: failedChoice,
+            primaryRequest: primary.answerRequest,
+            secondaryRequest: secondary.answerRequest
+        )
     }
 }
 

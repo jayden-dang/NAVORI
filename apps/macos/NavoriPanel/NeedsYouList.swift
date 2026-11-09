@@ -47,4 +47,17 @@ public enum NeedsYouList {
             frame.intersects(viewport) ? id : nil
         })
     }
+
+    /// Retry on a failed Decide row re-sends the choice that failed, even when the left button is primary.
+    public static func answerRequest(
+        primary wantsPrimary: Bool,
+        failedChoice: String?,
+        primaryRequest: String,
+        secondaryRequest: String
+    ) -> String {
+        if wantsPrimary, failedChoice == "secondary" {
+            return secondaryRequest
+        }
+        return wantsPrimary ? primaryRequest : secondaryRequest
+    }
 }
