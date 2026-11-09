@@ -6,6 +6,7 @@ mod common;
 use common::{harness, today};
 use navori_kernel::{DispatchError, ModuleAction};
 use navori_mod_todo::TodoAction;
+use serde_json::json;
 
 #[tokio::test(start_paused = true)]
 async fn adding_a_todo_shows_it_at_once() {
@@ -90,6 +91,50 @@ async fn todos_never_turn_on_attention() {
 
     h.add("Quiet", Some(today())).await.unwrap();
     assert!(!h.kernel.tray(None).attention);
+
+    h.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn ticking_an_unknown_id_is_refused() {
+    let h = harness();
+    h.idle().await;
+
+    let err = h
+        .kernel
+        .dispatch(navori_kernel::Envelope {
+            module: "todo".into(),
+            action: json!({ "tick": { "id": 99 } }),
+        })
+        .await
+        .expect_err("unknown id");
+    assert!(matches!(err, DispatchError::Action(_)), "{err:?}");
+    assert!(
+        h.state()["open"].as_array().unwrap().is_empty(),
+        "unknown tick must not create a To-do"
+    );
+
+    h.shutdown().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn undoing_an_open_todo_is_refused() {
+    let h = harness();
+    h.idle().await;
+
+    let reply = h.add("Still open", None).await.unwrap();
+    let id = reply["id"].as_i64().unwrap();
+
+    let err = h
+        .kernel
+        .dispatch(navori_kernel::Envelope {
+            module: "todo".into(),
+            action: json!({ "undo": { "id": id } }),
+        })
+        .await
+        .expect_err("open To-do has nothing to undo");
+    assert!(matches!(err, DispatchError::Action(_)), "{err:?}");
+    assert_eq!(h.state()["open"].as_array().unwrap().len(), 1);
 
     h.shutdown().await;
 }

@@ -89,24 +89,32 @@ pub fn into_open_todos(
 
 pub fn mark_done(store: &Store, id: i64, done_at_ms: i64) -> Result<(), String> {
     store.with_conn(|conn| {
-        conn.execute(
-            "UPDATE todo_items SET done_at_ms = ?1
-             WHERE id = ?2 AND done_at_ms IS NULL",
-            params![done_at_ms, id],
-        )
-        .map_err(|e| e.to_string())?;
+        let changed = conn
+            .execute(
+                "UPDATE todo_items SET done_at_ms = ?1
+                 WHERE id = ?2 AND done_at_ms IS NULL",
+                params![done_at_ms, id],
+            )
+            .map_err(|e| e.to_string())?;
+        if changed != 1 {
+            return Err("no open To-do with that id".into());
+        }
         Ok(())
     })
 }
 
 pub fn clear_done(store: &Store, id: i64) -> Result<(), String> {
     store.with_conn(|conn| {
-        conn.execute(
-            "UPDATE todo_items SET done_at_ms = NULL
-             WHERE id = ?1 AND done_at_ms IS NOT NULL",
-            params![id],
-        )
-        .map_err(|e| e.to_string())?;
+        let changed = conn
+            .execute(
+                "UPDATE todo_items SET done_at_ms = NULL
+                 WHERE id = ?1 AND done_at_ms IS NOT NULL",
+                params![id],
+            )
+            .map_err(|e| e.to_string())?;
+        if changed != 1 {
+            return Err("no ticked To-do with that id".into());
+        }
         Ok(())
     })
 }
