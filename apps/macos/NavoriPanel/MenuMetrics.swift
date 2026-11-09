@@ -31,15 +31,20 @@ public enum MenuHitMap {
         at point: CGPoint,
         width: CGFloat,
         tree: [CascadeNode],
-        decideButtons: [String: DecideButtonFrames] = [:]
+        decideButtons: [String: DecideButtonFrames] = [:],
+        caughtUp: Bool = false
     ) -> MenuHit? {
         guard point.x >= MenuMetrics.pad, point.x <= width - MenuMetrics.pad else { return nil }
         let row = MenuMetrics.rowHeight
         var y = MenuMetrics.pad
         for id in tree.map(\.id).reversed() {
             if id == "core" { y += MenuMetrics.divider }
+            if id == "needs" { y += MenuMetrics.divider }
             let band = y ..< (y + row)
-            defer { y += row }
+            defer {
+                y += row
+                if id == "needs", caughtUp { y += row }
+            }
             guard band.contains(point.y) else { continue }
             if id == "running" { return nil }
             if let buttons = decideButtons[id] {

@@ -37,7 +37,11 @@ final class StatusBarController: NSObject {
                     return AnyView(EmptyView())
                 }
             },
-            activate: { [weak self] id in self?.activate(id) }
+            activate: { [weak self] id in self?.activate(id) },
+            caughtUp: { [weak self] in
+                guard let needs = self?.store.needsYou, needs.down != true else { return false }
+                return needs.allCaughtUp
+            }
         )
         let panel = StatusPanel(content: content, onVisibility: { [weak self] visible in
             self?.store.setPanelVisible(visible)

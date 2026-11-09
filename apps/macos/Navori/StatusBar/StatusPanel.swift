@@ -312,7 +312,8 @@ final class StatusPanel: NSPanel {
             at: windowPoint,
             width: frame.width,
             tree: content.tree(),
-            decideButtons: cascade.decideButtonFrames()
+            decideButtons: cascade.decideButtonFrames(),
+            caughtUp: content.caughtUp()
         ) else { return }
         switch hit {
         case let .row(id):
