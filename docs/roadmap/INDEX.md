@@ -25,7 +25,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 
 ## Focus
 
-**Now:** MILE-2, MILE-4, ROAD-37
+**Now:** MILE-2, ROAD-37
 **Next:** MILE-9, ROAD-12, ROAD-11, ROAD-38, ROAD-19, ROAD-20, ROAD-21, ROAD-15, ROAD-16
 
 | ID | Milestone | Outcome | Depends-on | Commitment |
@@ -33,7 +33,7 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 | MILE-1 | Foundation (R0) | The user installs Navori with one command, it starts at login as a menubar icon, and `navori doctor` reports every check green. | none | Closed |
 | MILE-2 | Awake (R1) | The Mac stays awake while any Claude Code, Codex or Grok session is working and goes back to normal sleep after they stop, with no manual action. | MILE-1 | Committed |
 | MILE-3 | AI Assistant (R2) | The user asks Navori AI anything from the menubar, a hotkey or the terminal with any configured model, and answers its Decisions in Needs you before anything destructive runs. | MILE-2 | Planned |
-| MILE-4 | Ports (R3) | The user sees every listening port grouped by project, worktree and harness, and frees a whole group in at most 2 actions. | MILE-2 | Committed |
+| MILE-4 | Ports (R3) | The user sees every listening port grouped by project, worktree and harness, and frees a whole group in at most 2 actions. | MILE-2 | Closed |
 | MILE-5 | GitHub (R4) | The user sees pull requests needing review, failing checks and conflicts counted in the menubar, and opens, approves or merges them from the submenu. | MILE-3 | Planned |
 | MILE-6 | Proactive (R5) | Navori AI tells the user on its own, within a daily budget and quiet hours, when CI fails, a review arrives, an Agent session finishes or a port conflicts. | MILE-4, MILE-5 | Planned |
 | MILE-7 | MCP (R6) | Claude Code, Codex and Grok call Navori's tools over MCP under the same approval policy, and Navori AI uses tools from external MCP servers. | MILE-3 | Planned |
@@ -107,8 +107,8 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 - **ROAD-17** port-discovery — After: none — Surfaces: `modules/ports/`, `crates/procs/`, `crates/macos/`
 - **ROAD-18** ports-panel-and-stop — After: ROAD-17 — Surfaces: `modules/ports/`, `apps/macos/Navori/Features/`, `apps/macos/NavoriPanel/`
 **Depends-on:** MILE-2
-**Commitment:** Committed
-**Closed:** None
+**Commitment:** Closed 2026-11-14
+**Closed:** e6c0258ef0444ff219a9888e6156f226496133d4 (assessment: `assessments/MILE-4.md` Assessment 1, achieved)
 **Deferred:** None
 **Blockers:** None
 
