@@ -25,13 +25,13 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 
 ## Focus
 
-**Now:** MILE-2, ROAD-37
+**Now:** ROAD-37
 **Next:** MILE-9, ROAD-12, ROAD-11, ROAD-38, ROAD-19, ROAD-20, ROAD-21, ROAD-15, ROAD-16
 
 | ID | Milestone | Outcome | Depends-on | Commitment |
 |---|---|---|---|---|
 | MILE-1 | Foundation (R0) | The user installs Navori with one command, it starts at login as a menubar icon, and `navori doctor` reports every check green. | none | Closed |
-| MILE-2 | Awake (R1) | The Mac stays awake while any Claude Code, Codex or Grok session is working and goes back to normal sleep after they stop, with no manual action. | MILE-1 | Committed |
+| MILE-2 | Awake (R1) | The Mac stays awake while any Claude Code, Codex or Grok session is working and goes back to normal sleep after they stop, with no manual action. | MILE-1 | Closed |
 | MILE-3 | AI Assistant (R2) | The user asks Navori AI anything from the menubar, a hotkey or the terminal with any configured model, and answers its Decisions in Needs you before anything destructive runs. | MILE-2 | Planned |
 | MILE-4 | Ports (R3) | The user sees every listening port grouped by project, worktree and harness, and frees a whole group in at most 2 actions. | MILE-2 | Closed |
 | MILE-5 | GitHub (R4) | The user sees pull requests needing review, failing checks and conflicts counted in the menubar, and opens, approves or merges them from the submenu. | MILE-3 | Planned |
@@ -70,8 +70,8 @@ Release names R0–R6 in docs/ARCHITECTURE.md map to MILE-1 … MILE-7.
 - **ROAD-35** status-icon-states — After: ROAD-7, ROAD-8, ROAD-34 — Surfaces: `modules/awake/`, `crates/kernel/`, `crates/protocol/`, `crates/ffi/`, `apps/cli/`, `apps/macos/Navori/Core/`, `apps/macos/Navori/StatusBar/`, `apps/macos/NavoriPanel/`, `xtask/assets/`
 - **ROAD-41** awake-lid-and-last-sleep — After: ROAD-8, ROAD-18 — Surfaces: `modules/awake/`, `crates/macos/`, `crates/ffi/`, `apps/macos/Navori/`, `apps/macos/NavoriPanel/`, `apps/cli/` — Card: [ROAD-41](roads/ROAD-41.md)
 **Depends-on:** MILE-1
-**Commitment:** Committed
-**Closed:** None
+**Commitment:** Closed 2026-11-14
+**Closed:** a44b083515bbf33a71879d69f2ee6db02365d361 (assessment: `assessments/MILE-2.md` Assessment 1, achieved)
 **Deferred:** None
 **Blockers:** None
 

@@ -643,7 +643,7 @@ Amendment after delivery (operator decision, 2026-11-05, tier 1). The Core row w
 - [x] **Step 1: Write failing tests** for the visibility rule and for a root tree that gains or loses `core`. Run: `swift test --arch arm64 --package-path apps/macos --filter CoreRowStateTests` — expect: `isVisible` does not exist.
 - [x] **Step 2: Implement** the rule, draw the row and build the Cascade node only when it is visible, and replace the tree when visibility changes.
 - [x] **Step 3: Run** `cargo xtask ci` — expect: pass.
-- [ ] **Step 4: Check by hand** (a human): a healthy release-profile menu shows no Core row and keeps the separator before `Settings…`; the row appears when a module fails or the Core is down, and disappears on recovery with the menu open and no crash.
+- [x] **Step 4: Check by hand** (a human): a healthy release-profile menu shows no Core row and keeps the separator before `Settings…`; the row appears when a module fails or the Core is down, and disappears on recovery with the menu open and no crash. **Ticked 2026-11-14:** operator-confirmed (stated in session; no recording kept).
 - [x] **Step 5: Commit** `git commit -m "feat(menu): show the Core row only when the Core needs attention"`
 
 _Requirements: MENU-1.2, MENU-3.1, MENU-3.7, MENU-3.8, MENU-3.11, MENU-3.12, MENU-3.13_
