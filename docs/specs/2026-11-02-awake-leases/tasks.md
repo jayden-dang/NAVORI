@@ -608,7 +608,7 @@ Amendment after delivery, from `ui-brief.md`.
 - [x] **Step 2: Implement** both states and the view from `design.md` `## UI design`.
 - [x] **Step 3: Update** the menubar brief, `docs/features/awake.md` and this spec to what shipped.
 - [x] **Step 4: Verify** `cargo xtask ci` — expect: pass. `grep -nE "will sleep|Pause|sleep now|another app|other app"` over the three Awake UI files — expect: no match.
-- [ ] **Step 5: Verify by hand** on `cargo xtask run`: ↑ and ↓ reach all four commands, pressing `Display on` twice ends its Lease, VoiceOver reads each row as one sentence, and each state in `design.md` shows.
+- [x] **Step 5: Verify by hand** on `cargo xtask run`: ↑ and ↓ reach all four commands, pressing `Display on` twice ends its Lease, VoiceOver reads each row as one sentence, and each state in `design.md` shows. **Ticked 2026-11-14:** operator-confirmed (stated in session; no recording kept).
 - [x] **Step 6: Commit** `git commit -m "feat(menu): group Awake's Holding list by project with Harness marks"`
 
 _Requirements: AWAKE-11.11, AWAKE-11.12, AWAKE-11.13, AWAKE-11.14, AWAKE-11.15, AWAKE-11.17, AWAKE-11.18_
@@ -633,7 +633,7 @@ Amendment after delivery, from `ui-brief.md` amendment 6.
 - [x] **Step 2: Implement** the dot rule and `spokenValue`; the Awake row passes no `value`.
 - [x] **Step 3: Update** the design, both briefs and `docs/features/awake.md`.
 - [x] **Step 4: Verify** `cargo xtask ci` — expect: pass.
-- [ ] **Step 5: Verify by hand** on `cargo xtask run`: the row shows a green dot with a Lease and nothing after `Release all`; VoiceOver reads the state in words.
+- [x] **Step 5: Verify by hand** on `cargo xtask run`: the row shows a green dot with a Lease and nothing after `Release all`; VoiceOver reads the state in words. **Ticked 2026-11-14:** operator-confirmed (stated in session; no recording kept).
 - [x] **Step 6: Commit** `git commit -m "feat(menu): show the Awake row as a dot"`
 
 _Requirements: AWAKE-11.2, AWAKE-11.3, AWAKE-11.4, AWAKE-11.17, AWAKE-11.18, AWAKE-11.21_
@@ -659,7 +659,7 @@ Amendment after delivery, from stories 14 and 15 and `ui-brief.md` amendment 7.
 - [x] **Step 2: Implement** the Module, FFI, CLI and Shell changes from `design.md` Decisions 15–20.
 - [x] **Step 3: Update** the design, both briefs and the feature docs.
 - [x] **Step 4: Verify** `cargo xtask ci` — expect: pass.
-- [ ] **Step 5: Verify by hand** on `cargo xtask run`: the third level opens and each length checks and shows `until <time>`; pressing a check ends it; `Tracking agents` off lets `pmset -g assertions` drop a session's hold with a real agent running, and on brings it back at once; VoiceOver reads each row.
+- [x] **Step 5: Verify by hand** on `cargo xtask run`: the third level opens and each length checks and shows `until <time>`; pressing a check ends it; `Tracking agents` off lets `pmset -g assertions` drop a session's hold with a real agent running, and on brings it back at once; VoiceOver reads each row. **Ticked 2026-11-14:** operator-confirmed (stated in session; no recording kept).
 - [x] **Step 6: Commit** `git commit -m "feat(awake): add Keep awake lengths and a Tracking agents toggle"`
 
 _Requirements: AWAKE-14.1, AWAKE-14.2, AWAKE-14.3, AWAKE-14.4, AWAKE-14.5, AWAKE-14.6, AWAKE-14.7, AWAKE-14.8, AWAKE-14.9, AWAKE-14.10, AWAKE-14.11, AWAKE-15.1, AWAKE-15.2, AWAKE-15.3, AWAKE-15.4, AWAKE-15.5, AWAKE-15.6, AWAKE-15.7, AWAKE-15.8, AWAKE-15.9, AWAKE-15.10, AWAKE-15.11, AWAKE-15.12, AWAKE-15.13, AWAKE-15.14, AWAKE-15.15, AWAKE-15.16_
